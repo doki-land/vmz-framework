@@ -1,7 +1,7 @@
 //! Rewrite ESM module specifiers with Oak CST span patches.
 
 use oak_core::{Lexer, NoLexerCache, SourceText};
-use oak_typescript::ast::{Expression, ExpressionKind, Statement};
+use oak_typescript::ast::{Expression, ExpressionKind, ModuleSpecifier, Statement};
 use oak_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
 use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
@@ -62,11 +62,11 @@ fn collect_stmt_spec_patches(
 ) {
     match stmt {
         Statement::ImportDeclaration(imp) => {
-            push_spec_patch(source, imp.span.start, imp.span.end, &imp.module_specifier, map, out);
+            push_specifier_patch(source, &imp.module_specifier, map, out);
         }
         Statement::ExportDeclaration(exp) => {
             if let Some(spec) = &exp.source {
-                push_spec_patch(source, exp.span.start, exp.span.end, spec, map, out);
+                push_specifier_patch(source, spec, map, out);
             }
             if let Some(inner) = exp.declaration.as_deref() {
                 collect_stmt_spec_patches(source, inner, map, out);
@@ -231,22 +231,24 @@ fn push_string_spec_patch(
     }
 }
 
-fn push_spec_patch(
+/// Patch a declaration-path specifier with its AST span (quotes included).
+fn push_specifier_patch(
     source: &str,
-    span_start: usize,
-    span_end: usize,
-    spec: &str,
+    spec: &ModuleSpecifier,
     map: &mut dyn FnMut(&str) -> Option<String>,
     out: &mut Vec<(usize, usize, String)>,
 ) {
-    let Some(next) = map(spec) else {
+    let Some(next) = map(&spec.value) else {
         return;
     };
-    let Some((start, end, quote)) = find_specifier_string(source, span_start, span_end, spec)
-    else {
+    let Some(quote) = source.as_bytes().get(spec.span.start).copied() else {
         return;
     };
-    out.push((start, end, format!("{quote}{next}{quote}")));
+    let quote = quote as char;
+    if quote != '"' && quote != '\'' {
+        return;
+    }
+    out.push((spec.span.start, spec.span.end, format!("{quote}{next}{quote}")));
 }
 
 /// Locate the string-literal token that carries `spec` inside a declaration span.

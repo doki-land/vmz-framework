@@ -8,21 +8,26 @@
 //!   CallExpression 的 span 仍从 `import` 起算，与 callee 的 span 之间
 //!   留下至少 `import(` 长度的间隙。
 //! - `import.meta` 在语句头同空指纹，后随对象为 `meta` 的成员表达式。
-//! - 静态 import/export 的说明符不在 AST 中，只有说明符文本；
-//!   span 由语句区域内反查最后一次引号配对得到。
+//! - 静态 import/export 的说明符在 AST 中带原文与含引号的字面量 span。
+//! - 一元运算符在关键字后带空白时，`operator` 被 trivia 覆盖为空格，
+//!   与 `typeof`/`void`/`!`/`-` 完全同形，无法区分（见 `ModuleFlags::has_tla`）。
+//! - 多变量声明只保留第一个 declarator；解构声明的 `name` 是原文文本；
+//!   含初始值的 enum、`for…of` 解构、`namespace` 体会被误建成残缺语句；
+//!   模板字符串的插值表达式整体丢失。以上形态只按保守效果记录并给
+//!   `statement_fact_incomplete` 诊断，不做猜测性还原。
 
 use vmz_oak_frontend_adapter::{
     OakFrontendDiagnostic, ScriptRole, ScriptShellInput, parse_script_ast,
 };
 
 use oak_typescript::ast::{
-    ClassMember, ExportDeclaration, Expression, ExpressionKind, ImportSpecifier, ObjectProperty,
-    Statement,
+    ClassMember, ExportDeclaration, ExportSpecifier, Expression, ExpressionKind,
+    ExpressionStatement, ImportSpecifier, ObjectProperty, Statement, VariableKind,
 };
 
 use super::record::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
-    ModuleRecord, StatementFact,
+    ModuleRecord, StatementEffect, StatementFact,
 };
 use crate::diag::PackDiagnostic;
 
@@ -32,6 +37,9 @@ const PARSE_FAILED: &str = "vmz::pack::module::parse_failed";
 const DYNAMIC_IMPORT_UNRESOLVED: &str = "vmz::pack::module::dynamic_import_unresolved";
 /// import 形态无法提取模块说明符（如 `import.meta`、残缺语句）。
 const IMPORT_WITHOUT_SPECIFIER: &str = "vmz::pack::module::import_without_specifier";
+/// Oak 无法给出完整语句事实（多 declarator、解构、误解析形态等），
+/// 链接层必须按副作用保守保留。
+const STATEMENT_FACT_INCOMPLETE: &str = "vmz::pack::module::statement_fact_incomplete";
 /// 表达式位置动态 import 的最小 span 间隙：`import(` 的字节数。
 const DYNAMIC_CALL_GAP: usize = "import(".len();
 
@@ -55,6 +63,7 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
     };
     let mut collector = Collector::new(path, source);
     collector.walk_stmts(&root.statements);
+    collector.record_top(&root.statements);
     Ok(collector.record)
 }
 
@@ -91,14 +100,14 @@ fn range(span: core::range::Range<usize>) -> (usize, usize) {
 
 /// 语句头 `import(…)` / `import.meta…` 空指纹：说明符与绑定全空。
 fn is_empty_import(statement: &Statement) -> bool {
-    matches!(statement, Statement::ImportDeclaration(d) if d.specifiers.is_empty() && d.module_specifier.is_empty())
+    matches!(statement, Statement::ImportDeclaration(d) if d.specifiers.is_empty() && d.module_specifier.value.is_empty())
 }
 
 /// 单语句体位置的空指纹（`if`/`while`/`for` 的无花括号体）。
 fn hole_in_single_body(statement: &Statement) -> Option<(usize, usize)> {
     match statement {
         Statement::ImportDeclaration(d)
-            if d.specifiers.is_empty() && d.module_specifier.is_empty() =>
+            if d.specifiers.is_empty() && d.module_specifier.value.is_empty() =>
         {
             Some(range(d.span.clone()))
         }
@@ -110,7 +119,7 @@ fn hole_in_single_body(statement: &Statement) -> Option<(usize, usize)> {
 fn fingerprint_hole(statement: &Statement) -> Option<(usize, usize)> {
     match statement {
         Statement::ImportDeclaration(d)
-            if d.specifiers.is_empty() && d.module_specifier.is_empty() =>
+            if d.specifiers.is_empty() && d.module_specifier.value.is_empty() =>
         {
             Some(range(d.span.clone()))
         }
@@ -241,27 +250,249 @@ impl<'a> Collector<'a> {
         });
     }
 
-    fn push_statement(&mut self, statement: &Statement) {
+    /// 顶层语句 → [`StatementFact`]：只记模块顶层，嵌套声明并入所在顶层语句。
+    /// 与动态 import 空指纹配对的表达式语句不成事实（其效果由动态边承载）。
+    fn record_top(&mut self, statements: &[Statement]) {
+        for (index, statement) in statements.iter().enumerate() {
+            if index > 0
+                && matches!(statement, Statement::ExpressionStatement(_))
+                && fingerprint_hole(&statements[index - 1]).is_some()
+            {
+                continue;
+            }
+            match statement {
+                Statement::ImportDeclaration(_) => {}
+                Statement::ExportDeclaration(export) => {
+                    let Some(declaration) = export.declaration.as_deref() else {
+                        continue;
+                    };
+                    if export.is_default()
+                        && matches!(declaration, Statement::ExpressionStatement(_))
+                    {
+                        // `export default <表达式>`：事实 span 取整条 export 语句，
+                        // 与 `ExportFact::Default { local: None }` 的 span 对齐。
+                        self.push_fact(declaration, range(export.span.clone()));
+                    } else {
+                        self.push_fact(declaration, range(declaration.span()));
+                    }
+                }
+                other => self.push_fact(other, range(other.span())),
+            }
+        }
+    }
+
+    fn push_fact(&mut self, statement: &Statement, span: (usize, usize)) {
+        let (effect, incomplete) = self.statement_effect(statement);
+        if incomplete {
+            self.diagnostic(
+                STATEMENT_FACT_INCOMPLETE,
+                "Oak 无法给出该语句的完整事实，链接层按副作用保守保留",
+                span,
+            );
+        }
+        let mut referenced_names = Vec::new();
+        collect_refs_statement(statement, &mut referenced_names);
         self.record.statements.push(StatementFact {
-            span: range(statement.span()),
+            span,
             declared_names: declared_names(statement),
+            referenced_names,
+            effect,
         });
+    }
+
+    /// 语句效果分类：判定不了即非纯（保守）。
+    fn statement_effect(&self, statement: &Statement) -> (StatementEffect, bool) {
+        match statement {
+            Statement::Interface(_) | Statement::TypeAlias(_) => (StatementEffect::Pure, false),
+            Statement::VariableDeclaration(d) => {
+                if d.is_declare() {
+                    return (StatementEffect::Pure, false);
+                }
+                let trimmed = d.name.trim_start();
+                if trimmed.starts_with('{') || trimmed.starts_with('[') {
+                    return (StatementEffect::SideEffect, true);
+                }
+                if self.has_extra_declarator(&d.span, d.value.as_ref()) {
+                    return (StatementEffect::SideEffect, true);
+                }
+                match &d.value {
+                    None => {
+                        if matches!(d.kind, VariableKind::Const) {
+                            (StatementEffect::SideEffect, true)
+                        } else {
+                            (StatementEffect::Init, false)
+                        }
+                    }
+                    Some(value) => {
+                        if !expr_pure(value) {
+                            (StatementEffect::SideEffect, false)
+                        } else if matches!(d.kind, VariableKind::Const) {
+                            (StatementEffect::Pure, false)
+                        } else {
+                            (StatementEffect::Init, false)
+                        }
+                    }
+                }
+            }
+            Statement::FunctionDeclaration(d) => {
+                if d.is_declare() {
+                    (StatementEffect::Pure, false)
+                } else if !d.decorators.is_empty() {
+                    (StatementEffect::SideEffect, false)
+                } else {
+                    (StatementEffect::Pure, d.params.iter().any(|p| p.name.is_empty()))
+                }
+            }
+            Statement::ClassDeclaration(d) => {
+                if d.is_declare() {
+                    return (StatementEffect::Pure, false);
+                }
+                let mut incomplete = false;
+                let mut side_effect = !d.decorators.is_empty();
+                for member in &d.body {
+                    match member {
+                        ClassMember::Property { decorators, name, initializer, .. } => {
+                            if !decorators.is_empty() {
+                                side_effect = true;
+                            }
+                            if name.is_empty() {
+                                incomplete = true;
+                                side_effect = true;
+                            }
+                            if initializer.as_ref().is_some_and(|v| !expr_pure(v)) {
+                                side_effect = true;
+                            }
+                        }
+                        ClassMember::Method { decorators, name, .. } => {
+                            if !decorators.is_empty() {
+                                side_effect = true;
+                            }
+                            if name.is_empty() {
+                                incomplete = true;
+                                side_effect = true;
+                            }
+                        }
+                    }
+                }
+                if side_effect {
+                    (StatementEffect::SideEffect, incomplete)
+                } else {
+                    (StatementEffect::Init, incomplete)
+                }
+            }
+            Statement::Enum(d) => {
+                if d.is_declare() {
+                    return (StatementEffect::Pure, false);
+                }
+                let mut incomplete = false;
+                let mut side_effect = !d.decorators.is_empty();
+                if d.name.is_empty() {
+                    incomplete = true;
+                    side_effect = true;
+                }
+                for member in &d.members {
+                    if member.name.is_empty() {
+                        incomplete = true;
+                        side_effect = true;
+                    }
+                    if member.initializer.as_ref().is_some_and(|v| !expr_pure(v)) {
+                        side_effect = true;
+                    }
+                }
+                if side_effect {
+                    (StatementEffect::SideEffect, incomplete)
+                } else {
+                    (StatementEffect::Init, false)
+                }
+            }
+            Statement::Namespace(d) => {
+                if d.is_declare() {
+                    (StatementEffect::Pure, false)
+                } else if !d.decorators.is_empty() {
+                    (StatementEffect::SideEffect, false)
+                } else {
+                    self.combine_effects(&d.body)
+                }
+            }
+            Statement::ExpressionStatement(s) => {
+                if !s.decorators.is_empty() {
+                    return (StatementEffect::SideEffect, false);
+                }
+                if self.expression_statement_misparsed(s) {
+                    (StatementEffect::SideEffect, true)
+                } else if expr_pure(&s.expression) {
+                    (StatementEffect::Pure, false)
+                } else {
+                    (StatementEffect::SideEffect, false)
+                }
+            }
+            Statement::BlockStatement(s) => self.combine_effects(&s.statements),
+            // 其余控制流语句：顶层出现即按副作用保守处理。
+            _ => (StatementEffect::SideEffect, false),
+        }
+    }
+
+    fn combine_effects(&self, statements: &[Statement]) -> (StatementEffect, bool) {
+        let mut effect = StatementEffect::Pure;
+        let mut incomplete = false;
+        for statement in statements {
+            let (inner, inner_incomplete) = self.statement_effect(statement);
+            incomplete |= inner_incomplete;
+            effect = match (effect, inner) {
+                (StatementEffect::SideEffect, _) | (_, StatementEffect::SideEffect) => {
+                    StatementEffect::SideEffect
+                }
+                (StatementEffect::Init, _) | (_, StatementEffect::Init) => StatementEffect::Init,
+                _ => StatementEffect::Pure,
+            };
+        }
+        (effect, incomplete)
+    }
+
+    /// 多变量声明检测：Oak 只保留第一个 declarator，初值之后到语句末尾
+    /// （去尾分号与空白）的原文里还含逗号即判定为多 declarator。
+    fn has_extra_declarator(
+        &self,
+        statement_span: &core::range::Range<usize>,
+        value: Option<&Expression>,
+    ) -> bool {
+        let bytes = self.source.as_bytes();
+        let start = value
+            .map(|v| v.span.end.min(bytes.len()))
+            .unwrap_or(statement_span.start.min(bytes.len()));
+        let mut end = statement_span.end.min(bytes.len());
+        while end > start && (bytes[end - 1] == b';' || bytes[end - 1].is_ascii_whitespace()) {
+            end -= 1;
+        }
+        bytes[start..end].contains(&b',')
+    }
+
+    /// Oak 误解析指纹：表达式语句的表达式 span 与语句 span（去尾分号/空白）
+    /// 不重合，即语句里还有表达式未覆盖的原文（`for (…)`、`namespace` 等
+    /// 被误建成残缺标识符/成员表达式的形态）。
+    fn expression_statement_misparsed(&self, statement: &ExpressionStatement) -> bool {
+        let bytes = self.source.as_bytes();
+        let mut end = statement.span.end.min(bytes.len());
+        while end > statement.span.start
+            && (bytes[end - 1] == b';' || bytes[end - 1].is_ascii_whitespace())
+        {
+            end -= 1;
+        }
+        !(statement.expression.span.start == statement.span.start
+            && statement.expression.span.end == end)
     }
 
     fn walk_stmt(&mut self, statement: &Statement) {
         match statement {
             Statement::VariableDeclaration(d) => {
-                self.push_statement(statement);
                 if let Some(value) = &d.value {
                     self.walk_expr(value);
                 }
             }
             Statement::FunctionDeclaration(d) => {
-                self.push_statement(statement);
                 self.walk_stmts(&d.body);
             }
             Statement::ClassDeclaration(d) => {
-                self.push_statement(statement);
                 for member in &d.body {
                     match member {
                         ClassMember::Property { initializer, .. } => {
@@ -273,12 +504,9 @@ impl<'a> Collector<'a> {
                     }
                 }
             }
-            // 纯类型与枚举声明：只有声明事实，无可下钻的运行时语句。
-            Statement::Interface(_) | Statement::TypeAlias(_) | Statement::Enum(_) => {
-                self.push_statement(statement);
-            }
+            // 纯类型与枚举声明：无可下钻的运行时语句。
+            Statement::Interface(_) | Statement::TypeAlias(_) | Statement::Enum(_) => {}
             Statement::Namespace(d) => {
-                self.push_statement(statement);
                 self.walk_stmts(&d.body);
             }
             Statement::ExpressionStatement(s) => self.walk_expr(&s.expression),
@@ -296,19 +524,19 @@ impl<'a> Collector<'a> {
                     .specifiers
                     .iter()
                     .map(|specifier| match specifier {
-                        ImportSpecifier::Default(local) => ImportBinding {
+                        ImportSpecifier::Default { local, .. } => ImportBinding {
                             local: local.clone(),
                             imported: ImportedName::Default,
                             inline_type_only: false,
                             span: None,
                         },
-                        ImportSpecifier::Namespace(local) => ImportBinding {
+                        ImportSpecifier::Namespace { local, .. } => ImportBinding {
                             local: local.clone(),
                             imported: ImportedName::Namespace,
                             inline_type_only: false,
                             span: None,
                         },
-                        ImportSpecifier::Named { local, imported, type_modifier } => {
+                        ImportSpecifier::Named { local, imported, type_modifier, .. } => {
                             ImportBinding {
                                 local: local.clone(),
                                 imported: ImportedName::Name(imported.clone()),
@@ -319,9 +547,13 @@ impl<'a> Collector<'a> {
                     })
                     .collect();
                 let span = range(d.span.clone());
-                let specifier_span = self.scan_specifier(span, &d.module_specifier);
+                let specifier_span = if d.module_specifier.value.is_empty() {
+                    None
+                } else {
+                    Some(range(d.module_specifier.span.clone()))
+                };
                 self.record.imports.push(ImportFact {
-                    specifier: d.module_specifier.clone(),
+                    specifier: d.module_specifier.value.clone(),
                     specifier_span,
                     span,
                     kind,
@@ -427,34 +659,56 @@ impl<'a> Collector<'a> {
                 self.walk_stmt(declaration);
             }
             (None, Some(source)) => {
-                let source_span = self.scan_specifier(span, source);
+                let source_span =
+                    if source.value.is_empty() { None } else { Some(range(source.span.clone())) };
                 if export.specifiers.is_empty() {
-                    // `export * from '…'` 与 `export {} from '…'` 在 Oak AST 中同形。
+                    // `export {} from '…'`：无对外名字，仅来源模块被执行。
                     self.record.exports.push(ExportFact::ReexportAll {
-                        source: source.clone(),
+                        source: source.value.clone(),
                         source_span,
                         span,
                     });
                 } else {
                     for specifier in &export.specifiers {
-                        self.record.exports.push(ExportFact::ReexportNamed {
-                            source: source.clone(),
-                            source_span,
-                            local: specifier.local.clone(),
-                            exported: specifier.exported.clone(),
-                            type_only: type_only || specifier.is_inline_type_only(),
-                            span,
-                        });
+                        match specifier {
+                            ExportSpecifier::All { .. } => {
+                                self.record.exports.push(ExportFact::ReexportAll {
+                                    source: source.value.clone(),
+                                    source_span,
+                                    span,
+                                });
+                            }
+                            ExportSpecifier::Namespace { exported, .. } => {
+                                self.record.exports.push(ExportFact::ReexportNamespace {
+                                    source: source.value.clone(),
+                                    source_span,
+                                    namespace: exported.clone(),
+                                    type_only,
+                                    span,
+                                });
+                            }
+                            ExportSpecifier::Named { local, exported, .. } => {
+                                self.record.exports.push(ExportFact::ReexportNamed {
+                                    source: source.value.clone(),
+                                    source_span,
+                                    local: local.clone(),
+                                    exported: exported.clone(),
+                                    type_only: type_only || specifier.is_inline_type_only(),
+                                    span,
+                                });
+                            }
+                        }
                     }
                 }
             }
             (Some(declaration), Some(source)) => {
-                // Oak 实测该形态为 `export * as ns from '…'`：declaration 是标识符表达式语句。
-                let source_span = self.scan_specifier(span, source);
+                // 兼容形态：若 Oak 仍以 declaration 承载命名空间重导出，按标识符取名。
+                let source_span =
+                    if source.value.is_empty() { None } else { Some(range(source.span.clone())) };
                 if let Statement::ExpressionStatement(expression) = declaration.as_ref() {
                     if let ExpressionKind::Identifier(namespace) = &*expression.expression.kind {
                         self.record.exports.push(ExportFact::ReexportNamespace {
-                            source: source.clone(),
+                            source: source.value.clone(),
                             source_span,
                             namespace: namespace.clone(),
                             type_only,
@@ -465,12 +719,14 @@ impl<'a> Collector<'a> {
             }
             (None, None) => {
                 for specifier in &export.specifiers {
-                    self.record.exports.push(ExportFact::Local {
-                        local: specifier.local.clone(),
-                        exported: specifier.exported.clone(),
-                        type_only: type_only || specifier.is_inline_type_only(),
-                        span,
-                    });
+                    if let ExportSpecifier::Named { local, exported, .. } = specifier {
+                        self.record.exports.push(ExportFact::Local {
+                            local: local.clone(),
+                            exported: exported.clone(),
+                            type_only: type_only || specifier.is_inline_type_only(),
+                            span,
+                        });
+                    }
                 }
             }
         }
@@ -580,43 +836,267 @@ impl<'a> Collector<'a> {
             | ExpressionKind::JsxSelfClosingElement(_) => {}
         }
     }
+}
 
-    /// 在语句区域内反查说明符字面量 span（含引号）。
-    ///
-    /// 说明符是 import/export 语句的最后一个子句，因此从区域尾部向前
-    /// 逐个引号位置尝试配对，取内文等于 `specifier` 的最后一次匹配；
-    /// 转义与注释中的同形引号会因内文不等被跳过，取不到则返回 `None`。
-    fn scan_specifier(&self, span: (usize, usize), specifier: &str) -> Option<(usize, usize)> {
-        let bytes = self.source.as_bytes();
-        let start = span.0.min(bytes.len());
-        let end = span.1.min(bytes.len());
-        for close in (start..end).rev() {
-            let quote = bytes[close];
-            if quote != b'\'' && quote != b'"' {
-                continue;
-            }
-            // 从 closing 引号向前找配对 opening 引号（按前置反斜杠奇偶判转义）。
-            let mut open = close;
-            while open > start {
-                open -= 1;
-                if bytes[open] != quote {
-                    continue;
-                }
-                let mut backslashes = 0usize;
-                let mut cursor = open;
-                while cursor > start && bytes[cursor - 1] == b'\\' {
-                    backslashes += 1;
-                    cursor -= 1;
-                }
-                if backslashes % 2 == 1 {
-                    continue;
-                }
-                if &self.source[open + 1..close] == specifier {
-                    return Some((open, close + 1));
-                }
-                // 内文不等 → 继续向前找更早的引号作为 opening。
+/// 表达式在模块求值时是否可证明无副作用（保守：判不了即非纯）。
+fn expr_pure(expression: &Expression) -> bool {
+    match &*expression.kind {
+        ExpressionKind::Identifier(_)
+        | ExpressionKind::NumericLiteral(_)
+        | ExpressionKind::StringLiteral(_)
+        | ExpressionKind::BigIntLiteral(_)
+        | ExpressionKind::BooleanLiteral(_)
+        | ExpressionKind::NullLiteral
+        | ExpressionKind::RegexLiteral(_) => true,
+        ExpressionKind::TemplateString(text) => !text.contains("${"),
+        ExpressionKind::MemberExpression { object, property, .. } => {
+            expr_pure(object) && expr_pure(property)
+        }
+        ExpressionKind::BinaryExpression { left, right, .. } => expr_pure(left) && expr_pure(right),
+        ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
+            expr_pure(test) && expr_pure(consequent) && expr_pure(alternate)
+        }
+        ExpressionKind::UnaryExpression { operator, argument } => {
+            // Oak 实测：关键字后带空白的一元算子（含 `await x`、`delete o.k`）
+            // operator 被 trivia 覆盖为空格，与 `typeof`/`void` 同形不可区分，
+            // 只有无空格形态留下真实算子文本；判不了即非纯。
+            matches!(operator.as_str(), "typeof" | "void" | "!" | "-" | "+" | "~")
+                && expr_pure(argument)
+        }
+        ExpressionKind::SpreadElement(inner) | ExpressionKind::NonNullExpression(inner) => {
+            expr_pure(inner)
+        }
+        ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::TypeAssertionExpression { expression, .. } => expr_pure(expression),
+        // 闭包创建本身纯；体内引用与调用只在执行时发生。
+        ExpressionKind::ArrowFunction { .. } | ExpressionKind::FunctionExpression { .. } => true,
+        ExpressionKind::ObjectLiteral { properties } => {
+            properties.iter().all(|property| match property {
+                ObjectProperty::Property { value, .. } => expr_pure(value),
+                ObjectProperty::Spread(value) => expr_pure(value),
+            })
+        }
+        ExpressionKind::ArrayLiteral { elements } => elements.iter().all(expr_pure),
+        // 调用/构造/赋值/更新/await/yield/tagged template/动态 import/JSX：非纯。
+        _ => false,
+    }
+}
+
+/// 收集语句子树中的标识符引用（含嵌套函数/类体与属性名，保守多收录）。
+fn collect_refs_statement(statement: &Statement, names: &mut Vec<String>) {
+    match statement {
+        Statement::VariableDeclaration(d) => {
+            if let Some(value) = &d.value {
+                collect_refs_expression(value, names);
             }
         }
-        None
+        Statement::FunctionDeclaration(d) => {
+            for body in &d.body {
+                collect_refs_statement(body, names);
+            }
+        }
+        Statement::ClassDeclaration(d) => {
+            for decorator in &d.decorators {
+                collect_refs_expression(&decorator.expression, names);
+            }
+            for member in &d.body {
+                match member {
+                    ClassMember::Property { decorators, initializer, .. } => {
+                        for decorator in decorators {
+                            collect_refs_expression(&decorator.expression, names);
+                        }
+                        if let Some(value) = initializer {
+                            collect_refs_expression(value, names);
+                        }
+                    }
+                    ClassMember::Method { decorators, body, .. } => {
+                        for decorator in decorators {
+                            collect_refs_expression(&decorator.expression, names);
+                        }
+                        for statement in body {
+                            collect_refs_statement(statement, names);
+                        }
+                    }
+                }
+            }
+        }
+        Statement::ExpressionStatement(s) => collect_refs_expression(&s.expression, names),
+        Statement::ExportDeclaration(e) => {
+            if let Some(declaration) = &e.declaration {
+                collect_refs_statement(declaration, names);
+            }
+        }
+        Statement::Enum(d) => {
+            for member in &d.members {
+                if let Some(value) = &member.initializer {
+                    collect_refs_expression(value, names);
+                }
+            }
+        }
+        Statement::Namespace(d) => {
+            for statement in &d.body {
+                collect_refs_statement(statement, names);
+            }
+        }
+        Statement::ReturnStatement(s) => {
+            if let Some(argument) = &s.argument {
+                collect_refs_expression(argument, names);
+            }
+        }
+        Statement::ThrowStatement(s) => collect_refs_expression(&s.argument, names),
+        Statement::IfStatement(s) => {
+            collect_refs_expression(&s.test, names);
+            collect_refs_statement(&s.consequent, names);
+            if let Some(alternate) = &s.alternate {
+                collect_refs_statement(alternate, names);
+            }
+        }
+        Statement::WhileStatement(s) => {
+            collect_refs_expression(&s.test, names);
+            collect_refs_statement(&s.body, names);
+        }
+        Statement::DoWhileStatement(s) => {
+            collect_refs_statement(&s.body, names);
+            collect_refs_expression(&s.test, names);
+        }
+        Statement::ForStatement(s) => {
+            if let Some(initializer) = &s.initializer {
+                collect_refs_statement(initializer, names);
+            }
+            if let Some(test) = &s.test {
+                collect_refs_expression(test, names);
+            }
+            if let Some(incrementor) = &s.incrementor {
+                collect_refs_expression(incrementor, names);
+            }
+            collect_refs_statement(&s.body, names);
+        }
+        Statement::ForInStatement(s) => {
+            collect_refs_statement(&s.left, names);
+            collect_refs_expression(&s.right, names);
+            collect_refs_statement(&s.body, names);
+        }
+        Statement::ForOfStatement(s) => {
+            collect_refs_statement(&s.left, names);
+            collect_refs_expression(&s.right, names);
+            collect_refs_statement(&s.body, names);
+        }
+        Statement::SwitchStatement(s) => {
+            collect_refs_expression(&s.discriminant, names);
+            for case in &s.cases {
+                if let Some(test) = &case.test {
+                    collect_refs_expression(test, names);
+                }
+                for statement in &case.consequent {
+                    collect_refs_statement(statement, names);
+                }
+            }
+        }
+        Statement::TryStatement(s) => {
+            for statement in &s.block {
+                collect_refs_statement(statement, names);
+            }
+            if let Some(handler) = &s.handler {
+                for statement in &handler.body {
+                    collect_refs_statement(statement, names);
+                }
+            }
+            if let Some(finalizer) = &s.finalizer {
+                for statement in finalizer {
+                    collect_refs_statement(statement, names);
+                }
+            }
+        }
+        Statement::BlockStatement(s) => {
+            for statement in &s.statements {
+                collect_refs_statement(statement, names);
+            }
+        }
+        // 类型与模块声明不产生运行时引用；break/continue 无引用。
+        Statement::Interface(_)
+        | Statement::TypeAlias(_)
+        | Statement::ImportDeclaration(_)
+        | Statement::BreakStatement(_)
+        | Statement::ContinueStatement(_) => {}
+    }
+}
+
+fn collect_refs_expression(expression: &Expression, names: &mut Vec<String>) {
+    match &*expression.kind {
+        ExpressionKind::Identifier(name) => push_unique_name(names, name),
+        ExpressionKind::MemberExpression { object, property, .. } => {
+            collect_refs_expression(object, names);
+            collect_refs_expression(property, names);
+        }
+        ExpressionKind::CallExpression { func, args } => {
+            collect_refs_expression(func, names);
+            for argument in args {
+                collect_refs_expression(argument, names);
+            }
+        }
+        ExpressionKind::NewExpression { func, args } => {
+            collect_refs_expression(func, names);
+            for argument in args {
+                collect_refs_expression(argument, names);
+            }
+        }
+        ExpressionKind::UnaryExpression { argument, .. }
+        | ExpressionKind::UpdateExpression { argument, .. }
+        | ExpressionKind::SpreadElement(argument)
+        | ExpressionKind::AwaitExpression(argument)
+        | ExpressionKind::NonNullExpression(argument) => collect_refs_expression(argument, names),
+        ExpressionKind::BinaryExpression { left, right, .. }
+        | ExpressionKind::AssignmentExpression { left, right, .. } => {
+            collect_refs_expression(left, names);
+            collect_refs_expression(right, names);
+        }
+        ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
+            collect_refs_expression(test, names);
+            collect_refs_expression(consequent, names);
+            collect_refs_expression(alternate, names);
+        }
+        ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::TypeAssertionExpression { expression, .. } => {
+            collect_refs_expression(expression, names);
+        }
+        ExpressionKind::ArrowFunction { body, .. } => collect_refs_statement(body, names),
+        ExpressionKind::FunctionExpression { body, .. } => {
+            for statement in body {
+                collect_refs_statement(statement, names);
+            }
+        }
+        ExpressionKind::ObjectLiteral { properties } => {
+            for property in properties {
+                match property {
+                    ObjectProperty::Property { value, .. } => collect_refs_expression(value, names),
+                    ObjectProperty::Spread(value) => collect_refs_expression(value, names),
+                }
+            }
+        }
+        ExpressionKind::ArrayLiteral { elements } => {
+            for element in elements {
+                collect_refs_expression(element, names);
+            }
+        }
+        ExpressionKind::TaggedTemplateExpression { tag, template } => {
+            collect_refs_expression(tag, names);
+            collect_refs_expression(template, names);
+        }
+        ExpressionKind::ImportExpression { module_specifier } => {
+            collect_refs_expression(module_specifier, names);
+        }
+        ExpressionKind::YieldExpression(value) => {
+            if let Some(value) = value {
+                collect_refs_expression(value, names);
+            }
+        }
+        // 字面量与 JSX（本 crate 关闭）无引用。
+        _ => {}
+    }
+}
+
+fn push_unique_name(names: &mut Vec<String>, name: &str) {
+    if !name.is_empty() && !names.iter().any(|existing| existing == name) {
+        names.push(name.to_string());
     }
 }

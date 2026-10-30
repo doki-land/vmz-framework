@@ -7,5 +7,5 @@ mod record;
 pub use collect::parse_module;
 pub use record::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
-    ModuleRecord, StatementFact,
+    ModuleRecord, StatementEffect, StatementFact,
 };

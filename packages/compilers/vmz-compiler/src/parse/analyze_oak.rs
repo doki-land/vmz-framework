@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use oak_typescript::TypeScriptRoot;
 use oak_typescript::ast::{
-    ClassDeclaration, ClassMember, Expression, ExpressionKind, ImportSpecifier, Statement,
-    TypeAnnotation, Visibility as OakVisibility,
+    ClassDeclaration, ClassMember, ExportSpecifier, Expression, ExpressionKind, ImportSpecifier,
+    Statement, TypeAnnotation, Visibility as OakVisibility,
 };
 use vmz_oak_frontend_adapter::{
     ByteSpan, NyarBindingKind, NyarImportBinding, NyarImportDecl, NyarImportKind, ScriptRole,
@@ -244,46 +244,56 @@ fn imports_from_root(root: &TypeScriptRoot, source: &str) -> Vec<NyarImportDecl>
     for stmt in &root.statements {
         match stmt {
             Statement::ImportDeclaration(decl) => {
-                if decl.module_specifier.is_empty() {
+                if decl.module_specifier.value.is_empty() {
                     continue;
                 }
                 out.push(nyar_from_oak_import(decl, source));
             }
             Statement::ExportDeclaration(exp) => {
-                let Some(module_specifier) = exp.source.as_ref().filter(|s| !s.is_empty()) else {
+                let Some(module_specifier) = exp.source.as_ref().filter(|s| !s.value.is_empty())
+                else {
                     continue;
                 };
                 let decl_span = ByteSpan { start: exp.span.start, end: exp.span.end };
                 let specifier_span =
-                    specifier_span_in(source, exp.span.start, exp.span.end, module_specifier)
-                        .unwrap_or(decl_span);
+                    ByteSpan { start: module_specifier.span.start, end: module_specifier.span.end };
                 let mut specifiers = Vec::new();
                 for spec in &exp.specifiers {
-                    if !is_simple_ident(&spec.local) {
-                        continue;
+                    match spec {
+                        // `export * from "…"` re-exports the whole module without
+                        // introducing any local binding name.
+                        ExportSpecifier::All { .. } => {}
+                        ExportSpecifier::Namespace { exported, span } => {
+                            if !is_simple_ident(exported) {
+                                continue;
+                            }
+                            specifiers.push(NyarImportBinding {
+                                local: exported.clone(),
+                                imported: None,
+                                binding_kind: NyarBindingKind::Namespace,
+                                is_type_only: exp.is_type_only(),
+                                name_span: name_byte_span(source, span.start, span.end, exported)
+                                    .unwrap_or(decl_span),
+                            });
+                        }
+                        ExportSpecifier::Named { local, exported, span, .. } => {
+                            if !is_simple_ident(exported) {
+                                continue;
+                            }
+                            specifiers.push(NyarImportBinding {
+                                local: exported.clone(),
+                                imported: Some(local.clone()),
+                                binding_kind: NyarBindingKind::Named,
+                                is_type_only: exp.is_type_only() || spec.is_inline_type_only(),
+                                name_span: name_byte_span(source, span.start, span.end, exported)
+                                    .unwrap_or(decl_span),
+                            });
+                        }
                     }
-                    let local_name = if spec.exported.is_empty() {
-                        spec.local.clone()
-                    } else {
-                        spec.exported.clone()
-                    };
-                    specifiers.push(NyarImportBinding {
-                        local: local_name,
-                        imported: Some(spec.local.clone()),
-                        binding_kind: NyarBindingKind::Named,
-                        is_type_only: exp.is_type_only() || spec.is_inline_type_only(),
-                        name_span: name_byte_span(
-                            source,
-                            exp.span.start,
-                            exp.span.end,
-                            &spec.local,
-                        )
-                        .unwrap_or(decl_span),
-                    });
                 }
                 out.push(NyarImportDecl {
                     kind: NyarImportKind::ExportFrom,
-                    module_specifier: module_specifier.clone(),
+                    module_specifier: module_specifier.value.clone(),
                     specifiers,
                     is_type_only: exp.is_type_only(),
                     decl_span,
@@ -302,12 +312,11 @@ fn nyar_from_oak_import(
 ) -> NyarImportDecl {
     let decl_span = ByteSpan { start: decl.span.start, end: decl.span.end };
     let specifier_span =
-        specifier_span_in(source, decl.span.start, decl.span.end, &decl.module_specifier)
-            .unwrap_or(decl_span);
+        ByteSpan { start: decl.module_specifier.span.start, end: decl.module_specifier.span.end };
     let mut specifiers = Vec::new();
     for spec in &decl.specifiers {
         match spec {
-            ImportSpecifier::Default(local) => {
+            ImportSpecifier::Default { local, span } => {
                 if !is_simple_ident(local) {
                     continue;
                 }
@@ -316,11 +325,10 @@ fn nyar_from_oak_import(
                     imported: None,
                     binding_kind: NyarBindingKind::Default,
                     is_type_only: decl.is_type_only(),
-                    name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
-                        .unwrap_or(decl_span),
+                    name_span: ByteSpan { start: span.start, end: span.end },
                 });
             }
-            ImportSpecifier::Namespace(local) => {
+            ImportSpecifier::Namespace { local, span } => {
                 if !is_simple_ident(local) {
                     continue;
                 }
@@ -329,11 +337,11 @@ fn nyar_from_oak_import(
                     imported: None,
                     binding_kind: NyarBindingKind::Namespace,
                     is_type_only: decl.is_type_only(),
-                    name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
+                    name_span: name_byte_span(source, span.start, span.end, local)
                         .unwrap_or(decl_span),
                 });
             }
-            ImportSpecifier::Named { local, imported, .. } => {
+            ImportSpecifier::Named { local, imported, span, .. } => {
                 if !is_simple_ident(local) {
                     continue;
                 }
@@ -342,7 +350,7 @@ fn nyar_from_oak_import(
                     imported: Some(imported.clone()),
                     binding_kind: NyarBindingKind::Named,
                     is_type_only: decl.is_type_only() || spec.is_inline_type_only(),
-                    name_span: name_byte_span(source, decl.span.start, decl.span.end, local)
+                    name_span: name_byte_span(source, span.start, span.end, local)
                         .unwrap_or(decl_span),
                 });
             }
@@ -350,7 +358,7 @@ fn nyar_from_oak_import(
     }
     NyarImportDecl {
         kind: NyarImportKind::Static,
-        module_specifier: decl.module_specifier.clone(),
+        module_specifier: decl.module_specifier.value.clone(),
         specifiers,
         is_type_only: decl.is_type_only(),
         decl_span,
@@ -367,23 +375,25 @@ fn is_simple_ident(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
-fn specifier_span_in(source: &str, start: usize, end: usize, spec: &str) -> Option<ByteSpan> {
-    let end = end.min(source.len());
-    let start = start.min(end);
-    let slice = &source[start..end];
-    let quoted = format!("'{spec}'");
-    let dquoted = format!("\"{spec}\"");
-    let rel = slice.find(&quoted).or_else(|| slice.find(&dquoted))?;
-    let lit_len = if slice[rel..].starts_with('\'') { quoted.len() } else { dquoted.len() };
-    Some(ByteSpan { start: start + rel, end: start + rel + lit_len })
-}
-
+/// Best-effort span of an identifier inside `[start, end)`: first occurrence
+/// bounded by non-identifier characters on both sides.
 fn name_byte_span(source: &str, start: usize, end: usize, name: &str) -> Option<ByteSpan> {
     let end = end.min(source.len());
     let start = start.min(end);
     let slice = &source[start..end];
-    let rel = slice.find(name)?;
-    Some(ByteSpan { start: start + rel, end: start + rel + name.len() })
+    let is_ident_byte = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$';
+    let mut from = 0usize;
+    while let Some(rel) = slice[from..].find(name) {
+        let at = from + rel;
+        let before_ok = at == 0 || !is_ident_byte(slice.as_bytes()[at - 1]);
+        let after = at + name.len();
+        let after_ok = after == slice.len() || !is_ident_byte(slice.as_bytes()[after]);
+        if before_ok && after_ok {
+            return Some(ByteSpan { start: start + at, end: start + after });
+        }
+        from = at + 1;
+    }
+    None
 }
 
 pub(crate) fn component_decl_from_root(

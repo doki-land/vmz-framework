@@ -154,14 +154,37 @@ pub enum ExportFact {
     },
 }
 
-/// 一条声明语句事实。
+/// 一条顶层语句事实。
+///
+/// 只记录模块顶层语句；嵌套语句（函数体、类方法体等）不单独成事实，
+/// 其引用与效果并入所在顶层语句。
 #[derive(Debug, Clone, PartialEq)]
 pub struct StatementFact {
-    /// 声明自身的 span（`export` 包裹时是被包裹声明的 span）。
+    /// 声明自身的 span（`export` 包裹时是被包裹声明的 span；
+    /// `export default <表达式>` 是整条 export 语句的 span）。
     pub span: (usize, usize),
     /// 声明的顶层名字。解构声明在 Oak 中整体存为原始文本
     /// （如 `"{ a }"`）原样记录；多变量声明只保留第一个名字（Oak 限制）。
     pub declared_names: Vec<String>,
+    /// 语句子树中出现的标识符（含嵌套函数/类体与属性名，保守多收录），
+    /// 按首次出现顺序去重。
+    pub referenced_names: Vec<String>,
+    /// 模块求值时的语句效果分类，供链接层做保守活跃判定。
+    pub effect: StatementEffect,
+}
+
+/// 顶层语句在模块求值时的效果。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatementEffect {
+    /// 无观察效果：纯类型声明、`declare` 形态、纯初值的 `const`、
+    /// 函数声明与纯表达式语句；未被子模块引用时可安全剪除。
+    Pure,
+    /// 建立绑定但初值纯（`let`/`var`、class、无副作用 enum）：
+    /// TDZ 与绑定可见性使其在模块保留时不可剪除。
+    Init,
+    /// 模块求值即可能产生副作用（调用、赋值、控制流、装饰器、
+    /// 初值非纯、Oak 无法可靠解析的形态）：模块保留时恒活跃。
+    SideEffect,
 }
 
 /// 一条资源引用事实。

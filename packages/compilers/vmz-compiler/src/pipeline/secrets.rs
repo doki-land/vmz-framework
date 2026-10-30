@@ -215,7 +215,7 @@ impl SecretVisitor {
     }
 
     fn visit_import(&mut self, declaration: &oak_typescript::ast::ImportDeclaration) {
-        if !is_secrets_module(&declaration.module_specifier) {
+        if !is_secrets_module(&declaration.module_specifier.value) {
             return;
         }
         self.imported_secrets_module = true;
@@ -224,7 +224,8 @@ impl SecretVisitor {
                 ImportSpecifier::Named { local, imported, .. } if imported == "secret" => {
                     self.secret_locals.insert(local.clone());
                 }
-                ImportSpecifier::Default(local) | ImportSpecifier::Namespace(local) => {
+                ImportSpecifier::Default { local, .. }
+                | ImportSpecifier::Namespace { local, .. } => {
                     self.secret_locals.insert(local.clone());
                 }
                 ImportSpecifier::Named { .. } => {}
@@ -407,7 +408,7 @@ impl ClientBoundaryVisitor {
     }
 
     fn visit_import(&mut self, declaration: &oak_typescript::ast::ImportDeclaration) {
-        let source = declaration.module_specifier.as_str();
+        let source = declaration.module_specifier.value.as_str();
         if is_secrets_module(source) {
             self.push(
                 vmz_protocol::DIAG_SECRET_CLIENT_LEAK,

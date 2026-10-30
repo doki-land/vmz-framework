@@ -140,8 +140,5 @@ fn parse_failure_keeps_node_with_diagnostics() {
     let bad = &graph.nodes[1];
     assert_eq!(bad.resolved.path.file_name().unwrap(), "good.js");
     assert_eq!(bad.diagnostics[0].code, "vmz::pack::module::parse_failed");
-    assert_eq!(
-        bad.record.path.as_deref().map(|p| p.ends_with("good.js")),
-        Some(true)
-    );
+    assert_eq!(bad.record.path.as_deref().map(|p| p.ends_with("good.js")), Some(true));
 }
