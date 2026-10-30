@@ -776,3 +776,90 @@ function loadPageResumeEntriesSync(distDir, chunkId) {
 function isEventResumeStrategy(strategy) {
     return strategy === 'event' || strategy === 'click' || String(strategy).startsWith('event:');
 }
+
+/** Runtime face barrel loaded by URL (`import('/dom.browser.js')`) in the packed client navigation. */
+const FACE_ENTRY_REL = 'dom.browser.js';
+
+/**
+ * Transitive closure of the URL-loaded browser face: start at `dom.browser.js`
+ * and follow relative import specifiers that resolve to files in the dist tree.
+ * Everything else that is executable JS is either packed into `_vmz/pack/` or
+ * Node-side, so it must not ship in a web-static delivery.
+ */
+function collectFaceClosure(abs: string): Set<string> {
+    const closure = new Set<string>();
+    if (!fs.existsSync(path.join(abs, FACE_ENTRY_REL))) return closure;
+    const queue = [FACE_ENTRY_REL];
+    while (queue.length) {
+        const rel = queue.shift() as string;
+        if (closure.has(rel)) continue;
+        closure.add(rel);
+        let text: string;
+        try {
+            text = fs.readFileSync(path.join(abs, ...rel.split('/')), 'utf8');
+        } catch {
+            continue;
+        }
+        const specs = [
+            ...text.matchAll(/from\s+['"](\.[^'"]+)['"]/g),
+            ...text.matchAll(/import\(\s*['"](\.[^'"]+)['"]/g),
+        ];
+        for (const m of specs) {
+            const next = path.posix.normalize(`${path.posix.dirname(rel)}/${m[1]}`);
+            if (next.startsWith('..')) continue;
+            if (!fs.existsSync(path.join(abs, ...next.split('/')))) continue;
+            if (!closure.has(next)) queue.push(next);
+        }
+    }
+    return closure;
+}
+
+function listFilesRecursive(abs: string, rel = ''): string[] {
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(path.join(abs, ...rel.split('/')), { withFileTypes: true })) {
+        const nextRel = rel ? `${rel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) out.push(...listFilesRecursive(abs, nextRel));
+        else if (entry.isFile()) out.push(nextRel);
+    }
+    return out;
+}
+
+function removeEmptyDirsBottomUp(abs: string, rel = ''): void {
+    for (const entry of fs.readdirSync(path.join(abs, ...rel.split('/')), { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const nextRel = rel ? `${rel}/${entry.name}` : entry.name;
+        if (nextRel === '_vmz/pack' || nextRel.startsWith('_vmz/pack/')) continue;
+        removeEmptyDirsBottomUp(abs, nextRel);
+        if (nextRel === '_vmz') continue;
+        if (fs.readdirSync(path.join(abs, ...nextRel.split('/'))).length === 0) {
+            fs.rmdirSync(path.join(abs, ...nextRel.split('/')));
+        }
+    }
+}
+
+/**
+ * Prune the web-static delivery to its final browser set after HTML emit:
+ * remove the Node-only serve-host material (`_vmz/host/`, `vmz-serve-host.mjs`)
+ * and every unpacked module JS/map that `_vmz/pack/` chunks supersede
+ * (bootstrap entries, page/component/layout units, server faces, `#server/`,
+ * `ssr/`). The `/dom.browser.js` face closure stays — the packed navigation
+ * keeps that root-URL load by contract. JSON metadata and assets are untouched.
+ * Only `vmz serve` re-materializes the host (`materializeServeHostRuntime`);
+ * static hosting never needs it.
+ */
+export function pruneWebStaticDelivery(outDir: string): { removed: number; keptFaces: string[] } {
+    const abs = path.resolve(outDir);
+    if (!fs.existsSync(abs)) throw new Error(`pruneWebStaticDelivery: missing dist ${abs}`);
+    const faceClosure = collectFaceClosure(abs);
+    let removed = 0;
+    for (const rel of listFilesRecursive(abs)) {
+        if (rel.startsWith('_vmz/pack/') || rel.startsWith('assets/')) continue;
+        const isHost = rel.startsWith('_vmz/host/');
+        const isJs = rel.endsWith('.js') || rel.endsWith('.mjs') || rel.endsWith('.map');
+        if (!isHost && (!isJs || faceClosure.has(rel))) continue;
+        fs.rmSync(path.join(abs, ...rel.split('/')), { force: true });
+        removed++;
+    }
+    removeEmptyDirsBottomUp(abs);
+    return { removed, keptFaces: [...faceClosure].sort() };
+}

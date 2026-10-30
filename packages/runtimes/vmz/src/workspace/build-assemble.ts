@@ -10,7 +10,7 @@ import { emitEmbeddedPackaging } from './embedded-packaging.js';
 import { emitSiteDelivery } from './site-delivery.js';
 import { emitSiteFavicon } from './site-favicon.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
-import { emitWebStatic } from './static-emit.js';
+import { emitWebStatic, pruneWebStaticDelivery } from './static-emit.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 
 export const BUILD_PROOF_SCHEMA = 'vmz.build.proof.v0';
@@ -92,6 +92,16 @@ export async function assembleDelivery(outDir: string, ctx: Record<string, unkno
             htmlFiles: staticResult.htmlFiles,
             skipped: staticResult.skipped,
         };
+        if (assembly === 'web-static') {
+            // Final browser set only: Node-only host material and unpacked module JS
+            // superseded by `_vmz/pack/` chunks are stripped after HTML emit.
+            const pruned = pruneWebStaticDelivery(outDir);
+            result.steps.push({
+                kind: 'web-static-prune',
+                status: 'pruned',
+                note: `removed=${pruned.removed} faces=${pruned.keptFaces.length}`,
+            });
+        }
     } else if (assembly === 'server-host' || assembly === 'local-static') {
         // SSR / local packs: favicon + opaque public/ for serve-host.
         emitSiteFavicon(outDir, { projectRoot: ctx.projectRoot as string });
