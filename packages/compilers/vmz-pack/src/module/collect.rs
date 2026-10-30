@@ -7,6 +7,8 @@
 //! - 表达式位置 `import(…)` 的 `import` 关键字是 leaf，builder 丢弃后
 //!   CallExpression 的 span 仍从 `import` 起算，与 callee 的 span 之间
 //!   留下至少 `import(` 长度的间隙。
+//! - 两类 span 形状启发都必须由起点处的 `import` 原文佐证（词边界校验），
+//!   防止注释前缀调用等残缺形状被误判成动态 import。
 //! - `import.meta` 是正式 `MetaProperty` 节点；语句头 `import.meta` 解析为
 //!   表达式语句，不再产生空指纹。
 //! - 静态 import/export 的说明符在 AST 中带原文与含引号的字面量 span。
@@ -46,6 +48,19 @@ const IMPORT_WITHOUT_SPECIFIER: &str = "vmz::pack::module::import_without_specif
 const STATEMENT_FACT_INCOMPLETE: &str = "vmz::pack::module::statement_fact_incomplete";
 /// 表达式位置动态 import 的最小 span 间隙：`import(` 的字节数。
 const DYNAMIC_CALL_GAP: usize = "import(".len();
+
+/// 校验 `start` 处的源码原文以 `import` 关键字起头且带词边界。
+/// span 形状启发（空指纹配对、`import(` 前缀间隙）必须由原文佐证，
+/// 否则注释前缀调用等残缺形状会被误判成动态 import。
+fn is_import_keyword_at(source: &str, start: usize) -> bool {
+    let Some(rest) = source.as_bytes().get(start..) else {
+        return false;
+    };
+    let Some(after) = rest.strip_prefix(b"import") else {
+        return false;
+    };
+    !matches!(after.first(), Some(c) if c.is_ascii_alphanumeric() || *c == b'_' || *c == b'$')
+}
 
 /// 解析源码并收集模块事实。
 ///
@@ -208,7 +223,9 @@ impl<'a> Collector<'a> {
         for (index, statement) in statements.iter().enumerate() {
             if let Some(hole) = fingerprint_hole(statement) {
                 match statements.get(index + 1) {
-                    Some(Statement::ExpressionStatement(next)) => {
+                    Some(Statement::ExpressionStatement(next))
+                        if is_import_keyword_at(self.source, hole.0) =>
+                    {
                         let span = (hole.0, next.span.end);
                         self.push_dynamic(span, &next.expression);
                     }
@@ -255,7 +272,8 @@ impl<'a> Collector<'a> {
         for (index, statement) in statements.iter().enumerate() {
             if index > 0
                 && matches!(statement, Statement::ExpressionStatement(_))
-                && fingerprint_hole(&statements[index - 1]).is_some()
+                && fingerprint_hole(&statements[index - 1])
+                    .is_some_and(|hole| is_import_keyword_at(self.source, hole.0))
             {
                 continue;
             }
@@ -732,8 +750,12 @@ impl<'a> Collector<'a> {
                     }
                 }
                 // 表达式位置 `import('…')` / `import(v)`：callee 与语句起点之间
-                // 留有被丢弃的 `import(` 前缀间隙；`require('…')` 同形，无法区分。
-                else if args.is_empty() && func.span.start >= expression.span.start + DYNAMIC_CALL_GAP {
+                // 留有被丢弃的 `import(` 前缀间隙；间隙形状必须由起点处的
+                // `import` 原文佐证，`require('…')` 与注释前缀调用等形状据此排除。
+                else if args.is_empty()
+                    && func.span.start >= expression.span.start + DYNAMIC_CALL_GAP
+                    && is_import_keyword_at(self.source, expression.span.start)
+                {
                     self.push_dynamic(range(expression.span.clone()), func);
                 }
                 self.walk_expr(func);

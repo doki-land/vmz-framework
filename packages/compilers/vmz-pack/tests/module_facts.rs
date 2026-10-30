@@ -231,6 +231,31 @@ fn dynamic_import_literal_and_unresolved_paths() {
     assert_eq!(slice(dynamic_source, record.diagnostics[0].span.unwrap()), "import(someVar)");
 }
 
+/// 动态 import 的 span 形状启发必须由 `import` 原文佐证：`require` 与普通
+/// 调用不得产生 import 事实，真实动态 import 形态不受影响。
+#[test]
+fn shape_heuristics_require_import_text() {
+    // 语句头 `require('…')`：普通调用表达式，无 import 事实也无诊断。
+    let source = "require('./m');";
+    let record = ok(source);
+    assert!(record.imports.is_empty(), "{:?}", record.imports);
+    assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
+
+    // 表达式位置 `require('…')`：callee 为标识符，不产生动态事实。
+    let record = ok("const m = require('./m');");
+    assert!(record.imports.is_empty(), "{:?}", record.imports);
+
+    // 词边界校验：`important(…)` 与 `import` 前缀同形，只是普通调用。
+    let record = ok("const p = important('./x.js');");
+    assert!(record.imports.is_empty(), "{:?}", record.imports);
+
+    // 回归护栏：真实动态 import 仍是事实。
+    let record = ok("const p = import('./x.js');");
+    assert_eq!(record.imports.len(), 1);
+    assert_eq!(record.imports[0].kind, ImportKind::Dynamic);
+    assert_eq!(record.imports[0].specifier, "./x.js");
+}
+
 /// ⑦ 富模块全量 span 切片：每条 import / export / statement 记录都回到原文。
 #[test]
 fn every_record_span_slices_back_to_source() {
