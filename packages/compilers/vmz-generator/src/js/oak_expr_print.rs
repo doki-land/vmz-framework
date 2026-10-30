@@ -226,15 +226,26 @@ fn print_params(params: &[FunctionParam]) -> Option<String> {
     if params.is_empty() {
         return Some("()".into());
     }
-    if params.len() == 1 && params[0].name.is_empty() {
-        return None;
-    }
     let mut parts = Vec::with_capacity(params.len());
     for p in params {
-        if p.name.is_empty() {
+        if !p.decorators.is_empty() {
             return None;
         }
-        parts.push(p.name.clone());
+        let binding = match &p.pattern_text {
+            Some(text) => text.clone(),
+            None => {
+                if p.name.is_empty() {
+                    return None;
+                }
+                p.name.clone()
+            }
+        };
+        let rest = if p.is_rest { "..." } else { "" };
+        let default = match &p.default {
+            Some(d) => format!(" = {}", print_expr(d, Prec::Assign)?),
+            None => String::new(),
+        };
+        parts.push(format!("{rest}{binding}{default}"));
     }
     Some(format!("({})", parts.join(", ")))
 }

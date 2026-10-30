@@ -343,7 +343,7 @@ impl<'a> Collector<'a> {
                 } else if !d.decorators.is_empty() {
                     (StatementEffect::SideEffect, false)
                 } else {
-                    (StatementEffect::Pure, d.params.iter().any(|p| p.name.is_empty()))
+                    (StatementEffect::Pure, d.params.iter().any(|p| p.binding_names.is_empty()))
                 }
             }
             Statement::ClassDeclaration(d) => {
