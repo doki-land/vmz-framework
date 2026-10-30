@@ -131,6 +131,20 @@ pub struct Resolved {
     pub package: Option<PackageIdentity>,
 }
 
+/// 由文件路径回溯其最近的 `package.json`，得到所属包实例身份。
+/// 不在任何包下的文件返回 `None`；manifest 缺失或损坏同样返回 `None`，
+/// 不阻断图构建（文件身份仍是 canonical 路径本身）。
+pub fn package_of_path(file: &Path) -> Option<PackageIdentity> {
+    let dir = walk::find_owning_package_root(file.parent()?)?;
+    let root = std::fs::canonicalize(&dir).ok()?;
+    let manifest = manifest::Manifest::load(&root).ok()?;
+    let name = manifest
+        .name()
+        .map(str::to_string)
+        .or_else(|| root.file_name().map(|segment| segment.to_string_lossy().into_owned()))?;
+    Some(PackageIdentity { name, root, version: manifest.version().map(str::to_string) })
+}
+
 /// 解析一个 specifier。
 ///
 /// 错误一律为 [`PackDiagnostic`]，code 形如 `vmz::pack::resolve::*`，

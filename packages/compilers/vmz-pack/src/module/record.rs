@@ -25,6 +25,21 @@ pub struct ModuleRecord {
     pub diagnostics: Vec<PackDiagnostic>,
 }
 
+impl ModuleRecord {
+    /// 空记录：图占位节点与读取/解析失败时的最小形状。
+    pub fn empty(path: Option<String>) -> Self {
+        Self {
+            path,
+            imports: Vec::new(),
+            exports: Vec::new(),
+            statements: Vec::new(),
+            assets: Vec::new(),
+            flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
+            diagnostics: Vec::new(),
+        }
+    }
+}
+
 /// import 的结构形态。
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImportKind {
