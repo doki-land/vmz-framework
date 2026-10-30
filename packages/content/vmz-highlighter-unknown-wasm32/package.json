@@ -1,6 +1,6 @@
 {
     "name": "@vmz/highlighter-unknown-wasm32",
-    "version": "0.3.11",
+    "version": "0.3.12",
     "private": true,
     "type": "module",
     "description": "wasm32-oriented unknown-language highlighter fallback (thin stub; no .wasm binary required)",

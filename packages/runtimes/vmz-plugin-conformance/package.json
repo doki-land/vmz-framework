@@ -1,6 +1,6 @@
 {
     "name": "vmz-plugin-conformance",
-    "version": "0.3.11",
+    "version": "0.3.12",
     "private": true,
     "type": "module",
     "description": "Conformance plugin for structured plugin contributions",

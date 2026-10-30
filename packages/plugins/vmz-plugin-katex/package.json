@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/plugins/vmz-plugin-katex"
     },
-    "version": "0.3.11",
+    "version": "0.3.12",
     "type": "module",
     "description": "VMZ KaTeX adapter - <Katex> + math engine registration",
     "license": "MIT",

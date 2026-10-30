@@ -1,6 +1,6 @@
 {
     "name": "vmz-textmate",
-    "version": "0.3.11",
+    "version": "0.3.12",
     "private": true,
     "type": "module",
     "description": "Shared TextMate grammar for .vmz — VS Code + Shiki (homepage)",

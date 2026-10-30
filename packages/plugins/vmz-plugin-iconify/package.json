@@ -5,7 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/plugins/vmz-plugin-iconify"
     },
-    "version": "0.3.11",
+    "version": "0.3.12",
     "type": "module",
     "description": "VMZ Iconify adapter - <Iconify>",
     "license": "MIT",

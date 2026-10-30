@@ -2,7 +2,7 @@
     "name": "vmz",
     "displayName": "VMZ",
     "description": "VMZ TextMate grammar for `.vmz` — product toolchain is `@vmz/vmz`",
-    "version": "0.3.11",
+    "version": "0.3.12",
     "private": true,
     "publisher": "vmz-framework",
     "engines": {
