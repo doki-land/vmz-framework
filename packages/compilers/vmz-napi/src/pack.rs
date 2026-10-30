@@ -91,7 +91,9 @@ struct PlanWire {
     manifest_json: String,
 }
 
-/// One chunk artifact (`ChunkArtifact`).
+/// One chunk artifact (`ChunkArtifact`). The source map JSON itself stays
+/// Rust-side (like `StyleWire::content`); the wire only carries the map
+/// file name `<fileName>.map`, which `packWrite` materializes on disk.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ArtifactWire {
@@ -101,6 +103,7 @@ struct ArtifactWire {
     modules: Vec<String>,
     imports: Vec<String>,
     dynamic: Vec<String>,
+    source_map_file_name: String,
 }
 
 /// One aggregated CSS artifact (`StyleArtifact`). `content` stays Rust-side:
@@ -182,6 +185,7 @@ fn plan_to_wire(plan: &EmitPlan) -> PlanWire {
                 modules: artifact.modules.clone(),
                 imports: artifact.imports.clone(),
                 dynamic: artifact.dynamic.clone(),
+                source_map_file_name: format!("{}.map", artifact.file_name),
             })
             .collect(),
         styles: plan
@@ -450,6 +454,8 @@ mod tests {
         let modules = entry["modules"].as_array().unwrap();
         assert!(modules.iter().any(|m| m.as_str().unwrap().ends_with("src/lib.js")
             || m.as_str().unwrap().replace('\\', "/").ends_with("src/lib.js")));
+        // The wire carries the map file name only, never the map JSON.
+        assert_eq!(entry["sourceMapFileName"].as_str(), Some(&format!("{file_name}.map")[..]));
         // manifestJson is a JSON string under the frozen `v0` namespace.
         let manifest: Value =
             serde_json::from_str(response["plan"]["manifestJson"].as_str().unwrap()).unwrap();
@@ -470,6 +476,13 @@ mod tests {
         for artifact in artifacts {
             let path = out.join(artifact["fileName"].as_str().unwrap());
             assert!(path.is_file(), "artifact written: {}", path.display());
+            // The map file lands next to the chunk and the chunk text ends
+            // with the `sourceMappingURL` comment naming it.
+            let map_name = artifact["sourceMapFileName"].as_str().unwrap();
+            let map_path = out.join(map_name);
+            assert!(map_path.is_file(), "source map written: {}", map_path.display());
+            let js = fs::read_to_string(&path).unwrap();
+            assert!(js.ends_with(&format!("//# sourceMappingURL={map_name}\n")), "{js}");
         }
         assert!(out.join("manifest.json").is_file());
     }
