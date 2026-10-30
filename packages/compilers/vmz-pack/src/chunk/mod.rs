@@ -3,6 +3,9 @@
 //! 语义模型：
 //! - 只对 [`crate::link::LinkPlan`] 保留的模块分包；未保留节点不进入任何
 //!   chunk，本层不重算活跃性，也不复制链接层的语句判定。
+//! - [`crate::graph::NodeKind::Style`] 节点不是 chunk 成员：无 JS 文本可
+//!   装配，也不参与可达签名分区；其级联归属由 `emit` 层按 chunk 成员
+//!   执行序聚合（Living §Pack「WASM、CSS 与静态资源」）。
 //! - 静态 import / re-export 边在保留集合上求强连通收缩：循环内模块必落
 //!   同一 chunk，否则 live binding 与初始化顺序无法在产物层保持。收缩单元
 //!   是分包的图基元，不是按包名或组件形态的特判。

@@ -185,16 +185,111 @@ fn dynamic_import_rewrites_specifier() {
     assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
 }
 
-/// CSS 导入端到端：节点级拒绝诊断沿 chunk `incomplete_facts` 链路传到
-/// emit 整体拒绝，不静默产出把 CSS 当 JS 的错误文本。
+/// CSS 正式支持端到端：副作用导入不进 JS 文本（不留空壳），级联按
+/// chunk 成员执行序聚合为独立 `style-<hash8>.css`，同身份去重先到先得，
+/// `modules` 按执行序记录贡献宿主。
 #[test]
-fn css_import_is_rejected_end_to_end() {
+fn css_side_effect_import_aggregates_into_style_artifact() {
     let root = temp_tree(
-        "cssemit",
+        "cssstyle",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import './a.css';\nimport { helper } from './lib.js';\nexport const x = helper;\n",
+            ),
+            ("src/lib.js", "import './a.css';\nimport './b.css';\nexport const helper = 1;\n"),
+            ("src/a.css", "a { color: red }\n"),
+            ("src/b.css", "b { color: blue }\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    // JS 产物不含任何 CSS 文件引用：import 语句文本整体移除。
+    let code = &plan.artifacts[0].code;
+    assert!(!code.contains(".css"), "{code}");
+    assert!(!code.contains("import"), "{code}");
+
+    // 单 chunk 级联：成员执行序 lib→entry，`a.css` 去重先到先得。
+    assert_eq!(plan.styles.len(), 1);
+    let style = &plan.styles[0];
+    assert!(style.file_name.starts_with("style-"), "{}", style.file_name);
+    assert!(style.file_name.ends_with(".css"));
+    let stem = style.file_name.strip_suffix(".css").unwrap();
+    let hash = stem.rsplit('-').next().unwrap();
+    assert_eq!(hash.len(), 8, "指纹命名与 chunk 同规则: {}", style.file_name);
+    assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    assert_eq!(style.url, format!("/_vmz/{}", style.file_name));
+    assert_eq!(style.source_paths.len(), 2, "{:?}", style.source_paths);
+    assert!(style.source_paths[0].ends_with("src/a.css"));
+    assert!(style.source_paths[1].ends_with("src/b.css"));
+    let red = style.content.find("color: red").unwrap();
+    let blue = style.content.find("color: blue").unwrap();
+    assert!(red < blue, "拼接顺序即执行序: {}", style.content);
+    assert_eq!(style.content.matches("color: red").count(), 1, "去重: {}", style.content);
+    assert_eq!(style.modules.len(), 2);
+    assert!(style.modules[0].ends_with("src/lib.js"));
+    assert!(style.modules[1].ends_with("src/entry.js"));
+
+    // write_emit 完整落盘：CSS 文件字节与产物一致。
+    let out = root.join("dist");
+    write_emit(&plan, &out).unwrap();
+    assert_eq!(fs::read(out.join(&style.file_name)).unwrap(), style.content.as_bytes());
+}
+
+/// 死模块（剪枝的动态分支）的 CSS 不进级联：可达性即宿主活跃性。
+#[test]
+fn dead_module_css_is_not_emitted() {
+    let root = temp_tree(
+        "cssdead",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "export function go() { return import('./lazy.js'); }\nexport const x = 1;\n",
+            ),
+            ("src/lazy.js", "import './dead.css';\nexport const later = 1;\n"),
+            ("src/dead.css", "dead { color: red }\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    // `go` 未被使用：纯声明不激活 → 包含动态 import 的语句不活 → 边死 → lazy.js 不保留。
+    let link_plan = link(
+        &graph,
+        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.styles.is_empty(), "{:?}", plan.styles);
+}
+
+/// CSS 内相对 `url()` 按 asset 规则搬迁：共享 `assets/` 指纹命名、
+/// 重写为 `./assets/…` 相对路径并随 write_emit 拷贝；绝对路径、
+/// 协议 URL 与片段引用原样保留。
+#[test]
+fn css_url_relative_reference_is_relocated() {
+    let root = temp_tree(
+        "cssurl",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             ("src/entry.js", "import './s.css';\nexport const x = 1;\n"),
-            ("src/s.css", "body{margin:0}\n"),
+            (
+                "src/s.css",
+                "a { background: url(./img/logo.svg); }\nb { background: url(\"./img/logo.svg\"); }\nc { background: url(/abs.png); }\nd { background: url(https://cdn/x.png); }\ne { background: url(#frag); }\n",
+            ),
+            ("src/img/logo.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n"),
         ],
     );
     let graph =
@@ -204,20 +299,75 @@ fn css_import_is_rejected_end_to_end() {
         &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    assert!(
-        codes(&chunks.diagnostics).contains(&"vmz::pack::chunk::incomplete_facts".to_string()),
-        "{:?}",
-        chunks.diagnostics
-    );
-    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
-    assert!(
-        codes(&errors).contains(&"vmz::pack::emit::incomplete_facts".to_string()),
-        "{errors:?}"
-    );
-    assert!(
-        errors.iter().any(|d| d.path.as_deref().is_some_and(|p| p.ends_with("s.css"))),
-        "{errors:?}"
-    );
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    assert_eq!(plan.assets.len(), 1, "{:?}", plan.assets);
+    let asset = &plan.assets[0];
+    assert!(asset.module_path.ends_with("src/s.css"));
+    assert_eq!(asset.specifier, "./img/logo.svg");
+    assert!(asset.file_name.starts_with("assets/logo-"), "{}", asset.file_name);
+
+    assert_eq!(plan.styles.len(), 1);
+    let content = &plan.styles[0].content;
+    let relocated = format!("./{}", asset.file_name);
+    // 同一值两处引用（unquoted 与 quoted）都重写；unquoted 补双引号。
+    assert_eq!(content.matches(&format!("url(\"{relocated}\")")).count(), 2, "{content}");
+    assert!(content.contains("url(/abs.png)"), "{content}");
+    assert!(content.contains("url(https://cdn/x.png)"), "{content}");
+    assert!(content.contains("url(#frag)"), "{content}");
+    assert!(!content.contains("./img/"), "{content}");
+
+    let out = root.join("dist");
+    write_emit(&plan, &out).unwrap();
+    assert!(out.join(&asset.file_name).is_file(), "CSS 派生资产随 write_emit 拷贝");
+}
+
+/// 未实现形态保持显式拒绝：CSS `@import` 跨文件级联、CSS 绑定导入、
+/// CSS 重导出与动态导入 CSS 都不得静默产出错误级联。
+#[test]
+fn unsupported_style_forms_are_rejected() {
+    let cases: [(&str, [&str; 2], [&str; 2], &str); 4] = [
+        (
+            "atimport",
+            [
+                "import './s.css';\nexport const x = 1;\n",
+                "body{margin:0}\n@import url('other.css');\n",
+            ],
+            ["src/entry.js", "src/s.css"],
+            "vmz::pack::emit::style_import_unsupported",
+        ),
+        (
+            "binding",
+            ["import sheet from './s.css';\nexport const x = sheet;\n", "body{margin:0}\n"],
+            ["src/entry.js", "src/s.css"],
+            "vmz::pack::emit::style_binding_unsupported",
+        ),
+        (
+            "reexport",
+            ["export { a } from './s.css';\n", "body{margin:0}\n"],
+            ["src/entry.js", "src/s.css"],
+            "vmz::pack::emit::style_reexport_unsupported",
+        ),
+        (
+            "dynamic",
+            ["export const load = () => import('./s.css');\n", "body{margin:0}\n"],
+            ["src/entry.js", "src/s.css"],
+            "vmz::pack::emit::dynamic_style_unsupported",
+        ),
+    ];
+    for (name, contents, paths, expected) in cases {
+        let mut files: Vec<(&str, &str)> =
+            vec![("package.json", r#"{"name":"app","version":"0.0.0"}"#)];
+        files.extend(paths.iter().copied().zip(contents));
+        let root = temp_tree(name, &files);
+        let graph =
+            build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+        let link_plan =
+            link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+        let chunks = plan_chunks(&graph, &link_plan);
+        let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+        assert!(codes(&errors).contains(&expected.to_string()), "{name}: {errors:?}");
+    }
 }
 
 /// bootstrap 端到端：对象字面量箭头包裹的动态 import 建独立 async chunk、
@@ -406,8 +556,9 @@ fn namespace_synthesis_is_rejected() {
     );
 }
 
-/// 规范形态资源引用：`new URL('./logo.svg', import.meta.url)` 整段替换为
-/// 指纹 URL 字面量，资源进产物集并随 write_emit 拷贝。
+/// 规范形态资源引用：只重写 `new URL` 第一参数为指纹化相对路径，保留
+/// URL 构造外壳（chunk 与资产同目录写出，运行时解析成立）；资源进产物集
+/// 并随 write_emit 拷贝。
 #[test]
 fn asset_replaced_by_fingerprinted_url_and_copied() {
     let root = temp_tree(
@@ -439,9 +590,12 @@ fn asset_replaced_by_fingerprinted_url_and_copied() {
     assert!(std::path::Path::new(&asset.source_path).exists());
 
     let code = &plan.artifacts[0].code;
-    assert!(code.contains(&format!("\"{}\"", asset.url)), "{code}");
-    assert!(!code.contains("new URL"), "{code}");
-    assert!(!code.contains("import.meta"), "{code}");
+    // URL 对象语义：外壳保留，只换第一参数为指纹化相对路径。
+    assert!(code.contains("new URL("), "{code}");
+    assert!(code.contains("import.meta.url"), "{code}");
+    assert!(code.contains(&format!("\"./{}\"", asset.file_name)), "{code}");
+    assert!(!code.contains("./logo.svg"), "{code}");
+    assert!(!code.contains(&asset.url), "{code}");
 
     let out = root.join("dist");
     write_emit(&plan, &out).unwrap();
@@ -566,7 +720,7 @@ fn placeholder_collision_is_rejected() {
 /// 不产出猜测文本。
 #[test]
 fn incomplete_facts_member_is_rejected() {
-    use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode};
+    use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind};
     use vmz_pack::link::{LinkPlan, LinkedModule};
     use vmz_pack::module::ModuleRecord;
     use vmz_pack::resolve::Resolved;
@@ -577,6 +731,7 @@ fn incomplete_facts_member_is_rejected() {
     let pending = root.join("pending.js");
 
     let mut app_node = ModuleNode {
+        kind: NodeKind::Js,
         resolved: Resolved { path: app.clone(), package: None },
         record: ModuleRecord::empty(Some(app.display().to_string())),
         static_edges: vec![ModuleEdge {
@@ -596,6 +751,7 @@ fn incomplete_facts_member_is_rejected() {
         bindings: Vec::new(),
     });
     let mut pending_node = ModuleNode {
+        kind: NodeKind::Js,
         resolved: Resolved { path: pending.clone(), package: None },
         record: ModuleRecord::empty(Some(pending.display().to_string())),
         static_edges: Vec::new(),
@@ -642,7 +798,7 @@ fn incomplete_facts_member_is_rejected() {
 /// 手工图：成员文件在计划与写出之间不可读（磁盘缺失）时显式拒绝。
 #[test]
 fn missing_source_file_is_rejected() {
-    use vmz_pack::graph::{GraphEntry, ModuleGraph, ModuleNode};
+    use vmz_pack::graph::{GraphEntry, ModuleGraph, ModuleNode, NodeKind};
     use vmz_pack::link::{LinkPlan, LinkedModule};
     use vmz_pack::module::ModuleRecord;
     use vmz_pack::resolve::Resolved;
@@ -650,6 +806,7 @@ fn missing_source_file_is_rejected() {
     let root = temp_tree("readfail", &[("package.json", r#"{"name":"app","version":"0.0.0"}"#)]);
     let gone = root.join("gone.js");
     let node = ModuleNode {
+        kind: NodeKind::Js,
         resolved: Resolved { path: gone.clone(), package: None },
         record: ModuleRecord::empty(Some(gone.display().to_string())),
         static_edges: Vec::new(),

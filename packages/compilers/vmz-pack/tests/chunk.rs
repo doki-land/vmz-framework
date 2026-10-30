@@ -5,13 +5,14 @@ use std::path::PathBuf;
 
 use vmz_pack::PackDiagnostic;
 use vmz_pack::chunk::{Chunk, ChunkOrigin, ChunkPlan, plan_chunks};
-use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode};
+use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind};
 use vmz_pack::link::{LinkPlan, LinkedModule};
 use vmz_pack::module::ModuleRecord;
 use vmz_pack::resolve::{Resolved, Target};
 
 fn node(path: &str) -> ModuleNode {
     ModuleNode {
+        kind: NodeKind::Js,
         resolved: Resolved { path: PathBuf::from(path), package: None },
         record: ModuleRecord::empty(Some(path.to_string())),
         static_edges: Vec::new(),
@@ -293,6 +294,23 @@ fn entry_and_async_reachable_goes_to_shared() {
         out.dynamic_boundaries,
         vec![(0, out.chunks.iter().position(|c| c.id == async_chunk.id).unwrap())]
     );
+}
+
+/// Style 节点不是分包成员：链接层保留它，但它不进任何 chunk。
+#[test]
+fn style_nodes_are_not_chunk_members() {
+    let mut entry = node("/virtual/app.js");
+    entry.static_edges.push(static_edge("./a.css", "/virtual/a.css"));
+    let mut css = node("/virtual/a.css");
+    css.kind = NodeKind::Style;
+    let graph = graph(&[("app", "/virtual/app.js")], vec![entry, css]);
+    let link = plan(&[0, 1], &[]);
+
+    let out = plan_chunks(&graph, &link);
+    assert_eq!(out.chunks.len(), 1);
+    assert_eq!(out.chunks[0].modules, vec![0]);
+    assert!(out.chunks.iter().all(|c| !c.modules.contains(&1)));
+    assert!(out.diagnostics.is_empty());
 }
 
 /// 链式依赖 0→1→2（0 也直接→2）：执行序为被依赖者先于导入者。

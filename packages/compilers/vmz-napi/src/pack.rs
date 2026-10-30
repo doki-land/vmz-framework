@@ -5,6 +5,10 @@
 //! are defined by the wire structs below; every conversion is a plain Rust
 //! function independent of napi so it is unit-testable without a Node host.
 //!
+//! `plan.styles` carries one entry per aggregated CSS artifact
+//! (`fileName` / `url` / `modules` / `sourcePaths`); the CSS text itself
+//! stays Rust-side and only `packWrite` materializes it on disk.
+//!
 //! Error posture: JSON parse failure, missing fields, unknown fields,
 //! invalid `target` or `uses` not covering every entry logical all collapse
 //! into a single `{ ok: false }` response carrying
@@ -80,6 +84,7 @@ struct ResponseWire {
 #[serde(rename_all = "camelCase")]
 struct PlanWire {
     artifacts: Vec<ArtifactWire>,
+    styles: Vec<StyleWire>,
     assets: Vec<AssetWire>,
     entry_files: Vec<EntryFileWire>,
     dynamic_files: Vec<DynamicFileWire>,
@@ -96,6 +101,17 @@ struct ArtifactWire {
     modules: Vec<String>,
     imports: Vec<String>,
     dynamic: Vec<String>,
+}
+
+/// One aggregated CSS artifact (`StyleArtifact`). `content` stays Rust-side:
+/// the wire carries identity and provenance, `packWrite` writes the file.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StyleWire {
+    file_name: String,
+    url: String,
+    modules: Vec<String>,
+    source_paths: Vec<String>,
 }
 
 /// One asset artifact (`AssetArtifact`).
@@ -168,6 +184,16 @@ fn plan_to_wire(plan: &EmitPlan) -> PlanWire {
                 dynamic: artifact.dynamic.clone(),
             })
             .collect(),
+        styles: plan
+            .styles
+            .iter()
+            .map(|style| StyleWire {
+                file_name: style.file_name.clone(),
+                url: style.url.clone(),
+                modules: style.modules.clone(),
+                source_paths: style.source_paths.clone(),
+            })
+            .collect(),
         assets: plan
             .assets
             .iter()
@@ -235,10 +261,8 @@ fn serialize(response: &ResponseWire) -> String {
     match serde_json::to_string(response) {
         Ok(json) => json,
         Err(err) => {
-            serde_json::to_string(&invalid_request(format!(
-                "response serialization failed: {err}"
-            )))
-            .expect("static string-only response shape cannot fail serialization")
+            serde_json::to_string(&invalid_request(format!("response serialization failed: {err}")))
+                .expect("static string-only response shape cannot fail serialization")
         }
     }
 }
@@ -350,7 +374,7 @@ pub fn pack_write(request_json: String, out_dir: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use std::fs;
 
     /// Minimal three-file project: entry.js → lib.js → util.js.
@@ -417,15 +441,15 @@ mod tests {
         );
         // entryFiles maps the logical name onto that file.
         let entry_files = response["plan"]["entryFiles"].as_array().unwrap();
-        assert!(entry_files
-            .iter()
-            .any(|ef| ef["logical"] == "main" && ef["file"] == Value::String(file_name.into())));
+        assert!(
+            entry_files
+                .iter()
+                .any(|ef| ef["logical"] == "main" && ef["file"] == Value::String(file_name.into()))
+        );
         // Chunk members carry the normalized module paths.
         let modules = entry["modules"].as_array().unwrap();
-        assert!(modules
-            .iter()
-            .any(|m| m.as_str().unwrap().ends_with("src/lib.js")
-                || m.as_str().unwrap().replace('\\', "/").ends_with("src/lib.js")));
+        assert!(modules.iter().any(|m| m.as_str().unwrap().ends_with("src/lib.js")
+            || m.as_str().unwrap().replace('\\', "/").ends_with("src/lib.js")));
         // manifestJson is a JSON string under the frozen `v0` namespace.
         let manifest: Value =
             serde_json::from_str(response["plan"]["manifestJson"].as_str().unwrap()).unwrap();
@@ -436,8 +460,10 @@ mod tests {
     fn pack_write_emits_files() {
         let root = temp_tree("write");
         let out = root.join("dist");
-        let response =
-            parse(&pack_write_core(&request(&root, "browser", full_uses()), &out.to_string_lossy()));
+        let response = parse(&pack_write_core(
+            &request(&root, "browser", full_uses()),
+            &out.to_string_lossy(),
+        ));
         assert_eq!(response["ok"], Value::Bool(true));
         let artifacts = response["plan"]["artifacts"].as_array().unwrap();
         assert!(!artifacts.is_empty());
@@ -446,6 +472,93 @@ mod tests {
             assert!(path.is_file(), "artifact written: {}", path.display());
         }
         assert!(out.join("manifest.json").is_file());
+    }
+
+    /// CSS 项目：entry → theme.css + lib.js；lib → base.css + theme.css。
+    /// 执行序 lib 先于 entry，去重先到先得 → 级联 base 在前、theme 在后。
+    fn temp_tree_css(name: &str) -> PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("vmz-napi-pack-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/theme.css"), "body { color: red; }\n").unwrap();
+        fs::write(root.join("src/base.css"), "body { color: blue; }\n").unwrap();
+        fs::write(
+            root.join("src/lib.js"),
+            "import \"./base.css\";\nimport \"./theme.css\";\nexport const L = 1;\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("src/entry.js"),
+            "import \"./theme.css\";\nimport { L } from \"./lib.js\";\nexport function main() { return L; }\n",
+        )
+        .unwrap();
+        root
+    }
+
+    fn forward(value: &str) -> String {
+        value.replace('\\', "/")
+    }
+
+    #[test]
+    fn pack_plan_styles_wire_shape() {
+        let root = temp_tree_css("styles-plan");
+        let response = parse(&pack_plan_core(&request(&root, "browser", full_uses())));
+        assert_eq!(response["ok"], Value::Bool(true));
+        let styles = response["plan"]["styles"].as_array().unwrap();
+        // 同一 chunk 聚合为一个 CSS 产物；同身份去重先到先得。
+        assert_eq!(styles.len(), 1);
+        let style = &styles[0];
+        let file_name = style["fileName"].as_str().unwrap();
+        let stem = file_name.strip_suffix(".css").expect("css suffix");
+        let hash = stem.strip_prefix("style-").expect("style- prefix");
+        assert_eq!(hash.len(), 8);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()), "hex fingerprint: {hash}");
+        assert_eq!(style["url"], Value::String(format!("/_vmz/{file_name}")));
+        // sourcePaths 按执行序去重：lib 的边先跑，base 在前、theme 在后。
+        let source_paths: Vec<String> = style["sourcePaths"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| forward(p.as_str().unwrap()))
+            .collect();
+        assert_eq!(source_paths.len(), 2);
+        assert!(source_paths[0].ends_with("src/base.css"));
+        assert!(source_paths[1].ends_with("src/theme.css"));
+        // modules 为贡献级联的来源模块路径（有序）。
+        let modules = style["modules"].as_array().unwrap();
+        assert!(!modules.is_empty());
+        assert!(modules.iter().any(|m| forward(m.as_str().unwrap()).ends_with("src/lib.js")));
+        // content 不上 wire：文本只走 packWrite。
+        assert!(style.get("content").is_none());
+    }
+
+    #[test]
+    fn pack_write_materializes_css() {
+        let root = temp_tree_css("styles-write");
+        let out = root.join("dist");
+        let response = parse(&pack_write_core(
+            &request(&root, "browser", full_uses()),
+            &out.to_string_lossy(),
+        ));
+        assert_eq!(response["ok"], Value::Bool(true));
+        let styles = response["plan"]["styles"].as_array().unwrap();
+        assert_eq!(styles.len(), 1);
+        let path = out.join(styles[0]["fileName"].as_str().unwrap());
+        assert!(path.is_file(), "css artifact written: {}", path.display());
+        let css = fs::read_to_string(&path).unwrap();
+        // 级联顺序是合同：base（蓝）先于 theme（红）。
+        let blue = css.find("color: blue").expect("base.css inlined");
+        let red = css.find("color: red").expect("theme.css inlined");
+        assert!(blue < red, "cascade order: {css}");
+        // theme.css 去重：两个模块都引用，只拼接一次。
+        assert_eq!(css.matches("color: red").count(), 1);
+        // JS 产物不含 CSS import 文本。
+        for artifact in response["plan"]["artifacts"].as_array().unwrap() {
+            let code =
+                fs::read_to_string(out.join(artifact["fileName"].as_str().unwrap())).unwrap();
+            assert!(!code.contains(".css"), "css import removed from js: {code}");
+        }
     }
 
     #[test]

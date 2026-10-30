@@ -6,12 +6,17 @@
 //! 命名空间合成（星号语义、同 chunk 动态边界）的形态都显式诊断拒绝，
 //! 不产出猜测文本。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
 //! 不能提前定名），指纹与替换由 `manifest` 层的两遍法完成。
+//!
+//! Style 目标节点的边在本层只负责 JS 侧文本处置：副作用/空绑定形态的
+//! import 语句整体移除（级联由 `style` 层聚合为独立 CSS artifact），
+//! 绑定、重导出与动态导入形态显式诊断拒绝。资源引用只重写
+//! `new URL` 第一参数，保留 URL 构造外壳。
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::chunk::Chunk;
 use crate::diag::PackDiagnostic;
-use crate::graph::{EdgeKind, ModuleNode};
+use crate::graph::{EdgeKind, ModuleNode, NodeKind};
 use crate::link::{LinkedModule, UsedReexport};
 use crate::module::{ExportFact, ImportKind, ImportedName};
 
@@ -104,6 +109,19 @@ pub(crate) fn assemble_chunk(
                         );
                         continue;
                     };
+                    if context.graph.nodes[target].kind == NodeKind::Style {
+                        errors.push(
+                            PackDiagnostic::new(
+                                "vmz::pack::emit::dynamic_style_unsupported",
+                                format!(
+                                    "动态 import `{}` 目标是 CSS：样式只经宿主模块静态副作用边进入级联",
+                                    edge.specifier
+                                ),
+                            )
+                            .with_path(module_path.clone()),
+                        );
+                        continue;
+                    }
                     let Some(target_chunk) = chunk_of_node(context, target, &module_path, errors)
                     else {
                         continue;
@@ -195,9 +213,26 @@ pub(crate) fn assemble_chunk(
                 }
                 // 资源读不到的已在 `collect_assets` 阶段整体拒绝；这里只消费。
                 let key = (module_path.clone(), asset.specifier.clone());
-                if let Some(artifact) = context.asset_index.get(&key) {
-                    replacements.insert(asset.span, json_string(&artifact.url));
-                }
+                let Some(artifact) = context.asset_index.get(&key) else { continue };
+                // URL 对象语义：只重写 `new URL` 的第一参数为指纹化相对
+                // 路径，保留构造外壳；chunk 与资产同目录写出，运行时按
+                // chunk 自身 URL 解析成立。整段替换成字符串是错误语义。
+                let Some(specifier_span) = asset.specifier_span else {
+                    errors.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::asset_unrewritable",
+                            format!(
+                                "资源 `{}` 字面量 span 缺失，无法重写 `new URL` 第一参数",
+                                asset.specifier
+                            ),
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(asset.span),
+                    );
+                    continue;
+                };
+                replacements
+                    .insert(specifier_span, json_string(&format!("./{}", artifact.file_name)));
             }
             let replaced = match apply_replacements(raw, statement.span.0, replacements) {
                 Ok(text) => text,
@@ -440,6 +475,25 @@ pub(crate) fn assemble_chunk(
                 );
                 continue;
             };
+            if context.graph.nodes[target].kind == NodeKind::Style {
+                // CSS 导入语句的文本一律移除（不留空壳）：级联内容由
+                // `style` 层聚合为独立 CSS artifact，副作用顺序即执行序。
+                // 只有绑定形态需要显式拒绝——不透明节点给不出绑定。
+                if import.bindings.iter().any(|binding| !binding.inline_type_only) {
+                    errors.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::style_binding_unsupported",
+                            format!(
+                                "import `{}` 从 CSS 获取绑定：样式节点不透明，无导出绑定",
+                                import.specifier
+                            ),
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(import.span),
+                    );
+                }
+                continue;
+            }
             if !context.retained[target] {
                 // 目标被链接层剪除：绑定必未被活跃语句引用，import 文本一并消失。
                 continue;
@@ -658,7 +712,7 @@ fn check_names(
 }
 
 /// 切片内替换：按起点升序应用，区间不得重叠或越出切片。
-fn apply_replacements(
+pub(crate) fn apply_replacements(
     raw: &str,
     base: usize,
     replacements: BTreeMap<(usize, usize), String>,
@@ -713,6 +767,16 @@ fn edge_target_node(
         return None;
     };
     match context.graph.index_of(id) {
+        Some(target) if context.graph.nodes[target].kind == NodeKind::Style => {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::style_reexport_unsupported",
+                    format!("重导出 `{specifier}` 目标是 CSS：样式节点不透明，无法导出绑定"),
+                )
+                .with_path(module_path.to_string()),
+            );
+            None
+        }
         Some(target) => Some(target),
         None => {
             errors.push(

@@ -5,10 +5,12 @@
 //! 同一文件被多个 importer 引用时只建一个节点。类型-only 导入不建立边——
 //! 类型不进入运行时图。解析失败保留为边上的诊断，不静默丢边。
 //!
-//! CSS 导入在节点展开时显式拒绝（`vmz::pack::graph::css_import_unsupported`）：
-//! 不得按 JS 源码读取而静默产出错误文本；拒绝节点无模块事实，沿 `chunk` 与
-//! `emit` 的事实不完整链路整体拒绝。CSS 的正式支持（抽取、注入、按入口聚合）
-//! 是未实现的独立缺口。
+//! `.css` 文件进图成为 [`NodeKind::Style`] 不透明节点：绝不按 JS 源码解析、
+//! 绝不进 module collect、无出边；importer→style 的有序副作用边保留，
+//! 可达性即宿主模块活跃性。产物聚合（执行序拼接、指纹、`url()` 搬迁）
+//! 在 `emit` 层；内容指纹身份也在 emit 读取字节时派生。CSS 作为图入口
+//! 显式拒绝（`vmz::pack::graph::style_entry_unsupported`）：样式必须挂在
+//! JS 宿主模块的执行序上，没有宿主的 CSS 无法进入任何 chunk 的级联。
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -48,9 +50,20 @@ pub enum EdgeKind {
     Dynamic,
 }
 
+/// 节点类别：JS 模块或不透明样式节点。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeKind {
+    /// JS/TS 模块：经 Oak 事实收集参与链接与分包。
+    Js,
+    /// `.css` 样式节点：不透明，绝不按 JS 源码解析，只承载有序副作用边。
+    Style,
+}
+
 /// 一个可达模块节点。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleNode {
+    /// 节点类别。
+    pub kind: NodeKind,
     /// 解析身份（含包实例）。
     pub resolved: Resolved,
     /// Oak 模块事实。
@@ -118,6 +131,16 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
                 continue;
             }
         };
+        if canonical.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("css")) {
+            graph.diagnostics.push(
+                PackDiagnostic::new(
+                    "vmz::pack::graph::style_entry_unsupported",
+                    "CSS cannot be a graph entry; styles attach to JS host modules",
+                )
+                .with_path(canonical.display().to_string()),
+            );
+            continue;
+        }
         let resolved = Resolved {
             path: canonical.clone(),
             package: crate::resolve::package_of_path(&canonical),
@@ -167,19 +190,16 @@ fn expand(
     graph_diags: &mut Vec<PackDiagnostic>,
 ) -> ModuleNode {
     let path = &resolved.path;
-    // CSS 不是 JS 模块：不读源码、不猜测，节点级显式拒绝，
-    // 下游 chunk/emit 按事实不完整链路整体拒绝。
+    // CSS 进图成为不透明 Style 节点：不读源码、不收集 JS 事实、无出边；
+    // importer→style 的有序副作用边由宿主模块承载，产物聚合在 emit 层。
     if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("css")) {
         return ModuleNode {
+            kind: NodeKind::Style,
             resolved: resolved.clone(),
             record: ModuleRecord::empty(Some(path.display().to_string())),
             static_edges: Vec::new(),
             dynamic_edges: Vec::new(),
-            diagnostics: vec![PackDiagnostic::new(
-                "vmz::pack::graph::css_import_unsupported",
-                "CSS import cannot be linked as a JS module; formal CSS support is not implemented",
-            )
-            .with_path(path.display().to_string())],
+            diagnostics: Vec::new(),
         };
     }
     let source = match std::fs::read_to_string(path) {
@@ -193,6 +213,7 @@ fn expand(
                 .with_path(path.display().to_string()),
             );
             return ModuleNode {
+                kind: NodeKind::Js,
                 resolved: resolved.clone(),
                 record: ModuleRecord::empty(Some(path.display().to_string())),
                 static_edges: Vec::new(),
@@ -205,6 +226,7 @@ fn expand(
         Ok(record) => record,
         Err(diagnostics) => {
             return ModuleNode {
+                kind: NodeKind::Js,
                 resolved: resolved.clone(),
                 record: ModuleRecord::empty(Some(path.display().to_string())),
                 static_edges: Vec::new(),
@@ -277,6 +299,7 @@ fn expand(
     }
 
     ModuleNode {
+        kind: NodeKind::Js,
         resolved: resolved.clone(),
         record,
         static_edges,
@@ -346,6 +369,7 @@ mod placeholders {
     /// 入队但未展开的节点占位。
     pub fn pending(resolved: Resolved) -> ModuleNode {
         ModuleNode {
+            kind: NodeKind::Js,
             resolved,
             record: ModuleRecord::empty(None),
             static_edges: Vec::new(),

@@ -18,6 +18,12 @@ pub fn write_emit(plan: &EmitPlan, out_dir: &Path) -> Result<(), Vec<PackDiagnos
             diagnostics.push(write_failed(&path, &err));
         }
     }
+    for style in &plan.styles {
+        let path = out_dir.join(&style.file_name);
+        if let Err(err) = std::fs::write(&path, style.content.as_bytes()) {
+            diagnostics.push(write_failed(&path, &err));
+        }
+    }
     for asset in &plan.assets {
         let target = out_dir.join(&asset.file_name);
         if let Some(parent) = target.parent()

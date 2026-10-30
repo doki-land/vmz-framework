@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use vmz_pack::graph::{EdgeKind, build_graph};
+use vmz_pack::graph::{EdgeKind, NodeKind, build_graph};
 use vmz_pack::resolve::Target;
 
 fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
@@ -124,12 +124,12 @@ fn shared_dependency_is_a_single_node() {
     assert!(shared.resolved.package.as_ref().unwrap().name == "app");
 }
 
-/// CSS 导入在节点展开时显式拒绝：边仍解析到文件，节点带
-/// `css_import_unsupported` 诊断且没有模块事实，不被当 JS 读取。
+/// CSS 导入进图成为不透明 Style 节点：不按 JS 源码解析、无出边、
+/// 无诊断；宿主 importer→style 的有序副作用边保留。
 #[test]
-fn css_import_is_rejected_at_node_expansion() {
+fn css_import_becomes_opaque_style_node() {
     let root = temp_tree(
-        "cssreject",
+        "cssstyle",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             ("src/entry.js", "import './s.css';\nexport const x = 1;\n"),
@@ -141,17 +141,36 @@ fn css_import_is_rejected_at_node_expansion() {
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     assert_eq!(graph.nodes.len(), 2);
 
-    // 边目标解析成功（身份层只回答文件身份，语义拒绝在图展开层）。
     let edge = &graph.nodes[0].static_edges[0];
     assert_eq!(edge.specifier, "./s.css");
+    assert_eq!(edge.kind, EdgeKind::SideEffect);
     assert!(edge.target.is_ok(), "{:?}", edge.target);
 
     let css = &graph.nodes[1];
+    assert_eq!(css.kind, NodeKind::Style);
     assert!(css.resolved.path.ends_with("s.css"));
-    assert_eq!(css.diagnostics.len(), 1);
-    assert_eq!(css.diagnostics[0].code, "vmz::pack::graph::css_import_unsupported");
+    assert!(css.diagnostics.is_empty());
     assert!(css.record.statements.is_empty(), "CSS 不得按 JS 源码收集事实");
+    assert!(css.record.assets.is_empty());
     assert!(css.static_edges.is_empty() && css.dynamic_edges.is_empty());
+}
+
+/// CSS 作为图入口显式拒绝：样式必须挂在 JS 宿主模块的执行序上。
+#[test]
+fn css_entry_is_rejected() {
+    let root = temp_tree(
+        "cssentry",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/s.css", "body{margin:0}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/s.css"))], Target::Browser, &root);
+    assert_eq!(graph.diagnostics.len(), 1);
+    assert_eq!(graph.diagnostics[0].code, "vmz::pack::graph::style_entry_unsupported");
+    assert!(graph.entries.is_empty());
+    assert!(graph.nodes.is_empty());
 }
 
 #[test]

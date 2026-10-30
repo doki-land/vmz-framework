@@ -7,7 +7,9 @@
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use super::{AssetArtifact, ChunkArtifact, EmitContext, EmitPlan, normalize_path, placeholder};
+use super::{
+    AssetArtifact, ChunkArtifact, EmitContext, EmitPlan, StyleArtifact, normalize_path, placeholder,
+};
 
 /// sha256 摘要的前 `digits` 位十六进制（小写）。
 pub(crate) fn hex(bytes: &[u8], digits: usize) -> String {
@@ -34,6 +36,7 @@ fn slug(chunk_id: &str) -> String {
 pub(crate) fn finalize(
     context: &EmitContext<'_>,
     codes: Vec<String>,
+    styles: Vec<StyleArtifact>,
     warnings: Vec<PackDiagnostic>,
 ) -> EmitPlan {
     let file_names: Vec<String> = codes
@@ -103,6 +106,7 @@ pub(crate) fn finalize(
     let manifest_json = render_manifest(&artifacts, &entry_files, &assets);
     EmitPlan {
         artifacts,
+        styles,
         assets,
         entry_files,
         dynamic_files: dynamic_files.into_iter().collect(),
