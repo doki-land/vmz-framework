@@ -14,6 +14,10 @@ export interface NativeAddon {
     authorJson5ToCanonicalJson?: (source: string) => string;
     loadLocalePlan?: (projectRoot: string) => string;
     loadDocumentRoutePlan?: (projectRoot: string) => string;
+    /** vmz-pack v0 contract — synchronous plan request/response over JSON strings. */
+    packPlan?: (requestJson: string) => string;
+    /** vmz-pack v0 contract — plan plus artifact write under `outDir`. */
+    packWrite?: (requestJson: string, outDir: string) => string;
     [key: string]: unknown;
 }
 

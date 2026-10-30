@@ -33,6 +33,7 @@ const files = [
     'diag-locale-catalog.test.ts',
     'pack-vendor-module-closure.test.ts',
     'pack-vendor-assets.test.ts',
+    'pack-native-contract.test.ts',
 ].map((f) => path.join(here, 'unit', f));
 
 const r = spawnSync(process.execPath, ['--import', resolveHook, '--test', '--experimental-strip-types', ...files], {
