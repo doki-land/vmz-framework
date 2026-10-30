@@ -76,7 +76,7 @@ pub fn erase_types(source: &str) -> Result<String, String> {
 /// The ranges are sorted and merged, so they can be used to map erased output
 /// offsets back to the original source and to keep the minifier from emitting
 /// type-only tokens.
-pub(crate) fn erase_types_with_deletions(
+pub fn erase_types_with_deletions(
     source: &str,
 ) -> Result<(String, Vec<(usize, usize)>), String> {
     let text = SourceText::new(source);

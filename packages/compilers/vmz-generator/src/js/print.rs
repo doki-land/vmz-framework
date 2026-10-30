@@ -31,11 +31,18 @@ impl JsPrintOptions {
 }
 
 /// One generated token mapped back to its original source position.
-struct Segment {
-    gen_line: u32,
-    gen_col: u32,
-    src_line: u32,
-    src_col: u32,
+#[derive(Debug, Clone, Copy)]
+pub struct SourceMapSegment {
+    /// Line in the generated output (0-based).
+    pub gen_line: u32,
+    /// Column in the generated output, UTF-16 units (0-based).
+    pub gen_col: u32,
+    /// Index into the `sources` array passed to [`source_map_json`].
+    pub src_index: u32,
+    /// Line in the original source (0-based).
+    pub src_line: u32,
+    /// Column in the original source, UTF-16 units (0-based).
+    pub src_col: u32,
 }
 
 /// Parse and print a TypeScript source module with Oak type erasure.
@@ -63,8 +70,9 @@ pub fn print_js_source(
         let segments = erased_line_segments(source, &deletions, &formatted);
         (formatted, segments)
     };
-    let map =
-        options.source_map_path.as_ref().map(|_| source_map_json(filename, source, &segments));
+    let map = options.source_map_path.as_ref().map(|_| {
+        source_map_json(filename, &[filename.to_string()], &[source.to_string()], &segments)
+    });
     Ok(EmittedJs { code, map })
 }
 
@@ -82,7 +90,7 @@ pub fn print_js_source(
 fn minify_tokens(
     source: &str,
     deletions: &[(usize, usize)],
-) -> Result<(String, Vec<Segment>), String> {
+) -> Result<(String, Vec<SourceMapSegment>), String> {
     let text = SourceText::new(source);
     let language = TypeScriptLanguage::default();
     let lexer = TypeScriptLexer::new(&language);
@@ -117,7 +125,13 @@ fn minify_tokens(
                 push_text(&mut out, &mut line, &mut col, separator);
             }
             let (src_line, src_col) = source_lines.line_col(start);
-            segments.push(Segment { gen_line: line, gen_col: col, src_line, src_col });
+            segments.push(SourceMapSegment {
+                gen_line: line,
+                gen_col: col,
+                src_index: 0,
+                src_line,
+                src_col,
+            });
             push_text(&mut out, &mut line, &mut col, fragment);
             prev = Some((token.kind, start, end));
         }
@@ -236,14 +250,24 @@ fn push_text(out: &mut String, line: &mut u32, col: &mut u32, text: &str) {
 }
 
 /// Map generated offsets of the erased output back to original line starts.
-fn erased_line_segments(source: &str, deletions: &[(usize, usize)], erased: &str) -> Vec<Segment> {
+fn erased_line_segments(
+    source: &str,
+    deletions: &[(usize, usize)],
+    erased: &str,
+) -> Vec<SourceMapSegment> {
     let source_lines = SourceLines::new(source);
     let mut segments = Vec::new();
     let mut offset = 0usize;
     for (index, generated) in erased.split('\n').enumerate() {
         let original = map_erased_offset(offset, deletions);
         let (src_line, src_col) = source_lines.line_col(original);
-        segments.push(Segment { gen_line: index as u32, gen_col: 0, src_line, src_col });
+        segments.push(SourceMapSegment {
+            gen_line: index as u32,
+            gen_col: 0,
+            src_index: 0,
+            src_line,
+            src_col,
+        });
         offset += generated.len() + 1;
     }
     segments
@@ -252,7 +276,7 @@ fn erased_line_segments(source: &str, deletions: &[(usize, usize)], erased: &str
 /// Translate an offset in the erased output to the original source.
 ///
 /// Offsets inside a deleted range map to the end of that range.
-fn map_erased_offset(offset: usize, deletions: &[(usize, usize)]) -> usize {
+pub fn map_erased_offset(offset: usize, deletions: &[(usize, usize)]) -> usize {
     let mut removed = 0usize;
     for &(start, end) in deletions {
         let length = end - start;
@@ -267,13 +291,15 @@ fn map_erased_offset(offset: usize, deletions: &[(usize, usize)]) -> usize {
     offset + removed
 }
 
-struct SourceLines<'a> {
+/// Line index over a source text; columns are counted in UTF-16 units.
+pub struct SourceLines<'a> {
     source: &'a str,
     starts: Vec<usize>,
 }
 
 impl<'a> SourceLines<'a> {
-    fn new(source: &'a str) -> Self {
+    /// Index the line starts of `source`.
+    pub fn new(source: &'a str) -> Self {
         let mut starts = vec![0usize];
         for (index, byte) in source.bytes().enumerate() {
             if byte == b'\n' {
@@ -283,7 +309,8 @@ impl<'a> SourceLines<'a> {
         Self { source, starts }
     }
 
-    fn line_col(&self, offset: usize) -> (u32, u32) {
+    /// Line and UTF-16 column of a byte offset (clamped to the source end).
+    pub fn line_col(&self, offset: usize) -> (u32, u32) {
         let offset = offset.min(self.source.len());
         let line = self.starts.partition_point(|&start| start <= offset) - 1;
         let column =
@@ -292,13 +319,23 @@ impl<'a> SourceLines<'a> {
     }
 }
 
-/// Emit a source map v3 document with token-level mappings.
-fn source_map_json(filename: &str, source: &str, segments: &[Segment]) -> String {
+/// Emit a source map v3 document over one or more sources.
+///
+/// Segments must be sorted by `(gen_line, gen_col)`; the `src_index` field
+/// selects the entry in `sources` / `sources_content` (adjacent deltas are
+/// encoded into `mappings`).
+pub fn source_map_json(
+    file: &str,
+    sources: &[String],
+    sources_content: &[String],
+    segments: &[SourceMapSegment],
+) -> String {
     let mut mappings = String::new();
     let last_line = segments.last().map_or(0, |segment| segment.gen_line);
     let mut index = 0usize;
     let mut prev_src_line = 0i64;
     let mut prev_src_col = 0i64;
+    let mut prev_src_index = 0i64;
     for line in 0..=last_line {
         if line > 0 {
             mappings.push(';');
@@ -312,10 +349,11 @@ fn source_map_json(filename: &str, source: &str, segments: &[Segment]) -> String
             }
             first = false;
             mappings.push_str(&vlq(segment.gen_col as i64 - prev_gen_col));
-            mappings.push_str(&vlq(0));
+            mappings.push_str(&vlq(segment.src_index as i64 - prev_src_index));
             mappings.push_str(&vlq(segment.src_line as i64 - prev_src_line));
             mappings.push_str(&vlq(segment.src_col as i64 - prev_src_col));
             prev_gen_col = segment.gen_col as i64;
+            prev_src_index = segment.src_index as i64;
             prev_src_line = segment.src_line as i64;
             prev_src_col = segment.src_col as i64;
             index += 1;
@@ -323,9 +361,9 @@ fn source_map_json(filename: &str, source: &str, segments: &[Segment]) -> String
     }
     serde_json::json!({
         "version": 3,
-        "file": filename,
-        "sources": [filename],
-        "sourcesContent": [source],
+        "file": file,
+        "sources": sources,
+        "sourcesContent": sources_content,
         "names": [],
         "mappings": mappings,
     })

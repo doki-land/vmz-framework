@@ -20,7 +20,7 @@ pub use emit_compat::{
 };
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
-pub use erase::erase_types;
+pub use erase::{erase_types, erase_types_with_deletions};
 pub use expr_parse::{
     SnippetSpan, print_template_expr, template_expr_root_span, template_expr_snippet_error,
     template_expr_snippet_error_with_span, template_expr_snippet_ok, wrap_template_expr_source,
@@ -36,7 +36,10 @@ pub use locale::{
 };
 pub use module_rewrite::{rewrite_module_specifiers, rewrite_module_specifiers_required};
 pub use oak_expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_oak};
-pub use print::{EmittedJs, JsPrintOptions, print_js_source};
+pub use print::{
+    EmittedJs, JsPrintOptions, SourceLines, SourceMapSegment, map_erased_offset, print_js_source,
+    source_map_json,
+};
 pub use row_kernel::try_emit_row_kernel_js;
 pub use transpile::{transpile_ts, transpile_ts_printed, transpile_ts_with_map};
 mod entry;
