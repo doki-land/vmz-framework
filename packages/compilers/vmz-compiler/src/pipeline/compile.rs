@@ -818,6 +818,9 @@ fn rewrite_nested_browser_delivery(text: &str) -> String {
         "../../shared/dom-attr-normalize.js",
         "../../dom-attr-normalize.js",
     );
+    // `dom-ssr.js` 只交付在根（flat barrel），nested `ssr/` 下没有它：
+    // island resume 的动态边必须指向根级产物。
+    out = replace_import_path(&out, "../../ssr/dom-ssr.js", "../../dom-ssr.js");
     for (from, to) in [
         ("../direct-host-box.js", "../../direct-host-box.js"),
         ("../unknown-component.js", "../../unknown-component.js"),

@@ -50,6 +50,9 @@ function rewriteNestedSsrDelivery(text: string): string {
 
 function rewriteNestedBrowserDelivery(text: string): string {
     let out = replaceImportPath(text, '../../shared/dom-attr-normalize.js', '../../dom-attr-normalize.js');
+    // `dom-ssr.js` 只交付在根（flat barrel），nested `ssr/` 下没有它：
+    // island resume 的动态边必须指向根级产物。
+    out = replaceImportPath(out, '../../ssr/dom-ssr.js', '../../dom-ssr.js');
     for (const [from, to] of [
         ['../direct-host-box.js', '../../direct-host-box.js'],
         ['../unknown-component.js', '../../unknown-component.js'],
