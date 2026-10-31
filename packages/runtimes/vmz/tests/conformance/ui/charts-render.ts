@@ -18,6 +18,9 @@
  * - rows with null / non-finite cells are skipped with structured diagnostics
  *   (`davinci.chart.missing-value` / `davinci.chart.non-finite-value`), and NaN
  *   or Infinity never reaches the markup
+ * - an explicit `log` scale whose domain endpoints are not finite and positive
+ *   is refused with `davinci.chart.invalid-log-domain` (error): the scale is
+ *   never installed and never silently auto-derived, so the chart stays empty
  * - bars grow away from the zero pixel, so negative values keep a positive
  *   height and never flip above zero
  * - line marks never bridge two series (one path per series, legend order is
@@ -532,6 +535,56 @@ console.log('charts-render: unknown encoding field is an error diagnostic…');
     if (!unknown.message.includes('missing')) fail(`diagnostic must name the field: ${unknown.message}`);
     if (semantic.root.children.length !== 0) fail('an unusable y field must not emit geometry');
     if (svg.includes('NaN')) fail('unknown field must not emit NaN');
+}
+
+console.log('charts-render: an explicit log scale with an invalid domain is refused…');
+{
+    const pointSpec = {
+        mark: 'circle',
+        encoding: [
+            { field: 'step', channel: 'x' },
+            { field: 'score', channel: 'y' },
+        ],
+    };
+    const logRows = [
+        { step: 1, score: 10 },
+        { step: 2, score: 100 },
+        { step: 3, score: 1000 },
+    ];
+    const withYLog = (domain) => ({
+        ...pointSpec,
+        scales: new Map([['y', { kind: 'log', domain, range: [0, 1] }]]),
+    });
+    for (const domain of [
+        [0, 100],
+        [-5, 100],
+        [Number.NaN, 100],
+        [1, Number.POSITIVE_INFINITY],
+    ]) {
+        const plan = compile(withYLog(domain), fromRows(logRows));
+        const invalid = plan.diagnostics.items.find((d) => d.code === 'davinci.chart.invalid-log-domain');
+        if (!invalid) fail(`domain [${domain}] must raise davinci.chart.invalid-log-domain`);
+        if (invalid.severity !== 'error') fail(`invalid-log-domain must be an error, got ${invalid.severity}`);
+        if (invalid.source !== 'y') fail(`invalid-log-domain source must name the channel, got ${invalid.source}`);
+        if (!invalid.message.includes('y')) fail(`message must name the channel: ${invalid.message}`);
+        if (plan.scales.has('y')) fail(`a refused log scale must not be installed: domain [${domain}]`);
+        const semantic = buildScene(plan, { width: WIDTH, height: HEIGHT });
+        const svg = renderSvg(resolve(semantic, { width: WIDTH, height: HEIGHT }));
+        if (svg.includes('NaN') || svg.includes('Infinity')) {
+            fail(`refused log domain must not leak into markup: [${domain}]`);
+        }
+        if (count(svg, '<ellipse') !== 0) fail(`refused log scale must emit no marks: [${domain}]`);
+    }
+
+    // A usable log domain installs the scale untouched.
+    const okPlan = compile(withYLog([1, 1000]), fromRows(logRows));
+    if (okPlan.diagnostics.items.some((d) => d.code === 'davinci.chart.invalid-log-domain')) {
+        fail('a finite positive log domain must not be refused');
+    }
+    if (!okPlan.scales.has('y')) fail('a valid log scale must be installed');
+    const okSvg = renderSvg(resolve(buildScene(okPlan, { width: WIDTH, height: HEIGHT }), { width: WIDTH, height: HEIGHT }));
+    if (count(okSvg, '<ellipse') !== 3) fail(`valid log scale wants 3 marks, got ${count(okSvg, '<ellipse')}`);
+    if (okSvg.includes('NaN') || okSvg.includes('Infinity')) fail('valid log scale must not emit NaN / Infinity');
 }
 
 console.log('charts-render: negative values keep a zero baseline…');

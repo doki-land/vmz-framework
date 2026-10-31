@@ -141,7 +141,24 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
         // Auto-derive scales based on field semantics (simple heuristic).
         if (spec.scales?.has(enc.channel)) {
-            scales.set(enc.channel, spec.scales.get(enc.channel)!);
+            const explicit = spec.scales.get(enc.channel)!;
+            // A log scale whose domain endpoints are not finite and positive
+            // maps no real position. Refuse it outright — the scale is never
+            // installed and never silently replaced by an auto-derived one,
+            // so the channel stays scale-less (an empty chart) and the
+            // diagnostic says why.
+            if (explicit.kind === "log" && !isLogDomainUsable(explicit.domain)) {
+                diagnostics.push(
+                    diag(
+                        "error",
+                        "davinci.chart.invalid-log-domain",
+                        `log scale on channel "${enc.channel}" needs a finite positive domain, got [${String(explicit.domain[0])}, ${String(explicit.domain[1])}]`,
+                        enc.channel,
+                    ),
+                );
+                continue;
+            }
+            scales.set(enc.channel, explicit);
             continue;
         }
         switch (col.semantic) {
@@ -268,6 +285,13 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
 
     const seriesDomain: SeriesDomain = { field: seriesCol ? (seriesEnc?.field ?? null) : null, categories: seriesCategories };
     return { spec, resolvedData: data, scales, marks, series: seriesDomain, diagnostics: { items: diagnostics } };
+}
+
+/** Both log-domain endpoints must be finite and strictly positive —
+ *  `log(0)` / `log(negative)` is not a real position and a non-finite
+ *  endpoint poisons the whole mapping. */
+function isLogDomainUsable(domain: readonly [number, number]): boolean {
+    return Number.isFinite(domain[0]) && Number.isFinite(domain[1]) && domain[0] > 0 && domain[1] > 0;
 }
 
 /** Whether a raw cell can be turned into a finite number (or a real category). */
