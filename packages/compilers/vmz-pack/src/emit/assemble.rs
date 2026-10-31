@@ -10,6 +10,10 @@
 //! 事实链离开本 chunk 的按跨 chunk 形态合成 import；同 chunk 命名空间
 //! 绑定合成 `import * as <local> from <本 chunk 自身产物>`（真实 Module
 //! Namespace，名字集按 chunk 加宽，与既有加宽合同同构）。
+//! 同 chunk `declared × declared` 冲突中，未被任何非类型导出事实消费的
+//! 声明改名 `{name}__vmz{node_index}`（声明 token 与活跃值引用一并改写，
+//! chunk 对外名字集不变）；守卫任一不成立不改名，冲突维持 `name_conflict`
+//! 显式拒绝。
 //! 同 chunk 具名重导出沿目标模块的导出事实解析为 chunk 内绑定名，与
 //! deferred Local 导出同一机制发 `export { <绑定名> [as <导出名>] };`，
 //! 事实链离开本 chunk 时与跨 chunk 分支同形态发 `export { … } from`；
@@ -119,6 +123,11 @@ pub(crate) fn assemble_chunk(
     let mut json_locals: BTreeSet<(usize, String)> = BTreeSet::new();
     let mut json_texts: HashMap<usize, Option<String>> = HashMap::new();
 
+    // 同 chunk 声明改名预决议：必须先于逐模块处理——fresh 名的碰撞扫描
+    // 覆盖 chunk 全部活跃语句文本，改名 span 与消费者 scope 重写共用同一
+    // 替换表注入切片。守卫不成立的冲突维持由 `check_names` 显式拒绝。
+    let declaration_renames = plan_declaration_renames(context, chunk_index);
+
     for &node_index in &chunk.modules {
         let Some(node) = context.graph.nodes.get(node_index) else { continue };
         let Some(linked) = context.linked[node_index] else { continue };
@@ -129,7 +138,7 @@ pub(crate) fn assemble_chunk(
 
         // 同 chunk 静态 import 绑定预决议：必须先于语句切片——scope 重写的
         // 引用 span 要进入切片替换表，映射链（生成行→擦除→替换→源）随之成立。
-        let (renames, binding_decisions) = plan_same_chunk_bindings(
+        let (mut renames, binding_decisions) = plan_same_chunk_bindings(
             context,
             chunk_index,
             node,
@@ -143,6 +152,14 @@ pub(crate) fn assemble_chunk(
             warnings,
             errors,
         );
+        // 声明改名并入同一重写表：import local 与声明名在同模块内不相交
+        // （重复绑定即 scope_incomplete，两侧守卫都已拒绝），切片注入、
+        // `renamed_local` 与 deferred 导出统一消费。
+        if let Some(declared_renames) = declaration_renames.get(&node_index) {
+            for (name, rewrite) in declared_renames {
+                renames.insert(name.clone(), rewrite.clone());
+            }
+        }
 
         // 存活动态边分类：一次判定，避免按语句重复诊断。
         let mut dynamic_replacements: Vec<(String, usize)> = Vec::new();
@@ -935,10 +952,13 @@ pub(crate) fn assemble_chunk(
     Some(AssembledChunk { code: format!("{imports_text}{body}{exports_text}"), segments })
 }
 
-/// scope 重写计划：消费者绑定旧名在其值引用 span 上改写为 chunk 落点名。
+/// scope 重写计划：消费者绑定旧名在其值引用 span 上改写为 chunk 落点名，
+/// 或同 chunk 声明改名时声明 token 与其值引用 span 改写为 fresh 名。
+#[derive(Clone)]
 struct BindingRewrite {
     new_name: String,
-    /// 落在活跃语句内的值引用 span（import/export 子句内的不发射，不入表）。
+    /// 落在活跃语句内的值引用 span（import/export 子句内的不发射，不入表；
+    /// 声明改名时另含声明 token 自身）。
     spans: Vec<(usize, usize)>,
 }
 
@@ -1073,13 +1093,7 @@ fn plan_same_chunk_bindings(
     let mut stripped_spans: Vec<(usize, usize)> =
         record.imports.iter().map(|import| import.span).collect();
     for export in &record.exports {
-        stripped_spans.push(match export {
-            ExportFact::Local { span, .. }
-            | ExportFact::Default { span, .. }
-            | ExportFact::ReexportNamed { span, .. }
-            | ExportFact::ReexportAll { span, .. }
-            | ExportFact::ReexportNamespace { span, .. } => *span,
-        });
+        stripped_spans.push(export_fact_span(export));
     }
 
     for (import_index, import) in record.imports.iter().enumerate() {
@@ -1201,6 +1215,151 @@ fn plan_same_chunk_bindings(
         }
     }
     (renames, decisions)
+}
+
+/// export 事实的整条语句 span。
+fn export_fact_span(export: &ExportFact) -> (usize, usize) {
+    match export {
+        ExportFact::Local { span, .. }
+        | ExportFact::Default { span, .. }
+        | ExportFact::ReexportNamed { span, .. }
+        | ExportFact::ReexportAll { span, .. }
+        | ExportFact::ReexportNamespace { span, .. } => *span,
+    }
+}
+
+/// chunk 成员扫描快照：活跃语句 span 与活跃声明名，供声明改名预决议。
+struct ChunkModuleScan<'a> {
+    source: &'a str,
+    active_spans: Vec<(usize, usize)>,
+    declared: BTreeSet<String>,
+}
+
+/// 同 chunk 声明改名预决议：`declared × declared` 冲突中，未被任何非类型
+/// 导出事实消费的声明改名 `{name}__vmz{node_index}`——声明 token 与其
+/// 活跃语句内的值引用全部改写。改名不改变 chunk 对外名字集：被改名的
+/// 绑定不在导出面上，`resolve_same_chunk_reexport` 的落点必然沿导出事实
+/// 行走，不会命中被改名的声明。任一守卫不成立则不改名，冲突维持由
+/// `check_names` 发 `name_conflict` 显式拒绝（保守方向只多拒绝不漏引用）：
+/// - `scope_incomplete` 置位或绑定无 scope 事实：引用清单不可信/给不全；
+/// - `has_type_references`：类型位置引用无 span，无法一并改写；
+/// - `rename_unsafe`：声明 token 在解构模式内、或值引用是对象简写属性
+///   token，改写会连带改变属性键语义；
+/// - 声明/引用 span 切片回原文不是本名（事实与源码漂移），或引用发射
+///   归属不可判定（既不在活跃语句、也不在被剪除语句与 import/export 子句）；
+/// - fresh 名与 chunk 内任何活跃声明名相同，或按词边界出现在任一模块的
+///   活跃语句文本中（字符串与注释同样命中，保守拒绝）。
+fn plan_declaration_renames(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+) -> BTreeMap<usize, BTreeMap<String, BindingRewrite>> {
+    let chunk = &context.chunks.chunks[chunk_index];
+    let mut scans: BTreeMap<usize, ChunkModuleScan<'_>> = BTreeMap::new();
+    let mut name_nodes: BTreeMap<String, BTreeSet<usize>> = BTreeMap::new();
+    for &node_index in &chunk.modules {
+        let Some(node) = context.graph.nodes.get(node_index) else { continue };
+        let Some(linked) = context.linked[node_index] else { continue };
+        let Some(source) = context.sources.get(&node_index) else { continue };
+        let mut active_spans: Vec<(usize, usize)> = Vec::new();
+        let mut declared: BTreeSet<String> = BTreeSet::new();
+        for &index in &linked.active_statements {
+            let Some(statement) = node.record.statements.get(index) else { continue };
+            active_spans.push(statement.span);
+            for name in &statement.declared_names {
+                declared.insert(name.clone());
+            }
+        }
+        for name in &declared {
+            name_nodes.entry(name.clone()).or_default().insert(node_index);
+        }
+        scans.insert(node_index, ChunkModuleScan { source, active_spans, declared });
+    }
+    let mut plans: BTreeMap<usize, BTreeMap<String, BindingRewrite>> = BTreeMap::new();
+    for (name, nodes) in &name_nodes {
+        if nodes.len() < 2 {
+            continue;
+        }
+        for &node_index in nodes {
+            if let Some(rewrite) = try_plan_declaration_rename(context, node_index, name, &scans)
+            {
+                plans.entry(node_index).or_default().insert(name.clone(), rewrite);
+            }
+        }
+    }
+    plans
+}
+
+/// 单条冲突声明的改名守卫与重写计划；任一守卫不成立返回 `None`
+/// （不改名，冲突留给 `check_names` 显式拒绝）。
+fn try_plan_declaration_rename(
+    context: &EmitContext<'_>,
+    node_index: usize,
+    name: &str,
+    scans: &BTreeMap<usize, ChunkModuleScan<'_>>,
+) -> Option<BindingRewrite> {
+    let scan = scans.get(&node_index)?;
+    let record = &context.graph.nodes.get(node_index)?.record;
+    if record.scope_incomplete {
+        return None;
+    }
+    for export in &record.exports {
+        match export {
+            ExportFact::Local { local, type_only, .. } => {
+                if !type_only && local == name {
+                    return None;
+                }
+            }
+            ExportFact::Default { local: Some(local), .. } => {
+                if local == name {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+    }
+    let binding = record.scope_bindings.iter().find(|item| item.name == name)?;
+    if binding.has_type_references || binding.rename_unsafe {
+        return None;
+    }
+    if !scan.active_spans.iter().any(|outer| contains(*outer, binding.declaration)) {
+        return None;
+    }
+    if scan.source.get(binding.declaration.0..binding.declaration.1) != Some(name) {
+        return None;
+    }
+    let mut spans = vec![binding.declaration];
+    for span in &binding.references {
+        if scan.source.get(span.0..span.1) != Some(name) {
+            return None;
+        }
+        if scan.active_spans.iter().any(|outer| contains(*outer, *span)) {
+            spans.push(*span);
+            continue;
+        }
+        // 被剪除语句与 import/export 子句内的引用不进产物文本；其余位置
+        // 发射归属不可判定，拒绝。
+        let in_statement = record.statements.iter().any(|item| contains(item.span, *span));
+        let in_clause = record.imports.iter().any(|item| contains(item.span, *span))
+            || record.exports.iter().any(|item| contains(export_fact_span(item), *span));
+        if !in_statement && !in_clause {
+            return None;
+        }
+    }
+    let fresh = format!("{name}__vmz{node_index}");
+    for other in scans.values() {
+        if other.declared.contains(&fresh) {
+            return None;
+        }
+        for outer in &other.active_spans {
+            let Some(text) = other.source.get(outer.0..outer.1) else {
+                return None;
+            };
+            if contains_identifier(text, &fresh) {
+                return None;
+            }
+        }
+    }
+    Some(BindingRewrite { new_name: fresh, spans })
 }
 
 /// 替换文本偏移 → 切片原文偏移：落在替换新文本内取替换起点，
@@ -1389,6 +1548,8 @@ enum ReexportBinding {
 /// 继续走，跨 chunk 即停）。只有星号来源、表达式 default、来源链成环
 /// 解析不出绑定，显式拒绝。`code` 由调用方按语境给出（重导出语境与
 /// import 绑定预决议语境共用本解析器）。
+/// `Declared` 落点必然沿非类型导出事实行走，声明改名守卫已排除被导出
+/// 的绑定，因此落点名无需按改名表二次映射。
 fn resolve_same_chunk_reexport(
     context: &EmitContext<'_>,
     chunk_index: usize,

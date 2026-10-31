@@ -101,6 +101,7 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
             declaration: range(binding.declaration),
             references: binding.references.into_iter().map(range).collect(),
             has_type_references: binding.has_type_references,
+            rename_unsafe: binding.rename_unsafe,
         })
         .collect();
     Ok(collector.record)

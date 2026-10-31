@@ -848,6 +848,72 @@ fn name_conflict_is_rejected() {
     assert!(errors.iter().any(|d| d.message.contains("value")), "{errors:?}");
 }
 
+/// 同 chunk 冲突声明中未被导出事实消费的一侧改名 `{name}__vmz{node}`：
+/// 声明 token 与活跃值引用一并改写，导出面与另一侧声明不受影响。
+#[test]
+fn conflicting_unexported_declaration_is_renamed() {
+    let root = temp_tree(
+        "declrename",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { value } from './a.js';\nexport const main = value;\n"),
+            ("src/a.js", "import './b.js';\nexport const value = 1;\n"),
+            ("src/b.js", "const value = 2;\nconsole.log(value);\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    assert_eq!(plan.artifacts.len(), 1);
+    let code = &plan.artifacts[0].code;
+    // 被导出的一侧原样保留，导出面不变。
+    assert!(code.contains("const value = 1"), "{code}");
+    assert!(code.contains("export { value }"), "{code}");
+    assert!(code.contains("const main = value"), "{code}");
+    // 未导出的一侧声明与引用一起改名。
+    assert!(code.contains("console.log(value__vmz"), "{code}");
+    assert!(!code.contains("const value = 2"), "{code}");
+    assert!(!code.contains("console.log(value)"), "{code}");
+}
+
+/// 冲突声明的解构模式 token 同时充当属性键（上游 `rename_unsafe`），
+/// 改名会改变语义：不改名，冲突维持 `name_conflict` 显式拒绝。
+#[test]
+fn destructuring_conflict_stays_rejected() {
+    let root = temp_tree(
+        "declconflict",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { value } from './a.js';\nexport const main = value;\n"),
+            ("src/a.js", "import './b.js';\nexport const value = 1;\n"),
+            ("src/b.js", "const { value } = obj;\nconsole.log(value);\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    assert!(codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()), "{errors:?}");
+}
+
 /// 同 chunk 的 `import { value as v }`：scope 事实给出全部值引用，消费者
 /// 绑定名在活跃语句切片内改写为 chunk 落点名，不产出任何 import 文本。
 #[test]

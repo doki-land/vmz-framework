@@ -45,6 +45,10 @@ pub struct ScopeBindingFact {
     pub references: Vec<(usize, usize)>,
     /// 名字出现在类型位置（span 不记录）。
     pub has_type_references: bool,
+    /// 声明 token 处于解构模式、或值引用是对象字面量简写 token
+    /// （两者同时充当属性键，改写全部记录 span 仍会改变语义）。
+    /// 绑定改名必须拒绝本标志置位的绑定。
+    pub rename_unsafe: bool,
 }
 
 impl ModuleRecord {
