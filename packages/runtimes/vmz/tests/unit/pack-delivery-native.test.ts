@@ -108,8 +108,8 @@ describe('packFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.equal(request.root, root);
         assert.equal(request.publicBase, '/');
         assert.deepEqual(request.uses, [
-            { logical: 'entry-client.js', usedExports: null },
-            { logical: 'entry-event.js', usedExports: null },
+            { logical: 'entry-client.js', execution: 'full', exports: { kind: 'all' } },
+            { logical: 'entry-event.js', execution: 'full', exports: { kind: 'all' } },
         ]);
 
         assert.equal(manifestPath, path.join(distDir, '_vmz', 'pack-manifest.json'));
@@ -150,7 +150,9 @@ describe('packFromDeploymentIr on the vmz-pack binding (v0)', () => {
         packFromDeploymentIr(distDir, { projectRoot: root, binding });
         const request = JSON.parse(binding.calls[0].requestJson);
         assert.deepEqual(request.entries, [{ logical: 'entry-client.js', path: path.join(distDir, 'entry-client.js') }]);
-        assert.deepEqual(request.uses, [{ logical: 'entry-client.js', usedExports: null }]);
+        assert.deepEqual(request.uses, [
+            { logical: 'entry-client.js', execution: 'full', exports: { kind: 'all' } },
+        ]);
     });
 
     it('rejects an empty bootstrap set explicitly (no silent skip)', () => {

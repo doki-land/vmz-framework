@@ -147,12 +147,17 @@ const requestJson = packNative.buildPackRequest({
     entries: { 'entry-client.js': path.resolve(dist, 'entry-client.js') },
     target: 'browser',
     root: ROOT,
-    uses: [{ logical: 'entry-client.js', usedExports: null }],
+    uses: [{ logical: 'entry-client.js', execution: 'full', exports: { kind: 'all' } }],
     publicBase: '/',
 });
 const request = JSON.parse(requestJson);
-if (request.target !== 'browser' || request.publicBase !== '/' || request.uses[0].usedExports !== null) {
-    fail('buildPackRequest must pass target/publicBase/usedExports through without guessing');
+if (
+    request.target !== 'browser' ||
+    request.publicBase !== '/' ||
+    request.uses[0].execution !== 'full' ||
+    request.uses[0].exports?.kind !== 'all'
+) {
+    fail('buildPackRequest must pass target/publicBase/execution/exports through without guessing');
 }
 
 const packMod = await import(pathToFileURL(path.join(dist, 'workspace/pack.js')).href);

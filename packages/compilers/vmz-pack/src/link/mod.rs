@@ -1,19 +1,36 @@
-//! 链接层：模块图 + 入口导出使用 → 语句级活跃不动点（Living §Pack 第 4/5 条）。
+//! 链接层：模块图 + 入口需求 → 语句级活跃不动点（Living §Pack 第 4/5 条）。
 //!
-//! 语义模型：
-//! - 入口声明 `used_exports = None` 时整体执行（全量活跃）；`Some(names)` 时
-//!   具名解析，未命中的纯语句可剪除。
-//! - 符号需求沿 worklist 传播到不动点：具名使用命中导出 → 激活声明语句或
-//!   沿 import 绑定传播；命中重导出 → 向来源模块继续传播；命名空间使用与
-//!   未知使用形态 → 目标模块全量激活。
-//! - 模块保留（保守）：入口、显式副作用导入边目标、被符号使用的模块、
-//!   含非纯顶层语句（或事实不完整无法证明纯）且从保留模块可达的模块。
-//!   纯且无使用的模块消除。判定不了即非纯，宁保守勿误剪。
-//! - 名字解析不到任何导出时给 `vmz::pack::link::unknown_export` 诊断，并把
-//!   该模块保守转为全量活跃（Oak 事实缺口如多变量声明只记首名，会在此暴露）。
+//! 入口需求拆成可组合的维度，不再压进单一 `used_exports` 字段：
+//! - 执行（[`EntryExecution`]）：入口顶层语句是否整体活跃。`Full` = 求值根，
+//!   蕴含全部静态 import 绑定与重导出按 ESM 实例化语义传播；`SideEffects` =
+//!   入口仍求值（非纯语句恒活跃），纯语句只在导出需求命中时激活。
+//! - 导出需求（[`EntryExports`]）：入口的哪些导出被消费者读取（`All` /
+//!   `Named` / `Unconsumed`）。`execution: Full` 时导出维度不改变活跃结果
+//!   （执行已蕴含实例化传播），合同仍要求显式声明，不做默认猜测。
+//! - 副作用保留不是入口声明字段，而是链接器对任何保留模块的固有规则：
+//!   保留即执行，非纯语句恒活跃（[`Demand::Retain`] 的效应）。
 //!
-//! 本层不做分包与产物生成；图可达不等于活跃，活跃只由入口使用、效果分类
-//! 与保守规则驱动。
+//! 传播需求同样按维度组合（[`Demand`]）：`Execute`（执行）/ `Retain`
+//! （副作用保留）/ `Export`（具名导出消费），沿 worklist 求不动点：具名使用
+//! 命中导出 → 激活声明语句或沿 import 绑定传播；命中重导出 → 向来源模块
+//! 继续传播。
+//!
+//! 保守升级（回退到全量执行 `Demand::Execute`）的条件，逐条可审计：
+//! - `entry_uses` 缺失的入口声明。
+//! - `SideEffects` + `All` 且模块含 `export *`：星号来源的导出名不可枚举。
+//! - 命名空间使用：`import * as ns` 绑定被引用、`export * as ns` 被消费。
+//! - 具名需求解析不到导出事实：`vmz::pack::link::unknown_export` 诊断后升级
+//!   （Oak 事实缺口如多变量声明只记首名，会在此暴露）。
+//! - 动态 import 边找不到包含语句：模块保留即执行，边界保守活。
+//!
+//! 模块保留（保守）：入口、显式副作用导入边目标、被符号使用的模块、
+//! 含非纯顶层语句（或事实不完整无法证明纯）且从保留模块可达的模块。
+//! 纯且无使用的模块消除。判定不了即非纯，宁保守勿误剪。
+//!
+//! 本层不做分包与产物生成；图可达不等于活跃，活跃只由入口需求、效果分类
+//! 与保守规则驱动。[`LinkPlan::modules`] 的 `active_statements` 与
+//! `dynamic_edges` 是链接后的唯一活跃事实来源：chunk、资源、CSS、动态边
+//! 处理必须以此为共同输入，不得另起重算。
 
 use std::collections::{HashSet, VecDeque};
 
@@ -24,13 +41,43 @@ use crate::module::{ExportFact, ImportKind, ImportedName, StatementEffect};
 /// 请求的导出名在模块导出事实中不存在。
 const UNKNOWN_EXPORT: &str = "vmz::pack::link::unknown_export";
 
-/// 入口的导出使用声明。
+/// 入口的执行维度。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryExecution {
+    /// 整体执行：入口全部顶层语句活跃，所有静态 import 绑定与重导出按
+    /// ESM 实例化语义传播。script 标签加载与宿主直接运行属于本形态。
+    Full,
+    /// 副作用保留：入口仍求值（非纯语句恒活跃），纯语句只在导出需求
+    /// 命中时激活。
+    SideEffects,
+}
+
+/// 入口的导出需求维度。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntryExports {
+    /// 消费全部非类型导出（命名空间式消费者或消费面不可静态确定）。
+    /// 模块含 `export *` 时导出名不可枚举，链接器保守升级为整体执行。
+    All,
+    /// 只消费列出的导出名。空列表与 [`EntryExports::Unconsumed`] 语义
+    /// 等价，由调用方显式选择，不互相折叠。
+    Named(Vec<String>),
+    /// 无消费者：入口导出不作为需求传播源（script 标签直接加载）。
+    Unconsumed,
+}
+
+/// 入口的链接需求声明：执行与导出需求两个可组合维度。
+///
+/// `execution` 为 [`EntryExecution::Full`] 时，执行已蕴含全部绑定与重导出
+/// 的实例化传播，`exports` 不改变活跃结果；合同仍要求显式给出，链接器
+/// 不为其猜测默认值。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryUse {
     /// 与 [`crate::graph::GraphEntry::logical`] 对应的入口逻辑名。
     pub entry_logical: String,
-    /// 入口被消费的导出名；`None` 表示入口整体执行（全量活跃）。
-    pub used_exports: Option<Vec<String>>,
+    /// 执行维度。
+    pub execution: EntryExecution,
+    /// 导出需求维度。
+    pub exports: EntryExports,
 }
 
 /// 一条被实际使用的重导出事实。
@@ -81,14 +128,15 @@ pub struct LinkPlan {
     pub diagnostics: Vec<PackDiagnostic>,
 }
 
-/// 传播中的使用需求。
+/// 传播中的链接需求：与入口声明同口径的可组合维度。
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Demand {
-    /// 模块全量执行（入口整体、命名空间使用、未知使用保守升级）。
-    Full(usize),
-    /// 模块的某个导出名被使用。
-    Symbol(usize, String),
-    /// 模块仅保留执行（可达非纯或入口保留），不指定导出使用。
+    /// 执行维度：模块整体求值（全部语句活跃 + 全部绑定与重导出实例化
+    /// 传播）。命名空间使用、未知导出、缺失入口声明等保守升级的终点。
+    Execute(usize),
+    /// 具名导出消费维度：模块的某个导出名被使用。
+    Export(usize, String),
+    /// 副作用保留维度：模块保留求值（非纯语句恒活跃），不指定导出消费。
     Retain(usize),
 }
 
@@ -154,7 +202,7 @@ impl<'g> Linker<'g> {
             let Ok(target_id) = edge.target.as_ref() else { continue };
             let Some(target) = self.graph.index_of(target_id) else { continue };
             if edge.kind == EdgeKind::SideEffect {
-                self.demand(Demand::Full(target));
+                self.demand(Demand::Execute(target));
             } else if self.non_pure(target) {
                 self.demand(Demand::Retain(target));
             }
@@ -252,13 +300,13 @@ impl<'g> Linker<'g> {
                 propagated = true;
                 match binding.imported {
                     ImportedName::Default => {
-                        self.demand(Demand::Symbol(target, "default".to_string()));
+                        self.demand(Demand::Export(target, "default".to_string()));
                     }
                     ImportedName::Name(imported) => {
-                        self.demand(Demand::Symbol(target, imported));
+                        self.demand(Demand::Export(target, imported));
                     }
                     ImportedName::Namespace => {
-                        self.demand(Demand::Full(target));
+                        self.demand(Demand::Execute(target));
                     }
                 }
             }
@@ -277,10 +325,10 @@ impl<'g> Linker<'g> {
             }
             self.diagnostics.push(diagnostic);
         }
-        self.demand(Demand::Full(node));
+        self.demand(Demand::Execute(node));
     }
 
-    /// 解析 `Symbol(node, name)`。
+    /// 解析 `Export(node, name)`。
     fn resolve_symbol(&mut self, node: usize, name: &str) {
         if self.graph.nodes[node].kind == NodeKind::Json {
             // JSON 值节点无导出事实：`default` 即值本身，具名/命名空间与
@@ -337,7 +385,7 @@ impl<'g> Linker<'g> {
                             UsedReexport::Named { export_index: index, target_node: target },
                             (index, target),
                         );
-                        self.demand(Demand::Symbol(target, local));
+                        self.demand(Demand::Export(target, local));
                     }
                 }
                 ExportFact::ReexportNamespace { source, namespace, type_only, .. } => {
@@ -355,7 +403,7 @@ impl<'g> Linker<'g> {
                             UsedReexport::Namespace { export_index: index, target_node: target },
                             (index, target),
                         );
-                        self.demand(Demand::Full(target));
+                        self.demand(Demand::Execute(target));
                     }
                 }
                 ExportFact::ReexportAll { .. } => {}
@@ -374,7 +422,7 @@ impl<'g> Linker<'g> {
                     UsedReexport::All { export_index: index, target_node: target },
                     (index, target),
                 );
-                self.demand(Demand::Symbol(target, name.to_string()));
+                self.demand(Demand::Export(target, name.to_string()));
             }
         }
         if !matched {
@@ -437,7 +485,7 @@ impl<'g> Linker<'g> {
             let edge = &self.graph.nodes[node].dynamic_edges[edge_index];
             if let Ok(target_id) = edge.target.as_ref() {
                 if let Some(target) = self.graph.index_of(target_id) {
-                    self.demand(Demand::Full(target));
+                    self.demand(Demand::Execute(target));
                 }
             }
         }
@@ -446,7 +494,7 @@ impl<'g> Linker<'g> {
     fn run(&mut self) {
         while let Some(demand) = self.worklist.pop_front() {
             match demand {
-                Demand::Full(node) => {
+                Demand::Execute(node) => {
                     self.retain(node);
                     if std::mem::replace(&mut self.full[node], true) {
                         continue;
@@ -483,7 +531,7 @@ impl<'g> Linker<'g> {
                                         },
                                         (index, target),
                                     );
-                                    self.demand(Demand::Symbol(target, local));
+                                    self.demand(Demand::Export(target, local));
                                 }
                             }
                             ExportFact::Default { local, .. } => {
@@ -505,7 +553,7 @@ impl<'g> Linker<'g> {
                                         },
                                         (index, target),
                                     );
-                                    self.demand(Demand::Full(target));
+                                    self.demand(Demand::Execute(target));
                                 }
                             }
                             ExportFact::ReexportNamespace {
@@ -526,7 +574,7 @@ impl<'g> Linker<'g> {
                                         },
                                         (index, target),
                                     );
-                                    self.demand(Demand::Full(target));
+                                    self.demand(Demand::Execute(target));
                                 }
                             }
                         }
@@ -543,7 +591,7 @@ impl<'g> Linker<'g> {
                         }
                     }
                 }
-                Demand::Symbol(node, name) => {
+                Demand::Export(node, name) => {
                     self.retain(node);
                     self.resolve_symbol(node, &name);
                 }
@@ -610,21 +658,67 @@ impl<'g> Linker<'g> {
     }
 }
 
-/// 从模块图与入口使用声明计算链接计划。
+/// 从模块图与入口需求声明计算链接计划。
 ///
-/// `entry_uses` 中缺失的入口按全量执行处理（保守）。
+/// 入口需求按 [`EntryUse`] 的两个可组合维度映射为链接器需求：
+/// - `entry_uses` 中缺失的入口 → [`Demand::Execute`]（保守，不猜测）。
+/// - [`EntryExecution::Full`] → [`Demand::Execute`]；执行蕴含全部绑定与
+///   重导出实例化，`exports` 维度不改变活跃结果。
+/// - [`EntryExecution::SideEffects`] → [`Demand::Retain`]，再按导出维度：
+///   [`EntryExports::Named`] 逐名 [`Demand::Export`]；
+///   [`EntryExports::All`] 枚举非类型导出名逐个 [`Demand::Export`]，但模块
+///   含 `export *`（名字不可枚举）时升级为 [`Demand::Execute`]；
+///   [`EntryExports::Unconsumed`] 不发出导出需求。
 pub fn link(graph: &ModuleGraph, entry_uses: &[EntryUse]) -> LinkPlan {
     let mut linker = Linker::new(graph);
     for entry in &graph.entries {
         let Some(index) = graph.index_of(&entry.id) else { continue };
-        let declaration =
-            entry_uses.iter().find(|candidate| candidate.entry_logical == entry.logical);
-        match declaration.and_then(|candidate| candidate.used_exports.as_ref()) {
-            None => linker.demand(Demand::Full(index)),
-            Some(names) => {
+        let Some(declaration) =
+            entry_uses.iter().find(|candidate| candidate.entry_logical == entry.logical)
+        else {
+            linker.demand(Demand::Execute(index));
+            continue;
+        };
+        match declaration.execution {
+            EntryExecution::Full => linker.demand(Demand::Execute(index)),
+            EntryExecution::SideEffects => {
                 linker.demand(Demand::Retain(index));
-                for name in names {
-                    linker.demand(Demand::Symbol(index, name.clone()));
+                match &declaration.exports {
+                    EntryExports::Unconsumed => {}
+                    EntryExports::Named(names) => {
+                        for name in names {
+                            linker.demand(Demand::Export(index, name.clone()));
+                        }
+                    }
+                    EntryExports::All => {
+                        let record = &graph.nodes[index].record;
+                        let enumerable = !record
+                            .exports
+                            .iter()
+                            .any(|export| matches!(export, ExportFact::ReexportAll { .. }));
+                        if enumerable {
+                            let names: Vec<String> = record
+                                .exports
+                                .iter()
+                                .filter_map(|export| match export {
+                                    ExportFact::Local { exported, type_only, .. }
+                                    | ExportFact::ReexportNamed { exported, type_only, .. } => {
+                                        (!*type_only).then(|| exported.clone())
+                                    }
+                                    ExportFact::ReexportNamespace {
+                                        namespace, type_only, ..
+                                    } => (!*type_only).then(|| namespace.clone()),
+                                    ExportFact::Default { .. } => Some("default".to_string()),
+                                    ExportFact::ReexportAll { .. } => None,
+                                })
+                                .collect();
+                            for name in names {
+                                linker.demand(Demand::Export(index, name));
+                            }
+                        } else {
+                            linker.demand(Demand::Execute(index));
+                        }
+                    }
                 }
             }
         }

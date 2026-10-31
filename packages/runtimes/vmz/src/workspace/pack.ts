@@ -6,8 +6,9 @@
  * Browser graph roots are the bootstrap modules (`entry-client.js` /
  * `entry-event.js`) emitted by the compiler / static delivery path; page and
  * island modules enter the graph through the bootstrap's literal dynamic
- * import tables, never as pack entries. `usedExports: null` keeps every
- * bootstrap export live (script-tag load, whole-module execution).
+ * import tables, never as pack entries. Bootstrap entries declare
+ * `execution: 'full'` + `exports: { kind: 'all' }` (script-tag load,
+ * whole-module execution).
  *
  * No vendor materialization, no specifier lowering, and no second hashing
  * pass happen here: `packWrite` emits the final browser JS set under
@@ -20,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr } from './bundler-adapter.js';
 import { buildPackRequest, runPackWrite } from './pack-native.js';
-import type { PackNativeBinding } from './pack-native.js';
+import type { PackNativeBinding, PackRequestUse } from './pack-native.js';
 import { deliveryRuntimeFilePairs } from './delivery-runtime-files.js';
 import { rewriteDeliveryImports } from './delivery-runtime-imports.js';
 import { writePrettyJsonFile } from './pretty-json.js';
@@ -85,7 +86,11 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         const abs = path.join(absOut, logical);
         if (existsSync(abs)) entries[logical] = abs;
     }
-    const uses = Object.keys(entries).map((logical) => ({ logical, usedExports: null as string[] | null }));
+    const uses: PackRequestUse[] = Object.keys(entries).map((logical) => ({
+        logical,
+        execution: 'full',
+        exports: { kind: 'all' },
+    }));
     const requestJson = buildPackRequest({ entries, target: 'browser', root, uses, publicBase: PACK_PUBLIC_BASE });
 
     const packOutDir = path.join(absOut, ...PACK_OUTPUT_DIR_REL.split('/'));
@@ -158,8 +163,8 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         entryCount: plan.entryFiles.length,
         // `vmz-pack` runs no compressor: chunk bytes are the linked output verbatim.
         minify: 'none',
-        // `link` active fixed-point pruning really ran — entries keep all exports
-        // (`usedExports: null`), internal modules are pruned to reachable exports.
+        // `link` active fixed-point pruning really ran — bootstrap entries
+        // declare full execution, internal modules are pruned to reachable exports.
         treeShake: 'vmz-pack-link-pruning',
         // Chunk source maps are line-level v3: every assembled line maps back
         // to its module line (`<packOut>/<fileName>.map`, `sourceMapFileName`

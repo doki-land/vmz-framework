@@ -72,27 +72,62 @@ describe('pack-native buildPackRequest (v0)', () => {
             entries: { main: 'E:/abs/src/entry.js' },
             target: 'browser',
             root: 'E:/abs/project',
-            uses: [{ logical: 'main', usedExports: ['a', 'b'] }],
+            uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
             publicBase: '/_vmz/',
         });
         assert.deepEqual(JSON.parse(requestJson), {
             entries: [{ logical: 'main', path: 'E:/abs/src/entry.js' }],
             target: 'browser',
             root: 'E:/abs/project',
-            uses: [{ logical: 'main', usedExports: ['a', 'b'] }],
+            uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
             publicBase: '/_vmz/',
         });
     });
 
-    it('passes usedExports null through without guessing', () => {
+    it('passes the execution/exports demand through without guessing', () => {
         const requestJson = buildPackRequest({
             entries: { main: 'E:/abs/src/entry.js' },
             target: 'node',
             root: 'E:/abs/project',
-            uses: [{ logical: 'main', usedExports: null }],
+            uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
         });
-        assert.deepEqual(JSON.parse(requestJson).uses, [{ logical: 'main', usedExports: null }]);
+        assert.deepEqual(JSON.parse(requestJson).uses, [
+            { logical: 'main', execution: 'full', exports: { kind: 'all' } },
+        ]);
+    });
+
+    it('rejects execution and exports spellings outside the contract', () => {
+        assert.throws(
+            () =>
+                buildPackRequest({
+                    entries: { main: 'E:/abs/src/entry.js' },
+                    target: 'browser',
+                    root: 'E:/abs/project',
+                    uses: [{ logical: 'main', execution: 'full', exports: { kind: 'ghost' } } as never],
+                    publicBase: '/_vmz/',
+                }),
+            (error: unknown) => {
+                assert.ok(error instanceof PackNativeError);
+                assert.equal(error.code, 'pack.native.request-uses');
+                return true;
+            },
+        );
+        assert.throws(
+            () =>
+                buildPackRequest({
+                    entries: { main: 'E:/abs/src/entry.js' },
+                    target: 'browser',
+                    root: 'E:/abs/project',
+                    uses: [{ logical: 'main', execution: 'partial', exports: { kind: 'all' } } as never],
+                    publicBase: '/_vmz/',
+                }),
+            (error: unknown) => {
+                assert.ok(error instanceof PackNativeError);
+                assert.equal(error.code, 'pack.native.request-uses');
+                return true;
+            },
+        );
     });
 
     it('rejects uses that do not cover every entries logical', () => {
@@ -102,7 +137,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: 'E:/abs/src/entry.js', island: 'E:/abs/src/island.js' },
                     target: 'browser',
                     root: 'E:/abs/project',
-                    uses: [{ logical: 'main', usedExports: null }],
+                    uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
             (error: unknown) => {
@@ -121,7 +156,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: 'E:/abs/src/entry.js' },
                     target: 'deno' as 'node',
                     root: 'E:/abs/project',
-                    uses: [{ logical: 'main', usedExports: null }],
+                    uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
             (error: unknown) => {
@@ -139,7 +174,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: 'src/entry.js' },
                     target: 'browser',
                     root: 'E:/abs/project',
-                    uses: [{ logical: 'main', usedExports: null }],
+                    uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
             (error: unknown) => {
@@ -156,7 +191,7 @@ describe('pack-native runPackPlan / runPackWrite (v0)', () => {
         entries: { main: 'E:/abs/src/entry.js' },
         target: 'browser',
         root: 'E:/abs/project',
-        uses: [{ logical: 'main', usedExports: ['a', 'b'] }],
+        uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
         publicBase: '/_vmz/',
     });
 

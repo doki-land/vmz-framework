@@ -23,10 +23,21 @@ export interface PackRequestEntry {
     path: string;
 }
 
+/** Execution dimension, mirroring the Rust `EntryExecution` wire. */
+export type PackRequestExecution = 'full' | 'side-effects';
+
+/** Export demand dimension, mirroring the Rust `EntryExports` tagged union. */
+export type PackRequestExports =
+    | { kind: 'all' }
+    | { kind: 'named'; names: string[] }
+    | { kind: 'unconsumed' };
+
 export interface PackRequestUse {
     logical: string;
-    /** `null` keeps every export; an array lists the named exports to keep. */
-    usedExports: string[] | null;
+    /** `full` evaluates the entry wholesale; `side-effects` retains it under export demand. */
+    execution: PackRequestExecution;
+    /** Which entry exports a consumer reads. Explicit — never guessed. */
+    exports: PackRequestExports;
 }
 
 export interface PackRequest {
@@ -317,21 +328,39 @@ export function buildPackRequest(input: BuildPackRequestInput): string {
     const uses: PackRequestUse[] = [];
     for (const use of input.uses) {
         if (!use || typeof use !== 'object' || typeof use.logical !== 'string' || !use.logical) {
-            throw requestInvalid('uses[] items must be { logical, usedExports } objects');
+            throw requestInvalid('uses[] items must be { logical, execution, exports } objects');
         }
-        if (use.usedExports !== null) {
-            if (!Array.isArray(use.usedExports) || !use.usedExports.every((name) => typeof name === 'string' && name)) {
+        if (use.execution !== 'full' && use.execution !== 'side-effects') {
+            throw new PackNativeError(
+                'pack.native.request-uses',
+                `uses["${use.logical}"].execution must be "full" or "side-effects", got ${JSON.stringify(use.execution)}`,
+            );
+        }
+        const exports = use.exports;
+        if (!exports || typeof exports !== 'object' || typeof exports.kind !== 'string') {
+            throw new PackNativeError(
+                'pack.native.request-uses',
+                `uses["${use.logical}"].exports must be a tagged object { kind: "all" | "named" | "unconsumed" }`,
+            );
+        }
+        if (exports.kind === 'named') {
+            if (!Array.isArray(exports.names) || !exports.names.every((name) => typeof name === 'string' && name)) {
                 throw new PackNativeError(
                     'pack.native.request-uses',
-                    `uses["${use.logical}"].usedExports must be null (keep all) or an array of export names`,
+                    `uses["${use.logical}"].exports.names must be an array of non-empty export names`,
                 );
             }
+        } else if (exports.kind !== 'all' && exports.kind !== 'unconsumed') {
+            throw new PackNativeError(
+                'pack.native.request-uses',
+                `uses["${use.logical}"].exports.kind must be "all", "named" or "unconsumed"`,
+            );
         }
         if (useLogicals.has(use.logical)) {
             throw new PackNativeError('pack.native.request-uses', `uses duplicates logical "${use.logical}"`);
         }
         useLogicals.add(use.logical);
-        uses.push({ logical: use.logical, usedExports: use.usedExports });
+        uses.push({ logical: use.logical, execution: use.execution, exports: use.exports });
     }
     const missing = logicals.filter((logical) => !useLogicals.has(logical));
     if (missing.length) {

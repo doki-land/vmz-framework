@@ -9,7 +9,7 @@ use vmz_pack::PackDiagnostic;
 use vmz_pack::chunk::plan_chunks;
 use vmz_pack::emit::{EmitOptions, plan_emit, write_emit};
 use vmz_pack::graph::build_graph;
-use vmz_pack::link::{EntryUse, link};
+use vmz_pack::link::{EntryExecution, EntryExports, EntryUse, link};
 use vmz_pack::resolve::Target;
 
 fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
@@ -59,7 +59,11 @@ fn single_entry_prunes_and_erases_types() {
 
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["run".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
@@ -124,8 +128,16 @@ fn source_map_shape_matches_chunk_contract() {
     let link_plan = link(
         &graph,
         &[
-            EntryUse { entry_logical: "one".to_string(), used_exports: Some(vec!["a1".into()]) },
-            EntryUse { entry_logical: "two".to_string(), used_exports: Some(vec!["a2".into()]) },
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a1".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a2".into()]),
+            },
         ],
     );
     let chunks = plan_chunks(&graph, &link_plan);
@@ -157,8 +169,7 @@ fn source_map_shape_matches_chunk_contract() {
 /// 解码 source map v3 `mappings` 为逐生成行的绝对
 /// `(gen_col, src_index, src_line, src_col)` 段序列。
 fn decode_mappings(mappings: &str) -> Vec<Vec<(u32, u32, u32, u32)>> {
-    const B64: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out: Vec<Vec<(u32, u32, u32, u32)>> = Vec::new();
     let (mut src_index, mut src_line, mut src_col) = (0i64, 0i64, 0i64);
     for line in mappings.split(';') {
@@ -173,10 +184,8 @@ fn decode_mappings(mappings: &str) -> Vec<Vec<(u32, u32, u32, u32)>> {
                     let mut result = 0i64;
                     let mut shift = 0u32;
                     loop {
-                        let digit = B64
-                            .iter()
-                            .position(|b| *b == bytes[pos])
-                            .expect("base64 digit") as i64;
+                        let digit =
+                            B64.iter().position(|b| *b == bytes[pos]).expect("base64 digit") as i64;
                         pos += 1;
                         result += (digit & 31) << shift;
                         shift += 5;
@@ -228,7 +237,11 @@ fn source_map_line_mappings_decode_to_module_lines() {
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["run".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
@@ -276,7 +289,11 @@ fn write_emit_lands_source_maps() {
         build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Browser, &root);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "app".to_string(), used_exports: Some(vec!["load".into()]) }],
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["load".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
@@ -318,8 +335,16 @@ fn two_entries_emit_shared_chunk_imports() {
     let link_plan = link(
         &graph,
         &[
-            EntryUse { entry_logical: "one".to_string(), used_exports: Some(vec!["a1".into()]) },
-            EntryUse { entry_logical: "two".to_string(), used_exports: Some(vec!["a2".into()]) },
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a1".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a2".into()]),
+            },
         ],
     );
     let chunks = plan_chunks(&graph, &link_plan);
@@ -365,7 +390,11 @@ fn dynamic_import_rewrites_specifier() {
 
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "app".to_string(), used_exports: Some(vec!["load".into()]) }],
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["load".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
@@ -404,7 +433,11 @@ fn css_side_effect_import_aggregates_into_style_artifact() {
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["x".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
@@ -464,7 +497,11 @@ fn dead_module_css_is_not_emitted() {
     // `go` 未被使用：纯声明不激活 → 包含动态 import 的语句不活 → 边死 → lazy.js 不保留。
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["x".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
@@ -492,7 +529,11 @@ fn css_url_relative_reference_is_relocated() {
         build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["x".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["x".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
@@ -558,8 +599,14 @@ fn unsupported_style_forms_are_rejected() {
         let root = temp_tree(name, &files);
         let graph =
             build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
-        let link_plan =
-            link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+        let link_plan = link(
+            &graph,
+            &[EntryUse {
+                entry_logical: "main".to_string(),
+                execution: EntryExecution::Full,
+                exports: EntryExports::All,
+            }],
+        );
         let chunks = plan_chunks(&graph, &link_plan);
         let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
         assert!(codes(&errors).contains(&expected.to_string()), "{name}: {errors:?}");
@@ -584,7 +631,11 @@ fn json_default_import_inlines_raw_text() {
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["k".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["k".into()]),
+        }],
     );
     assert!(link_plan.diagnostics.is_empty(), "{:?}", link_plan.diagnostics);
     let chunks = plan_chunks(&graph, &link_plan);
@@ -639,8 +690,14 @@ fn unsupported_json_forms_are_rejected() {
         let graph =
             build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
         assert!(graph.diagnostics.is_empty(), "{name}: {:?}", graph.diagnostics);
-        let link_plan =
-            link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+        let link_plan = link(
+            &graph,
+            &[EntryUse {
+                entry_logical: "main".to_string(),
+                execution: EntryExecution::Full,
+                exports: EntryExports::All,
+            }],
+        );
         let chunks = plan_chunks(&graph, &link_plan);
         let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
         assert!(codes(&errors).contains(&expected.to_string()), "{name}: {errors:?}");
@@ -649,7 +706,7 @@ fn unsupported_json_forms_are_rejected() {
 
 /// bootstrap 端到端：对象字面量箭头包裹的动态 import 建独立 async chunk、
 /// 说明符重写为目标 chunk 文件且查询串随身份剥离；裸包经 `exports` browser
-/// 条件进图；入口 `used_exports = None` 整体执行（全部模块保留）；两懒页
+/// 条件进图；入口 `execution: Full` 整体执行（全部模块保留）；两懒页
 /// 共享 lib 落 shared chunk，且 bootstrap chunk 不预载 lib。
 #[test]
 fn bootstrap_dynamic_map_emits_async_chunks() {
@@ -699,8 +756,14 @@ fn bootstrap_dynamic_map_emits_async_chunks() {
     assert_eq!(bootstrap_node.dynamic_edges[1].specifier, "./pages/about.client.js?v=1");
 
     // 入口不声明导出使用：整体执行，全部模块保留。
-    let link_plan =
-        link(&graph, &[EntryUse { entry_logical: "bootstrap".to_string(), used_exports: None }]);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "bootstrap".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
     assert_eq!(link_plan.modules.len(), graph.nodes.len(), "入口整体执行应保留全部模块");
 
     let chunks = plan_chunks(&graph, &link_plan);
@@ -773,7 +836,11 @@ fn name_conflict_is_rejected() {
         build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
@@ -797,7 +864,11 @@ fn binding_rename_is_rejected() {
         build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
@@ -823,7 +894,11 @@ fn namespace_synthesis_is_rejected() {
         build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
@@ -852,7 +927,11 @@ fn asset_replaced_by_fingerprinted_url_and_copied() {
 
     let link_plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["icon".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["icon".into()]),
+        }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
@@ -903,8 +982,16 @@ fn plan_is_deterministic() {
     let link_plan = link(
         &graph,
         &[
-            EntryUse { entry_logical: "one".to_string(), used_exports: Some(vec!["a1".into()]) },
-            EntryUse { entry_logical: "two".to_string(), used_exports: Some(vec!["a2".into()]) },
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a1".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a2".into()]),
+            },
         ],
     );
     let chunks = plan_chunks(&graph, &link_plan);
@@ -937,8 +1024,16 @@ fn write_emit_lands_files_and_manifest() {
     let link_plan = link(
         &graph,
         &[
-            EntryUse { entry_logical: "one".to_string(), used_exports: Some(vec!["a1".into()]) },
-            EntryUse { entry_logical: "two".to_string(), used_exports: Some(vec!["a2".into()]) },
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a1".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a2".into()]),
+            },
         ],
     );
     let chunks = plan_chunks(&graph, &link_plan);
@@ -982,7 +1077,8 @@ fn placeholder_collision_is_rejected() {
         &graph,
         &[EntryUse {
             entry_logical: "main".to_string(),
-            used_exports: Some(vec!["marker".into()]),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["marker".into()]),
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
@@ -1041,11 +1137,8 @@ fn incomplete_facts_member_is_rejected() {
     ));
 
     let nodes = vec![app_node, pending_node];
-    let node_index = nodes
-        .iter()
-        .enumerate()
-        .map(|(index, node)| (node.resolved.path.clone(), index))
-        .collect();
+    let node_index =
+        nodes.iter().enumerate().map(|(index, node)| (node.resolved.path.clone(), index)).collect();
     let graph = ModuleGraph {
         target: Target::Browser,
         root: root.clone(),
@@ -1128,16 +1221,19 @@ fn root_absolute_dynamic_import_is_kept_verbatim() {
         "urlkeep",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            (
-                "src/entry.js",
-                "export const loadFace = () => import('/dom.browser.js');\n",
-            ),
+            ("src/entry.js", "export const loadFace = () => import('/dom.browser.js');\n"),
         ],
     );
     let graph =
         build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
-    let link_plan =
-        link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
     let chunks = plan_chunks(&graph, &link_plan);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
     assert!(
@@ -1158,16 +1254,19 @@ fn unresolved_relative_dynamic_import_still_errors() {
         "urlreject",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            (
-                "src/entry.js",
-                "export const loadFace = () => import('./gone.js');\n",
-            ),
+            ("src/entry.js", "export const loadFace = () => import('./gone.js');\n"),
         ],
     );
     let graph =
         build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
-    let link_plan =
-        link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
     let chunks = plan_chunks(&graph, &link_plan);
     let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
     assert!(

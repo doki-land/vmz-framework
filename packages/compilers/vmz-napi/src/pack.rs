@@ -26,7 +26,7 @@ use napi_derive::napi;
 use serde::{Deserialize, Serialize};
 use vmz_pack::diag::PackDiagnostic;
 use vmz_pack::emit::{EmitOptions, EmitPlan};
-use vmz_pack::link::EntryUse;
+use vmz_pack::link::{EntryExecution, EntryExports, EntryUse};
 use vmz_pack::resolve::Target;
 
 /// Stable diagnostic code for every request-shape rejection at this boundary.
@@ -36,7 +36,7 @@ const INVALID_REQUEST: &str = "vmz::napi::pack::invalid_request";
 // Request wire
 // ---------------------------------------------------------------------------
 
-/// Packed request: entries + target + root + per-entry export uses + public base.
+/// Packed request: entries + target + root + per-entry link demands + public base.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RequestWire {
@@ -55,13 +55,32 @@ struct EntryWire {
     path: String,
 }
 
-/// Export usage declaration for one logical entry; `usedExports: null`
-/// keeps every export live (maps to `EntryUse::used_exports == None`).
+/// Execution dimension, mirroring `vmz_pack::link::EntryExecution`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum ExecutionWire {
+    Full,
+    SideEffects,
+}
+
+/// Export demand dimension, mirroring `vmz_pack::link::EntryExports`.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+enum ExportsWire {
+    All,
+    Named { names: Vec<String> },
+    Unconsumed,
+}
+
+/// Link demand for one logical entry: two composable dimensions mirroring
+/// [`EntryUse`]. Unknown spellings collapse into `invalid_request` through
+/// serde rejection — no defaults, no guessing.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct UseWire {
     logical: String,
-    used_exports: Option<Vec<String>>,
+    execution: ExecutionWire,
+    exports: ExportsWire,
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +334,15 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
         .iter()
         .map(|use_wire| EntryUse {
             entry_logical: use_wire.logical.clone(),
-            used_exports: use_wire.used_exports.clone(),
+            execution: match use_wire.execution {
+                ExecutionWire::Full => EntryExecution::Full,
+                ExecutionWire::SideEffects => EntryExecution::SideEffects,
+            },
+            exports: match &use_wire.exports {
+                ExportsWire::All => EntryExports::All,
+                ExportsWire::Named { names } => EntryExports::Named(names.clone()),
+                ExportsWire::Unconsumed => EntryExports::Unconsumed,
+            },
         })
         .collect();
 
@@ -413,7 +440,7 @@ mod tests {
     }
 
     fn full_uses() -> Value {
-        json!([{ "logical": "main", "usedExports": ["main"] }])
+        json!([{ "logical": "main", "execution": "full", "exports": { "kind": "all" } }])
     }
 
     fn parse(json: &str) -> Value {

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use vmz_pack::graph::build_graph;
-use vmz_pack::link::{EntryUse, UsedReexport, link};
+use vmz_pack::link::{EntryExecution, EntryExports, EntryUse, UsedReexport, link};
 use vmz_pack::resolve::Target;
 
 fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
@@ -42,7 +42,11 @@ fn named_use_prunes_unused_pure_modules_and_statements() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
 
@@ -80,7 +84,14 @@ fn side_effect_imports_force_full_retention() {
     let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
 
-    let plan = link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+    let plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
 
     let css = graph.index_of(&root.join("src/styles.css")).unwrap();
     let pkg = graph.index_of(&root.join("node_modules/side-pkg/index.js")).unwrap();
@@ -113,7 +124,11 @@ fn barrel_star_reexport_chain_propagates() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["use".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["use".into()]),
+        }],
     );
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
 
@@ -147,7 +162,11 @@ fn live_binding_reexport_of_imported_name() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["use".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["use".into()]),
+        }],
     );
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
 
@@ -185,7 +204,11 @@ fn module_cycles_terminate_and_retain_on_demand() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["use".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["use".into()]),
+        }],
     );
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
 
@@ -233,7 +256,11 @@ fn dual_package_instances_stay_distinct() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
 
@@ -270,7 +297,11 @@ fn unknown_export_diagnoses_and_activates_fully() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
 
     let lib = graph.index_of(&root.join("src/lib.js")).unwrap();
@@ -303,14 +334,25 @@ fn dynamic_edges_follow_statement_activity() {
     // 具名入口只用 keep：loader 纯且未用 → 剪除 → 动态边死 → lazy 不保留。
     let pruned = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["keep".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["keep".into()]),
+        }],
     );
     assert!(pruned.diagnostics.is_empty(), "{:?}", pruned.diagnostics);
     assert!(pruned.modules.iter().all(|m| m.node != lazy));
     assert!(pruned.modules.iter().find(|m| m.node == entry_node).unwrap().dynamic_edges.is_empty());
 
     // 全量入口：loader 激活 → 动态边活 → lazy 全量保留。
-    let full = link(&graph, &[EntryUse { entry_logical: "main".to_string(), used_exports: None }]);
+    let full = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
     assert!(full.diagnostics.is_empty(), "{:?}", full.diagnostics);
     let lazy_module = full.modules.iter().find(|m| m.node == lazy).expect("lazy retained");
     assert_eq!(lazy_module.active_statements, vec![0]);
@@ -340,7 +382,11 @@ fn tla_shaped_module_retained_without_new_diagnostics() {
 
     let plan = link(
         &graph,
-        &[EntryUse { entry_logical: "main".to_string(), used_exports: Some(vec!["main".into()]) }],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
     );
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
     // `await (…) ` 形态判不了即非纯：模块保留且语句恒活。
