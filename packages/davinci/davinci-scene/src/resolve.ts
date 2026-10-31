@@ -55,26 +55,80 @@ function resolveFill(f: Fill | undefined): DisplayFill | undefined {
 
 // ─── Text metrics (deterministic estimate, no host measurement) ──────────
 
-/** Average glyph advance as a fraction of font size. CJK and half-width
- *  glyphs share one coefficient so bounds stay deterministic. */
+/** Half-width glyph advance as a fraction of font size. */
 const TEXT_ADVANCE_RATIO = 0.6;
+/** Wide (East-Asian fullwidth) glyph advance as a fraction of font size. */
+const WIDE_ADVANCE_RATIO = 1;
 /** Line box height as a fraction of font size. */
 const TEXT_LINE_RATIO = 1.2;
 const DEFAULT_TEXT_SIZE = 12;
+const ELLIPSIS = "…";
 
 /** Estimate a text block's size without a font measurement provider.
  *  This is a deterministic approximation that marks the current limitation,
  *  not real metrics: browser font metrics are only available after
  *  `document.fonts.ready`, so a host needing tight bounds must re-measure
  *  there instead of trusting these numbers.
- *  Width = longest line's character count × size × 0.6,
- *  height = line count × size × 1.2. */
+ *  Width = widest line's summed glyph advances (wide CJK glyphs 1 em,
+ *  half-width glyphs 0.6 em), height = line count × size × 1.2. */
 export function estimateTextSize(text: string, sizePx: number): { width: number; height: number } {
     const size = Number.isFinite(sizePx) && sizePx > 0 ? sizePx : DEFAULT_TEXT_SIZE;
     const lines = text.split("\n");
-    let longest = 0;
-    for (const line of lines) longest = Math.max(longest, Array.from(line).length);
-    return { width: longest * size * TEXT_ADVANCE_RATIO, height: lines.length * size * TEXT_LINE_RATIO };
+    let widest = 0;
+    for (const line of lines) widest = Math.max(widest, measureWidth(line, size));
+    return { width: widest, height: lines.length * size * TEXT_LINE_RATIO };
+}
+
+/** Truncate `text` so its estimated width fits `maxWidth`, appending `…` when
+ *  characters were dropped. The longest prefix that still fits is kept; when
+ *  even the ellipsis does not fit, the result is empty. Truncation and bounds
+ *  share one advance model, so they can never disagree. */
+export function truncateToWidth(text: string, maxWidth: number, sizePx: number): string {
+    const size = Number.isFinite(sizePx) && sizePx > 0 ? sizePx : DEFAULT_TEXT_SIZE;
+    // `Infinity` means "no budget" (numeric axes are bounded by the tick
+    // algorithm); NaN and non-positive widths collapse to an empty label.
+    const limit = maxWidth > 0 ? maxWidth : 0;
+    if (measureWidth(text, size) <= limit) return text;
+    const ellipsisWidth = measureWidth(ELLIPSIS, size);
+    if (ellipsisWidth > limit) return "";
+    const chars = Array.from(text);
+    let used = ellipsisWidth;
+    let keep = 0;
+    for (const ch of chars) {
+        const advance = charAdvance(ch, size);
+        if (used + advance > limit) break;
+        used += advance;
+        keep += 1;
+    }
+    return chars.slice(0, keep).join("") + ELLIPSIS;
+}
+
+function measureWidth(text: string, size: number): number {
+    let width = 0;
+    for (const ch of Array.from(text)) width += charAdvance(ch, size);
+    return width;
+}
+
+function charAdvance(ch: string, size: number): number {
+    return isWideCodepoint(ch.codePointAt(0) ?? 0) ? size * WIDE_ADVANCE_RATIO : size * TEXT_ADVANCE_RATIO;
+}
+
+/** East-Asian fullwidth ranges the deterministic model advances as one em.
+ *  This is a bounded model, not a full Unicode EastAsianWidth table. */
+function isWideCodepoint(cp: number): boolean {
+    return (
+        (cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo
+        (cp >= 0x2e80 && cp <= 0x303e) || // radicals, Kangxi, CJK symbols and punctuation
+        (cp >= 0x3041 && cp <= 0x33ff) || // kana, Hangul compatibility, enclosed CJK
+        (cp >= 0x3400 && cp <= 0x4dbf) || // CJK Extension A
+        (cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs
+        (cp >= 0xa000 && cp <= 0xa4cf) || // Yi
+        (cp >= 0xac00 && cp <= 0xd7a3) || // Hangul syllables
+        (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
+        (cp >= 0xfe30 && cp <= 0xfe4f) || // CJK Form Variants
+        (cp >= 0xff00 && cp <= 0xff60) || // Fullwidth Forms
+        (cp >= 0xffe0 && cp <= 0xffe6) // fullwidth signs
+    );
 }
 
 function fontCssOf(font: FontSpec): string {

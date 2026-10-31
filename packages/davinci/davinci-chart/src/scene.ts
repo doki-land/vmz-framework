@@ -12,7 +12,13 @@
 // array. The plan is also the only source of the series grouping domain.
 
 import type { PathCommand, RGBA } from "@doki-land/davinci-types";
-import { estimateTextSize, SCENE_VERSION, type SemanticNode, type SemanticScene } from "@doki-land/davinci-scene";
+import {
+    SCENE_VERSION,
+    estimateTextSize,
+    truncateToWidth,
+    type SemanticNode,
+    type SemanticScene,
+} from "@doki-land/davinci-scene";
 import type { ChartCompilePlan } from "./compile.js";
 import { column, type DataColumn } from "./data.js";
 import { apply, bandwidth, formatTickLabel, niceLinearTicks, type Scale } from "./scale.js";
@@ -324,13 +330,22 @@ function buildAxis(
 
     if (orientation === "horizontal") {
         const baseline = plot.y + plot.h;
+        // Categorical slots are the truncation budget: a band / point axis
+        // owns `plot.w / domain.length` per label, so long categories never
+        // collide with their neighbours. Numeric ticks are bounded by the
+        // tick algorithm itself and stay untruncated.
+        const slot =
+            scale.kind === "band" || scale.kind === "point"
+                ? Math.max(0, plot.w / Math.max(1, scale.domain.length) - 2)
+                : Number.POSITIVE_INFINITY;
         ticks.forEach((tick, i) => {
             nodes.push(
                 shortLine(`${id}:tick:${i}`, tick.position, baseline, tick.position, baseline + TICK_LENGTH, theme),
             );
-            const height = estimateTextSize(tick.label, theme.labelFont.sizePx).height;
+            const label = truncateToWidth(tick.label, slot, theme.labelFont.sizePx);
+            const height = estimateTextSize(label, theme.labelFont.sizePx).height;
             nodes.push(
-                labelNode(`${id}:label:${i}`, tick.label, tick.position, baseline + TICK_LENGTH + height / 2, theme),
+                labelNode(`${id}:label:${i}`, label, tick.position, baseline + TICK_LENGTH + height / 2, theme),
             );
         });
     } else {
@@ -443,14 +458,18 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme):
     if (categories.length === 0) return [];
 
     const size = theme.legendFont.sizePx;
-    const widths = categories.map((category) => estimateTextSize(category, size).width);
+    const shown = categories.slice(0, Math.max(1, Math.floor((plot.h - LEGEND_EDGE_GAP * 2) / LEGEND_ITEM_STEP)));
+    // Legend labels share the plot width: each entry truncates with an
+    // ellipsis so the swatch block never runs past the plot edge.
+    const budget = Math.max(0, plot.w - LEGEND_EDGE_GAP * 2 - LEGEND_SWATCH - LEGEND_SWATCH_GAP);
+    const labels = shown.map((category) => truncateToWidth(category, budget, size));
+    const widths = labels.map((label) => estimateTextSize(label, size).width);
     const blockWidth = LEGEND_SWATCH + LEGEND_SWATCH_GAP + Math.max(...widths);
     const right = plot.x + plot.w - LEGEND_EDGE_GAP;
     const left = Math.max(plot.x + LEGEND_EDGE_GAP, right - blockWidth);
-    const capacity = Math.max(1, Math.floor((plot.h - LEGEND_EDGE_GAP * 2) / LEGEND_ITEM_STEP));
 
     const items: SemanticNode[] = [];
-    categories.slice(0, capacity).forEach((category, i) => {
+    shown.forEach((category, i) => {
         // Use the same palette index as `seriesColor` so legend swatches match
         // mark colors one-for-one.
         const color = seriesColor(theme, categories, category);
@@ -471,7 +490,7 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme):
             kind: "text",
             id: `legend:label:${i}`,
             role: "chart.legend",
-            text: category,
+            text: labels[i],
             font: theme.legendFont,
             anchor: { x: left + LEGEND_SWATCH + LEGEND_SWATCH_GAP + widths[i] / 2, y: top + LEGEND_ITEM_STEP / 2 },
             color: theme.labelColor,

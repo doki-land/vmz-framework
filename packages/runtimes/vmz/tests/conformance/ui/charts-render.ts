@@ -10,7 +10,9 @@
  *   4–6 ticks, band one per category) with minimal decimals
  * - a legend appears only when a color / series channel exists, and sits in the
  *   plot's upper right, clear of the ticks
- * - text bounds are a deterministic size estimate centred on the anchor
+ * - text bounds are a deterministic size estimate centred on the anchor —
+ *   wide CJK glyphs advance one em, half-width glyphs 0.6 em, and categorical
+ *   x labels / legend entries truncate with an ellipsis into their slot
  * - `renderSvg` is deterministic, viewBox comes from the scene size, numbers
  *   stay at ≤3 decimals, text/attributes are escaped and empty data is safe
  * - rows with null / non-finite cells are skipped with structured diagnostics
@@ -45,7 +47,13 @@ import {
     niceLinearTicks,
 } from '../../../../../davinci/davinci-chart/src/index.ts';
 import { rgb8 } from '../../../../../davinci/davinci-types/src/index.ts';
-import { renderSvg, resolve, validateScene } from '../../../../../davinci/davinci-scene/src/index.ts';
+import {
+    estimateTextSize,
+    renderSvg,
+    resolve,
+    truncateToWidth,
+    validateScene,
+} from '../../../../../davinci/davinci-scene/src/index.ts';
 import {
     buildScene as buildDiagramScene,
     simpleLayout,
@@ -320,7 +328,7 @@ console.log('charts-render: text bounds are deterministic estimates…');
         fail('text bounds must stay finite');
     }
 
-    // CJK and half-width glyphs share one advance coefficient.
+    // Wide CJK glyphs advance one em, half-width glyphs 0.6 em.
     const cjkSpec = {
         mark: 'bar',
         encoding: [
@@ -331,7 +339,72 @@ console.log('charts-render: text bounds are deterministic estimates…');
     const { display: cjkDisplay } = pipeline(cjkSpec, [{ 类别: '图表', 数值: 2 }]);
     const cjk = collectTexts(cjkDisplay.root).find((t) => t.text === '图表');
     if (!cjk) fail('CJK tick label missing');
-    if (Math.abs(cjk.bounds.w - 13.2) > 1e-9) fail(`CJK bounds want 13.2 wide, got ${cjk.bounds.w}`);
+    if (Math.abs(cjk.bounds.w - 22) > 1e-9) fail(`CJK bounds want 22 wide, got ${cjk.bounds.w}`);
+}
+
+console.log('charts-render: overflow truncates labels into their slot…');
+{
+    // Direct contract: longest prefix plus `…` fits the budget.
+    if (truncateToWidth('图表', 22, 11) !== '图表') fail('text that fits must stay whole');
+    if (truncateToWidth('图表图表', 33, 11) !== '图表…') {
+        fail(`wide glyphs truncate by width: ${truncateToWidth('图表图表', 33, 11)}`);
+    }
+    if (truncateToWidth('abcdef', 13.2, 11) !== 'a…') {
+        fail(`half-width glyphs truncate by width: ${truncateToWidth('abcdef', 13.2, 11)}`);
+    }
+    if (truncateToWidth('abc', 5, 11) !== '') fail('nothing fits when the budget is below the ellipsis');
+
+    // Categorical x labels never exceed their band slot.
+    const narrow = { width: 140, height: 120 };
+    const longSpec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'value', channel: 'y' },
+        ],
+    };
+    const longPlan = compile(
+        longSpec,
+        fromRows([
+            { category: 'alphabet-soup', value: 3 },
+            { category: 'beta', value: 7 },
+        ]),
+    );
+    const longSemantic = buildScene(longPlan, narrow);
+    const xLabels = guideGroups(longSemantic, 'chart.axis')
+        .find((g) => g.id === 'x-axis')
+        .children.filter((n) => n.kind === 'text');
+    if (!xLabels[0].text.endsWith('…')) fail(`long category must truncate: ${xLabels[0].text}`);
+    if (xLabels[1].text !== 'beta') fail(`short category must stay whole: ${xLabels[1].text}`);
+    const w0 = estimateTextSize(xLabels[0].text, 11).width;
+    const w1 = estimateTextSize(xLabels[1].text, 11).width;
+    if (!(Math.abs(xLabels[0].anchor.x - xLabels[1].anchor.x) >= (w0 + w1) / 2 - 1e-9)) {
+        fail('truncated x labels must not collide');
+    }
+
+    // Long legend entries truncate and stay inside the plot.
+    const legendSpec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'value', channel: 'y' },
+            { field: 'region', channel: 'color' },
+        ],
+    };
+    const legendPlan = compile(
+        legendSpec,
+        fromRows([
+            { category: 'a', value: 3, region: 'europe-middle' },
+            { category: 'b', value: 7, region: 'asia-pacific' },
+        ]),
+    );
+    const legendSemantic = buildScene(legendPlan, narrow);
+    const legendTexts = guideGroups(legendSemantic, 'chart.legend')[0].children.filter((n) => n.kind === 'text');
+    if (!legendTexts.some((t) => t.text.endsWith('…'))) fail('long legend entries must truncate');
+    for (const t of legendTexts) {
+        const w = estimateTextSize(t.text, 11).width;
+        if (t.anchor.x + w / 2 > narrow.width - 16 + 1e-9) fail(`legend label must stay inside the plot: ${t.text}`);
+    }
 }
 
 console.log('charts-render: empty data is not an error…');
