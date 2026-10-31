@@ -431,6 +431,14 @@ impl<'g> Linker<'g> {
     }
 
     /// 活跃语句的引用名命中 import 绑定 → 传播。
+    ///
+    /// 绑定事实现状（缺口 3 调查结论）：Oak TypeScript AST 的标识符是裸
+    /// `Identifier(String)`，上游没有 scope 解析与 reference 绑定事实，
+    /// `referenced_names` 只能按语法名字与 import 绑定匹配。方向是保守
+    /// 超集：同名误命中只会多传播需求（多保留），不会误剪；漏引用风险
+    /// 由事实完整性门兜底（语句事实不完整 → 判非纯 → emit 前置拒绝）。
+    /// 收紧到绑定级精确传播需要先在 `oak-typescript` 上游补 scope/reference
+    /// 分析，属大改上游；VMZ 侧不堆名字匹配特例。
     fn propagate_statement_refs(&mut self, node: usize) {
         let mut indexes: Vec<usize> = self.active[node].iter().copied().collect();
         indexes.sort_unstable();

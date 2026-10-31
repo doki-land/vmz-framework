@@ -398,6 +398,11 @@ pub(crate) fn assemble_chunk(
                         continue;
                     };
                     if target_chunk == chunk_index {
+                        // 评估结论（缺口 3 附带项）：同 chunk 重导出可以闭合——
+                        // 把目标模块的导出名解析为 chunk 内绑定名后发
+                        // `export { <绑定名> as exported };`，与 deferred Local
+                        // 导出同一机制。该机制属 emit 层新工作块，未实现前保持
+                        // 显式拒绝，不做名字猜测。
                         errors.push(
                             PackDiagnostic::new(
                                 "vmz::pack::emit::reexport_rename_unsupported",
@@ -499,6 +504,9 @@ pub(crate) fn assemble_chunk(
         // import 事实：同 chunk 只接受具名同名绑定；跨 chunk 按使用过滤后合并。
         // used 集合 = 活跃语句引用名 ∪ 本模块待决议导出 local（`export {a as b}`
         // 消费的是 import 绑定，不体现在 referenced_names 里）。
+        // referenced_names 是语法名字匹配（Oak 无 scope/reference 事实，与链接层
+        // 同口径）：对 import 保留是保守超集，只会多留不会误剪；收紧到绑定级
+        // 精确以补上游 Oak scope 事实为前提，不在本层堆名字匹配特例。
         let mut used_names: HashSet<&str> = HashSet::new();
         for &statement_index in &linked.active_statements {
             if let Some(statement) = record.statements.get(statement_index) {
