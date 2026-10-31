@@ -24,6 +24,7 @@ import {
 } from "@doki-land/davinci-types";
 import type { DisplayNode, DisplayScene, DisplayGroup, DisplayStroke, DisplayFill } from "./display.js";
 import type { SemanticNode, SemanticScene, Stroke, Fill } from "./semantic.js";
+import { assertSceneVersion, SCENE_VERSION } from "./version.js";
 
 /** Resolve options — currently minimal; host extensions may add font metrics
  *  providers or resource loaders in future. */
@@ -91,10 +92,11 @@ function fontCssOf(font: FontSpec): string {
  *  source ref, role) are intentionally stripped — use SemanticScene for
  *  provenance/debug/hit-test target lookup. */
 export function resolve(scene: SemanticScene, opts: ResolveOptions = {}): DisplayScene {
+    assertSceneVersion(scene.version, "resolve");
     const root = resolveNode(scene.root, IDENTITY_AFFINE, undefined) as DisplayGroup;
     const width = opts.width ?? root.bounds.w;
     const height = opts.height ?? root.bounds.h;
-    return { root, width, height };
+    return { version: SCENE_VERSION, root, width, height };
 }
 
 function resolveNode(

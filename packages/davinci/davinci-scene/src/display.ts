@@ -6,6 +6,7 @@
 // no scale inference, no layout recomputation.
 
 import type { Affine2D, BoundsRect, Path, RGBA } from "@doki-land/davinci-types";
+import type { SceneVersion } from "./version.js";
 
 /** Final stroke style (resolved). */
 export interface DisplayStroke {
@@ -91,6 +92,8 @@ export type DisplayNode =
 
 /** The root of a display scene. Always a group. */
 export interface DisplayScene {
+    /** Contract namespace this scene was resolved under (`/v0` before 1.0.0). */
+    readonly version: SceneVersion;
     readonly root: DisplayGroup;
     /** Optional background color. */
     readonly background?: RGBA;

@@ -28,6 +28,10 @@
  *   palette and neutrals serialize as hex, a custom theme replaces them
  *   everywhere with no leftover hardcoded color, legend swatches share the
  *   series mark color, and nice ticks stay domain-derived
+ * - the scene contract carries `/v0` end to end, `resolve` and `renderSvg`
+ *   refuse foreign versions, `validateScene` reports duplicate ids, invalid
+ *   clips and non-finite geometry, and clips resolve into intersected
+ *   world clips that serialize as `<clipPath>`
  * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
  *   labels, and ids that survive a spec update
  */
@@ -41,7 +45,7 @@ import {
     niceLinearTicks,
 } from '../../../../../davinci/davinci-chart/src/index.ts';
 import { rgb8 } from '../../../../../davinci/davinci-types/src/index.ts';
-import { renderSvg, resolve } from '../../../../../davinci/davinci-scene/src/index.ts';
+import { renderSvg, resolve, validateScene } from '../../../../../davinci/davinci-scene/src/index.ts';
 import {
     buildScene as buildDiagramScene,
     simpleLayout,
@@ -350,6 +354,7 @@ console.log('charts-render: rendering is deterministic and escaped…');
 
     const id = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
     const textScene = {
+        version: '/v0',
         width: 20,
         height: 10,
         root: {
@@ -704,6 +709,95 @@ console.log('charts-render: nice ticks stay domain-derived…');
     if (formatTickLabel(-0, 0) !== '0') fail('tick label must never print -0');
 }
 
+console.log('charts-render: scene contract carries /v0 end to end…');
+{
+    const { semantic, display } = pipeline(barSpec, barRows);
+    if (semantic.version !== '/v0') fail(`semantic scene wants /v0, got ${semantic.version}`);
+    if (display.version !== '/v0') fail(`display scene wants /v0, got ${display.version}`);
+
+    // Foreign versions are refused outright — no dual read, no fallback.
+    let threw = false;
+    try {
+        resolve({ ...semantic, version: '/v1' });
+    } catch {
+        threw = true;
+    }
+    if (!threw) fail('resolve must refuse an unknown scene version');
+    threw = false;
+    try {
+        renderSvg({ ...display, version: 'davinci/0' });
+    } catch {
+        threw = true;
+    }
+    if (!threw) fail('renderSvg must refuse an unknown display version');
+
+    // Builders produce conformant scenes.
+    const issues = validateScene(semantic);
+    if (issues.length !== 0) fail(`builder scene must be conformant: ${JSON.stringify(issues)}`);
+    const badVersion = validateScene({ ...semantic, version: '/v1' });
+    if (!badVersion.some((d) => d.code === 'davinci.scene.unsupported-version')) {
+        fail(`validateScene must flag /v1: ${JSON.stringify(badVersion)}`);
+    }
+
+    // Duplicate ids, invalid clips and non-finite geometry are reported.
+    const dup = {
+        version: '/v0',
+        root: {
+            kind: 'group',
+            id: 'g',
+            role: 'group',
+            children: [
+                { kind: 'rect', id: 'bar:0', role: 'chart.mark', x: 0, y: 0, w: 1, h: 1 },
+                { kind: 'rect', id: 'bar:0', role: 'chart.mark', x: 2, y: 0, w: 1, h: 1 },
+            ],
+        },
+    };
+    const dupCodes = validateScene(dup).map((d) => d.code);
+    if (!dupCodes.includes('davinci.scene.duplicate-id')) fail(`duplicate ids must be reported: ${dupCodes}`);
+
+    const badGeom = {
+        version: '/v0',
+        root: {
+            kind: 'group',
+            id: 'g',
+            role: 'group',
+            children: [{ kind: 'rect', id: 'r', role: 'chart.mark', x: Number.NaN, y: 0, w: 1, h: 1 }],
+        },
+    };
+    if (!validateScene(badGeom).some((d) => d.code === 'davinci.scene.invalid-geometry')) {
+        fail('non-finite geometry must be reported');
+    }
+
+    const badClip = {
+        version: '/v0',
+        root: { kind: 'group', id: 'g', role: 'group', clip: { x: 0, y: 0, w: -1, h: 2 }, children: [] },
+    };
+    if (!validateScene(badClip).some((d) => d.code === 'davinci.scene.invalid-clip')) {
+        fail('a negative clip rect must be reported');
+    }
+
+    // Clips resolve into intersected world clips and serialize as <clipPath>.
+    const clipped = {
+        version: '/v0',
+        root: {
+            kind: 'group',
+            id: 'g',
+            role: 'group',
+            clip: { x: 10, y: 10, w: 40, h: 40 },
+            children: [{ kind: 'rect', id: 'r', role: 'decorative', x: 0, y: 0, w: 100, h: 100 }],
+        },
+    };
+    const clippedDisplay = resolve(clipped, { width: 100, height: 100 });
+    const leaf = clippedDisplay.root.children[0];
+    if (!leaf.worldClip || leaf.worldClip.w !== 40 || leaf.worldClip.x !== 10) {
+        fail(`child must inherit the parent clip: ${JSON.stringify(leaf.worldClip)}`);
+    }
+    if (leaf.bounds.w !== 100) fail('bounds stay geometric, clip does not rewrite them');
+    const clippedSvg = renderSvg(clippedDisplay);
+    if (!clippedSvg.includes('<clipPath id="clip-0">')) fail('clip must serialize into defs/clipPath');
+    if (!clippedSvg.includes('clip-path="url(#clip-0)"')) fail('clipped markup must reference the clip id');
+}
+
 // ─── Diagram: topology → layout → DisplayScene → SVG ─────────────────────
 
 function diagramPipeline(spec) {
@@ -730,6 +824,8 @@ const diagramSpec = {
 console.log('charts-render: diagram carries nodes, edges and labels as SVG…');
 {
     const { plan, semantic, display, svg } = diagramPipeline(diagramSpec);
+    if (semantic.version !== '/v0') fail(`diagram scene wants /v0, got ${semantic.version}`);
+    if (validateScene(semantic).length !== 0) fail('diagram builder scene must be conformant');
     const nodes = semantic.root.children.filter((n) => n.role === 'diagram.node');
     const edges = semantic.root.children.filter((n) => n.role === 'diagram.edge');
     const labels = semantic.root.children.filter((n) => n.kind === 'text');

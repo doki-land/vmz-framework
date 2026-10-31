@@ -12,7 +12,7 @@
 // array. The plan is also the only source of the series grouping domain.
 
 import type { PathCommand, RGBA } from "@doki-land/davinci-types";
-import { estimateTextSize, type SemanticNode, type SemanticScene } from "@doki-land/davinci-scene";
+import { estimateTextSize, SCENE_VERSION, type SemanticNode, type SemanticScene } from "@doki-land/davinci-scene";
 import type { ChartCompilePlan } from "./compile.js";
 import { column, type DataColumn } from "./data.js";
 import { apply, bandwidth, formatTickLabel, niceLinearTicks, type Scale } from "./scale.js";
@@ -117,6 +117,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
     }
 
     return {
+        version: SCENE_VERSION,
         root: {
             kind: "group",
             id: "chart-root",

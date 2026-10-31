@@ -18,6 +18,7 @@ import type {
     DisplayStroke,
     DisplayText,
 } from "./display.js";
+import { assertSceneVersion } from "./version.js";
 
 type DisplayLeaf = DisplayPath | DisplayRect | DisplayEllipse | DisplayImage | DisplayText;
 
@@ -33,6 +34,7 @@ interface RenderContext {
 
 /** Serialize a resolved DisplayScene to an SVG document string. */
 export function renderSvg(scene: DisplayScene): string {
+    assertSceneVersion(scene.version, "renderSvg");
     const ctx: RenderContext = { clips: [], clipSeq: 0 };
     const body: string[] = [];
     walk(scene.root, ctx, body);

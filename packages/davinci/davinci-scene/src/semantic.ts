@@ -6,6 +6,7 @@
 // in DisplayScene after `resolve()` runs.
 
 import type { Affine2D, Path, Point2D, RGBA, Rect as BoundsRect } from "@doki-land/davinci-types";
+import type { SceneVersion } from "./version.js";
 
 /** A stable identifier assigned by the domain (chart, diagram, ...). */
 export type StableId = string;
@@ -148,5 +149,7 @@ export type SemanticNode = SemanticGroup | SemanticShape;
 
 /** The root of a semantic scene. Always a group. */
 export interface SemanticScene {
+    /** Contract namespace this scene was built under (`/v0` before 1.0.0). */
+    readonly version: SceneVersion;
     readonly root: SemanticGroup;
 }
