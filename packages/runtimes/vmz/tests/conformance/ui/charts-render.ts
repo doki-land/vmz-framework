@@ -39,6 +39,8 @@
  *   token is refused
  * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
  *   labels, and ids that survive a spec update
+ * - the published `@doki-land/davinci` dist renders the same fixtures
+ *   byte-identical to the internal workspace packages
  */
 
 import {
@@ -61,6 +63,11 @@ import {
     buildScene as buildDiagramScene,
     simpleLayout,
 } from '../../../../../davinci/davinci-diagram/src/index.ts';
+// Published contract: the bundled dist of `@doki-land/davinci`, rebuilt by
+// the `build:davinci` pre-step before this gate loads.
+import * as facadeChart from '../../../../../davinci/davinci/dist/chart.js';
+import * as facadeScene from '../../../../../davinci/davinci/dist/scene.js';
+import * as facadeDiagram from '../../../../../davinci/davinci/dist/diagram.js';
 
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -995,6 +1002,48 @@ console.log('charts-render: diagram carries nodes, edges and labels as SVG…');
             fail(`node ${node.id} moved after appending an unrelated node`);
         }
     }
+}
+
+console.log('charts-render: the published facade dist is byte-identical to the internals…');
+{
+    // Two independent code paths — internal workspace sources (all sections
+    // above) and the bundled `@doki-land/davinci` dist — must agree on every
+    // byte of the same fixture's markup, or the published artifact lies.
+    const facadePlan = facadeChart.compile(barSpec, facadeChart.fromRows(barRows));
+    const facadeSemantic = facadeChart.buildScene(facadePlan, { width: WIDTH, height: HEIGHT });
+    if (facadeSemantic.version !== '/v0') fail('facade chart builder must emit the /v0 contract');
+    const facadeDisplay = facadeScene.resolve(facadeSemantic, { width: WIDTH, height: HEIGHT });
+    const facadeSvg = facadeScene.renderSvg(facadeDisplay);
+    if (facadeSvg !== pipeline(barSpec, barRows).svg) {
+        fail('facade chart SVG must be byte-identical to the internal packages');
+    }
+
+    const facadeDiagramPlan = facadeDiagram.simpleLayout(diagramSpec);
+    const facadeDiagramSemantic = facadeDiagram.buildScene(diagramSpec, facadeDiagramPlan);
+    const facadeDiagramDisplay = facadeScene.resolve(facadeDiagramSemantic, {
+        width: facadeDiagramPlan.canvasBounds.w,
+        height: facadeDiagramPlan.canvasBounds.h,
+    });
+    if (facadeScene.renderSvg(facadeDiagramDisplay) !== diagramPipeline(diagramSpec).svg) {
+        fail('facade diagram SVG must be byte-identical to the internal packages');
+    }
+
+    // Resource-id prefixing survives the bundle boundary too.
+    const facadeClipped = facadeScene.resolve(
+        {
+            version: '/v0',
+            root: {
+                kind: 'group',
+                id: 'g',
+                role: 'group',
+                clip: { x: 10, y: 10, w: 40, h: 40 },
+                children: [{ kind: 'rect', id: 'r', role: 'decorative', x: 0, y: 0, w: 100, h: 100 }],
+            },
+        },
+        { width: 100, height: 100 },
+    );
+    const prefixed = facadeScene.renderSvg(facadeClipped, { resourceIdPrefix: 'f1-' });
+    if (!prefixed.includes('<clipPath id="f1-clip-0">')) fail('facade renderSvg must honour resourceIdPrefix');
 }
 
 console.log('charts-render PASS: chart pipeline + diagnostics + zero baseline + series + diagram SVG');
