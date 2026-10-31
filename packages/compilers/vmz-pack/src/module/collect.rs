@@ -33,10 +33,11 @@ use oak_typescript::ast::{
     ClassMember, ExportDeclaration, ExportSpecifier, Expression, ExpressionKind,
     ExpressionStatement, ImportSpecifier, ObjectProperty, Statement, TypeAnnotation, VariableKind,
 };
+use oak_typescript::scope::module_scope_facts;
 
 use super::record::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
-    ModuleRecord, StatementEffect, StatementFact,
+    ModuleRecord, ScopeBindingFact, StatementEffect, StatementFact,
 };
 use crate::diag::PackDiagnostic;
 
@@ -88,6 +89,20 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
     collector.record_top(&root.statements);
     // TLA 资格直接取 Oak root 级正式事实，不扫语句树、不猜测。
     collector.record.flags.has_tla = root.has_top_level_await();
+    // scope 事实直接取 Oak 正式投影：builder 未开启类型擦除（默认关闭），
+    // 值引用与遮蔽排除由上游保证；`incomplete` 原样透传，本层不做名字匹配补洞。
+    let scope = module_scope_facts(&root);
+    collector.record.scope_incomplete = scope.incomplete;
+    collector.record.scope_bindings = scope
+        .bindings
+        .into_iter()
+        .map(|binding| ScopeBindingFact {
+            name: binding.name,
+            declaration: range(binding.declaration),
+            references: binding.references.into_iter().map(range).collect(),
+            has_type_references: binding.has_type_references,
+        })
+        .collect();
     Ok(collector.record)
 }
 
@@ -207,6 +222,8 @@ impl<'a> Collector<'a> {
                 statements: Vec::new(),
                 assets: Vec::new(),
                 flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
+                scope_bindings: Vec::new(),
+                scope_incomplete: false,
                 diagnostics: Vec::new(),
             },
         }

@@ -458,6 +458,53 @@ fn class_expression_facts_mirror_class_declaration() {
     assert!(record.statements[0].declared_names.is_empty(), "{:?}", record.statements[0]);
 }
 
+/// scope 事实：import 绑定与声明绑定的 declaration/references span、
+/// 遮蔽排除、export 子句 token 记为值引用。
+#[test]
+fn scope_bindings_project_declaration_and_reference_spans() {
+    let source = "import { helper } from './lib.js';\nconst value = helper(1);\nfunction use(): number { const helper = 2; return helper; }\nexport { use };\n";
+    let record = ok(source);
+    assert!(!record.scope_incomplete, "{:?}", record.diagnostics);
+    let names: Vec<&str> = record.scope_bindings.iter().map(|b| b.name.as_str()).collect();
+    assert_eq!(names, ["helper", "value", "use"]);
+
+    let helper = &record.scope_bindings[0];
+    assert_eq!(slice(source, helper.declaration), "helper");
+    // 唯一值引用是 `helper(1)`；`use` 体内遮蔽的 `helper` 不记。
+    assert_eq!(helper.references.len(), 1);
+    assert_eq!(slice(source, helper.references[0]), "helper");
+    assert!(!helper.has_type_references);
+
+    let use_binding = record.scope_bindings.iter().find(|b| b.name == "use").unwrap();
+    assert_eq!(slice(source, use_binding.declaration), "use");
+    assert!(
+        use_binding.references.iter().any(|span| slice(source, *span) == "use"),
+        "export 子句 token 必须记为值引用：{:?}",
+        use_binding.references
+    );
+}
+
+/// 类型位置引用只置标志不记 span，值位置引用照常记 span
+/// （改名守卫据 `has_type_references` 拒绝，擦除后类型 span 无意义）。
+#[test]
+fn type_reference_sets_flag_without_span() {
+    let source = "class Flag {}\nconst on: Flag = new Flag();\n";
+    let record = ok(source);
+    assert!(!record.scope_incomplete, "{:?}", record.diagnostics);
+    let flag = record.scope_bindings.iter().find(|b| b.name == "Flag").expect("class 绑定事实");
+    assert!(flag.has_type_references, "注解位置 `: Flag` 必须置标志");
+    assert_eq!(flag.references.len(), 1, "类型位置不得记 span：{:?}", flag.references);
+    assert_eq!(slice(source, flag.references[0]), "Flag");
+}
+
+/// `eval` 触发上游 incomplete：引用可能缺失，消费者必须拒绝任何绑定改名；
+/// 本层原样透传，不做名字匹配补洞。
+#[test]
+fn scope_incomplete_is_passed_through_from_oak() {
+    let record = ok("const a = 1;\neval('a');\n");
+    assert!(record.scope_incomplete);
+}
+
 /// `export const { a } = x`：导出名来自 declarator 绑定名。
 #[test]
 fn destructured_export_resolves_local_name() {

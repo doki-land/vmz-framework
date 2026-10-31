@@ -21,8 +21,30 @@ pub struct ModuleRecord {
     pub assets: Vec<AssetFact>,
     /// 模块级标志。
     pub flags: ModuleFlags,
+    /// 模块级绑定 scope 事实（Oak `module_scope_facts` 投影），
+    /// 供打包层做 rename-safe 的绑定重写。
+    pub scope_bindings: Vec<ScopeBindingFact>,
+    /// scope 事实可能缺引用时为 `true`；消费者必须拒绝任何绑定改名。
+    pub scope_incomplete: bool,
     /// 非致命诊断；解析失败走 `Err`，不进入本结构。
     pub diagnostics: Vec<PackDiagnostic>,
+}
+
+/// 一个模块级绑定的 scope 事实。
+///
+/// 语义与上游 `oak_typescript::scope::ModuleBindingFacts` 一致：
+/// `references` 是值位置引用（源序，遮蔽排除），类型位置只给标志
+/// 不给 span。`scope_incomplete` 为 `true` 时两者都不可信。
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScopeBindingFact {
+    /// 绑定名。
+    pub name: String,
+    /// 绑定 token 的声明 span。
+    pub declaration: (usize, usize),
+    /// 值位置引用 span，源序。
+    pub references: Vec<(usize, usize)>,
+    /// 名字出现在类型位置（span 不记录）。
+    pub has_type_references: bool,
 }
 
 impl ModuleRecord {
@@ -35,6 +57,8 @@ impl ModuleRecord {
             statements: Vec::new(),
             assets: Vec::new(),
             flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
+            scope_bindings: Vec::new(),
+            scope_incomplete: false,
             diagnostics: Vec::new(),
         }
     }
@@ -71,8 +95,8 @@ pub struct ImportBinding {
     pub imported: ImportedName,
     /// 绑定内联 `type` 修饰（`{ type X }`）。
     pub inline_type_only: bool,
-    /// 绑定自身 span。Oak AST 的 `ImportSpecifier` 不携带 span，恒为 `None`，
-    /// 只有语句级 span 与内联 `type` 修饰符可用。
+    /// 绑定 token 自身 span。本层不回填（恒 `None`）：绑定级精确事实统一
+    /// 走 [`ModuleRecord::scope_bindings`]，避免同一信息两个来源。
     pub span: Option<(usize, usize)>,
 }
 
