@@ -75,6 +75,7 @@ fn plan(retained: &[usize], live_dynamic: &[(usize, Vec<usize>)]) -> LinkPlan {
             node,
             active_statements: Vec::new(),
             used_reexports: Vec::new(),
+            used_targets: Vec::new(),
             dynamic_edges: live_dynamic
                 .iter()
                 .find(|(source, _)| *source == node)

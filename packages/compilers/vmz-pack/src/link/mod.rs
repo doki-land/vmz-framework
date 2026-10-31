@@ -35,7 +35,7 @@
 //! `dynamic_edges` 是链接后的唯一活跃事实来源：chunk、资源、CSS、动态边
 //! 处理必须以此为共同输入，不得另起重算。
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeSet, HashSet, VecDeque};
 
 use crate::diag::PackDiagnostic;
 use crate::graph::{EdgeKind, ModuleGraph, NodeKind};
@@ -118,6 +118,11 @@ pub struct LinkedModule {
     pub active_statements: Vec<usize>,
     /// 被使用的重导出事实（按首次使用顺序）。
     pub used_reexports: Vec<UsedReexport>,
+    /// 本模块活跃语句实际传播了符号需求的静态边目标（图节点索引，升序）。
+    /// 与 [`Self::used_reexports`] 的 `target_node` 合并即本模块「符号使用」
+    /// 的全部目标；分包层据此判定真实依赖，不把保留集合的每条静态边都当作
+    /// 依赖（未消费的纯目标不产生依赖边）。
+    pub used_targets: Vec<usize>,
     /// 存活的动态 import 边在 `ModuleNode::dynamic_edges` 中的下标，升序。
     pub dynamic_edges: Vec<usize>,
 }
@@ -210,6 +215,7 @@ struct Linker<'g> {
     active: Vec<HashSet<usize>>,
     used_reexports: Vec<Vec<UsedReexport>>,
     seen_reexports: Vec<HashSet<(usize, usize)>>,
+    used_targets: Vec<BTreeSet<usize>>,
     live_dynamic: Vec<HashSet<usize>>,
     worklist: VecDeque<Demand>,
     seen_demands: HashSet<Demand>,
@@ -228,6 +234,7 @@ impl<'g> Linker<'g> {
             active: (0..count).map(|_| HashSet::new()).collect(),
             used_reexports: (0..count).map(|_| Vec::new()).collect(),
             seen_reexports: (0..count).map(|_| HashSet::new()).collect(),
+            used_targets: (0..count).map(|_| BTreeSet::new()).collect(),
             live_dynamic: (0..count).map(|_| HashSet::new()).collect(),
             worklist: VecDeque::new(),
             seen_demands: HashSet::new(),
@@ -309,6 +316,7 @@ impl<'g> Linker<'g> {
     fn record_reexport(&mut self, node: usize, used: UsedReexport, key: (usize, usize)) {
         if self.seen_reexports[node].insert(key) {
             self.used_reexports[node].push(used);
+            self.used_targets[node].insert(key.1);
         }
     }
 
@@ -356,6 +364,7 @@ impl<'g> Linker<'g> {
                     continue;
                 }
                 propagated = true;
+                self.used_targets[node].insert(target);
                 match binding.imported {
                     ImportedName::Default => {
                         self.demand(Demand::Export(target, "default".to_string()));
@@ -730,6 +739,7 @@ impl<'g> Linker<'g> {
                 node,
                 active_statements: active,
                 used_reexports: std::mem::take(&mut self.used_reexports[node]),
+                used_targets: std::mem::take(&mut self.used_targets[node]).into_iter().collect(),
                 dynamic_edges: dynamic,
             });
         }

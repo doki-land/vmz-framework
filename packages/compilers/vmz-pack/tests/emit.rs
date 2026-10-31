@@ -2083,12 +2083,14 @@ fn incomplete_facts_member_is_rejected() {
                 node: 0,
                 active_statements: Vec::new(),
                 used_reexports: Vec::new(),
+                used_targets: Vec::new(),
                 dynamic_edges: Vec::new(),
             },
             LinkedModule {
                 node: 1,
                 active_statements: Vec::new(),
                 used_reexports: Vec::new(),
+                used_targets: Vec::new(),
                 dynamic_edges: Vec::new(),
             },
         ],
@@ -2134,6 +2136,7 @@ fn missing_source_file_is_rejected() {
             node: 0,
             active_statements: Vec::new(),
             used_reexports: Vec::new(),
+            used_targets: Vec::new(),
             dynamic_edges: Vec::new(),
         }],
         diagnostics: Vec::new(),
@@ -2273,4 +2276,56 @@ fn cross_chunk_evaluation_is_preserved_without_used_bindings() {
         "{}",
         entry_b.code
     );
+}
+
+/// 分包依赖只取 link 活跃结论：入口 A 静态导入纯模块 P 的未消费导出时，
+/// 这条边既不可观察求值也不是符号使用，不产生依赖边。P 不进入 shared 分区，
+/// 只随真正使用它的入口 B 落进 B 的 chunk。
+#[test]
+fn pure_target_without_symbol_use_does_not_join_shared_partition() {
+    let root = temp_tree(
+        "chunkpure",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry-one.js", "import { unused } from './p.js';\nexport const one = 1;\n"),
+            ("src/entry-two.js", "import { p } from './p.js';\nexport const two = p;\n"),
+            ("src/p.js", "export const p = 1;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/entry-one.js")),
+            ("two".to_string(), root.join("src/entry-two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["one".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["two".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    assert_eq!(chunks.chunks.len(), 2, "{:?}", chunks.chunks);
+    assert!(chunks.chunks.iter().all(|chunk| !chunk.id.starts_with("shared/")));
+    let one = chunks.chunks.iter().find(|chunk| chunk.id == "entry/one").unwrap();
+    let two = chunks.chunks.iter().find(|chunk| chunk.id == "entry/two").unwrap();
+    let pure = graph.index_of(&root.join("src/p.js")).unwrap();
+    assert!(!one.modules.contains(&pure), "{:?}", one.modules);
+    assert!(two.modules.contains(&pure), "{:?}", two.modules);
+    assert!(one.depends_on.is_empty(), "{:?}", one.depends_on);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
 }

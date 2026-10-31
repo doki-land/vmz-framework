@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::diag::PackDiagnostic;
 use crate::graph::{ModuleGraph, NodeKind};
-use crate::link::LinkPlan;
+use crate::link::{LinkPlan, UsedReexport};
 
 /// 保留节点缺少完整模块事实时的显式诊断码。
 const INCOMPLETE_FACTS: &str = "vmz::pack::chunk::incomplete_facts";
@@ -85,7 +85,24 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
         }
     }
 
-    // 保留集合上的静态边邻接（保守：一律算依赖，不重判语句活跃）。
+    // 依赖边 = 可观察求值目标 ∪ 本模块传播了符号需求的目标。前者是 ESM 求值
+    // 语义（求值本模块必然求值它的可观察静态依赖），后者是真正被合成 import /
+    // export-from 引用的目标。未被任何活跃语句消费、也不可观察求值的纯目标是
+    // 无依赖边：它既不会被导入，也不需要与之同 chunk。
+    let effectful = crate::link::effectful_modules(graph);
+    let mut used_targets: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); node_count];
+    for module in &plan.modules {
+        if module.node >= node_count {
+            continue;
+        }
+        used_targets[module.node].extend(module.used_targets.iter().copied());
+        used_targets[module.node]
+            .extend(module.used_reexports.iter().map(|used| match used {
+                UsedReexport::Named { target_node, .. }
+                | UsedReexport::All { target_node, .. }
+                | UsedReexport::Namespace { target_node, .. } => *target_node,
+            }));
+    }
     let mut forward: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); node_count];
     let mut reverse: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); node_count];
     for (index, node) in graph.nodes.iter().enumerate() {
@@ -96,6 +113,9 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
             let Ok(target_id) = edge.target.as_ref() else { continue };
             let Some(target) = graph.index_of(target_id) else { continue };
             if !retained[target] {
+                continue;
+            }
+            if !effectful[target] && !used_targets[index].contains(&target) {
                 continue;
             }
             forward[index].insert(target);
