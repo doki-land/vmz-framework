@@ -94,9 +94,10 @@ fn referenced_local_pure_declarations_are_activated() {
     assert_eq!(module.active_statements, vec![0, 1, 2], "{:?}", module.active_statements);
 }
 
-/// 副作用导入（css 与包）强制目标全量保留。
+/// 副作用导入按**求值**维度保留目标：非纯语句恒活跃，纯声明只在被活跃引用
+/// 命中时激活。CSS 与包都走同一条规则，不再把「求值」升格成全量执行。
 #[test]
-fn side_effect_imports_force_full_retention() {
+fn side_effect_imports_retain_evaluation() {
     let root = temp_tree(
         "sideeffect",
         &[
@@ -424,4 +425,70 @@ fn tla_shaped_module_retained_without_new_diagnostics() {
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
     // `await (…) ` 形态判不了即非纯：模块保留且语句恒活。
     assert_eq!(plan.modules.iter().find(|m| m.node == tla).unwrap().active_statements, vec![0]);
+}
+
+/// 传递可观察求值：纯模块静态导入有副作用的模块时，整个链都必须求值。
+/// 入口只用 `a.js` 的一个未被消费的导出，`a.js` 自身语句全纯，但它静态导入
+/// 了带副作用的 `b.js`；丢失 `a.js` 就等于丢失 `b.js` 的副作用。
+#[test]
+fn transitive_effect_keeps_pure_importer_and_its_effectful_target() {
+    let root = temp_tree(
+        "transitive",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { unused } from './a.js';\nexport const main = 1;\n"),
+            ("src/a.js", "import './b.js';\nexport function unused(){ return 0 }\n"),
+            ("src/b.js", "console.log('b-side');\nexport const q = 1;\n"),
+        ],
+    );
+    let entry = root.join("src/entry.js");
+    let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let a = graph.index_of(&root.join("src/a.js")).unwrap();
+    let b = graph.index_of(&root.join("src/b.js")).unwrap();
+    // a 自身语句全纯，但求值会触发 b：模块保留，活跃语句为空（纯声明被剪）。
+    let a_module = plan.modules.iter().find(|m| m.node == a).expect("a retained for evaluation");
+    assert!(a_module.active_statements.is_empty(), "{:?}", a_module.active_statements);
+    // b 求值可观察：副作用语句恒活跃，未被消费的纯导出剪除。
+    let b_module = plan.modules.iter().find(|m| m.node == b).expect("b retained");
+    assert_eq!(b_module.active_statements, vec![0], "{:?}", b_module.active_statements);
+}
+
+/// 纯模块的副作用导入不保留：目标全部语句可证明纯时，`import './pure.js'`
+/// 既无导出消费也无副作用，整条边剪除。
+#[test]
+fn side_effect_import_of_pure_module_is_dropped() {
+    let root = temp_tree(
+        "pureside",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import './pure.js';\nexport const main = 1;\n"),
+            ("src/pure.js", "export function helper(){ return 1 }\n"),
+        ],
+    );
+    let entry = root.join("src/entry.js");
+    let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let pure = graph.index_of(&root.join("src/pure.js")).unwrap();
+    assert!(plan.modules.iter().all(|m| m.node != pure));
 }

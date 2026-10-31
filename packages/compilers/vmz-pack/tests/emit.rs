@@ -821,6 +821,8 @@ fn bootstrap_dynamic_map_emits_async_chunks() {
 }
 
 /// 同 chunk 两个模块声明同名绑定：拼接会产生非法重复声明，显式拒绝。
+/// `b.js` 的值声明必须被活跃语句引用，否则纯且未使用的声明会被剪除，
+/// 不再与 `a.js` 的导出构成冲突。
 #[test]
 fn name_conflict_is_rejected() {
     let root = temp_tree(
@@ -829,7 +831,7 @@ fn name_conflict_is_rejected() {
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             ("src/entry.js", "import { value } from './a.js';\nexport const main = value;\n"),
             ("src/a.js", "import './b.js';\nexport const value = 1;\n"),
-            ("src/b.js", "export const value = 2;\n"),
+            ("src/b.js", "export const value = 2;\nconsole.log(value);\n"),
         ],
     );
     let graph =
@@ -1192,7 +1194,8 @@ fn shadowed_only_import_binding_is_pruned() {
 
 /// 未使用的同 chunk 绑定不参与预决议：`y` 只被剪除的纯语句引用，不重写
 /// 也不误拒（旧行为对剪除语句内的引用 span 给 `binding_rename_unsupported`
-/// 假拒绝）；目标模块经副作用导入全量保留，导出面不受影响。
+/// 假拒绝）；目标模块按求值维度保留——副作用语句保留，未被消费的纯导出
+/// 随剪除消失。
 #[test]
 fn unused_same_chunk_binding_skips_pre_resolve() {
     let root = temp_tree(
@@ -1221,7 +1224,7 @@ fn unused_same_chunk_binding_skips_pre_resolve() {
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
     let code = &plan.artifacts[0].code;
     assert!(code.contains("console.log(\"b-side\")"), "{code}");
-    assert!(code.contains("export { x }"), "{code}");
+    assert!(!code.contains("export { x }"), "{code}");
     assert!(!code.contains("pruned"), "{code}");
     assert!(!code.contains(" y"), "{code}");
 }

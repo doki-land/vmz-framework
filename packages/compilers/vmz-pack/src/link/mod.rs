@@ -7,11 +7,11 @@
 //! - 导出需求（[`EntryExports`]）：入口的哪些导出被消费者读取（`All` /
 //!   `Named` / `Unconsumed`）。`execution: Full` 时导出维度不改变活跃结果
 //!   （执行已蕴含实例化传播），合同仍要求显式声明，不做默认猜测。
-//! - 副作用保留不是入口声明字段，而是链接器对任何保留模块的固有规则：
-//!   保留即执行，非纯语句恒活跃（[`Demand::Retain`] 的效应）。
+//! - 求值保留不是入口声明字段，而是链接器对任何保留模块的固有规则：
+//!   保留即求值，非纯语句恒活跃（[`Demand::Retain`] 的效应）。
 //!
-//! 传播需求同样按维度组合（[`Demand`]）：`Execute`（执行）/ `Retain`
-//! （副作用保留）/ `Export`（具名导出消费），沿 worklist 求不动点：具名使用
+//! 传播需求同样按维度组合（[`Demand`]）：`Execute`（整体执行）/ `Retain`
+//! （求值）/ `Export`（具名导出消费），沿 worklist 求不动点：具名使用
 //! 命中导出 → 激活声明语句或沿 import 绑定传播；命中重导出 → 向来源模块
 //! 继续传播。
 //!
@@ -23,9 +23,12 @@
 //!   （Oak 事实缺口如多变量声明只记首名，会在此暴露）。
 //! - 动态 import 边找不到包含语句：模块保留即执行，边界保守活。
 //!
-//! 模块保留（保守）：入口、显式副作用导入边目标、被符号使用的模块、
-//! 含非纯顶层语句（或事实不完整无法证明纯）且从保留模块可达的模块。
-//! 纯且无使用的模块消除。判定不了即非纯，宁保守勿误剪。
+//! 模块保留（保守）：入口、被符号使用的模块、以及**可观察求值**的模块。
+//! 可观察求值（[`effectful_modules`]）是图级不动点：模块自身含非纯顶层
+//! 语句、事实为空无法证明纯、或经静态 import / re-export 边到达另一个
+//! 可观察求值模块（ESM 求值一个模块必然先求值它的静态依赖），都算可观察。
+//! 保留模块的静态边只在目标可观察求值时传播 [`Demand::Retain`]（求值维度），
+//! 纯且无使用的模块消除。判定不了即可观察，宁保守勿误剪。
 //!
 //! 本层不做分包与产物生成；图可达不等于活跃，活跃只由入口需求、效果分类
 //! 与保守规则驱动。[`LinkPlan::modules`] 的 `active_statements` 与
@@ -136,13 +139,72 @@ enum Demand {
     Execute(usize),
     /// 具名导出消费维度：模块的某个导出名被使用。
     Export(usize, String),
-    /// 副作用保留维度：模块保留求值（非纯语句恒活跃），不指定导出消费。
+    /// 求值维度：模块保留求值（非纯语句恒活跃），不指定导出消费。静态
+    /// import / re-export / 副作用导入边在目标可观察求值时传播本需求。
     Retain(usize),
+}
+
+/// 图级可观察求值不动点：模块求值时是否可能产生可观察效果。
+///
+/// 判定为可观察的任一条件：
+/// - 模块含非纯顶层语句（[`StatementEffect`] 非 `Pure`）；
+/// - 顶层语句事实为空（空记录既可能是真正的空模块，也可能是读取/解析失败
+///   的占位，无法据此证明纯，按保守口径视为可观察）；
+/// - 存在未解析的静态边（无法证明目标无害）；
+/// - 经静态 import / re-export 边到达任一可观察求值的模块。
+///
+/// 最后一条是 ESM 语义要求：求值一个模块必然先求值它的全部静态依赖，所以
+/// 「静态导入了一个有副作用的模块」本身就可观察——即便本模块自己的语句
+/// 全部为纯，也不能整条链剪掉，否则依赖的副作用会消失。
+///
+/// 返回按图节点索引的布尔表。link、chunk 与 emit 共享这一条规则，不各自
+/// 重判副作用，也不在产物层用另一套启发式补齐。
+pub fn effectful_modules(graph: &ModuleGraph) -> Vec<bool> {
+    let count = graph.nodes.len();
+    let mut effectful = vec![false; count];
+    let mut reverse: Vec<Vec<usize>> = vec![Vec::new(); count];
+    let mut queue: Vec<usize> = Vec::new();
+    for (index, node) in graph.nodes.iter().enumerate() {
+        let record = &node.record;
+        let own = record.statements.is_empty()
+            || record.statements.iter().any(|statement| statement.effect != StatementEffect::Pure);
+        if own {
+            effectful[index] = true;
+            queue.push(index);
+        }
+        for edge in &node.static_edges {
+            match edge.target.as_ref() {
+                Ok(id) => match graph.index_of(id) {
+                    Some(target) => reverse[target].push(index),
+                    None => {
+                        // 目标身份不在图中：无法证明无害，保守视为可观察。
+                        effectful[index] = true;
+                        queue.push(index);
+                    }
+                },
+                Err(_) => {
+                    effectful[index] = true;
+                    queue.push(index);
+                }
+            }
+        }
+    }
+    // 沿反向静态边传播：被可观察模块静态依赖的模块，其求值同样可观察。
+    while let Some(node) = queue.pop() {
+        for &importer in &reverse[node] {
+            if !effectful[importer] {
+                effectful[importer] = true;
+                queue.push(importer);
+            }
+        }
+    }
+    effectful
 }
 
 /// 链接器内部状态。
 struct Linker<'g> {
     graph: &'g ModuleGraph,
+    effectful: Vec<bool>,
     retained: Vec<bool>,
     full: Vec<bool>,
     active: Vec<HashSet<usize>>,
@@ -156,10 +218,11 @@ struct Linker<'g> {
 }
 
 impl<'g> Linker<'g> {
-    fn new(graph: &'g ModuleGraph) -> Self {
+    fn new(graph: &'g ModuleGraph, effectful: Vec<bool>) -> Self {
         let count = graph.nodes.len();
         Self {
             graph,
+            effectful,
             retained: vec![false; count],
             full: vec![false; count],
             active: (0..count).map(|_| HashSet::new()).collect(),
@@ -179,15 +242,12 @@ impl<'g> Linker<'g> {
         }
     }
 
-    /// 保守保留判定：无法证明模块顶层全纯即不可消除（事实为空同样不可证明）。
-    fn non_pure(&self, node: usize) -> bool {
-        let record = &self.graph.nodes[node].record;
-        record.statements.is_empty()
-            || record.statements.iter().any(|s| s.effect != StatementEffect::Pure)
-    }
-
-    /// 保留模块：激活 Init/SideEffect 语句，并沿静态边传播请求。
-    /// 显式副作用导入边目标全量执行；其余可达非纯模块保留。
+    /// 保留模块：激活非纯语句，并沿静态边传播求值需求。
+    ///
+    /// 保留即求值：模块的可观察求值由 [`effectful_modules`] 决定，静态边只在
+    /// 目标可观察求值时传播 [`Demand::Retain`]。副作用导入（`import '…'`）
+    /// 与静态绑定导入走同一条规则：求值目标，而不是把「求值」混同成「全部
+    /// 导出被消费」的全量执行。
     fn retain(&mut self, node: usize) {
         if self.retained[node] {
             return;
@@ -201,9 +261,7 @@ impl<'g> Linker<'g> {
         for edge in &self.graph.nodes[node].static_edges {
             let Ok(target_id) = edge.target.as_ref() else { continue };
             let Some(target) = self.graph.index_of(target_id) else { continue };
-            if edge.kind == EdgeKind::SideEffect {
-                self.demand(Demand::Execute(target));
-            } else if self.non_pure(target) {
+            if self.effectful[target] {
                 self.demand(Demand::Retain(target));
             }
         }
@@ -691,7 +749,8 @@ impl<'g> Linker<'g> {
 ///   含 `export *`（名字不可枚举）时升级为 [`Demand::Execute`]；
 ///   [`EntryExports::Unconsumed`] 不发出导出需求。
 pub fn link(graph: &ModuleGraph, entry_uses: &[EntryUse]) -> LinkPlan {
-    let mut linker = Linker::new(graph);
+    let effectful = effectful_modules(graph);
+    let mut linker = Linker::new(graph, effectful);
     for entry in &graph.entries {
         let Some(index) = graph.index_of(&entry.id) else { continue };
         let Some(declaration) =
