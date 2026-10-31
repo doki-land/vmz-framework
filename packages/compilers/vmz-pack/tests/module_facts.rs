@@ -521,3 +521,31 @@ fn destructured_export_resolves_local_name() {
     }
     assert_eq!(record.statements[0].declared_names, ["a"]);
 }
+
+/// 函数表达式体内的引用必须进入语句事实：生成器的 `X.create = function (api) { … }`
+/// 形态一旦丢体，导入绑定会被判成未使用，减枝就会删掉仍在被引用的模块。
+#[test]
+fn function_expression_body_references_are_collected() {
+    let source = "import Greeting from './greeting.client.js';\nexport default class Page {}\nPage.create = function named(api) { api.component(this, Greeting, {}); };\n";
+    let record = ok(source);
+    assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
+    let statement = record
+        .statements
+        .iter()
+        .find(|statement| statement.referenced_names.iter().any(|name| name == "Greeting"))
+        .expect("assignment statement should reference Greeting");
+    assert!(
+        statement.referenced_names.iter().any(|name| name == "component"),
+        "{:?}",
+        statement.referenced_names
+    );
+    let binding = record
+        .scope_bindings
+        .iter()
+        .find(|binding| binding.name == "Greeting")
+        .expect("import binding fact");
+    assert!(!binding.references.is_empty(), "binding references should include the body use");
+    for span in &binding.references {
+        assert_eq!(slice(source, *span), "Greeting");
+    }
+}
