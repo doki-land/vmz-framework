@@ -6,8 +6,9 @@
 // It emits mark geometry plus axis baselines, tick labels and a minimal legend
 // — no theme, motion or interaction state.
 //
-// Node identity comes from `rowIndex` (bar / point) or the series value (line),
-// never from the position of an item in a temporary array.
+// Node identity comes from the plan's stable row `key` (bar / point) or the
+// series value (line), never from the position of an item in a temporary
+// array. The plan is also the only source of the series grouping domain.
 
 import { rgb8, type FontSpec, type PathCommand, type RGBA } from "@doki-land/davinci-types";
 import { estimateTextSize, type SemanticNode, type SemanticScene } from "@doki-land/davinci-scene";
@@ -40,6 +41,8 @@ interface PlotRect {
 
 interface PositionedMark {
     readonly rowIndex: number;
+    /** Stable row identity from the compile plan. */
+    readonly key: string;
     readonly x: number;
     readonly y: number;
     readonly series: string | null;
@@ -88,31 +91,11 @@ function seriesColor(categories: ReadonlyArray<string> | undefined, series: stri
     return LEGEND_PALETTE[seriesPaletteIndex(categories, series) % LEGEND_PALETTE.length];
 }
 
-/** Collect unique non-null category values from a data column, preserving first-seen order. */
-function collectCategories(col: { values: ReadonlyArray<unknown> } | undefined): string[] {
-    if (!col) return [];
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const v of col.values) {
-        if (v === null || v === undefined) continue;
-        if (typeof v === "number" && !Number.isFinite(v)) continue;
-        const key = String(v);
-        if (!seen.has(key)) {
-            seen.add(key);
-            out.push(key);
-        }
-    }
-    return out;
-}
-
 /** Build a SemanticScene from a ChartCompilePlan and a pixel viewport. */
 export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): SemanticScene {
     const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
     const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
-    const seriesEnc = plan.spec.encoding.find(
-        (e) => e.channel === "series" || e.channel === "color" || e.channel === "group",
-    );
-    const seriesCategories = seriesEnc ? collectCategories(column(plan.resolvedData, seriesEnc.field)) : undefined;
+    const seriesCategories = plan.series.field !== null ? plan.series.categories : undefined;
 
     // Compute adaptive plot padding so axis labels and tick marks do not get
     // clipped. Defaults are only a floor — Y-axis label width and X-axis
@@ -126,10 +109,9 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
         const yScale = pixelScale(plan.scales.get(yEnc.channel), [plot.y + plot.h, plot.y]);
         const xCol = column(plan.resolvedData, xEnc.field);
         const yCol = column(plan.resolvedData, yEnc.field);
-        const seriesCol = seriesEnc ? column(plan.resolvedData, seriesEnc.field) : undefined;
 
         if (xScale && yScale && xCol && yCol) {
-            const rows = positionedRows(plan, xScale, yScale, xCol, yCol, seriesCol);
+            const rows = positionedRows(plan, xScale, yScale, xCol, yCol);
             children.push(buildAxis("x-axis", plot, xScale, "horizontal"));
             children.push(buildAxis("y-axis", plot, yScale, "vertical"));
             children.push(...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories));
@@ -201,15 +183,13 @@ function positionedRows(
     yScale: Scale,
     xCol: DataColumn,
     yCol: DataColumn,
-    seriesCol: DataColumn | undefined,
 ): ReadonlyArray<PositionedMark> {
     const rows: PositionedMark[] = [];
     for (const mark of plan.marks) {
         const x = project(xScale, xCol.values[mark.rowIndex] ?? null);
         const y = project(yScale, yCol.values[mark.rowIndex] ?? null);
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-        const rawSeries = seriesCol ? (seriesCol.values[mark.rowIndex] ?? null) : null;
-        rows.push({ rowIndex: mark.rowIndex, x, y, series: rawSeries === null ? null : String(rawSeries) });
+        rows.push({ rowIndex: mark.rowIndex, key: mark.key, x, y, series: mark.series });
     }
     return rows;
 }
@@ -251,9 +231,9 @@ function buildBars(
 
     return rows.map((row) => ({
         kind: "rect" as const,
-        id: `${plan.spec.mark}:${row.rowIndex}`,
+        id: `${plan.spec.mark}:${row.key}`,
         role: "chart.mark" as const,
-        source: { domain: "chart", path: ["mark", row.rowIndex] },
+        source: { domain: "chart", path: ["mark", row.key] },
         x: row.x - w / 2,
         y: Math.min(row.y, baseline),
         w,
@@ -310,9 +290,9 @@ function buildPoints(
 ): SemanticNode[] {
     return rows.map((row) => ({
         kind: "ellipse" as const,
-        id: `${plan.spec.mark}:${row.rowIndex}`,
+        id: `${plan.spec.mark}:${row.key}`,
         role: "chart.mark" as const,
-        source: { domain: "chart", path: ["mark", row.rowIndex] },
+        source: { domain: "chart", path: ["mark", row.key] },
         cx: row.x,
         cy: row.y,
         rx: POINT_RADIUS,
@@ -478,11 +458,8 @@ function normalizeNumber(value: number): number {
 
 /** Color swatches live in the plot's upper-right corner, clear of the ticks. */
 function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
-    const enc = plan.spec.encoding.find((e) => e.channel === "color" || e.channel === "series");
-    if (!enc) return [];
-    const col = column(plan.resolvedData, enc.field);
-    if (!col) return [];
-    const categories = collectCategories(col);
+    if (plan.series.field === null) return [];
+    const categories = plan.series.categories;
     if (categories.length === 0) return [];
 
     const size = LEGEND_FONT.sizePx;

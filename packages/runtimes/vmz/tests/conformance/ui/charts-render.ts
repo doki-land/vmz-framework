@@ -20,6 +20,10 @@
  *   height and never flip above zero
  * - line marks never bridge two series (one path per series, legend order is
  *   first appearance)
+ * - `keyField` gives marks a stable identity that survives row reordering,
+ *   duplicate keys are reported (`davinci.chart.duplicate-key`) and stay
+ *   unique, an unknown `keyField` is an error, and the plan — not the scene —
+ *   owns the series grouping domain
  * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
  *   labels, and ids that survive a spec update
  */
@@ -284,9 +288,9 @@ console.log('charts-render: text bounds are deterministic estimates…');
     if (texts.length === 0) fail('display scene must carry axis text');
     const alpha = texts.find((t) => t.text === 'alpha');
     if (!alpha) fail('alpha tick label missing');
-    // 5 chars × 10px × 0.6 wide, 1 line × 10px × 1.2 tall.
-    if (Math.abs(alpha.bounds.w - 30) > 1e-9 || Math.abs(alpha.bounds.h - 12) > 1e-9) {
-        fail(`alpha bounds want 30×12, got ${alpha.bounds.w}×${alpha.bounds.h}`);
+    // 5 chars × 11px × 0.6 wide, 1 line × 11px × 1.2 tall.
+    if (Math.abs(alpha.bounds.w - 33) > 1e-9 || Math.abs(alpha.bounds.h - 13.2) > 1e-9) {
+        fail(`alpha bounds want 33×13.2, got ${alpha.bounds.w}×${alpha.bounds.h}`);
     }
     if (Math.abs(alpha.bounds.x + alpha.bounds.w / 2 - alpha.anchor.x) > 1e-9) {
         fail('text bounds must be centred on the anchor');
@@ -294,7 +298,7 @@ console.log('charts-render: text bounds are deterministic estimates…');
     if (Math.abs(alpha.bounds.y + alpha.bounds.h / 2 - alpha.anchor.y) > 1e-9) {
         fail('text bounds must be centred on the anchor');
     }
-    if (alpha.fontCss !== '400 10px sans-serif') fail(`fontCss want "400 10px sans-serif", got "${alpha.fontCss}"`);
+    if (alpha.fontCss !== '400 11px sans-serif') fail(`fontCss want "400 11px sans-serif", got "${alpha.fontCss}"`);
     if (texts.some((t) => !(t.bounds.w > 0 && t.bounds.h > 0))) fail('every text node needs non-zero bounds');
     if (texts.some((t) => !Number.isFinite(t.bounds.x) || !Number.isFinite(t.bounds.y))) {
         fail('text bounds must stay finite');
@@ -311,7 +315,7 @@ console.log('charts-render: text bounds are deterministic estimates…');
     const { display: cjkDisplay } = pipeline(cjkSpec, [{ 类别: '图表', 数值: 2 }]);
     const cjk = collectTexts(cjkDisplay.root).find((t) => t.text === '图表');
     if (!cjk) fail('CJK tick label missing');
-    if (Math.abs(cjk.bounds.w - 12) > 1e-9) fail(`CJK bounds want 12 wide, got ${cjk.bounds.w}`);
+    if (Math.abs(cjk.bounds.w - 13.2) > 1e-9) fail(`CJK bounds want 13.2 wide, got ${cjk.bounds.w}`);
 }
 
 console.log('charts-render: empty data is not an error…');
@@ -513,6 +517,111 @@ console.log('charts-render: line marks never bridge two series…');
         fail(`svg want ${paths.length} series + axis <path>, got ${count(svg, '<path')}`);
     }
     if (svg.includes('NaN')) fail('series paths must not emit NaN');
+}
+
+console.log('charts-render: keyField gives marks a stable identity…');
+{
+    const keyedSpec = {
+        mark: 'bar',
+        keyField: 'category',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'value', channel: 'y' },
+        ],
+    };
+    const keyedRows = [
+        { category: 'alpha', value: 3 },
+        { category: 'beta', value: 7 },
+        { category: 'gamma', value: 5 },
+    ];
+    const { semantic } = pipeline(keyedSpec, keyedRows);
+    const marks = semantic.root.children.filter((n) => n.kind === 'rect');
+    if (marks.map((m) => m.id).join(',') !== 'bar:alpha,bar:beta,bar:gamma') {
+        fail(`keyField ids want bar:alpha,bar:beta,bar:gamma, got ${marks.map((m) => m.id).join(',')}`);
+    }
+    for (const m of marks) {
+        const path = m.source?.path ?? [];
+        if (path[0] !== 'mark' || !keyedRows.some((r) => r.category === path[1])) {
+            fail(`mark source path must carry the key, got ${JSON.stringify(path)}`);
+        }
+    }
+
+    // Reordering rows must not renumber identities — each category keeps its id.
+    const reordered = pipeline(keyedSpec, [keyedRows[2], keyedRows[0], keyedRows[1]]);
+    const reorderedMarks = reordered.semantic.root.children.filter((n) => n.kind === 'rect');
+    if (reorderedMarks.map((m) => m.id).join(',') !== 'bar:gamma,bar:alpha,bar:beta') {
+        fail(`ids must follow keys after reorder: ${reorderedMarks.map((m) => m.id).join(',')}`);
+    }
+    // The band domain follows row order, so x may shift; the measured height
+    // belongs to the value, so it must ride with the key.
+    for (const row of keyedRows) {
+        const before = marks.find((m) => m.id === `bar:${row.category}`);
+        const after = reorderedMarks.find((m) => m.id === `bar:${row.category}`);
+        if (!before || !after) fail(`key ${row.category} lost on reorder`);
+        if (Math.abs(before.h - after.h) > 1e-9) {
+            fail(`bar ${row.category} height drifted on reorder: ${before.h} vs ${after.h}`);
+        }
+    }
+
+    // Duplicate keys are reported once per collision and stay unique in ids.
+    const dup = pipeline(keyedSpec, [
+        { category: 'alpha', value: 3 },
+        { category: 'alpha', value: 5 },
+        { category: 'beta', value: 7 },
+    ]);
+    const dupCodes = dup.plan.diagnostics.items.filter((d) => d.code === 'davinci.chart.duplicate-key');
+    if (dupCodes.length !== 1) fail(`want 1 duplicate-key diagnostic, got ${dupCodes.length}`);
+    if (dupCodes[0].severity !== 'warning') fail(`duplicate-key must be a warning, got ${dupCodes[0].severity}`);
+    if (!dupCodes[0].message.includes('alpha')) fail(`duplicate-key must name the key: ${dupCodes[0].message}`);
+    if (dupCodes[0].source !== 'category#1') fail(`duplicate-key source must point at the row: ${dupCodes[0].source}`);
+    const dupIds = dup.semantic.root.children.filter((n) => n.kind === 'rect').map((m) => m.id);
+    if (new Set(dupIds).size !== dupIds.length) fail(`ids must stay unique on duplicate keys: ${dupIds.join(',')}`);
+
+    // An unknown keyField is the same class of authoring mistake as an
+    // unknown encoding field.
+    const badKey = pipeline({ ...keyedSpec, keyField: 'nope' }, keyedRows);
+    const badKeyDiag = badKey.plan.diagnostics.items.find(
+        (d) => d.code === 'davinci.chart.unknown-field' && d.message.includes('nope'),
+    );
+    if (!badKeyDiag) fail('unknown keyField must raise davinci.chart.unknown-field');
+    if (badKeyDiag.severity !== 'error') fail(`unknown keyField must be an error, got ${badKeyDiag.severity}`);
+}
+
+console.log('charts-render: the plan owns the series grouping domain…');
+{
+    const spec = {
+        mark: 'line',
+        encoding: [
+            { field: 'step', channel: 'x' },
+            { field: 'score', channel: 'y' },
+            { field: 'region', channel: 'series' },
+        ],
+    };
+    const rows = [
+        { step: 1, score: 10, region: 'B' },
+        { step: 2, score: 20, region: 'A' },
+        { step: 3, score: 15, region: 'B' },
+    ];
+    const plan = compile(spec, fromRows(rows));
+    if (plan.series.field !== 'region') fail(`series.field want region, got ${plan.series.field}`);
+    if (plan.series.categories.join(',') !== 'B,A') {
+        fail(`series.categories must be first-appearance order, got ${plan.series.categories.join(',')}`);
+    }
+    if (plan.marks.map((m) => m.series).join(',') !== 'B,A,B') {
+        fail(`marks must carry their series group: ${plan.marks.map((m) => m.series).join(',')}`);
+    }
+    if (plan.marks.map((m) => m.key).join(',') !== '0,1,2') {
+        fail(`positional keys want 0,1,2, got ${plan.marks.map((m) => m.key).join(',')}`);
+    }
+
+    const ungrouped = compile(
+        { mark: 'bar', encoding: [{ field: 'category', channel: 'x' }, { field: 'value', channel: 'y' }] },
+        fromRows(barRows),
+    );
+    if (ungrouped.series.field !== null || ungrouped.series.categories.length !== 0) {
+        fail('unkeyed charts must carry an empty grouping domain');
+    }
+    if (ungrouped.marks.some((m) => m.series !== null)) fail('ungrouped marks must have series null');
 }
 
 // ─── Diagram: topology → layout → DisplayScene → SVG ─────────────────────

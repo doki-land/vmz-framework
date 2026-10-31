@@ -30,12 +30,31 @@ export interface ChartSpec {
     readonly scales?: ReadonlyMap<string, Scale>;
     /** Facet field (optional — produces one plan row per facet). */
     readonly facetField?: string;
+    /** Field whose value names each row. Marks carry this key as identity, so
+     *  re-sorting or filtering rows never renumbers them. Without `keyField`
+     *  keys are positional (`"0"`, `"1"`, …) and only stable while the row
+     *  order is. */
+    readonly keyField?: string;
+}
+
+/** Series (grouping) domain resolved once by `compile`. */
+export interface SeriesDomain {
+    /** Encoding field that groups marks, or null when ungrouped. */
+    readonly field: string | null;
+    /** Group values in first-appearance order — legend and palette share it. */
+    readonly categories: ReadonlyArray<string>;
 }
 
 /** One resolved mark instance in the plan — will become one Scene node. */
 export interface PlanMark {
     /** Row index in the resolved data. */
     readonly rowIndex: number;
+    /** Stable row identity — `keyField` value, or the row index as a string.
+     *  Duplicated keys are disambiguated with a `~rowIndex` suffix and
+     *  reported as `davinci.chart.duplicate-key`. */
+    readonly key: string;
+    /** Series group this row belongs to (stringified), null when ungrouped. */
+    readonly series: string | null;
     /** Encoded channel values (scale-applied). */
     readonly channels: ReadonlyMap<string, number | string>;
 }
@@ -46,9 +65,14 @@ export interface ChartCompilePlan {
     readonly resolvedData: DataSnapshot;
     readonly scales: ReadonlyMap<string, Scale>;
     readonly marks: ReadonlyArray<PlanMark>;
+    /** Resolved grouping domain — the scene never re-reads the series column. */
+    readonly series: SeriesDomain;
     /** Data problems found while compiling — row-level, never fatal to the host. */
     readonly diagnostics: DiagnosticSet;
 }
+
+/** Encoding channels that group marks into series. */
+const seriesChannels: ReadonlySet<string> = new Set(["series", "color", "group"]);
 
 /** Mark kinds measured from a zero baseline. */
 const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area"]);
@@ -61,6 +85,43 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     const scales = new Map<string, Scale>();
     const marks: PlanMark[] = [];
     const diagnostics: Diagnostic[] = [];
+
+    // Resolve the grouping domain once: first-appearance category order is a
+    // contract (legend and palette index marks by it), so it is computed here,
+    // not re-derived by the scene builder.
+    const seriesEnc = spec.encoding.find((e) => seriesChannels.has(e.channel));
+    const seriesCol = seriesEnc ? column(data, seriesEnc.field) : undefined;
+    const seriesCategories: string[] = [];
+    if (seriesCol) {
+        const seenSeries = new Set<string>();
+        for (const v of seriesCol.values) {
+            if (v === null || v === undefined) continue;
+            if (typeof v === "number" && !Number.isFinite(v)) continue;
+            const key = String(v);
+            if (!seenSeries.has(key)) {
+                seenSeries.add(key);
+                seriesCategories.push(key);
+            }
+        }
+    }
+
+    // Resolve row identity. A declared keyField that is absent is the same
+    // class of authoring mistake as an unknown encoding field.
+    let keyCol: ReturnType<typeof column> = undefined;
+    if (spec.keyField) {
+        keyCol = column(data, spec.keyField);
+        if (!keyCol && data.columns.length > 0) {
+            diagnostics.push(
+                diag(
+                    "error",
+                    "davinci.chart.unknown-field",
+                    `keyField "${spec.keyField}" is not in the data`,
+                    spec.keyField,
+                ),
+            );
+        }
+    }
+    const usedKeys = new Set<string>();
 
     for (const enc of spec.encoding) {
         const col = column(data, enc.field);
@@ -134,6 +195,36 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     for (let r = 0; r < data.rowCount; r++) {
         const channels = new Map<string, number | string>();
         let positioned = true;
+
+        // Row identity: keyField value when usable, positional otherwise.
+        // Duplicates keep the first occurrence and disambiguate later ones.
+        const rawKey = keyCol ? (keyCol.values[r] ?? null) : null;
+        const keyUsable =
+            rawKey !== null &&
+            rawKey !== undefined &&
+            !(typeof rawKey === "number" && !Number.isFinite(rawKey));
+        let key = keyUsable ? String(rawKey) : String(r);
+        if (usedKeys.has(key)) {
+            diagnostics.push(
+                diag(
+                    "warning",
+                    "davinci.chart.duplicate-key",
+                    `keyField "${spec.keyField}" gives duplicate key "${key}" for row ${r}`,
+                    `${spec.keyField}#${r}`,
+                ),
+            );
+            key = `${key}~${r}`;
+        }
+        usedKeys.add(key);
+
+        // Series group for this row (null when ungrouped or the cell is not a
+        // real category — never the strings "null" / "NaN").
+        const rawSeries = seriesCol ? (seriesCol.values[r] ?? null) : null;
+        const seriesUsable =
+            rawSeries !== null &&
+            rawSeries !== undefined &&
+            !(typeof rawSeries === "number" && !Number.isFinite(rawSeries));
+        const series = seriesUsable ? String(rawSeries) : null;
         for (const enc of spec.encoding) {
             const col = column(data, enc.field);
             if (!col) continue;
@@ -166,17 +257,18 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             }
 
             if (scale) {
-                const key = scale.kind === "band" || scale.kind === "point" ? String(raw) : raw;
-                channels.set(enc.channel, applyScale(scale, key));
+                const scaleKey = scale.kind === "band" || scale.kind === "point" ? String(raw) : raw;
+                channels.set(enc.channel, applyScale(scale, scaleKey));
             } else if (typeof raw === "number") channels.set(enc.channel, raw);
             else channels.set(enc.channel, String(raw));
         }
         // Rows without a usable x / y position never become marks; the rest
-        // still keep their original row index so ids do not renumber.
-        if (positioned) marks.push({ rowIndex: r, channels });
+        // still keep their original row index and key so ids do not renumber.
+        if (positioned) marks.push({ rowIndex: r, key, series, channels });
     }
 
-    return { spec, resolvedData: data, scales, marks, diagnostics: { items: diagnostics } };
+    const seriesDomain: SeriesDomain = { field: seriesCol ? (seriesEnc?.field ?? null) : null, categories: seriesCategories };
+    return { spec, resolvedData: data, scales, marks, series: seriesDomain, diagnostics: { items: diagnostics } };
 }
 
 /** Whether a raw cell can be turned into a finite number (or a real category). */
