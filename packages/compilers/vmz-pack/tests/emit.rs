@@ -1131,6 +1131,151 @@ fn binding_rename_guards_reject() {
     }
 }
 
+/// 未使用绑定精确剪枝：scope 事实完整时绑定 used 当且仅当引用 span 落在
+/// 活跃语句或 export 子句内。`shared` 只出现在形参遮蔽位置（模块绑定零值
+/// 引用），跨 chunk import 不合成；真实使用的同名绑定照常合成。
+#[test]
+fn shadowed_only_import_binding_is_pruned() {
+    let root = temp_tree(
+        "shadowprune",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/one.js",
+                "import { shared } from './shared.js';\nfunction f(shared){ return shared }\nexport const a1 = f(1);\n",
+            ),
+            ("src/two.js", "import { shared } from './shared.js';\nexport const a2 = shared;\n"),
+            ("src/shared.js", "export const shared = 7;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/one.js")),
+            ("two".to_string(), root.join("src/two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a1".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a2".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let shared = plan.artifacts.iter().find(|a| a.chunk_id == "shared/one+two").unwrap();
+    let one = plan.artifacts.iter().find(|a| a.chunk_id == "entry/one").unwrap();
+    assert!(!one.code.contains("import"), "{}", one.code);
+    assert!(one.code.contains("function f(shared)"), "{}", one.code);
+    assert!(one.code.contains("export { a1 }"), "{}", one.code);
+
+    let two = plan.artifacts.iter().find(|a| a.chunk_id == "entry/two").unwrap();
+    assert!(
+        two.code
+            .contains(&format!("import {{ shared }} from \"./{}\";", shared.file_name)),
+        "{}",
+        two.code
+    );
+}
+
+/// 未使用的同 chunk 绑定不参与预决议：`y` 只被剪除的纯语句引用，不重写
+/// 也不误拒（旧行为对剪除语句内的引用 span 给 `binding_rename_unsupported`
+/// 假拒绝）；目标模块经副作用导入全量保留，导出面不受影响。
+#[test]
+fn unused_same_chunk_binding_skips_pre_resolve() {
+    let root = temp_tree(
+        "unusedsame",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { x as y } from './b.js';\nimport './b.js';\nconst pruned = y;\nexport const main = 1;\n",
+            ),
+            ("src/b.js", "export const x = 1;\nconsole.log(\"b-side\");\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("console.log(\"b-side\")"), "{code}");
+    assert!(code.contains("export { x }"), "{code}");
+    assert!(!code.contains("pruned"), "{code}");
+    assert!(!code.contains(" y"), "{code}");
+}
+
+/// 类型引用参与时回退方向：`extends T` 是运行时值使用但上游只记类型引用
+/// （无 span），精确判定不可信，回退语法名字匹配后 import 照常保留——
+/// 保守超集只多留不误剪，剪掉它会产出悬空引用。
+#[test]
+fn extends_only_use_falls_back_to_name_matching() {
+    let root = temp_tree(
+        "extendsfallback",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/one.js", "import { T } from './shared.js';\nexport class C extends T {}\n"),
+            ("src/two.js", "import { v } from './shared.js';\nexport const a2 = v;\n"),
+            ("src/shared.js", "export class T {}\nexport const v = 1;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/one.js")),
+            ("two".to_string(), root.join("src/two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["C".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a2".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let shared = plan.artifacts.iter().find(|a| a.chunk_id == "shared/one+two").unwrap();
+    let one = plan.artifacts.iter().find(|a| a.chunk_id == "entry/one").unwrap();
+    assert!(
+        one.code.contains(&format!("import {{ T }} from \"./{}\";", shared.file_name)),
+        "{}",
+        one.code
+    );
+    assert!(one.code.contains("class C extends T"), "{}", one.code);
+}
+
 /// External 决议：同 chunk barrel 的重导出事实链落到其它 chunk 时，消费者
 /// 绑定按落点 chunk 与落点导出名合成跨 chunk import（`q as y`），
 /// 名字保持消费者本地名 `y`。

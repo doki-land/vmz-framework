@@ -2,6 +2,11 @@
 //! 类型擦除 → 合成跨 chunk import/export → 名字唯一性检查。
 //!
 //! 拼接语义的前提：同 chunk 模块直接文本拼接，绑定必须原同名可达；
+//! import 绑定的使用判定：scope 事实完整可信时按引用 span 落点精确判定
+//! （used 当且仅当至少一个值引用落在活跃语句或 export 子句内；未使用的
+//! 绑定不合成、不重写、不登记），`scope_incomplete`、无绑定事实、类型位置
+//! 引用或引用 span 漂移时回退语法名字匹配 ∪ export 子句名字消费（保守
+//! 超集，只多留不误剪）。
 //! 同 chunk 静态 import 绑定沿目标模块导出事实链解析落点绑定名：落点与
 //! 消费者本地名不一致时对消费者做 scope 重写——其绑定的值引用 span 改写
 //! 为落点名，守卫全部成立才执行（上游 `scope_incomplete` 未置位、绑定无
@@ -136,6 +141,25 @@ pub(crate) fn assemble_chunk(
         let record = &node.record;
         let source_lines = vmz_generator::js::SourceLines::new(source);
 
+        // 绑定使用判定输入：活跃语句 span、export 子句 span 与语法名字
+        // 回退集。回退集是保守超集（含属性名与遮蔽标识符），只在 scope
+        // 事实不可信时使用；scope 完整时按引用 span 落点精确判定。
+        let active_spans: Vec<(usize, usize)> = linked
+            .active_statements
+            .iter()
+            .filter_map(|&index| record.statements.get(index).map(|statement| statement.span))
+            .collect();
+        let export_spans: Vec<(usize, usize)> =
+            record.exports.iter().map(export_fact_span).collect();
+        let mut referenced_in_active: HashSet<&str> = HashSet::new();
+        for &statement_index in &linked.active_statements {
+            if let Some(statement) = record.statements.get(statement_index) {
+                for name in &statement.referenced_names {
+                    referenced_in_active.insert(name.as_str());
+                }
+            }
+        }
+
         // 同 chunk 静态 import 绑定预决议：必须先于语句切片——scope 重写的
         // 引用 span 要进入切片替换表，映射链（生成行→擦除→替换→源）随之成立。
         let (mut renames, binding_decisions) = plan_same_chunk_bindings(
@@ -144,7 +168,9 @@ pub(crate) fn assemble_chunk(
             node,
             record,
             source,
-            linked,
+            &active_spans,
+            &export_spans,
+            &referenced_in_active,
             &module_path,
             &mut merged,
             &mut same_chunk_locals,
@@ -650,25 +676,11 @@ pub(crate) fn assemble_chunk(
         }
 
         // import 事实：同 chunk 绑定已由预决议消费（同名可达/scope 重写/
-        // 自引用命名空间/显式拒绝），仅事实链离开本 chunk 的按目标 chunk
-        // 合成；跨 chunk 按使用过滤后合并。
-        // used 集合 = 活跃语句引用名 ∪ 本模块待决议导出 local（`export {a as b}`
-        // 消费的是 import 绑定，不体现在 referenced_names 里）。
-        // referenced_names 是语法名字匹配（与链接层同口径）：对 import 保留
-        // 是保守超集，只会多留不会误剪。
-        let mut used_names: HashSet<&str> = HashSet::new();
-        for &statement_index in &linked.active_statements {
-            if let Some(statement) = record.statements.get(statement_index) {
-                for name in &statement.referenced_names {
-                    used_names.insert(name.as_str());
-                }
-            }
-        }
-        for item in &deferred {
-            if item.module == module_path {
-                used_names.insert(item.local.as_str());
-            }
-        }
+        // 自引用命名空间/显式拒绝/未使用跳过），仅事实链离开本 chunk 的按
+        // 目标 chunk 合成；跨 chunk 按使用过滤后合并。使用判定见
+        // [`binding_is_used`]：scope 事实完整可信时按引用 span 落点精确判定
+        // （未使用绑定不合成——引用只可能出现在被剪除语句里），否则回退
+        // 语法名字匹配 ∪ export 子句名字消费（保守超集，只会多留不会误剪）。
         for (import_index, import) in record.imports.iter().enumerate() {
             if import.type_only {
                 continue;
@@ -747,8 +759,15 @@ pub(crate) fn assemble_chunk(
                     }
                     match &binding.imported {
                         ImportedName::Default => {
-                            // 未被活跃语句引用的绑定不合成（与跨 chunk 同口径）。
-                            if !used_names.contains(binding.local.as_str()) {
+                            // 未被发射文本消费的绑定不合成（与跨 chunk 同口径）。
+                            if !binding_is_used(
+                                record,
+                                source,
+                                binding.local.as_str(),
+                                &active_spans,
+                                &export_spans,
+                                &referenced_in_active,
+                            ) {
                                 continue;
                             }
                             if !json_locals.insert((target, binding.local.clone())) {
@@ -808,7 +827,14 @@ pub(crate) fn assemble_chunk(
                         let bindings = merged.entry(synth_chunk).or_default();
                         // 未被引用的绑定不合成：目标 chunk 可能已剪除该声明，
                         // 合成会产出引用不存在导出的错误 JS。
-                        if !used_names.contains(binding.local.as_str()) {
+                        if !binding_is_used(
+                            record,
+                            source,
+                            binding.local.as_str(),
+                            &active_spans,
+                            &export_spans,
+                            &referenced_in_active,
+                        ) {
                             continue;
                         }
                         match &binding.imported {
@@ -1007,6 +1033,68 @@ fn contains_identifier(haystack: &str, needle: &str) -> bool {
     false
 }
 
+/// 精确判定绑定是否被发射文本消费（仅在 scope 事实可信时有结论）：
+/// 绑定 used 当且仅当其至少一个值引用 span 落在活跃语句内（引用随切片
+/// 发射）或落在 export 子句内（deferred 导出机制消费绑定）。返回 `None`
+/// 表示无法精确判定，调用方必须回退语法名字匹配（保守超集）：
+/// - `scope_incomplete` 置位：引用清单可能漏引用；
+/// - 绑定无 scope 事实：引用清单给不全；
+/// - `has_type_references`：类型位置不记 span，而 `extends Foo` 是运行时
+///   值使用却被上游记为类型引用，按 span 清单剪枝会漏引用；
+/// - 引用 span 切片回原文不是本名：源码与事实漂移。
+fn precise_binding_used(
+    record: &ModuleRecord,
+    source: &str,
+    name: &str,
+    active_spans: &[(usize, usize)],
+    export_spans: &[(usize, usize)],
+) -> Option<bool> {
+    if record.scope_incomplete {
+        return None;
+    }
+    let binding = record.scope_bindings.iter().find(|item| item.name == name)?;
+    if binding.has_type_references {
+        return None;
+    }
+    let mut used = false;
+    for span in &binding.references {
+        if source.get(span.0..span.1) != Some(name) {
+            return None;
+        }
+        if active_spans.iter().any(|outer| contains(*outer, *span))
+            || export_spans.iter().any(|outer| contains(*outer, *span))
+        {
+            used = true;
+        }
+    }
+    Some(used)
+}
+
+/// 绑定是否被发射文本消费：scope 事实完整可信时按引用 span 落点精确判定
+/// （未使用的 import 绑定不合成、不重写——其引用只可能出现在被剪除的
+/// 语句里），否则回退语法名字匹配 ∪ export 子句名字消费（与链接层同口径
+/// 的保守超集，只会多留不会误剪）。
+fn binding_is_used(
+    record: &ModuleRecord,
+    source: &str,
+    name: &str,
+    active_spans: &[(usize, usize)],
+    export_spans: &[(usize, usize)],
+    referenced_in_active: &HashSet<&str>,
+) -> bool {
+    if let Some(used) = precise_binding_used(record, source, name, active_spans, export_spans) {
+        return used;
+    }
+    if referenced_in_active.contains(name) {
+        return true;
+    }
+    record.exports.iter().any(|export| match export {
+        ExportFact::Local { local, type_only, .. } => !type_only && local == name,
+        ExportFact::Default { local: Some(item), .. } => item == name,
+        _ => false,
+    })
+}
+
 /// 绑定改名守卫：全部成立才产出重写计划，任一失败返回拒绝原因（调用方发
 /// `binding_rename_unsupported`）。前提是不漏引用——引用清单不完整、落点
 /// 名与消费者任何文本形态碰撞、引用 span 无法判定发射归属，都拒绝。
@@ -1064,6 +1152,8 @@ fn plan_binding_rewrite(
 /// 同 chunk 静态 import 绑定预决议：先于语句切片执行，产出 scope 重写计划
 /// 与逐绑定决议。只处理目标为同 chunk JS 节点的静态值导入；其余形态
 /// （Style/Json/未解析/未保留/跨 chunk）原样留给主循环按既有合同处置。
+/// 未被发射文本消费的绑定（[`binding_is_used`] 判否）直接跳过：不重写、
+/// 不登记同名、不合成自引用，import 文本随绑定一起消失。
 #[allow(clippy::too_many_arguments)]
 fn plan_same_chunk_bindings(
     context: &EmitContext<'_>,
@@ -1071,7 +1161,9 @@ fn plan_same_chunk_bindings(
     node: &ModuleNode,
     record: &ModuleRecord,
     source: &str,
-    linked: &LinkedModule,
+    active_spans: &[(usize, usize)],
+    export_spans: &[(usize, usize)],
+    referenced_in_active: &HashSet<&str>,
     module_path: &str,
     merged: &mut BTreeMap<usize, Bindings>,
     same_chunk_locals: &mut BTreeSet<String>,
@@ -1083,18 +1175,11 @@ fn plan_same_chunk_bindings(
     let mut renames: BTreeMap<String, BindingRewrite> = BTreeMap::new();
     let mut decisions: HashMap<(usize, usize), BindingDecision> = HashMap::new();
 
-    let active_spans: Vec<(usize, usize)> = linked
-        .active_statements
-        .iter()
-        .filter_map(|&index| record.statements.get(index).map(|statement| statement.span))
-        .collect();
     // import 语句与 export 子句文本不进入 body（语句事实不含这些形态），
     // 其中的名字引用由合成语句与 deferred 导出机制携带落点名。
     let mut stripped_spans: Vec<(usize, usize)> =
         record.imports.iter().map(|import| import.span).collect();
-    for export in &record.exports {
-        stripped_spans.push(export_fact_span(export));
-    }
+    stripped_spans.extend(export_spans.iter().copied());
 
     for (import_index, import) in record.imports.iter().enumerate() {
         if import.kind != ImportKind::Static
@@ -1125,6 +1210,17 @@ fn plan_same_chunk_bindings(
                 continue;
             }
             let consumer = binding.local.as_str();
+            if !binding_is_used(
+                record,
+                source,
+                consumer,
+                active_spans,
+                export_spans,
+                referenced_in_active,
+            ) {
+                decisions.insert((import_index, binding_index), BindingDecision::Handled);
+                continue;
+            }
             if binding.imported == ImportedName::Namespace {
                 // 同 chunk 命名空间：对本 chunk 自身产物发 import-from-self，
                 // 拿到真实 Module Namespace（名字集按 chunk 加宽，与跨 chunk
@@ -1168,7 +1264,7 @@ fn plan_same_chunk_bindings(
                             source,
                             consumer,
                             &landing,
-                            &active_spans,
+                            active_spans,
                             &stripped_spans,
                         ) {
                             Ok(rewrite) => {
