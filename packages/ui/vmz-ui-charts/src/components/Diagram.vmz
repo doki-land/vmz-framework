@@ -113,6 +113,9 @@ import {
 import { renderSvg, resolve, type DisplayScene } from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
 
+/** 同页多图共存时 SVG 资源 id 前缀按实例递增，clip 等 id 不再互相覆盖。 */
+let diagramInstanceSeq = 0;
+
 export default class Diagram {
     /** DiagramSpec（nodes / edges / clusters）。 */
     public spec: DiagramSpec | null = null;
@@ -131,6 +134,8 @@ export default class Diagram {
 
     /** 每次 recompile 递增。异步返回时先比对再应用，为未来异步管线预留。 */
     public _latestRevision: number = 0;
+    /** 本实例 SVG 资源 id 前缀（构造时分配），多图内联同一文档不撞 id。 */
+    public readonly _resourceIdPrefix: string = `davinci-diagram-${++diagramInstanceSeq}-`;
     /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
     public _resizeObserver: ResizeObserver | null = null;
     /** 当前 hover 的节点或边 id —— 简化占位。 */
@@ -170,7 +175,7 @@ export default class Diagram {
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
         if (this._zeroSize()) return "";
-        return this.scene ? renderSvg(this.scene) : "";
+        return this.scene ? renderSvg(this.scene, { resourceIdPrefix: this._resourceIdPrefix }) : "";
     }
 
     onMount() {

@@ -30,12 +30,30 @@ interface ResolvedClip {
 interface RenderContext {
     readonly clips: ResolvedClip[];
     clipSeq: number;
+    readonly idPrefix: string;
 }
 
+/** Render options for the SVG target. */
+export interface RenderSvgOptions {
+    /** Prefix prepended to every generated resource id (`clip-…`).
+     *  Hosts embedding several scenes in one document must pass an
+     *  instance-unique prefix so ids never collide across charts.
+     *  The default is empty, keeping ids local to a standalone document. */
+    readonly resourceIdPrefix?: string;
+}
+
+/** A prefix must be a safe id token: it is interpolated into `id` /
+ *  `url(#…)` attributes, so anything else is rejected at the boundary. */
+const SAFE_ID_PREFIX = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
+
 /** Serialize a resolved DisplayScene to an SVG document string. */
-export function renderSvg(scene: DisplayScene): string {
+export function renderSvg(scene: DisplayScene, options: RenderSvgOptions = {}): string {
     assertSceneVersion(scene.version, "renderSvg");
-    const ctx: RenderContext = { clips: [], clipSeq: 0 };
+    const idPrefix = options.resourceIdPrefix ?? "";
+    if (idPrefix !== "" && !SAFE_ID_PREFIX.test(idPrefix)) {
+        throw new Error(`davinci.scene.invalid-resource-prefix: ${JSON.stringify(idPrefix)} is not a safe id token`);
+    }
+    const ctx: RenderContext = { clips: [], clipSeq: 0, idPrefix };
     const body: string[] = [];
     walk(scene.root, ctx, body);
 
@@ -169,7 +187,7 @@ function transformAttr(transform: Affine2D): string {
 }
 
 function clipFor(rect: BoundsRect, ctx: RenderContext): string {
-    const id = `clip-${ctx.clipSeq++}`;
+    const id = `${ctx.idPrefix}clip-${ctx.clipSeq++}`;
     ctx.clips.push({ id, rect });
     return id;
 }

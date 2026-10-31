@@ -115,6 +115,9 @@ import {
 import { resolve, renderSvg, type DisplayScene } from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
 
+/** 同页多图共存时 SVG 资源 id 前缀按实例递增，clip 等 id 不再互相覆盖。 */
+let chartInstanceSeq = 0;
+
 export default class Chart {
     /** DaVinci ChartSpec（mark + encoding）。 */
     public spec: ChartSpec | null = null;
@@ -134,6 +137,8 @@ export default class Chart {
 
     /** 每次 scene() 计算递增。异步返回时先比对再应用，为未来异步管线预留。 */
     public _latestRevision: number = 0;
+    /** 本实例 SVG 资源 id 前缀（构造时分配），多图内联同一文档不撞 id。 */
+    public readonly _resourceIdPrefix: string = `davinci-chart-${++chartInstanceSeq}-`;
     /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
     public _resizeObserver: ResizeObserver | null = null;
     /** 宿主显式传了 width / height 时为 true。ResizeObserver 只在 auto 模式下回写。 */
@@ -191,7 +196,7 @@ export default class Chart {
     public markup(): string {
         if (this._zeroSize()) return "";
         const scene = this.scene();
-        return scene ? renderSvg(scene) : "";
+        return scene ? renderSvg(scene, { resourceIdPrefix: this._resourceIdPrefix }) : "";
     }
 
     public get hostStyle(): string {

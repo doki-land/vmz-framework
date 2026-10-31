@@ -34,6 +34,9 @@
  *   refuse foreign versions, `validateScene` reports duplicate ids, invalid
  *   clips and non-finite geometry, and clips resolve into intersected
  *   world clips that serialize as `<clipPath>`
+ * - `renderSvg` `resourceIdPrefix` qualifies every generated resource id so
+ *   coexisting charts stay id-disjoint, and a prefix that is not a safe id
+ *   token is refused
  * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
  *   labels, and ids that survive a spec update
  */
@@ -869,6 +872,39 @@ console.log('charts-render: scene contract carries /v0 end to end…');
     const clippedSvg = renderSvg(clippedDisplay);
     if (!clippedSvg.includes('<clipPath id="clip-0">')) fail('clip must serialize into defs/clipPath');
     if (!clippedSvg.includes('clip-path="url(#clip-0)"')) fail('clipped markup must reference the clip id');
+}
+
+console.log('charts-render: resource ids stay unique across coexisting charts…');
+{
+    const clipped = {
+        version: '/v0',
+        root: {
+            kind: 'group',
+            id: 'g',
+            role: 'group',
+            clip: { x: 10, y: 10, w: 40, h: 40 },
+            children: [{ kind: 'rect', id: 'r', role: 'decorative', x: 0, y: 0, w: 100, h: 100 }],
+        },
+    };
+    const clippedDisplay = resolve(clipped, { width: 100, height: 100 });
+    const idsOf = (svg) => [...svg.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+
+    const aSvg = renderSvg(clippedDisplay, { resourceIdPrefix: 'a-' });
+    const bSvg = renderSvg(clippedDisplay, { resourceIdPrefix: 'b-' });
+    if (!aSvg.includes('<clipPath id="a-clip-0">')) fail('prefix must qualify the clipPath id');
+    if (!aSvg.includes('clip-path="url(#a-clip-0)"')) fail('references must use the prefixed id');
+    if (bSvg.includes('id="a-clip-0"')) fail('prefixed renders must not share ids');
+    const shared = idsOf(aSvg).filter((id) => idsOf(bSvg).includes(id));
+    if (shared.length !== 0) fail(`coexisting charts must have disjoint ids: ${shared}`);
+
+    // Unsafe prefixes would corrupt attribute markup — rejected at the boundary.
+    let threw = false;
+    try {
+        renderSvg(clippedDisplay, { resourceIdPrefix: 'bad"prefix' });
+    } catch {
+        threw = true;
+    }
+    if (!threw) fail('a prefix that is not a safe id token must be refused');
 }
 
 // ─── Diagram: topology → layout → DisplayScene → SVG ─────────────────────
