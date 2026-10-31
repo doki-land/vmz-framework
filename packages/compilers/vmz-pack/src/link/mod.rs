@@ -430,22 +430,35 @@ impl<'g> Linker<'g> {
         }
     }
 
-    /// 活跃语句的引用名命中 import 绑定 → 传播。
+    /// 活跃语句的引用名：命中 import 绑定 → 向来源模块传播需求；命中本模块
+    /// 本地声明 → 激活声明语句（Pure 声明的可剪除条件是「未被引用」，同模块
+    /// 活跃语句的引用同样是使用，不激活会产出悬空引用）。级联在新语句激活后
+    /// 继续：其引用可能再命中本地声明或 import 绑定，扫到本模块活跃集与
+    /// 新需求都不再增长为止。
     ///
-    /// 绑定事实现状（缺口 3 调查结论）：Oak TypeScript AST 的标识符是裸
-    /// `Identifier(String)`，上游没有 scope 解析与 reference 绑定事实，
-    /// `referenced_names` 只能按语法名字与 import 绑定匹配。方向是保守
-    /// 超集：同名误命中只会多传播需求（多保留），不会误剪；漏引用风险
-    /// 由事实完整性门兜底（语句事实不完整 → 判非纯 → emit 前置拒绝）。
-    /// 收紧到绑定级精确传播需要先在 `oak-typescript` 上游补 scope/reference
-    /// 分析，属大改上游；VMZ 侧不堆名字匹配特例。
+    /// 绑定事实现状（缺口 3 调查结论）：链接层 `referenced_names` 按语法名字
+    /// 匹配，方向是保守超集：同名误命中只会多激活（多保留），不会误剪；
+    /// 漏引用风险由事实完整性门兜底（语句事实不完整 → 判非纯 → emit 前置
+    /// 拒绝）。绑定级精确使用判定由 `emit` 层沿上游 `module_scope_facts`
+    /// 引用 span 消费，链接层保持超集口径（激活单调、需求去重保证终止）。
     fn propagate_statement_refs(&mut self, node: usize) {
-        let mut indexes: Vec<usize> = self.active[node].iter().copied().collect();
-        indexes.sort_unstable();
-        for index in indexes {
-            let refs = self.graph.nodes[node].record.statements[index].referenced_names.clone();
-            for name in refs {
-                self.propagate_import_binding(node, &name);
+        loop {
+            let mut indexes: Vec<usize> = self.active[node].iter().copied().collect();
+            indexes.sort_unstable();
+            let active_before = self.active[node].len();
+            let demands_before = self.seen_demands.len();
+            for index in indexes {
+                let refs =
+                    self.graph.nodes[node].record.statements[index].referenced_names.clone();
+                for name in refs {
+                    if !self.propagate_import_binding(node, &name) {
+                        self.activate_declared(node, &name);
+                    }
+                }
+            }
+            if self.active[node].len() == active_before && self.seen_demands.len() == demands_before
+            {
+                break;
             }
         }
     }

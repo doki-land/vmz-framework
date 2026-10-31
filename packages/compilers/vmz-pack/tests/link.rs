@@ -61,6 +61,39 @@ fn named_use_prunes_unused_pure_modules_and_statements() {
     assert!(found(pure).is_none());
 }
 
+/// 活跃语句引用的本地 Pure 声明必须激活：`f` 只被导出的活跃初值引用，
+/// 不激活会产出悬空调用；`f` 激活后级联到 `g`。级联不经需求队列，靠模块内
+/// 不动点扫描收敛。
+#[test]
+fn referenced_local_pure_declarations_are_activated() {
+    let root = temp_tree(
+        "localrefs",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "function g(){ return 2 }\nfunction f(){ return g() }\nexport const main = f();\n",
+            ),
+        ],
+    );
+    let entry = root.join("src/entry.js");
+    let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let entry_node = graph.index_of(&entry).unwrap();
+    let module = plan.modules.iter().find(|m| m.node == entry_node).expect("entry retained");
+    assert_eq!(module.active_statements, vec![0, 1, 2], "{:?}", module.active_statements);
+}
+
 /// 副作用导入（css 与包）强制目标全量保留。
 #[test]
 fn side_effect_imports_force_full_retention() {
