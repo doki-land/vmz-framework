@@ -282,7 +282,7 @@ pub fn plan_emit(
     }
 
     let (mut asset_index, mut by_disk, asset_errors) =
-        collect_assets(graph, chunks, &node_chunk, options);
+        collect_assets(graph, chunks, &node_chunk, &linked, options);
     errors.extend(asset_errors);
 
     // Style 聚合：CSS 文本读取、`@import` 拒绝与 `url()` 搬迁复用同一
@@ -325,14 +325,20 @@ pub fn plan_emit(
     Ok(manifest::finalize(&context, codes, segments, styles, warnings))
 }
 
-/// 解析并指纹化全部 [`crate::module::AssetFact`]。同一磁盘路径只读一次；
-/// 读不到即 `vmz::pack::emit::asset_unresolved`（拒绝，不猜 URL）。
-/// 返回的 `by_disk` 缓存交给 [`style::collect_styles`] 继续复用：CSS 内
-/// `url()` 引用的资产与 JS 资产共享同一命名与去重，绝不两套指纹。
+/// 解析并指纹化**活跃**的 [`crate::module::AssetFact`]：资产只能从
+/// [`LinkedModule::active_statements`] 的引用产生——资产 span 必须被某条
+/// 活跃顶层语句包含，死分支（语句被链接层剪除）里的资产不进产物集与
+/// manifest，其磁盘文件缺失也不报错（切片重写同样不会触达该语句文本）。
+/// 不被任何语句包含的资产同样跳过，与装配切片行为一致。
+/// 同一磁盘路径只读一次；读不到即 `vmz::pack::emit::asset_unresolved`
+/// （拒绝，不猜 URL）。返回的 `by_disk` 缓存交给 [`style::collect_styles`]
+/// 继续复用：CSS 内 `url()` 引用的资产与 JS 资产共享同一命名与去重，
+/// 绝不两套指纹。
 fn collect_assets(
     graph: &ModuleGraph,
     chunks: &ChunkPlan,
     node_chunk: &[Option<usize>],
+    linked: &[Option<&LinkedModule>],
     options: &EmitOptions,
 ) -> (
     BTreeMap<(String, String), AssetArtifact>,
@@ -351,8 +357,18 @@ fn collect_assets(
             if module_node.record.path.is_none() {
                 continue;
             }
+            let Some(Some(module_link)) = linked.get(node) else { continue };
             let module_path = normalize_path(&module_node.resolved.path);
             for asset in &module_node.record.assets {
+                // 资产只随活跃语句存活：span 被某条活跃顶层语句包含。
+                let live = module_link.active_statements.iter().any(|&index| {
+                    module_node.record.statements.get(index).is_some_and(|statement| {
+                        statement.span.0 <= asset.span.0 && asset.span.1 <= statement.span.1
+                    })
+                });
+                if !live {
+                    continue;
+                }
                 let key = (module_path.clone(), asset.specifier.clone());
                 if index.contains_key(&key) {
                     continue;

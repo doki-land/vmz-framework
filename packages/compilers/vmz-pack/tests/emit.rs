@@ -959,6 +959,92 @@ fn asset_replaced_by_fingerprinted_url_and_copied() {
     assert_eq!(fs::read(&copied).unwrap(), fs::read(&asset.source_path).unwrap());
 }
 
+/// 死分支资产：链接层剪除的语句里的 `new URL` 引用不进产物集与 manifest，
+/// `write_emit` 不建 `assets/` 目录，切片文本原样保留（资产不存在）。
+#[test]
+fn dead_branch_asset_is_not_emitted() {
+    let root = temp_tree(
+        "deadasset",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "export const keep = 1;\nexport function deadIcon() { return new URL('./gone.svg', import.meta.url); }\n",
+            ),
+            ("src/gone.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["keep".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    assert!(plan.assets.is_empty(), "{:?}", plan.assets);
+    assert!(!plan.manifest_json.contains("gone.svg"), "{}", plan.manifest_json);
+    let code = &plan.artifacts[0].code;
+    assert!(!code.contains("deadIcon"), "{code}");
+
+    let out = root.join("dist");
+    write_emit(&plan, &out).unwrap();
+    assert!(!out.join("assets").exists(), "no assets dir for dead references");
+}
+
+/// 死分支资产文件缺失：被剪除的引用不读文件，构建成功；对照同一引用
+/// 在全量执行下保持活跃时，缺失文件仍显式拒绝 `asset_unresolved`。
+#[test]
+fn dead_branch_missing_asset_file_does_not_fail_build() {
+    let root = temp_tree(
+        "deadassetmissing",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "export const keep = 1;\nexport function deadIcon() { return new URL('./missing.svg', import.meta.url); }\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["keep".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.assets.is_empty(), "{:?}", plan.assets);
+
+    let full_link = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
+    let full_chunks = plan_chunks(&graph, &full_link);
+    let errors = plan_emit(&graph, &full_link, &full_chunks, &options()).unwrap_err();
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::asset_unresolved".to_string()),
+        "{errors:?}"
+    );
+}
+
 /// 同输入两次 plan_emit 结果逐字节一致（指纹与占位符替换无随机性）。
 #[test]
 fn plan_is_deterministic() {
