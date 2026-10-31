@@ -46,6 +46,9 @@ describe('pruneWebStaticDelivery', () => {
             '_vmz/host/serve/http.js': 'export const http = 1;',
             '_vmz/pack/entry-client-aa11.js': 'export default 1;',
             '_vmz/pack-manifest.json': '{}',
+            '_vmz/pack-node/entry-pages-index-aa11.js': 'export { X as default };',
+            '_vmz/pack-node/package.json': '{"type":"module"}',
+            '_vmz/pack-node-manifest.json': '{}',
             'assets/vmz-designs.css': 'body{}',
             'vmz.css': 'body{}',
         });
@@ -75,6 +78,10 @@ describe('pruneWebStaticDelivery', () => {
             '#server/pages/charts.js',
             'ssr/render.js',
             '_vmz/host/serve/http.js',
+            // Node pack 只在构建期使用，web-static 交付不得携带服务端字节。
+            '_vmz/pack-node/entry-pages-index-aa11.js',
+            '_vmz/pack-node/package.json',
+            '_vmz/pack-node-manifest.json',
         ];
         for (const rel of gone) assert.ok(!existsSync(path.join(dist, ...rel.split('/'))), `removed ${rel}`);
         assert.ok(!existsSync(path.join(dist, '#server')), 'empty #server dir removed');

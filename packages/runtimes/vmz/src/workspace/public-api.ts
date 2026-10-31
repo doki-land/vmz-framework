@@ -935,8 +935,13 @@ export {
     PACK_MANIFEST_SCHEMA,
     PACK_OUTPUT_DIR_REL,
     PACK_PUBLIC_BASE,
+    PACK_NODE_MANIFEST_SCHEMA,
+    PACK_NODE_OUTPUT_DIR_REL,
+    PACK_NODE_MANIFEST_REL,
     packFromDeploymentIr,
+    packSsrFromDeploymentIr,
     packEntryHref,
+    packNodeEntryFile,
     ensureRuntimeCompanions,
 } from './pack.js';
 export { buildPackRequest, runPackPlan, runPackWrite, PackNativeError } from './pack-native.js';

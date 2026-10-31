@@ -21,7 +21,7 @@ import {
     linkRouteAliasesFromUnits,
 } from '../locale/locale-router.js';
 import { requireNativeAddon } from './native-addon.js';
-import { packEntryHref } from './pack.js';
+import { PACK_NODE_MANIFEST_REL, PACK_NODE_OUTPUT_DIR_REL, packEntryHref, packNodeEntryFile } from './pack.js';
 import { writePrettyJsonFile } from './pretty-json.js';
 import { emitPublicStaticAssets } from './public-static-assets.js';
 import { emitRouteCatalog, loadRouteCatalog, ROUTE_CATALOG_SCHEMA } from './route-catalog-emit.js';
@@ -418,8 +418,11 @@ function htmlPathForRoute(pathname) {
  * @param {string} chunkId
  */
 async function loadCtor(distDir, chunkId) {
-    const href = pathToFileURL(path.join(distDir, `${chunkId}.client.js`)).href;
-    const mod = await import(`${href}?t=${Date.now()}`);
+    // Node chunk identity comes from `_vmz/pack-node-manifest.json`; the
+    // unpacked root `${chunkId}.client.js` is not a fallback. No `?t=` cache
+    // bust: packed chunks are shared instance URLs.
+    const href = pathToFileURL(packNodeEntryFile(distDir, chunkId)).href;
+    const mod = await import(href);
     return mod.default;
 }
 
@@ -858,6 +861,20 @@ export function pruneWebStaticDelivery(outDir: string): { removed: number; keptF
         const isJs = rel.endsWith('.js') || rel.endsWith('.mjs') || rel.endsWith('.map');
         if (!isHost && (!isJs || faceClosure.has(rel))) continue;
         fs.rmSync(path.join(abs, ...rel.split('/')), { force: true });
+        removed++;
+    }
+    // Node pack 是构建期产物：静态托管不会执行它，浏览器集已由 `_vmz/pack/`
+    // 定型。这里显式清掉 Node chunk 目录与 manifest，避免把服务端字节一起交付。
+    const nodePackDir = path.join(abs, ...PACK_NODE_OUTPUT_DIR_REL.split('/'));
+    if (fs.existsSync(nodePackDir)) {
+        for (const entry of fs.readdirSync(nodePackDir, { recursive: true, withFileTypes: true })) {
+            if (entry.isFile()) removed++;
+        }
+        fs.rmSync(nodePackDir, { recursive: true, force: true });
+    }
+    const nodeManifestPath = path.join(abs, ...PACK_NODE_MANIFEST_REL.split('/'));
+    if (fs.existsSync(nodeManifestPath)) {
+        fs.rmSync(nodeManifestPath, { force: true });
         removed++;
     }
     removeEmptyDirsBottomUp(abs);

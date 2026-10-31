@@ -10,9 +10,10 @@ import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfi
 import { buildIntegratedDocuments, projectHasDocuments } from '../document/document-integrate.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from '../locale/locale-check.js';
 import { emitLocaleRouteRealization } from '../locale/locale-route-emit.js';
-import { packFromDeploymentIr } from './pack.js';
+import { ensureRuntimeCompanions, packFromDeploymentIr, packSsrFromDeploymentIr } from './pack.js';
 import { loadVmzConfig } from './plugin-host.js';
 import { emitRouteCatalog } from './route-catalog-emit.js';
+import { resolveCoreRuntimeDist } from './runtime-dist.js';
 import { emitStaticBootstrapEntries } from './static-emit.js';
 
 export type BuildProjectOptions = {
@@ -191,6 +192,24 @@ export async function buildProjectToOutDirRoot(
                 deliveryName,
                 diagnostics,
                 error: routeCatalog.error || 'route catalog emit failed',
+            };
+        }
+
+        try {
+            // Node graph must be packed before any SSR consumer (document build,
+            // static emit, render host) imports a compiled chunk. Companions are
+            // copied first so the Node graph sees the delivery runtime beside the
+            // client modules.
+            ensureRuntimeCompanions(artifactDir, resolveCoreRuntimeDist());
+            packSsrFromDeploymentIr(artifactDir, { projectRoot: project });
+        } catch (err) {
+            return {
+                ok: false,
+                outDirRoot: root,
+                artifactDir,
+                deliveryName,
+                diagnostics,
+                error: `node pack failed: ${err instanceof Error ? err.message : String(err)}`,
             };
         }
 

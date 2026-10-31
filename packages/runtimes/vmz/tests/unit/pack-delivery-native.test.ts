@@ -8,8 +8,19 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { after, describe, it } from 'node:test';
-import { packEntryHref, packFromDeploymentIr, PACK_MANIFEST_SCHEMA, PACK_OUTPUT_DIR_REL } from '../../src/workspace/pack.ts';
+import {
+    packEntryHref,
+    packFromDeploymentIr,
+    packNodeEntryFile,
+    packSsrFromDeploymentIr,
+    PACK_MANIFEST_SCHEMA,
+    PACK_NODE_MANIFEST_REL,
+    PACK_NODE_MANIFEST_SCHEMA,
+    PACK_NODE_OUTPUT_DIR_REL,
+    PACK_OUTPUT_DIR_REL,
+} from '../../src/workspace/pack.ts';
 import { PackNativeError } from '../../src/workspace/pack-native.ts';
 import type { PackNativeBinding } from '../../src/workspace/pack-native.ts';
 
@@ -206,5 +217,200 @@ describe('packEntryHref (v0)', () => {
     it('throws when the pack manifest is absent', () => {
         const distDir = makeDist('href-nomanifest', { 'entry-client.js': 'x' });
         assert.throws(() => packEntryHref(distDir, 'entry-client.js'), /missing .*pack-manifest\.json/);
+    });
+});
+
+function makeDistWithUnits(name: string, units: unknown[], files: Record<string, string>) {
+    const distDir = path.join(root, name);
+    mkdirSync(distDir, { recursive: true });
+    writeFileSync(path.join(distDir, 'vmz-deployment.json'), JSON.stringify({ schema: 'vmz.deployment.v0', units }));
+    for (const [file, text] of Object.entries(files)) {
+        const abs = path.join(distDir, ...file.split('/'));
+        mkdirSync(path.dirname(abs), { recursive: true });
+        writeFileSync(abs, text);
+    }
+    return distDir;
+}
+
+const nodeUnits = [
+    { chunkId: 'Application', kind: 'application', clientEntry: 'Application.client.js' },
+    { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/Greeting.client.js' },
+    { chunkId: 'pages/index', kind: 'page', clientEntry: 'pages/index.client.js' },
+];
+
+const nodeClientFiles = {
+    'Application.client.js': 'export default class Application {}',
+    'components/Greeting.client.js': 'export default class Greeting {}',
+    'pages/index.client.js': 'export default class IndexPage {}',
+};
+
+const nodePlanResponse = {
+    ok: true,
+    plan: {
+        artifacts: [
+            {
+                chunkId: 'Application',
+                fileName: 'Application-node-11aa.js',
+                code: 'export default class Application {}',
+                modules: ['E:/app/dist/web-ssr/Application.client.js'],
+                imports: [],
+                dynamic: [],
+                sourceMapFileName: 'Application-node-11aa.js.map',
+            },
+            {
+                chunkId: 'components/Greeting',
+                fileName: 'components-Greeting-node-33cc.js',
+                code: 'export default class Greeting {}',
+                modules: ['E:/app/dist/web-ssr/components/Greeting.client.js'],
+                imports: [],
+                dynamic: [],
+                sourceMapFileName: 'components-Greeting-node-33cc.js.map',
+            },
+            {
+                chunkId: 'pages/index',
+                fileName: 'pages-index-node-22bb.js',
+                code: 'import Greeting from "./components-Greeting-node-33cc.js";\nexport default class IndexPage {}\nexport { Greeting };',
+                modules: ['E:/app/dist/web-ssr/pages/index.client.js'],
+                imports: ['components-Greeting-node-33cc.js'],
+                dynamic: [],
+                sourceMapFileName: 'pages-index-node-22bb.js.map',
+            },
+        ],
+        styles: [],
+        assets: [],
+        entryFiles: [
+            { logical: 'Application', file: 'Application-node-11aa.js' },
+            { logical: 'components/Greeting', file: 'components-Greeting-node-33cc.js' },
+            { logical: 'pages/index', file: 'pages-index-node-22bb.js' },
+        ],
+        dynamicFiles: [],
+        manifestJson: JSON.stringify({ version: 'v0', target: 'node', entries: { Application: 'Application-node-11aa.js' } }),
+    },
+    diagnostics: [],
+};
+
+function writeNodeChunks(distDir: string) {
+    for (const artifact of nodePlanResponse.plan.artifacts) {
+        writeFileSync(path.join(distDir, '_vmz', 'pack-node', artifact.fileName), artifact.code, 'utf8');
+    }
+}
+
+describe('packSsrFromDeploymentIr on the vmz-pack binding (v0)', () => {
+    it('packs every unit clientEntry with logical=chunkId, side-effects and named default on target node', () => {
+        const distDir = makeDistWithUnits('node-full', nodeUnits, nodeClientFiles);
+        const binding = fakeBinding(nodePlanResponse);
+        const { manifest, path: manifestPath } = packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
+
+        assert.equal(binding.calls.length, 1);
+        assert.equal(binding.calls[0].outDir, path.join(distDir, ...PACK_NODE_OUTPUT_DIR_REL.split('/')));
+        const request = JSON.parse(binding.calls[0].requestJson);
+        assert.equal(request.target, 'node');
+        assert.equal(request.root, root);
+        assert.equal(request.publicBase, '/');
+        assert.deepEqual(
+            request.entries.map((e: { logical: string }) => e.logical).sort(),
+            ['Application', 'components/Greeting', 'pages/index'],
+        );
+        const byLogical = new Map(nodeUnits.map((u) => [u.chunkId, path.join(distDir, ...u.clientEntry.split('/'))]));
+        for (const entry of request.entries) {
+            assert.ok(path.isAbsolute(entry.path), `entry path must be absolute: ${entry.path}`);
+            assert.equal(entry.path, byLogical.get(entry.logical));
+        }
+        assert.deepEqual(request.uses, nodeUnits.map((u) => ({
+            logical: u.chunkId,
+            execution: 'side-effects',
+            exports: { kind: 'named', names: ['default'] },
+        })));
+
+        assert.equal(manifestPath, path.join(distDir, ...PACK_NODE_MANIFEST_REL.split('/')));
+        const pkg = JSON.parse(readFileSync(path.join(distDir, '_vmz', 'pack-node', 'package.json'), 'utf8'));
+        assert.equal(pkg.type, 'module');
+        assert.equal(manifest.schema, PACK_NODE_MANIFEST_SCHEMA);
+        assert.equal(manifest.target, 'node');
+        assert.equal(manifest.deploymentSchema, 'vmz.deployment.v0');
+        assert.deepEqual(manifest.entryFiles, nodePlanResponse.plan.entryFiles);
+        assert.equal(manifest.entryCount, 3);
+        assert.equal(manifest.chunkCount, 3);
+        assert.equal(manifest.chunks.length, 3);
+        assert.match(manifest.chunks[0].digest, /^[a-f0-9]{64}$/);
+        assert.deepEqual(manifest.nativeManifest, JSON.parse(nodePlanResponse.plan.manifestJson));
+        assert.match(manifest.packDigest as string, /^[a-f0-9]{64}$/);
+    });
+
+    it('falls back to ${chunkId}.client.js only for an empty clientEntry, and requires the file', () => {
+        const distDir = makeDistWithUnits(
+            'node-empty-entry',
+            [{ chunkId: 'components/Legacy', kind: 'component', clientEntry: '' }],
+            { 'components/Legacy.client.js': 'export default class Legacy {}' },
+        );
+        const binding = fakeBinding(nodePlanResponse);
+        packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
+        const request = JSON.parse(binding.calls[0].requestJson);
+        assert.deepEqual(request.entries, [
+            { logical: 'components/Legacy', path: path.join(distDir, 'components', 'Legacy.client.js') },
+        ]);
+
+        const missing = makeDistWithUnits(
+            'node-empty-entry-missing',
+            [{ chunkId: 'components/Legacy', kind: 'component', clientEntry: '' }],
+            {},
+        );
+        assert.throws(
+            () => packSsrFromDeploymentIr(missing, { projectRoot: root, binding: fakeBinding(nodePlanResponse) }),
+            /unit "components\/Legacy" client entry missing: components\/Legacy\.client\.js/,
+        );
+    });
+
+    it('rejects a deployment IR without units explicitly', () => {
+        const distDir = makeDist('node-no-units', {});
+        assert.throws(
+            () => packSsrFromDeploymentIr(distDir, { projectRoot: root, binding: fakeBinding(nodePlanResponse) }),
+            /deployment IR has no units/,
+        );
+    });
+});
+
+describe('packNodeEntryFile (v0)', () => {
+    it('resolves and imports the packed chunk while the root client file is absent', async () => {
+        const distDir = makeDistWithUnits('node-href', nodeUnits, nodeClientFiles);
+        packSsrFromDeploymentIr(distDir, { projectRoot: root, binding: fakeBinding(nodePlanResponse) });
+        writeNodeChunks(distDir);
+        for (const rel of Object.keys(nodeClientFiles)) rmSync(path.join(distDir, ...rel.split('/')), { force: true });
+
+        const abs = packNodeEntryFile(distDir, 'pages/index');
+        assert.equal(abs, path.join(distDir, '_vmz', 'pack-node', 'pages-index-node-22bb.js'));
+        assert.ok(existsSync(abs));
+        const mod = await import(pathToFileURL(abs).href);
+        assert.equal(typeof mod.default, 'function');
+        assert.match(readFileSync(abs, 'utf8'), /^\s*export\s+(default|{)/m);
+        assert.match(readFileSync(abs, 'utf8'), /from "\.\/components-Greeting-node-33cc\.js"/);
+    });
+
+    it('throws when the logical entry is not in the node manifest even if the root file exists', () => {
+        const distDir = makeDistWithUnits(
+            'node-href-missing-logical',
+            [{ chunkId: 'Application', kind: 'application', clientEntry: 'Application.client.js' }],
+            {
+                'Application.client.js': 'export default class Application {}',
+                'pages/index.client.js': 'export default class IndexPage {}',
+            },
+        );
+        const single = {
+            ...nodePlanResponse,
+            plan: {
+                ...nodePlanResponse.plan,
+                entryFiles: [{ logical: 'Application', file: 'Application-node-11aa.js' }],
+            },
+        };
+        packSsrFromDeploymentIr(distDir, { projectRoot: root, binding: fakeBinding(single) });
+        assert.ok(existsSync(path.join(distDir, 'pages', 'index.client.js')));
+        assert.throws(() => packNodeEntryFile(distDir, 'pages/index'), /no entry file for "pages\/index"/);
+    });
+
+    it('throws when the node pack manifest is absent', () => {
+        const distDir = makeDistWithUnits('node-href-nomanifest', [], {
+            'pages/index.client.js': 'export default class IndexPage {}',
+        });
+        assert.throws(() => packNodeEntryFile(distDir, 'pages/index'), /missing .*pack-node-manifest\.json/);
     });
 });

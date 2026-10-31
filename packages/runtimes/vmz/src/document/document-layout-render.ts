@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRenderHost } from '@vmz/core/render-host';
+import { packNodeEntryFile } from '../workspace/pack.js';
 
 declare global {
     // Locale hint consumed by compiled DocumentLayout during SSR.
@@ -60,8 +61,11 @@ export function assertCompiledShellHtml(html: string): void {
 }
 
 async function loadCtor(distDir: string, chunkId: string): Promise<unknown> {
-    const href = pathToFileURL(path.join(distDir, `${chunkId}.client.js`)).href;
-    const mod = await import(`${href}?t=${Date.now()}`);
+    // Node chunk identity comes from `_vmz/pack-node-manifest.json`; the
+    // unpacked root `${chunkId}.client.js` is not a fallback. No `?t=` cache
+    // bust: packed chunks are shared instance URLs.
+    const href = pathToFileURL(packNodeEntryFile(distDir, chunkId)).href;
+    const mod = await import(href);
     return mod.default;
 }
 

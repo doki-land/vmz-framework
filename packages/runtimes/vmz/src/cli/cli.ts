@@ -32,7 +32,7 @@ import { emitLocaleRouteRealization } from '../locale/locale-route-emit.js';
 import { log } from '../workspace/log.js';
 import { resolveCliLogLevel, setCliLogLevel } from '../workspace/log-level.js';
 import { parseCliLogStyle, setCliLogStyle } from '../workspace/log-style.js';
-import { packFromDeploymentIr } from '../workspace/pack.js';
+import { ensureRuntimeCompanions, packFromDeploymentIr, packSsrFromDeploymentIr } from '../workspace/pack.js';
 import { registerPlanCommands } from './plan-cmd.js';
 import { loadVmzConfig } from '../workspace/plugin-host.js';
 import { findAvailablePort } from '../workspace/port.js';
@@ -40,6 +40,7 @@ import { registerRefactorCommands } from './refactor-cmd.js';
 import { registerArtifactCommands } from './release-cmd.js';
 import { readPackageMeta, resolveWorkspaceDirs } from '../workspace/resolve.js';
 import { emitRouteCatalog } from '../workspace/route-catalog-emit.js';
+import { resolveCoreRuntimeDist } from '../workspace/runtime-dist.js';
 import { registerTestCommand } from './test-cmd.js';
 import { emitStaticBootstrapEntries } from '../workspace/static-emit.js';
 
@@ -316,6 +317,20 @@ async function cmdBuild(args: ParsedOptions): Promise<number> {
         }
         if (routeCatalog.written.length) {
             log.info(`route catalog (${routeCatalog.written.length} artifact(s))`);
+        }
+        if (!wechatPack) {
+            try {
+                // Node graph must be packed before any SSR consumer (document
+                // build, static emit, render host) imports a compiled chunk.
+                ensureRuntimeCompanions(outDir, resolveCoreRuntimeDist());
+                const nodePack = packSsrFromDeploymentIr(outDir, { projectRoot: project });
+                log.info(
+                    `node pack ok (entries=${nodePack.manifest.entryCount}, chunks=${nodePack.manifest.chunkCount}, digest=${String(nodePack.manifest.packDigest).slice(0, 12)}…)`,
+                );
+            } catch (err) {
+                log.error(`node pack failed: ${err instanceof Error ? err.message : String(err)}`);
+                return 1;
+            }
         }
         if (projectHasDocuments(project)) {
             const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
