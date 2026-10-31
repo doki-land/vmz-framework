@@ -9,8 +9,12 @@
 //! `default` 不随星号传播），逐个沿同一事实链机制展开为具名导出；
 //! 解析不到绑定事实的形态（具名解析落在星号来源、具名来自表达式
 //! default、来源链成环、星号来源自身含活跃星号链）与需要 scope 重写
-//! （重命名绑定）或运行时命名空间合成（`export * as ns`、同 chunk
-//! 动态边界）的形态都显式诊断拒绝，不产出猜测文本。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
+//! （重命名绑定）的形态显式诊断拒绝，不产出猜测文本。
+//! `export * as ns` 与同 chunk 动态边界改写为对本 chunk 自身产物文件的
+//! 引用（第三遍占位符替换同样成立）：命名空间是原生 ESM 的真实
+//! Module Namespace，名字集按 chunk 粒度加宽，发非致命诊断
+//! `namespace_widened` / `dynamic_same_chunk_widened`，与跨 chunk 命名空间
+//! 与动态边界的既有加宽合同同构，不合成 getter 伪命名空间。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
 //! 不能提前定名），指纹与替换由 `manifest` 层的两遍法完成。
 //!
 //! Style 目标节点的边在本层只负责 JS 侧文本处置：副作用/空绑定形态的
@@ -208,17 +212,20 @@ pub(crate) fn assemble_chunk(
                         continue;
                     };
                     if target_chunk == chunk_index {
-                        errors.push(
+                        // 同 chunk 动态边界：说明符改写为本 chunk 自身产物文件
+                        // （自引用）。原生 ESM 返回已实例化模块的真实命名空间，
+                        // 名字集加宽到整个 chunk——与跨 chunk 动态边界（同样按
+                        // chunk 粒度取命名空间）同一合同，不合成 getter 伪命名空间。
+                        warnings.push(
                             PackDiagnostic::new(
-                                "vmz::pack::emit::dynamic_same_chunk_unsupported",
+                                "vmz::pack::emit::dynamic_same_chunk_widened",
                                 format!(
-                                    "动态 import `{}` 目标与源同 chunk，需要运行时命名空间合成，未实现",
+                                    "动态 import `{}` 目标与源同 chunk，改写为 chunk 自身文件，命名空间加宽到整个 chunk",
                                     edge.specifier
                                 ),
                             )
                             .with_path(module_path.clone()),
                         );
-                        continue;
                     }
                     dynamic_replacements.push((edge.specifier.clone(), target_chunk));
                 }
@@ -557,16 +564,20 @@ pub(crate) fn assemble_chunk(
                         continue;
                     };
                     if target_chunk == chunk_index {
-                        errors.push(
+                        // 同 chunk `export * as ns`：发对本 chunk 自身产物文件的
+                        // 自引用。命名空间是真实 Module Namespace（原生 ESM 自
+                        // 引用），名字集含整个 chunk 的全部导出——与跨 chunk
+                        // `namespace_widened` 同一加宽合同；星号链与跨 chunk 重
+                        // 导出的名字沿 chunk 导出面自然流入，无需枚举合成。
+                        warnings.push(
                             PackDiagnostic::new(
-                                "vmz::pack::emit::namespace_synthesis_unsupported",
+                                "vmz::pack::emit::namespace_widened",
                                 format!(
-                                    "同 chunk `export * as {namespace} from '{source}'` 拼接后无法表达命名空间语义，未实现"
+                                    "同 chunk `export * as {namespace}` 改写为 chunk 自身文件，实际拿到整个 chunk 的命名空间（比源模块宽）"
                                 ),
                             )
                             .with_path(module_path.clone()),
                         );
-                        continue;
                     }
                     exports_text.push_str(&format!(
                         "export * as {namespace} from {};\n",

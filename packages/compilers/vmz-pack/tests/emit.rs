@@ -878,9 +878,11 @@ fn binding_rename_is_rejected() {
     );
 }
 
-/// 同 chunk `export * as ns from`：拼接后无法表达命名空间语义，显式拒绝。
+/// 同 chunk `export * as ns`：改写为对本 chunk 自身产物文件的引用，命名空间
+/// 是真实 Module Namespace（原生 ESM 自引用），名字集加宽到整个 chunk，
+/// 发非致命 `namespace_widened`，不阻断产出。
 #[test]
-fn namespace_synthesis_is_rejected() {
+fn same_chunk_namespace_reexport_emits_self_reference() {
     let root = temp_tree(
         "namespace",
         &[
@@ -901,10 +903,72 @@ fn namespace_synthesis_is_rejected() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert_eq!(plan.artifacts.len(), 1);
+    let artifact = &plan.artifacts[0];
+    let code = &artifact.code;
+    // 自引用指向 chunk 自身最终文件名，不留占位符与原始说明符。
     assert!(
-        codes(&errors).contains(&"vmz::pack::emit::namespace_synthesis_unsupported".to_string()),
-        "{errors:?}"
+        code.contains(&format!("export * as ns from \"./{}\";", artifact.file_name)),
+        "{code}"
+    );
+    assert!(!code.contains("__vmz_chunk_"), "{code}");
+    assert!(!code.contains("./impl.js"), "{code}");
+    // 命名空间经 chunk 导出面可达源模块导出。
+    assert!(code.contains("export { thing }"), "{code}");
+    assert!(
+        codes(&plan.diagnostics).contains(&"vmz::pack::emit::namespace_widened".to_string()),
+        "{:?}",
+        plan.diagnostics
+    );
+}
+
+/// 同 chunk 动态边界（SCC：动态目标与源同 chunk）：说明符改写为 chunk 自身
+/// 产物文件，发非致命 `dynamic_same_chunk_widened`，manifest 动态映射如实
+/// 记录自引用。
+#[test]
+fn same_chunk_dynamic_import_rewrites_to_self_chunk() {
+    let root = temp_tree(
+        "dynsame",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { helper } from './lib.js';\nexport const main = helper;\nexport const lazy = () => import('./lib.js');\n",
+            ),
+            (
+                "src/lib.js",
+                "import { main } from './entry.js';\nexport function helper() { return main; }\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into(), "lazy".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert_eq!(plan.artifacts.len(), 1, "循环依赖收缩为同一 chunk");
+    let artifact = &plan.artifacts[0];
+    let code = &artifact.code;
+    assert!(
+        code.contains(&format!("import(\"./{}\")", artifact.file_name)),
+        "{code}"
+    );
+    assert!(!code.contains("__vmz_chunk_"), "{code}");
+    assert!(!code.contains("./lib.js"), "{code}");
+    assert_eq!(artifact.dynamic, vec![artifact.file_name.clone()], "动态映射如实记录自引用");
+    assert!(
+        codes(&plan.diagnostics)
+            .contains(&"vmz::pack::emit::dynamic_same_chunk_widened".to_string()),
+        "{:?}",
+        plan.diagnostics
     );
 }
 

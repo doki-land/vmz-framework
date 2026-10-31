@@ -30,10 +30,13 @@
 //!   `code` 末尾追加 `//# sourceMappingURL=<file_name>.map` 注释行，
 //!   map JSON 内容不上 wire、只有 [`write_emit`] 物化；内容指纹仍只覆盖
 //!   第一遍装配文本，map 注释与 map 本身不参与指纹与占位符替换。
-//! - 未实现的语义（同 chunk 重命名绑定、命名空间合成（`export * as ns`、
-//!   同 chunk 动态边界）、事实不完整、无法重写的说明符、样式/JSON 绑定、
-//!   重导出与动态导入等）一律显式诊断拒绝，禁止猜测、禁止静默产出错误
-//!   JS、禁止兼容层。
+//! - 未实现的语义（同 chunk 重命名绑定、事实不完整、无法重写的说明符、
+//!   样式/JSON 绑定、重导出与动态导入等）一律显式诊断拒绝，禁止猜测、
+//!   禁止静默产出错误 JS、禁止兼容层。
+//! - 同 chunk 命名空间形态（`export * as ns`、同 chunk 动态边界）改写为对
+//!   本 chunk 自身产物文件的引用：命名空间是真实 Module Namespace，名字集
+//!   按 chunk 粒度加宽，发非致命诊断（`namespace_widened`、
+//!   `dynamic_same_chunk_widened`），与跨 chunk 加宽合同同构。
 //!
 //! [`plan_emit`] 是纯计算（只按 [`crate::graph::ModuleNode::resolved`] 路径
 //! 重读模块源码与资源字节，IO 姿态与 `graph` 层一致）；[`write_emit`]
@@ -154,7 +157,8 @@ pub struct EmitPlan {
     pub dynamic_files: Vec<(String, String)>,
     /// 序列化的产物 manifest（合同版本命名空间 `v0`）。
     pub manifest_json: String,
-    /// 非致命诊断（保留的非字面量动态 import、保留的根绝对 URL 动态 import、命名空间加宽）。
+    /// 非致命诊断（保留的非字面量动态 import、保留的根绝对 URL 动态 import、
+    /// 命名空间加宽、同 chunk 动态边界加宽）。
     pub diagnostics: Vec<PackDiagnostic>,
 }
 
