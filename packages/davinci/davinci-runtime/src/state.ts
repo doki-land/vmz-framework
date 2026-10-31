@@ -1,5 +1,4 @@
 // Runtime state — interaction-only, never mutates canonical domain.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §7.
 
 /** Selection — stable ids of selected nodes. */
 export interface SelectionState {

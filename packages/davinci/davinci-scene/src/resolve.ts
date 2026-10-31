@@ -1,5 +1,4 @@
 // Resolve — SemanticScene → DisplayScene.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §4.
 //
 // Resolve performs three things:
 //   1. **Transform composition** — walk the tree, compose local affine with

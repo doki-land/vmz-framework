@@ -1,7 +1,7 @@
 // Chart theme — presentation tokens resolved before the scene builder.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §4 — the renderer
-// never picks colors or themes; the chart domain resolves tokens into the
-// SemanticScene, so browser, SSR and static export share one mapping.
+// The renderer never picks colors or themes; the chart domain resolves
+// tokens into the SemanticScene, so browser, SSR and static export share
+// one mapping.
 
 import { rgb8, type FontSpec, type RGBA } from "@doki-land/davinci-types";
 

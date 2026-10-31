@@ -1,5 +1,4 @@
 // DataSnapshot — columnar data for chart domain.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §6.
 //
 // DataSnapshot is a materialized, column-oriented table with field semantics
 // attached. It does NOT execute statistics — those live in the statistic

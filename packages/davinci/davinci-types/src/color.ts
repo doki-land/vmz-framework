@@ -1,5 +1,4 @@
 // Color primitives — RGBA canonical + conversions.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §3.
 
 /** Canonical sRGB color with alpha (0–1 each). */
 export interface RGBA {

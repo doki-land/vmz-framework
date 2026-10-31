@@ -1,5 +1,4 @@
 // Geometry primitives — domain-agnostic shape foundations.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §3.
 
 /** 2D point / vector (x, y). */
 export interface Point2D {

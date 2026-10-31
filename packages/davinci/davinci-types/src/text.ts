@@ -1,5 +1,4 @@
 // Text primitives — measured text block.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §3.
 
 /** A font family + size + weight/style descriptor (platform-neutral). */
 export interface FontSpec {

@@ -1,5 +1,4 @@
 // Bounding box primitives.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §3.
 
 /** Axis-aligned rectangle (x, y is top-left, w/h non-negative). */
 export interface Rect {

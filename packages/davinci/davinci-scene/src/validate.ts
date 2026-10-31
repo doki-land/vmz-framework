@@ -1,5 +1,4 @@
 // Scene conformance — SemanticScene → structured diagnostics.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §4.
 //
 // `resolve` refuses a foreign contract version outright, but a scene can still
 // break the rules its builders promise: stable ids must be unique within one

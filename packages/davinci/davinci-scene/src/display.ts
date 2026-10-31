@@ -1,5 +1,4 @@
 // DisplayScene — backend-ready, no domain semantics retained.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §4.
 //
 // Every transform is pre-composed, every clip is inherited and intersected,
 // every bounds is final. Renderers consume this directly — no data reload,

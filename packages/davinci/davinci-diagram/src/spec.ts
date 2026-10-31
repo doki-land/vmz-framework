@@ -1,5 +1,4 @@
 // Diagram spec — graph topology, nodes, edges, ports, clusters, constraints.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §5.
 //
 // DiagramSpec is the domain input to davinci-diagram. It does NOT carry
 // SVG path, paint order, or canvas commands — the layout engine computes

@@ -1,5 +1,4 @@
 // Invalidation graph — partition of nodes that must be re-evaluated together.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §7.
 //
 // The invalidation set tells the compile pipeline which nodes are stale and
 // need recompile after a state change. Categories are intentionally coarse —

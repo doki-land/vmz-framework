@@ -1,5 +1,4 @@
 // Transition plan — between two matched DisplayNodes.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §8.
 
 import type { DisplayNode } from "@doki-land/davinci-scene";
 

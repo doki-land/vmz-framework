@@ -1,5 +1,4 @@
 // Motion — scene correspondence, transition plan, timeline.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §8.
 //
 // Correspondence is the foundation: matching nodes across scenes by stable
 // key (not array index). Transitions operate only on matched pairs; new nodes

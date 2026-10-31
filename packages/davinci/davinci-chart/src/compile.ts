@@ -1,5 +1,4 @@
 // Chart compile — ChartSpec + DataSnapshot → ChartCompilePlan.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §6.
 //
 // ChartCompilePlan is the resolved stage between domain spec and scene. It
 // contains fully-instantiated scales, resolved encodings, one row per mark

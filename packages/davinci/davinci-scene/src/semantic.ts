@@ -1,5 +1,4 @@
 // SemanticScene — retains domain identity, semantic ids, source refs.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §4.
 //
 // Semantic nodes carry only "what this IS"; they intentionally do NOT carry
 // resolved transform, clip inheritance, or backend-ready geometry. Those live

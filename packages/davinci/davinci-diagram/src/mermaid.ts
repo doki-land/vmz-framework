@@ -1,5 +1,4 @@
 // Diagram importer stubs — Mermaid / other DSLs → DiagramSpec.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §5.
 //
 // Full Mermaid parsing lives upstream (oak-mermaid / host). This module
 // is intentionally thin — host produces structured input, we accept it.

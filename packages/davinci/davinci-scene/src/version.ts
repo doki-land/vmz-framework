@@ -1,5 +1,4 @@
 // Scene contract version — the single namespace every scene carries.
-// Follow design: `规划设计/davinci/00-概述与架构边界.md` §4.
 //
 // Before 1.0.0 the contract namespace is `/v0` and never moves with package
 // versions. Consumers refuse anything else outright — no dual read, no
