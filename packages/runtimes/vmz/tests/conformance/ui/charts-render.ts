@@ -21,6 +21,8 @@
  * - an explicit `log` scale whose domain endpoints are not finite and positive
  *   is refused with `davinci.chart.invalid-log-domain` (error): the scale is
  *   never installed and never silently auto-derived, so the chart stays empty
+ * - `aggregate` reads only finite numbers — ±Infinity / NaN cells are skipped
+ *   the way `compile` treats quantitative columns, so every result stays finite
  * - bars grow away from the zero pixel, so negative values keep a positive
  *   height and never flip above zero
  * - line marks never bridge two series (one path per series, legend order is
@@ -48,6 +50,7 @@
 
 import {
     DEFAULT_CHART_THEME,
+    aggregate,
     buildScene,
     compile,
     formatTickLabel,
@@ -585,6 +588,26 @@ console.log('charts-render: an explicit log scale with an invalid domain is refu
     const okSvg = renderSvg(resolve(buildScene(okPlan, { width: WIDTH, height: HEIGHT }), { width: WIDTH, height: HEIGHT }));
     if (count(okSvg, '<ellipse') !== 3) fail(`valid log scale wants 3 marks, got ${count(okSvg, '<ellipse')}`);
     if (okSvg.includes('NaN') || okSvg.includes('Infinity')) fail('valid log scale must not emit NaN / Infinity');
+}
+
+console.log('charts-render: aggregate keeps only finite numbers…');
+{
+    const vals = [1, Number.POSITIVE_INFINITY, 2, Number.NaN, Number.NEGATIVE_INFINITY, 4];
+    if (aggregate(vals, 'sum') !== 7) fail(`sum wants 7, got ${aggregate(vals, 'sum')}`);
+    if (aggregate(vals, 'count') !== 3) fail(`count wants 3, got ${aggregate(vals, 'count')}`);
+    if (Math.abs(aggregate(vals, 'mean') - 7 / 3) > 1e-12) fail(`mean wants 7/3, got ${aggregate(vals, 'mean')}`);
+    if (aggregate(vals, 'min') !== 1) fail(`min wants 1, got ${aggregate(vals, 'min')}`);
+    if (aggregate(vals, 'max') !== 4) fail(`max wants 4, got ${aggregate(vals, 'max')}`);
+    if (aggregate(vals, 'median') !== 2) fail(`median wants 2, got ${aggregate(vals, 'median')}`);
+
+    // A column of only non-finite cells has no usable values — every kind
+    // must return a finite neutral result instead of poisoning with Infinity.
+    const poison = [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    for (const kind of ['count', 'sum', 'mean', 'min', 'max', 'median']) {
+        if (!Number.isFinite(aggregate(poison, kind))) fail(`${kind} must stay finite on non-finite input`);
+    }
+    if (aggregate(poison, 'sum') !== 0) fail('sum over no usable values wants 0');
+    if (aggregate(poison, 'mean') !== 0) fail('mean over no usable values wants 0');
 }
 
 console.log('charts-render: negative values keep a zero baseline…');

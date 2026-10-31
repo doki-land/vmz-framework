@@ -2,9 +2,11 @@
 
 export type AggregateKind = "count" | "sum" | "mean" | "min" | "max" | "median";
 
-/** Compute aggregate over a numeric column (nulls skipped). */
+/** Compute aggregate over a numeric column. Only finite numbers are usable —
+ *  nulls, non-numeric cells and ±Infinity / NaN are skipped, matching how
+ *  `compile` reads quantitative columns, so every result stays finite. */
 export function aggregate(values: ReadonlyArray<number | string | boolean | null>, kind: AggregateKind): number {
-    const nums = values.filter((v): v is number => typeof v === "number" && !Number.isNaN(v));
+    const nums = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
     switch (kind) {
         case "count":
             return nums.length;
