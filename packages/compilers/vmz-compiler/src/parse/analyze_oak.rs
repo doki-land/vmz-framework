@@ -335,7 +335,7 @@ fn nyar_from_oak_import(
                     name_span: ByteSpan { start: span.start, end: span.end },
                 });
             }
-            ImportSpecifier::Namespace { local, span } => {
+            ImportSpecifier::Namespace { local, local_span, span } => {
                 if !is_simple_ident(local) {
                     continue;
                 }
@@ -344,11 +344,18 @@ fn nyar_from_oak_import(
                     imported: None,
                     binding_kind: NyarBindingKind::Namespace,
                     is_type_only: decl.is_type_only(),
-                    name_span: name_byte_span(source, span.start, span.end, local)
-                        .unwrap_or(decl_span),
+                    name_span: binding_name_span(
+                        source,
+                        local,
+                        local_span.start,
+                        local_span.end,
+                        span.start,
+                        span.end,
+                    )
+                    .unwrap_or(decl_span),
                 });
             }
-            ImportSpecifier::Named { local, imported, span, .. } => {
+            ImportSpecifier::Named { local, imported, local_span, span, .. } => {
                 if !is_simple_ident(local) {
                     continue;
                 }
@@ -357,8 +364,15 @@ fn nyar_from_oak_import(
                     imported: Some(imported.clone()),
                     binding_kind: NyarBindingKind::Named,
                     is_type_only: decl.is_type_only() || spec.is_inline_type_only(),
-                    name_span: name_byte_span(source, span.start, span.end, local)
-                        .unwrap_or(decl_span),
+                    name_span: binding_name_span(
+                        source,
+                        local,
+                        local_span.start,
+                        local_span.end,
+                        span.start,
+                        span.end,
+                    )
+                    .unwrap_or(decl_span),
                 });
             }
         }
@@ -380,6 +394,24 @@ fn is_simple_ident(name: &str) -> bool {
     };
     (first.is_ascii_alphabetic() || first == '_' || first == '$')
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+}
+
+/// Local binding token span for `Namespace` / `Named` specifiers: prefer
+/// oak's authoritative `local_span`, and fall back to a word-boundary search
+/// within the clause when the builder could not recover the token
+/// (`local_span` is zero-width).
+fn binding_name_span(
+    source: &str,
+    local: &str,
+    local_start: usize,
+    local_end: usize,
+    clause_start: usize,
+    clause_end: usize,
+) -> Option<ByteSpan> {
+    if local_start < local_end {
+        return Some(ByteSpan { start: local_start, end: local_end });
+    }
+    name_byte_span(source, clause_start, clause_end, local)
 }
 
 /// Best-effort span of an identifier inside `[start, end)`: first occurrence
