@@ -337,6 +337,35 @@ describe('packSsrFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.match(manifest.packDigest as string, /^[a-f0-9]{64}$/);
     });
 
+    it('collapses repeated deployment units by chunkId into one node entry', () => {
+        // Deployment IR repeats a component once per consuming page.
+        const duplicated = [...nodeUnits, nodeUnits[1], nodeUnits[1]];
+        const distDir = makeDistWithUnits('node-dupes', duplicated, nodeClientFiles);
+        const binding = fakeBinding(nodePlanResponse);
+        packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
+        const request = JSON.parse(binding.calls[0].requestJson);
+        assert.deepEqual(
+            request.entries.map((e: { logical: string }) => e.logical).sort(),
+            ['Application', 'components/Greeting', 'pages/index'],
+        );
+        assert.equal(request.uses.length, 3);
+    });
+
+    it('rejects one chunkId mapping to conflicting client entries', () => {
+        const conflicting = [
+            { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/Greeting.client.js' },
+            { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/GreetingCopy.client.js' },
+        ];
+        const distDir = makeDistWithUnits('node-conflict', conflicting, {
+            ...nodeClientFiles,
+            'components/GreetingCopy.client.js': 'export default class GreetingCopy {}',
+        });
+        assert.throws(
+            () => packSsrFromDeploymentIr(distDir, { projectRoot: root, binding: fakeBinding(nodePlanResponse) }),
+            /conflicting client entries/,
+        );
+    });
+
     it('falls back to ${chunkId}.client.js only for an empty clientEntry, and requires the file', () => {
         const distDir = makeDistWithUnits(
             'node-empty-entry',

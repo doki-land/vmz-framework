@@ -216,6 +216,11 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
 
     const entries: Record<string, string> = {};
     const uses: PackRequestUse[] = [];
+    // Deployment IR may list the same component unit more than once (one entry
+    // per consuming page). The node graph identity is `chunkId`, so duplicates
+    // collapse into one entry; a same-identity unit pointing at a different
+    // client file is a contract violation, not something to silently pick.
+    const seen = new Map<string, string>();
     for (const unit of ir.units || []) {
         const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
         if (!chunkId) throw new Error(`packSsrFromDeploymentIr: deployment unit has an empty chunkId in ${absOut}`);
@@ -223,10 +228,20 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
         // when `clientEntry` is empty. Decide it here so the pack request stays
         // explicit, then require the file — a missing entry is never skipped.
         const rel = (unit.clientEntry ? String(unit.clientEntry) : `${chunkId}.client.js`).replace(/\\/g, '/');
+        if (seen.has(chunkId)) {
+            if (seen.get(chunkId) !== rel) {
+                throw new Error(
+                    `packSsrFromDeploymentIr: deployment unit "${chunkId}" maps to conflicting client entries: ` +
+                        `${seen.get(chunkId)} and ${rel} (in ${absOut})`,
+                );
+            }
+            continue;
+        }
         const abs = path.join(absOut, ...rel.split('/'));
         if (!existsSync(abs)) {
             throw new Error(`packSsrFromDeploymentIr: unit "${chunkId}" client entry missing: ${rel} (in ${absOut})`);
         }
+        seen.set(chunkId, rel);
         entries[chunkId] = abs;
         uses.push({ logical: chunkId, execution: 'side-effects', exports: { kind: 'named', names: ['default'] } });
     }
