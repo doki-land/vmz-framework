@@ -5,9 +5,12 @@
 //! 同 chunk 具名重导出沿目标模块的导出事实解析为 chunk 内绑定名，与
 //! deferred Local 导出同一机制发 `export { <绑定名> [as <导出名>] };`，
 //! 事实链离开本 chunk 时与跨 chunk 分支同形态发 `export { … } from`；
-//! 解析不到绑定事实的形态（只有星号来源、具名来自表达式 default、来源链
-//! 成环）与需要 scope 重写（重命名绑定）或运行时命名空间合成（星号语义、
-//! 同 chunk 动态边界）的形态都显式诊断拒绝，不产出猜测文本。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
+//! 同 chunk `export *` 枚举目标模块直接非类型具名导出（不递归星号链、
+//! `default` 不随星号传播），逐个沿同一事实链机制展开为具名导出；
+//! 解析不到绑定事实的形态（具名解析落在星号来源、具名来自表达式
+//! default、来源链成环、星号来源自身含活跃星号链）与需要 scope 重写
+//! （重命名绑定）或运行时命名空间合成（`export * as ns`、同 chunk
+//! 动态边界）的形态都显式诊断拒绝，不产出猜测文本。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
 //! 不能提前定名），指纹与替换由 `manifest` 层的两遍法完成。
 //!
 //! Style 目标节点的边在本层只负责 JS 侧文本处置：副作用/空绑定形态的
@@ -476,15 +479,56 @@ pub(crate) fn assemble_chunk(
                         continue;
                     };
                     if target_chunk == chunk_index {
-                        errors.push(
-                            PackDiagnostic::new(
-                                "vmz::pack::emit::namespace_synthesis_unsupported",
-                                format!(
-                                    "同 chunk `export * from '{source}'` 拼接后无法表达星号语义，未实现"
-                                ),
-                            )
-                            .with_path(module_path.clone()),
-                        );
+                        // 同 chunk 星号重导出：枚举目标模块直接非类型导出
+                        // （不递归星号链），逐个沿具名重导出同一事实链机制
+                        // 解析为 chunk 内绑定名，与 deferred Local 同一口径
+                        // 发 `export {local [as exported]}`；`default` 按 ESM
+                        // 星号语义不随 `export *` 传播，不参与展开。目标模块
+                        // 自身含活跃星号重导出喂入不可枚举名字时保持显式拒绝。
+                        if target_has_active_star(context, target, &module_path, errors) {
+                            continue;
+                        }
+                        let mut star_names: Vec<(String, String)> = Vec::new();
+                        collect_direct_exports(context, target, &mut star_names);
+                        for (exported, _) in star_names {
+                            if exported == "default" {
+                                continue;
+                            }
+                            match resolve_same_chunk_reexport(
+                                context,
+                                chunk_index,
+                                target,
+                                &exported,
+                                &module_path,
+                                errors,
+                            ) {
+                                Some(ReexportBinding::Declared(binding)) => {
+                                    deferred.push(DeferredExport {
+                                        local: binding,
+                                        exported,
+                                        module: module_path.clone(),
+                                        is_default: false,
+                                    });
+                                }
+                                Some(ReexportBinding::External { chunk, name }) => {
+                                    if emitted_reexports
+                                        .insert((chunk, name.clone(), exported.clone()))
+                                    {
+                                        let clause = if name == exported {
+                                            name
+                                        } else {
+                                            format!("{name} as {exported}")
+                                        };
+                                        exports_text.push_str(&format!(
+                                            "export {{ {clause} }} from {};\n",
+                                            json_string(&placeholder(chunk))
+                                        ));
+                                        export_names.push((exported, module_path.clone()));
+                                    }
+                                }
+                                None => {}
+                            }
+                        }
                         continue;
                     }
                     exports_text.push_str(&format!(
@@ -1169,6 +1213,45 @@ fn json_text(
     };
     cache.insert(node, built.clone());
     built
+}
+
+/// 星号重导出目标自身是否含活跃 `export *`（名字经链流入，展开时不可
+/// 枚举）：命中即显式拒绝展开，不递归收集。
+fn target_has_active_star(
+    context: &EmitContext<'_>,
+    target: usize,
+    module_path: &str,
+    errors: &mut Vec<PackDiagnostic>,
+) -> bool {
+    let Some(linked) = context.linked[target] else {
+        errors.push(
+            inconsistent(format!(
+                "星号重导出目标 `{}` 未被链接层保留",
+                normalize_path(&context.graph.nodes[target].resolved.path)
+            ))
+            .with_path(module_path.to_string()),
+        );
+        return true;
+    };
+    let record = &context.graph.nodes[target].record;
+    for (index, export) in record.exports.iter().enumerate() {
+        if matches!(export, ExportFact::ReexportAll { .. })
+            && used_reexport(linked, index, is_all)
+        {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::namespace_synthesis_unsupported",
+                    format!(
+                        "同 chunk 星号重导出的来源 `{}` 自身含活跃 `export *`，名字集不可枚举，未实现",
+                        normalize_path(&context.graph.nodes[target].resolved.path)
+                    ),
+                )
+                .with_path(module_path.to_string()),
+            );
+            return true;
+        }
+    }
+    false
 }
 
 /// 目标模块的直接非类型导出名（`export *` 的 (c) 收集口径，不递归星号链）。

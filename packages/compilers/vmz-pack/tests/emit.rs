@@ -1127,6 +1127,116 @@ fn same_chunk_reexport_of_expression_default_is_rejected() {
     );
 }
 
+/// 同 chunk `export *`：目标模块直接非类型具名导出沿事实链展开为具名
+/// 导出，与目标模块自身 deferred Local 同一绑定同一名字去重成一条；
+/// 未被需求命中的纯导出按既有剪枝口径消失，不产出 `export *` 文本。
+#[test]
+fn same_chunk_star_reexport_expands_direct_named_exports() {
+    let root = temp_tree(
+        "starexpand",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { thing } from './barrel.js';\nexport const main = thing;\n"),
+            ("src/barrel.js", "export * from './lib.js';\n"),
+            ("src/lib.js", "export const thing = 1;\nexport const other = 2;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    assert_eq!(plan.artifacts.len(), 1);
+
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("const thing = 1"), "{code}");
+    // 展开的具名导出与 lib 自身 Local 事实合一：恰好一条。
+    assert_eq!(code.matches("export { thing };").count(), 1, "{code}");
+    assert!(code.contains("export { main }"), "{code}");
+    // 未被需求的纯导出剪枝，星号文本与原始说明符不残留。
+    assert!(!code.contains("export { other }"), "{code}");
+    assert!(!code.contains("export *"), "{code}");
+    assert!(!code.contains("__vmz_chunk_"), "{code}");
+    assert!(!code.contains("./lib.js"), "{code}");
+    assert!(!code.contains("./barrel.js"), "{code}");
+}
+
+/// 同 chunk `export *` 的来源自身含活跃 `export *`（名字经链流入不可
+/// 枚举）：保持显式拒绝，不递归收集。
+#[test]
+fn same_chunk_star_reexport_active_star_chain_is_rejected() {
+    let root = temp_tree(
+        "starchain",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { thing } from './barrel.js';\nexport const main = thing;\n"),
+            ("src/barrel.js", "export * from './lib.js';\n"),
+            ("src/lib.js", "export * from './deep.js';\n"),
+            ("src/deep.js", "export const thing = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::namespace_synthesis_unsupported".to_string()),
+        "{errors:?}"
+    );
+}
+
+/// 同 chunk `export *` 不传播 `default`（ESM 星号语义）：来源模块的
+/// 表达式 default 无绑定名也不阻断具名展开，产物不含 `as default`。
+#[test]
+fn same_chunk_star_reexport_skips_expression_default() {
+    let root = temp_tree(
+        "stardefault",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { thing } from './barrel.js';\nexport const main = thing;\n"),
+            ("src/barrel.js", "export * from './lib.js';\n"),
+            ("src/lib.js", "export default 42;\nexport const thing = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("export { thing }"), "{code}");
+    assert!(!code.contains("as default"), "{code}");
+    // 未被需求的表达式 default 语句按剪枝口径消失。
+    assert!(!code.contains("42"), "{code}");
+    assert!(!code.contains("export *"), "{code}");
+}
+
 /// 规范形态资源引用：只重写 `new URL` 第一参数为指纹化相对路径，保留
 /// URL 构造外壳（chunk 与资产同目录写出，运行时解析成立）；资源进产物集
 /// 并随 write_emit 拷贝。
