@@ -848,10 +848,10 @@ fn name_conflict_is_rejected() {
     assert!(errors.iter().any(|d| d.message.contains("value")), "{errors:?}");
 }
 
-/// 同 chunk 的 `import { value as v }`：拼接语义要求绑定原名可达，
-/// scope 重写未实现，显式拒绝。
+/// 同 chunk 的 `import { value as v }`：scope 事实给出全部值引用，消费者
+/// 绑定名在活跃语句切片内改写为 chunk 落点名，不产出任何 import 文本。
 #[test]
-fn binding_rename_is_rejected() {
+fn binding_rename_is_applied_via_scope_facts() {
     let root = temp_tree(
         "rename",
         &[
@@ -871,11 +871,248 @@ fn binding_rename_is_rejected() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
-    assert!(
-        codes(&errors).contains(&"vmz::pack::emit::binding_rename_unsupported".to_string()),
-        "{errors:?}"
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    assert_eq!(plan.artifacts.len(), 1);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("const main = value"), "{code}");
+    assert!(!code.contains(" as v"), "{code}");
+    assert!(!code.contains("import"), "{code}");
+    assert!(code.contains("export { value }"), "{code}");
+    assert!(code.contains("export { main }"), "{code}");
+}
+
+/// 隐藏改名落点：`export { value as shared }` 的 chunk 绑定名是 `value`，
+/// 消费者引用全部改写；deferred 导出仍发 `export { value as shared }`。
+#[test]
+fn hidden_rename_lands_on_declaration_name() {
+    let root = temp_tree(
+        "hidden",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { shared } from './a.js';\nexport const main = shared;\n",
+            ),
+            ("src/a.js", "let value;\nexport { value as shared };\n"),
+        ],
     );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("const main = value"), "{code}");
+    assert!(code.contains("export { value as shared }"), "{code}");
+    assert!(!code.contains("shared;"), "{code}");
+}
+
+/// default 导入落点到具名默认声明：`import D` 改写为 chunk 绑定名 `Foo`。
+#[test]
+fn default_import_renamed_to_class_binding() {
+    let root = temp_tree(
+        "defaultrename",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import D from './a.js';\nexport const main = D;\n"),
+            ("src/a.js", "export default class Foo {}\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("const main = Foo"), "{code}");
+    assert!(code.contains("export { Foo as default }"), "{code}");
+}
+
+/// 同 chunk 命名空间绑定：对本 chunk 自身产物发 import-from-self，真实
+/// Module Namespace，发非致命 `namespace_widened`，不做名字重写。
+#[test]
+fn namespace_import_same_chunk_self_reference() {
+    let root = temp_tree(
+        "nssame",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import * as ns from './a.js';\nexport const main = ns.value;\n"),
+            ("src/a.js", "export const value = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert_eq!(plan.artifacts.len(), 1);
+    let artifact = &plan.artifacts[0];
+    let code = &artifact.code;
+    assert!(
+        code.contains(&format!("import * as ns from \"./{}\";", artifact.file_name)),
+        "{code}"
+    );
+    assert!(code.contains("ns.value"), "{code}");
+    assert!(code.contains("export { value }"), "{code}");
+    assert!(
+        codes(&plan.diagnostics).contains(&"vmz::pack::emit::namespace_widened".to_string()),
+        "{:?}",
+        plan.diagnostics
+    );
+}
+
+/// 消费者重命名绑定经 deferred 导出转手：`export { helper as api }` 的
+/// local 走同一重写计划，发射 `export { util as api }`。
+#[test]
+fn renamed_import_exported_via_deferred_local() {
+    let root = temp_tree(
+        "deferred",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { util as helper } from './lib.js';\nexport { helper as api };\n"),
+            ("src/lib.js", "export const util = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["api".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("export { util as api }"), "{code}");
+    assert!(!code.contains("helper"), "{code}");
+}
+
+/// 守卫反例：类型位置引用、嵌套遮蔽、`scope_incomplete`、消费者同名绑定
+/// 四类都会让重写不安全，全部维持 `binding_rename_unsupported` 显式拒绝。
+#[test]
+fn binding_rename_guards_reject() {
+    let cases: [(&str, &str); 4] = [
+        (
+            "type",
+            "import { value as v } from './a.js';\nlet on: v = null;\nexport const main = v;\n",
+        ),
+        (
+            "shadow",
+            "import { value as v } from './a.js';\nexport const main = (() => { const value = 2; return v; })();\n",
+        ),
+        ("eval", "import { value as v } from './a.js';\neval('x');\nexport const main = v;\n"),
+        (
+            "collision",
+            "import { value as v } from './a.js';\nconst value = 3;\nexport const main = v + value;\n",
+        ),
+    ];
+    for (name, entry_src) in cases {
+        let root = temp_tree(
+            &format!("renameguard-{name}"),
+            &[
+                ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+                ("src/entry.js", entry_src),
+                ("src/a.js", "export const value = 1;\n"),
+            ],
+        );
+        let graph =
+            build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+        let link_plan = link(
+            &graph,
+            &[EntryUse {
+                entry_logical: "main".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["main".into()]),
+            }],
+        );
+        let chunks = plan_chunks(&graph, &link_plan);
+        let errors = match plan_emit(&graph, &link_plan, &chunks, &options()) {
+            Ok(plan) => panic!("case `{name}` 期望拒绝，实际产出：{:?}", plan.artifacts),
+            Err(errors) => errors,
+        };
+        assert!(
+            codes(&errors).contains(&"vmz::pack::emit::binding_rename_unsupported".to_string()),
+            "case `{name}`: {errors:?}"
+        );
+    }
+}
+
+/// External 决议：同 chunk barrel 的重导出事实链落到其它 chunk 时，消费者
+/// 绑定按落点 chunk 与落点导出名合成跨 chunk import（`q as y`），
+/// 名字保持消费者本地名 `y`。
+#[test]
+fn binding_external_chain_synthesizes_landing_name() {
+    let root = temp_tree(
+        "external",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/e1.js", "import { x as y } from './barrel.js';\nexport const main = y;\n"),
+            ("src/barrel.js", "export { q as x } from './deep.js';\n"),
+            ("src/deep.js", "export const q = 1;\n"),
+            ("src/e2.js", "import { q } from './deep.js';\nexport const other = q;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("main".to_string(), root.join("src/e1.js")),
+            ("other".to_string(), root.join("src/e2.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "main".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["main".into()]),
+            },
+            EntryUse {
+                entry_logical: "other".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["other".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let e1 = plan
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.code.contains("const main = y"))
+        .expect("e1 chunk 保留本地名 y");
+    assert!(e1.code.contains("import { q as y } from"), "{}", e1.code);
+    assert!(!e1.code.contains("./barrel.js"), "{}", e1.code);
 }
 
 /// 同 chunk `export * as ns`：改写为对本 chunk 自身产物文件的引用，命名空间

@@ -2,14 +2,22 @@
 //! 类型擦除 → 合成跨 chunk import/export → 名字唯一性检查。
 //!
 //! 拼接语义的前提：同 chunk 模块直接文本拼接，绑定必须原同名可达；
+//! 同 chunk 静态 import 绑定沿目标模块导出事实链解析落点绑定名：落点与
+//! 消费者本地名不一致时对消费者做 scope 重写——其绑定的值引用 span 改写
+//! 为落点名，守卫全部成立才执行（上游 `scope_incomplete` 未置位、绑定无
+//! 类型位置引用、落点名按词边界不出现在消费者文本、引用 span 切片回原文
+//! 且落点可判定），任一失败维持 `binding_rename_unsupported` 显式拒绝；
+//! 事实链离开本 chunk 的按跨 chunk 形态合成 import；同 chunk 命名空间
+//! 绑定合成 `import * as <local> from <本 chunk 自身产物>`（真实 Module
+//! Namespace，名字集按 chunk 加宽，与既有加宽合同同构）。
 //! 同 chunk 具名重导出沿目标模块的导出事实解析为 chunk 内绑定名，与
 //! deferred Local 导出同一机制发 `export { <绑定名> [as <导出名>] };`，
 //! 事实链离开本 chunk 时与跨 chunk 分支同形态发 `export { … } from`；
 //! 同 chunk `export *` 枚举目标模块直接非类型具名导出（不递归星号链、
 //! `default` 不随星号传播），逐个沿同一事实链机制展开为具名导出；
 //! 解析不到绑定事实的形态（具名解析落在星号来源、具名来自表达式
-//! default、来源链成环、星号来源自身含活跃星号链）与需要 scope 重写
-//! （重命名绑定）的形态显式诊断拒绝，不产出猜测文本。
+//! default、来源链成环、星号来源自身含活跃星号链）显式诊断拒绝，
+//! 不产出猜测文本。
 //! `export * as ns` 与同 chunk 动态边界改写为对本 chunk 自身产物文件的
 //! 引用（第三遍占位符替换同样成立）：命名空间是原生 ESM 的真实
 //! Module Namespace，名字集按 chunk 粒度加宽，发非致命诊断
@@ -41,7 +49,7 @@ use crate::chunk::Chunk;
 use crate::diag::PackDiagnostic;
 use crate::graph::{EdgeKind, ModuleNode, NodeKind};
 use crate::link::{LinkedModule, UsedReexport};
-use crate::module::{ExportFact, ImportKind, ImportedName};
+use crate::module::{ExportFact, ImportKind, ImportedName, ModuleRecord};
 
 use super::{EmitContext, PLACEHOLDER_PREFIX, json_string, normalize_path, placeholder};
 
@@ -118,6 +126,23 @@ pub(crate) fn assemble_chunk(
         let module_path = normalize_path(&node.resolved.path);
         let record = &node.record;
         let source_lines = vmz_generator::js::SourceLines::new(source);
+
+        // 同 chunk 静态 import 绑定预决议：必须先于语句切片——scope 重写的
+        // 引用 span 要进入切片替换表，映射链（生成行→擦除→替换→源）随之成立。
+        let (renames, binding_decisions) = plan_same_chunk_bindings(
+            context,
+            chunk_index,
+            node,
+            record,
+            source,
+            linked,
+            &module_path,
+            &mut merged,
+            &mut same_chunk_locals,
+            &mut import_locals,
+            warnings,
+            errors,
+        );
 
         // 存活动态边分类：一次判定，避免按语句重复诊断。
         let mut dynamic_replacements: Vec<(String, usize)> = Vec::new();
@@ -264,7 +289,7 @@ pub(crate) fn assemble_chunk(
                 continue;
             }
             for name in &statement.declared_names {
-                declared.push((name.clone(), module_path.clone()));
+                declared.push((renamed_local(&renames, name), module_path.clone()));
             }
             let mut replacements: BTreeMap<(usize, usize), String> = BTreeMap::new();
             for (specifier, target_chunk) in &dynamic_replacements {
@@ -322,6 +347,23 @@ pub(crate) fn assemble_chunk(
                 replacements
                     .insert(specifier_span, json_string(&format!("./{}", artifact.file_name)));
             }
+            // scope 重写：消费者绑定名在其值引用 span 上改写为 chunk 绑定名。
+            for rewrite in renames.values() {
+                for span in &rewrite.spans {
+                    if !contains(statement.span, *span) {
+                        continue;
+                    }
+                    if replacements.contains_key(span) {
+                        errors.push(
+                            inconsistent(format!("绑定重写 span {span:?} 与切片内既有替换区间冲突"))
+                                .with_path(module_path.clone())
+                                .with_span(statement.span),
+                        );
+                        continue;
+                    }
+                    replacements.insert(*span, rewrite.new_name.clone());
+                }
+            }
             let replaced = match apply_replacements(raw, statement.span.0, &replacements) {
                 Ok(text) => text,
                 Err(diagnostic) => {
@@ -373,7 +415,7 @@ pub(crate) fn assemble_chunk(
                 ExportFact::Local { local, exported, type_only, .. } => {
                     if !*type_only {
                         deferred.push(DeferredExport {
-                            local: local.clone(),
+                            local: renamed_local(&renames, local),
                             exported: exported.clone(),
                             module: module_path.clone(),
                             is_default: false,
@@ -382,7 +424,7 @@ pub(crate) fn assemble_chunk(
                 }
                 ExportFact::Default { local, span } => match local {
                     Some(name) => deferred.push(DeferredExport {
-                        local: name.clone(),
+                        local: renamed_local(&renames, name),
                         exported: "default".to_string(),
                         module: module_path.clone(),
                         is_default: true,
@@ -428,6 +470,7 @@ pub(crate) fn assemble_chunk(
                             target,
                             local,
                             &module_path,
+                            "vmz::pack::emit::reexport_rename_unsupported",
                             errors,
                         ) {
                             Some(ReexportBinding::Declared(binding)) => {
@@ -507,6 +550,7 @@ pub(crate) fn assemble_chunk(
                                 target,
                                 &exported,
                                 &module_path,
+                                "vmz::pack::emit::reexport_rename_unsupported",
                                 errors,
                             ) {
                                 Some(ReexportBinding::Declared(binding)) => {
@@ -588,12 +632,13 @@ pub(crate) fn assemble_chunk(
             }
         }
 
-        // import 事实：同 chunk 只接受具名同名绑定；跨 chunk 按使用过滤后合并。
+        // import 事实：同 chunk 绑定已由预决议消费（同名可达/scope 重写/
+        // 自引用命名空间/显式拒绝），仅事实链离开本 chunk 的按目标 chunk
+        // 合成；跨 chunk 按使用过滤后合并。
         // used 集合 = 活跃语句引用名 ∪ 本模块待决议导出 local（`export {a as b}`
         // 消费的是 import 绑定，不体现在 referenced_names 里）。
-        // referenced_names 是语法名字匹配（Oak 无 scope/reference 事实，与链接层
-        // 同口径）：对 import 保留是保守超集，只会多留不会误剪；收紧到绑定级
-        // 精确以补上游 Oak scope 事实为前提，不在本层堆名字匹配特例。
+        // referenced_names 是语法名字匹配（与链接层同口径）：对 import 保留
+        // 是保守超集，只会多留不会误剪。
         let mut used_names: HashSet<&str> = HashSet::new();
         for &statement_index in &linked.active_statements {
             if let Some(statement) = record.statements.get(statement_index) {
@@ -607,7 +652,7 @@ pub(crate) fn assemble_chunk(
                 used_names.insert(item.local.as_str());
             }
         }
-        for import in &record.imports {
+        for (import_index, import) in record.imports.iter().enumerate() {
             if import.type_only {
                 continue;
             }
@@ -726,68 +771,68 @@ pub(crate) fn assemble_chunk(
             };
             match import.kind {
                 ImportKind::Static => {
-                    if target_chunk == chunk_index {
-                        for binding in &import.bindings {
-                            if binding.inline_type_only {
-                                continue;
-                            }
-                            match &binding.imported {
-                                ImportedName::Name(name) if name == &binding.local => {
-                                    same_chunk_locals.insert(binding.local.clone());
+                    for (binding_index, binding) in import.bindings.iter().enumerate() {
+                        if binding.inline_type_only {
+                            continue;
+                        }
+                        // 同 chunk 绑定：预决议消费后仅剩事实链离开本 chunk 的
+                        // 绑定，按其所在 chunk 合成（跨 chunk 形态），落点导出
+                        // 名沿事实链取（`external_name`）。
+                        let (synth_chunk, external_name) = if target_chunk == chunk_index {
+                            match binding_decisions.get(&(import_index, binding_index)) {
+                                Some(BindingDecision::External { chunk, name }) => {
+                                    (*chunk, Some(name.clone()))
                                 }
-                                _ => errors.push(
+                                _ => continue,
+                            }
+                        } else {
+                            (target_chunk, None)
+                        };
+                        let bindings = merged.entry(synth_chunk).or_default();
+                        // 未被引用的绑定不合成：目标 chunk 可能已剪除该声明，
+                        // 合成会产出引用不存在导出的错误 JS。
+                        if !used_names.contains(binding.local.as_str()) {
+                            continue;
+                        }
+                        match &binding.imported {
+                            ImportedName::Default => match external_name {
+                                // 事实链落点是其它 chunk 的具名导出（同 chunk
+                                // barrel 以 `export { q as default } from` 喂入）：
+                                // 按具名导入合成，不是目标 chunk 的 default。
+                                Some(name) => {
+                                    bindings.named.insert((name, binding.local.clone()));
+                                }
+                                None => {
+                                    bindings.defaults.insert(binding.local.clone());
+                                }
+                            },
+                            ImportedName::Namespace => {
+                                bindings.namespaces.insert(binding.local.clone());
+                                warnings.push(
                                     PackDiagnostic::new(
-                                        "vmz::pack::emit::binding_rename_unsupported",
+                                        "vmz::pack::emit::namespace_widened",
                                         format!(
-                                            "同 chunk import 绑定 `{}` 需要 scope 重写，未实现",
-                                            binding.local
+                                            "命名空间绑定 `{}` 指向 chunk `{}`，实际拿到整个 chunk 的命名空间（比源模块宽）",
+                                            binding.local,
+                                            context.chunks.chunks[synth_chunk].id
                                         ),
                                     )
                                     .with_path(module_path.clone())
                                     .with_span(import.span),
-                                ),
+                                );
+                            }
+                            ImportedName::Name(name) => {
+                                bindings.named.insert((
+                                    external_name.unwrap_or_else(|| name.clone()),
+                                    binding.local.clone(),
+                                ));
                             }
                         }
-                    } else {
-                        let bindings = merged.entry(target_chunk).or_default();
-                        for binding in &import.bindings {
-                            if binding.inline_type_only {
-                                continue;
-                            }
-                            // 未被引用的绑定不合成：目标 chunk 可能已剪除该声明，
-                            // 合成会产出引用不存在导出的错误 JS。
-                            if !used_names.contains(binding.local.as_str()) {
-                                continue;
-                            }
-                            match &binding.imported {
-                                ImportedName::Default => {
-                                    bindings.defaults.insert(binding.local.clone());
-                                }
-                                ImportedName::Namespace => {
-                                    bindings.namespaces.insert(binding.local.clone());
-                                    warnings.push(
-                                        PackDiagnostic::new(
-                                            "vmz::pack::emit::namespace_widened",
-                                            format!(
-                                                "命名空间绑定 `{}` 指向 chunk `{}`，实际拿到整个 chunk 的命名空间（比源模块宽）",
-                                                binding.local,
-                                                context.chunks.chunks[target_chunk].id
-                                            ),
-                                        )
-                                        .with_path(module_path.clone())
-                                        .with_span(import.span),
-                                    );
-                                }
-                                ImportedName::Name(name) => {
-                                    bindings.named.insert((name.clone(), binding.local.clone()));
-                                }
-                            }
-                            import_locals.push((
-                                binding.local.clone(),
-                                target_chunk,
-                                module_path.clone(),
-                            ));
-                        }
+                        import_locals.push((
+                            binding.local.clone(),
+                            synth_chunk,
+                            module_path.clone(),
+                        ));
                     }
                 }
                 ImportKind::SideEffect => {
@@ -888,6 +933,274 @@ pub(crate) fn assemble_chunk(
         segment.gen_line += shift;
     }
     Some(AssembledChunk { code: format!("{imports_text}{body}{exports_text}"), segments })
+}
+
+/// scope 重写计划：消费者绑定旧名在其值引用 span 上改写为 chunk 落点名。
+struct BindingRewrite {
+    new_name: String,
+    /// 落在活跃语句内的值引用 span（import/export 子句内的不发射，不入表）。
+    spans: Vec<(usize, usize)>,
+}
+
+/// 同 chunk 静态 import 绑定的预决议结果。
+enum BindingDecision {
+    /// 已由预决议消费：同名可达、scope 重写、自引用命名空间，或显式拒绝
+    /// 诊断已给出。主 import 循环不再为该绑定合成任何文本。
+    Handled,
+    /// 事实链离开本 chunk：按 `chunk` 合成跨 chunk import，落点导出名为
+    /// `name`（沿导出事实链解析，可能与消费者声明的来源名不同）。
+    External { chunk: usize, name: String },
+}
+
+/// 改名后的本地名：命中 scope 重写计划时取落点名，否则原样。
+fn renamed_local(renames: &BTreeMap<String, BindingRewrite>, name: &str) -> String {
+    match renames.get(name) {
+        Some(rewrite) => rewrite.new_name.clone(),
+        None => name.to_string(),
+    }
+}
+
+/// 词边界出现检查：标识符字节为 ASCII 字母数字、`_`、`$` 与非 ASCII 字节
+/// （保守口径：字符串、注释里的出现同样命中，只会多拒绝不会漏）。
+fn contains_identifier(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    let bytes = haystack.as_bytes();
+    let pattern = needle.as_bytes();
+    let is_ident_byte =
+        |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b >= 0x80;
+    let mut from = 0usize;
+    while from < bytes.len() {
+        let Some(offset) = bytes[from..].windows(pattern.len()).position(|w| w == pattern) else {
+            return false;
+        };
+        let start = from + offset;
+        let end = start + pattern.len();
+        let left_ok = start == 0 || !is_ident_byte(bytes[start - 1]);
+        let right_ok = end == bytes.len() || !is_ident_byte(bytes[end]);
+        if left_ok && right_ok {
+            return true;
+        }
+        from = start + 1;
+    }
+    false
+}
+
+/// 绑定改名守卫：全部成立才产出重写计划，任一失败返回拒绝原因（调用方发
+/// `binding_rename_unsupported`）。前提是不漏引用——引用清单不完整、落点
+/// 名与消费者任何文本形态碰撞、引用 span 无法判定发射归属，都拒绝。
+fn plan_binding_rewrite(
+    record: &ModuleRecord,
+    source: &str,
+    old: &str,
+    new: &str,
+    active_spans: &[(usize, usize)],
+    stripped_spans: &[(usize, usize)],
+) -> Result<BindingRewrite, String> {
+    if record.scope_incomplete {
+        return Err(format!("消费者模块 scope 事实不完整，无法证明 `{old}` 的全部引用"));
+    }
+    if record.scope_bindings.iter().any(|binding| binding.name == new) {
+        return Err(format!("消费者模块已有名为 `{new}` 的模块级绑定，重写会碰撞"));
+    }
+    let Some(binding) = record.scope_bindings.iter().find(|item| item.name == old) else {
+        return Err(format!("`{old}` 无 scope 绑定事实，引用清单给不全"));
+    };
+    if binding.has_type_references {
+        return Err(format!("`{old}` 存在类型位置引用（span 不记录），重写会漏掉类型引用"));
+    }
+    let mut spans: Vec<(usize, usize)> = Vec::with_capacity(binding.references.len());
+    for span in &binding.references {
+        if source.get(span.0..span.1) != Some(old) {
+            return Err(format!("`{old}` 的引用 span {span:?} 切片回原文不是本名（源码与事实漂移）"));
+        }
+        let in_active = active_spans.iter().any(|outer| contains(*outer, *span));
+        let in_stripped = stripped_spans.iter().any(|outer| contains(*outer, *span));
+        if in_active {
+            // 活跃语句切片即发射文本（export 包裹声明时切片含声明体），
+            // 其中的引用必须全部重写。
+            spans.push(*span);
+        } else if !in_stripped {
+            return Err(format!(
+                "`{old}` 的引用 span {span:?} 既不在活跃语句也不在被移除的 import/export 子句内，无法判定发射归属"
+            ));
+        }
+    }
+    // 碰撞扫描只针对会发射的文本：落点名出现在 import/export 子句里随
+    // 子句一起消失，不构成碰撞；出现在活跃语句里（嵌套遮蔽声明、同名
+    // 绑定）才可能让重写后的引用指向错误绑定，保守拒绝。
+    for outer in active_spans {
+        let Some(text) = source.get(outer.0..outer.1) else {
+            return Err(format!("活跃语句 span {outer:?} 超出源码长度（源码与事实漂移）"));
+        };
+        if contains_identifier(text, new) {
+            return Err(format!("落点名 `{new}` 按词边界出现在消费者活跃语句文本中，重写会碰撞"));
+        }
+    }
+    Ok(BindingRewrite { new_name: new.to_string(), spans })
+}
+
+/// 同 chunk 静态 import 绑定预决议：先于语句切片执行，产出 scope 重写计划
+/// 与逐绑定决议。只处理目标为同 chunk JS 节点的静态值导入；其余形态
+/// （Style/Json/未解析/未保留/跨 chunk）原样留给主循环按既有合同处置。
+#[allow(clippy::too_many_arguments)]
+fn plan_same_chunk_bindings(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+    node: &ModuleNode,
+    record: &ModuleRecord,
+    source: &str,
+    linked: &LinkedModule,
+    module_path: &str,
+    merged: &mut BTreeMap<usize, Bindings>,
+    same_chunk_locals: &mut BTreeSet<String>,
+    import_locals: &mut Vec<(String, usize, String)>,
+    warnings: &mut Vec<PackDiagnostic>,
+    errors: &mut Vec<PackDiagnostic>,
+) -> (BTreeMap<String, BindingRewrite>, HashMap<(usize, usize), BindingDecision>) {
+    const REJECT: &str = "vmz::pack::emit::binding_rename_unsupported";
+    let mut renames: BTreeMap<String, BindingRewrite> = BTreeMap::new();
+    let mut decisions: HashMap<(usize, usize), BindingDecision> = HashMap::new();
+
+    let active_spans: Vec<(usize, usize)> = linked
+        .active_statements
+        .iter()
+        .filter_map(|&index| record.statements.get(index).map(|statement| statement.span))
+        .collect();
+    // import 语句与 export 子句文本不进入 body（语句事实不含这些形态），
+    // 其中的名字引用由合成语句与 deferred 导出机制携带落点名。
+    let mut stripped_spans: Vec<(usize, usize)> =
+        record.imports.iter().map(|import| import.span).collect();
+    for export in &record.exports {
+        stripped_spans.push(match export {
+            ExportFact::Local { span, .. }
+            | ExportFact::Default { span, .. }
+            | ExportFact::ReexportNamed { span, .. }
+            | ExportFact::ReexportAll { span, .. }
+            | ExportFact::ReexportNamespace { span, .. } => *span,
+        });
+    }
+
+    for (import_index, import) in record.imports.iter().enumerate() {
+        if import.kind != ImportKind::Static
+            || import.type_only
+            || import.bindings.is_empty()
+            || import.bindings.iter().all(|binding| binding.inline_type_only)
+        {
+            continue;
+        }
+        let Some(edge) = node
+            .static_edges
+            .iter()
+            .find(|edge| edge.kind == EdgeKind::Static && edge.specifier == import.specifier)
+        else {
+            continue;
+        };
+        let Ok(id) = edge.target.as_ref() else { continue };
+        let Some(target) = context.graph.index_of(id) else { continue };
+        if context.graph.nodes[target].kind != NodeKind::Js || !context.retained[target] {
+            continue;
+        }
+        let Some(target_chunk) = context.node_chunk[target] else { continue };
+        if target_chunk != chunk_index {
+            continue;
+        }
+        for (binding_index, binding) in import.bindings.iter().enumerate() {
+            if binding.inline_type_only {
+                continue;
+            }
+            let consumer = binding.local.as_str();
+            if binding.imported == ImportedName::Namespace {
+                // 同 chunk 命名空间：对本 chunk 自身产物发 import-from-self，
+                // 拿到真实 Module Namespace（名字集按 chunk 加宽，与跨 chunk
+                // 加宽合同同构），不做任何名字重写。
+                merged.entry(chunk_index).or_default().namespaces.insert(consumer.to_string());
+                import_locals.push((consumer.to_string(), chunk_index, module_path.to_string()));
+                warnings.push(
+                    PackDiagnostic::new(
+                        "vmz::pack::emit::namespace_widened",
+                        format!(
+                            "同 chunk 命名空间绑定 `{consumer}` 指向 chunk 自身文件，实际拿到整个 chunk 的命名空间（比源模块宽）"
+                        ),
+                    )
+                    .with_path(module_path.to_string())
+                    .with_span(import.span),
+                );
+                decisions.insert((import_index, binding_index), BindingDecision::Handled);
+                continue;
+            }
+            let source_name = match &binding.imported {
+                ImportedName::Default => "default".to_string(),
+                ImportedName::Name(name) => name.clone(),
+                ImportedName::Namespace => unreachable!("上面已处理命名空间绑定"),
+            };
+            let mut scratch: Vec<PackDiagnostic> = Vec::new();
+            match resolve_same_chunk_reexport(
+                context,
+                chunk_index,
+                target,
+                &source_name,
+                module_path,
+                REJECT,
+                &mut scratch,
+            ) {
+                Some(ReexportBinding::Declared(landing)) => {
+                    if landing == consumer {
+                        same_chunk_locals.insert(consumer.to_string());
+                    } else {
+                        match plan_binding_rewrite(
+                            record,
+                            source,
+                            consumer,
+                            &landing,
+                            &active_spans,
+                            &stripped_spans,
+                        ) {
+                            Ok(rewrite) => {
+                                if renames.insert(consumer.to_string(), rewrite).is_some() {
+                                    errors.push(
+                                        PackDiagnostic::new(
+                                            REJECT,
+                                            format!("消费者模块存在多个名为 `{consumer}` 的 import 绑定，非法源形态"),
+                                        )
+                                        .with_path(module_path.to_string())
+                                        .with_span(import.span),
+                                    );
+                                }
+                            }
+                            Err(reason) => errors.push(
+                                PackDiagnostic::new(
+                                    REJECT,
+                                    format!(
+                                        "同 chunk import 绑定 `{consumer}` 需 scope 重写为 `{landing}`：{reason}，未实现"
+                                    ),
+                                )
+                                .with_path(module_path.to_string())
+                                .with_span(import.span),
+                            ),
+                        }
+                    }
+                    decisions.insert((import_index, binding_index), BindingDecision::Handled);
+                }
+                Some(ReexportBinding::External { chunk, name }) => {
+                    decisions
+                        .insert((import_index, binding_index), BindingDecision::External { chunk, name });
+                }
+                None => {
+                    // 具名同名（shorthand）：名字经拼接直接可达（星号来源不
+                    // 展开的既有口径）；其余形态解析器已给出拒绝诊断。
+                    if consumer == source_name {
+                        same_chunk_locals.insert(consumer.to_string());
+                    } else {
+                        errors.append(&mut scratch);
+                    }
+                    decisions.insert((import_index, binding_index), BindingDecision::Handled);
+                }
+            }
+        }
+    }
+    (renames, decisions)
 }
 
 /// 替换文本偏移 → 切片原文偏移：落在替换新文本内取替换起点，
@@ -1074,18 +1387,19 @@ enum ReexportBinding {
 /// 同 chunk 具名重导出 → 绑定事实：从目标模块的导出事实逐跳解析
 /// （`Local` 与具名 `Default` 落在 chunk 内绑定名；`ReexportNamed` 沿边
 /// 继续走，跨 chunk 即停）。只有星号来源、表达式 default、来源链成环
-/// 解析不出绑定，显式拒绝。
+/// 解析不出绑定，显式拒绝。`code` 由调用方按语境给出（重导出语境与
+/// import 绑定预决议语境共用本解析器）。
 fn resolve_same_chunk_reexport(
     context: &EmitContext<'_>,
     chunk_index: usize,
     target: usize,
     name: &str,
     module_path: &str,
+    code: &str,
     errors: &mut Vec<PackDiagnostic>,
 ) -> Option<ReexportBinding> {
     let unsupported = |message: String| {
-        PackDiagnostic::new("vmz::pack::emit::reexport_rename_unsupported", message)
-            .with_path(module_path.to_string())
+        PackDiagnostic::new(code, message).with_path(module_path.to_string())
     };
     let mut visited: BTreeSet<usize> = BTreeSet::new();
     let mut node = target;
