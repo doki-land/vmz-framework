@@ -42,12 +42,17 @@
  * - `renderSvg` `resourceIdPrefix` qualifies every generated resource id so
  *   coexisting charts stay id-disjoint, and a prefix that is not a safe id
  *   token is refused
+ * - `resolveResourceIdPrefix` regenerates a prefix purely from declarative
+ *   inputs (an explicit host prop wins, otherwise a deterministic hash), so
+ *   construction order never changes markup and the components carry no
+ *   per-instance counter
  * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
  *   labels, and ids that survive a spec update
  * - the published `@doki-land/davinci` dist renders the same fixtures
  *   byte-identical to the internal workspace packages
  */
 
+import { readFileSync } from 'node:fs';
 import {
     DEFAULT_CHART_THEME,
     aggregate,
@@ -62,6 +67,7 @@ import {
     estimateTextSize,
     renderSvg,
     resolve,
+    resolveResourceIdPrefix,
     truncateToWidth,
     validateScene,
 } from '../../../../../davinci/davinci-scene/src/index.ts';
@@ -988,6 +994,60 @@ console.log('charts-render: resource ids stay unique across coexisting charts…
         threw = true;
     }
     if (!threw) fail('a prefix that is not a safe id token must be refused');
+}
+
+console.log('charts-render: resource prefixes regenerate deterministically…');
+{
+    const identityA = { mark: 'bar', encoding: [{ field: 'category', channel: 'x' }], data: [{ category: 'alpha', value: 3 }] };
+    const identityB = { mark: 'bar', encoding: [{ field: 'category', channel: 'x' }], data: [{ category: 'beta', value: 7 }] };
+
+    // Two independent construction orders must agree — the prefix comes from
+    // the declarative inputs, never from a per-process counter.
+    const orderA = [resolveResourceIdPrefix('davinci-chart', identityB), resolveResourceIdPrefix('davinci-chart', identityA)];
+    const orderB = [resolveResourceIdPrefix('davinci-chart', identityA), resolveResourceIdPrefix('davinci-chart', identityB)];
+    if (orderA[0] !== orderB[1] || orderA[1] !== orderB[0]) {
+        fail('prefixes must not depend on construction order');
+    }
+    if (orderA[0] === orderA[1]) fail('distinct identities must derive distinct prefixes');
+    const derived = orderA[1];
+    if (!derived.startsWith('davinci-chart-') || !derived.endsWith('-')) {
+        fail(`derived prefix wants davinci-chart-<hash>-, got ${derived}`);
+    }
+
+    // An explicit host prop wins over the derived token.
+    if (resolveResourceIdPrefix('davinci-chart', identityA, 'host-1-') !== 'host-1-') {
+        fail('an explicit prefix must be returned untouched');
+    }
+    if (resolveResourceIdPrefix('davinci-chart', identityA, null) !== derived) {
+        fail('a null explicit prefix must fall back to the derived token');
+    }
+
+    // The derived prefix is a safe id token and survives the render boundary.
+    const clippedDisplay = resolve(
+        {
+            version: '/v0',
+            root: {
+                kind: 'group',
+                id: 'g',
+                role: 'group',
+                clip: { x: 10, y: 10, w: 40, h: 40 },
+                children: [{ kind: 'rect', id: 'r', role: 'decorative', x: 0, y: 0, w: 100, h: 100 }],
+            },
+        },
+        { width: 100, height: 100 },
+    );
+    const derivedSvg = renderSvg(clippedDisplay, { resourceIdPrefix: derived });
+    if (!derivedSvg.includes(`<clipPath id="${derived}clip-0">`)) fail('derived prefix must qualify resource ids');
+
+    // The components resolve prefixes through the shared helper — no counters.
+    for (const [file, seq] of [
+        ['../../../../../ui/vmz-ui-charts/src/components/Chart.vmz', 'chartInstanceSeq'],
+        ['../../../../../ui/vmz-ui-charts/src/components/Diagram.vmz', 'diagramInstanceSeq'],
+    ]) {
+        const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+        if (source.includes(seq)) fail(`${file} must not carry the ${seq} counter`);
+        if (!source.includes('resolveResourceIdPrefix')) fail(`${file} must resolve prefixes deterministically`);
+    }
 }
 
 // ─── Diagram: topology → layout → DisplayScene → SVG ─────────────────────

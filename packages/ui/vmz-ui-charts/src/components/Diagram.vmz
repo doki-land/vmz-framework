@@ -110,11 +110,8 @@ import {
     buildScene as buildDiagramScene,
     type DiagramSpec,
 } from "@doki-land/davinci/diagram";
-import { renderSvg, resolve, type DisplayScene } from "@doki-land/davinci/scene";
+import { renderSvg, resolve, resolveResourceIdPrefix, type DisplayScene } from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
-
-/** 同页多图共存时 SVG 资源 id 前缀按实例递增，clip 等 id 不再互相覆盖。 */
-let diagramInstanceSeq = 0;
 
 export default class Diagram {
     /** DiagramSpec（nodes / edges / clusters）。 */
@@ -125,6 +122,9 @@ export default class Diagram {
     public height: number = 500;
     /** 是否自动适应布局画布（忽略 width/height 用 canvasBounds）。 */
     public autoSize: boolean = true;
+    /** 宿主显式提供的 SVG 资源 id 前缀。null 时从声明式输入确定性派生，
+     *  同页多实例不撞 id；需要绝对唯一时由宿主传入。 */
+    public resourceIdPrefix: string | null = null;
 
     public scene: DisplayScene | null = null;
     public state: RuntimeState | null = null;
@@ -134,8 +134,6 @@ export default class Diagram {
 
     /** 每次 recompile 递增。异步返回时先比对再应用，为未来异步管线预留。 */
     public _latestRevision: number = 0;
-    /** 本实例 SVG 资源 id 前缀（构造时分配），多图内联同一文档不撞 id。 */
-    public readonly _resourceIdPrefix: string = `davinci-diagram-${++diagramInstanceSeq}-`;
     /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
     public _resizeObserver: ResizeObserver | null = null;
     /** 当前 hover 的节点或边 id —— 简化占位。 */
@@ -172,10 +170,17 @@ export default class Diagram {
         return `width:${w}px;height:${h}px;position:relative;${hide}`;
     }
 
+    /** SVG 资源 id 前缀 —— 显式 prop 优先，否则从声明式输入（spec + direction）
+     *  确定性派生。SSR 与客户端对同一输入再生同一前缀，不同 spec 天然不撞 id。 */
+    public _resourcePrefix(): string {
+        const identity = { spec: this.spec, direction: this.direction };
+        return resolveResourceIdPrefix("davinci-diagram", identity, this.resourceIdPrefix);
+    }
+
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
         if (this._zeroSize()) return "";
-        return this.scene ? renderSvg(this.scene, { resourceIdPrefix: this._resourceIdPrefix }) : "";
+        return this.scene ? renderSvg(this.scene, { resourceIdPrefix: this._resourcePrefix() }) : "";
     }
 
     onMount() {

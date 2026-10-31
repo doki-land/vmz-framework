@@ -46,6 +46,34 @@ export interface RenderSvgOptions {
  *  `url(#…)` attributes, so anything else is rejected at the boundary. */
 const SAFE_ID_PREFIX = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
 
+/** Resolve the resource-id prefix for one rendered scene.
+ *
+ *  Contract: the prefix must be regenerated deterministically from the
+ *  declarative inputs of the component, never from a per-process counter —
+ *  SSR and client hydration of the same inputs then agree on every id. When
+ *  the host needs absolute uniqueness (several identical scenes in one
+ *  document), it passes an explicit prefix; `renderSvg` still validates the
+ *  safe-token shape at the boundary. */
+export function resolveResourceIdPrefix(
+    family: string,
+    identity: unknown,
+    explicit?: string | null,
+): string {
+    if (typeof explicit === "string" && explicit !== "") return explicit;
+    return `${family}-${fnv1aHex(JSON.stringify(identity) ?? "")}-`;
+}
+
+/** FNV-1a (32-bit) as hex — a pure hash, so identical inputs always rebuild
+ *  the identical token. */
+function fnv1aHex(text: string): string {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16);
+}
+
 /** Serialize a resolved DisplayScene to an SVG document string. */
 export function renderSvg(scene: DisplayScene, options: RenderSvgOptions = {}): string {
     assertSceneVersion(scene.version, "renderSvg");

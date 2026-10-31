@@ -112,11 +112,8 @@ import {
     type ChartSpec,
     type DataSnapshot,
 } from "@doki-land/davinci/chart";
-import { resolve, renderSvg, type DisplayScene } from "@doki-land/davinci/scene";
+import { resolve, renderSvg, resolveResourceIdPrefix, type DisplayScene } from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
-
-/** 同页多图共存时 SVG 资源 id 前缀按实例递增，clip 等 id 不再互相覆盖。 */
-let chartInstanceSeq = 0;
 
 export default class Chart {
     /** DaVinci ChartSpec（mark + encoding）。 */
@@ -127,6 +124,9 @@ export default class Chart {
     public snapshot: DataSnapshot | null = null;
     public width: number = 600;
     public height: number = 400;
+    /** 宿主显式提供的 SVG 资源 id 前缀。null 时从声明式输入确定性派生，
+     *  同页多实例不撞 id；需要绝对唯一（例如同 spec 重复内联）时由宿主传入。 */
+    public resourceIdPrefix: string | null = null;
 
     /** 交互 runtime state。 */
     public state: RuntimeState | null = null;
@@ -137,8 +137,6 @@ export default class Chart {
 
     /** 每次 scene() 计算递增。异步返回时先比对再应用，为未来异步管线预留。 */
     public _latestRevision: number = 0;
-    /** 本实例 SVG 资源 id 前缀（构造时分配），多图内联同一文档不撞 id。 */
-    public readonly _resourceIdPrefix: string = `davinci-chart-${++chartInstanceSeq}-`;
     /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
     public _resizeObserver: ResizeObserver | null = null;
     /** 宿主显式传了 width / height 时为 true。ResizeObserver 只在 auto 模式下回写。 */
@@ -192,11 +190,25 @@ export default class Chart {
         return resolve(semantic, { width: this.width, height: this.height });
     }
 
+    /** SVG 资源 id 前缀 —— 显式 prop 优先，否则从声明式输入（spec + 数据）
+     *  确定性派生。SSR 与客户端对同一输入再生同一前缀，不同 spec 天然不撞 id。 */
+    public _resourcePrefix(): string {
+        const identity = {
+            mark: this.spec?.mark ?? null,
+            encoding: this.spec?.encoding ?? null,
+            keyField: this.spec?.keyField ?? null,
+            facetField: this.spec?.facetField ?? null,
+            scales: this.spec?.scales ? Array.from(this.spec.scales.entries()) : null,
+            data: this.data ?? this.snapshot?.columns ?? null,
+        };
+        return resolveResourceIdPrefix("davinci-chart", identity, this.resourceIdPrefix);
+    }
+
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
         if (this._zeroSize()) return "";
         const scene = this.scene();
-        return scene ? renderSvg(scene, { resourceIdPrefix: this._resourceIdPrefix }) : "";
+        return scene ? renderSvg(scene, { resourceIdPrefix: this._resourcePrefix() }) : "";
     }
 
     public get hostStyle(): string {
