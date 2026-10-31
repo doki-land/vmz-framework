@@ -908,6 +908,225 @@ fn namespace_synthesis_is_rejected() {
     );
 }
 
+/// 同 chunk `X as X` 重导出：目标模块的绑定事实给出 chunk 内绑定名，
+/// 与目标模块自身的 Local 事实是同一导出，只发一条 `export { helper }`，
+/// 不产出任何 export-from 文本。
+#[test]
+fn same_chunk_reexport_same_name_emits_single_binding_export() {
+    let root = temp_tree(
+        "reexportsame",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { helper } from './barrel.js';\nexport const main = helper;\n"),
+            ("src/barrel.js", "export { helper as helper } from './lib.js';\n"),
+            ("src/lib.js", "export function helper() { return 1 }\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    assert_eq!(plan.artifacts.len(), 1);
+
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("function helper"), "{code}");
+    // 绑定名决议出的导出与 lib 自身 Local 事实合一：恰好一条。
+    assert_eq!(code.matches("export { helper };").count(), 1, "{code}");
+    assert!(code.contains("export { main }"), "{code}");
+    // 同 chunk 拼接不产出 export-from，也不留占位符与原始说明符。
+    assert!(!code.contains("} from"), "{code}");
+    assert!(!code.contains("__vmz_chunk_"), "{code}");
+    assert!(!code.contains("./lib.js"), "{code}");
+    assert!(!code.contains("./barrel.js"), "{code}");
+}
+
+/// 同 chunk `A as B` 重导出、B 被其它 chunk 消费：落点绑定名沿事实解析为
+/// `helper`，chunk 对外发 `export { helper as alias }`，消费方合成 import。
+#[test]
+fn same_chunk_reexport_rename_exports_to_other_chunks() {
+    let root = temp_tree(
+        "reexportrename",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/one.js", "import { alias } from './barrel.js';\nexport const a = alias;\n"),
+            ("src/two.js", "import { alias } from './barrel.js';\nexport const b = alias;\n"),
+            ("src/barrel.js", "export { helper as alias } from './lib.js';\n"),
+            ("src/lib.js", "export function helper() { return 1 }\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/one.js")),
+            ("two".to_string(), root.join("src/two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["b".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let shared = plan.artifacts.iter().find(|a| a.chunk_id.starts_with("shared/")).unwrap();
+    assert!(shared.code.contains("export { helper as alias }"), "{}", shared.code);
+    assert!(shared.code.contains("export { helper }"), "{}", shared.code);
+    assert!(!shared.code.contains("} from"), "{}", shared.code);
+    assert!(!shared.code.contains("__vmz_chunk_"), "{}", shared.code);
+    for logical in ["one", "two"] {
+        let artifact =
+            plan.artifacts.iter().find(|a| a.chunk_id == format!("entry/{logical}")).unwrap();
+        assert!(
+            artifact
+                .code
+                .contains(&format!("import {{ alias }} from \"./{}\";", shared.file_name)),
+            "{}",
+            artifact.code
+        );
+    }
+}
+
+/// 同 chunk 重导出链中途离开本 chunk：沿事实走到跨 chunk 一跳后，按跨
+/// chunk 同形态发 `export { <目标导出名> as <导出名> } from <目标 chunk>`，
+/// 同链路的重复表述只发一条。
+#[test]
+fn same_chunk_reexport_chain_leaving_chunk_emits_export_from() {
+    let root = temp_tree(
+        "reexportexternal",
+        &[
+            (
+                "package.json",
+                r#"{"name":"app","version":"0.0.0"}"#,
+            ),
+            (
+                "src/entry.js",
+                "export { thing } from './barrel.js';\nexport const load = () => import('./impl.js');\n",
+            ),
+            ("src/barrel.js", "export { x as thing } from './mid.js';\n"),
+            ("src/mid.js", "export { value as x } from './impl.js';\n"),
+            ("src/impl.js", "export const value = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["thing".into(), "load".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    // impl 同时被静态链与动态根可达 → 独立 chunk；entry/barrel/mid 同 chunk。
+    let target = plan.artifacts.iter().find(|a| a.modules[0].ends_with("src/impl.js")).unwrap();
+    assert_ne!(target.chunk_id, "entry/main");
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/main").unwrap();
+    // 链路落点 `value` 直接以 chunk 对外导出名 `thing` 发 export-from，恰好一条。
+    assert_eq!(
+        entry.code.matches(&format!("export {{ value as thing }} from \"./{}\";", target.file_name)).count(),
+        1,
+        "{}",
+        entry.code
+    );
+    assert!(entry.code.contains("export { load }"), "{}", entry.code);
+    assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
+    assert!(!entry.code.contains("./barrel.js"), "{}", entry.code);
+    assert!(!entry.code.contains("./mid.js"), "{}", entry.code);
+    assert!(target.code.contains("export { value }"), "{}", target.code);
+}
+
+/// 重导出链的落点只有 `export *` 事实（星号来源不展开）：解析不到绑定
+/// 事实，显式拒绝，不做名字猜测。
+#[test]
+fn same_chunk_reexport_from_star_source_is_rejected() {
+    let root = temp_tree(
+        "reexportstar",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { t2 } from './wrapper.js';\nexport const main = t2;\n"),
+            ("src/wrapper.js", "export { thing as t2 } from './barrel.js';\n"),
+            ("src/barrel.js", "export * from './impl.js';\n"),
+            ("src/impl.js", "export const thing = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::reexport_rename_unsupported".to_string()),
+        "{errors:?}"
+    );
+}
+
+/// 重导出 `export { default as x } from`：`export default <表达式>` 没有
+/// 绑定名可引用，解析不到绑定事实，显式拒绝。
+#[test]
+fn same_chunk_reexport_of_expression_default_is_rejected() {
+    let root = temp_tree(
+        "reexportexprdefault",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { answer } from './barrel.js';\nexport const main = answer;\n"),
+            ("src/barrel.js", "export { default as answer } from './lib.js';\n"),
+            ("src/lib.js", "export default 42;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::reexport_rename_unsupported".to_string()),
+        "{errors:?}"
+    );
+}
+
 /// 规范形态资源引用：只重写 `new URL` 第一参数为指纹化相对路径，保留
 /// URL 构造外壳（chunk 与资产同目录写出，运行时解析成立）；资源进产物集
 /// 并随 write_emit 拷贝。

@@ -2,9 +2,12 @@
 //! 类型擦除 → 合成跨 chunk import/export → 名字唯一性检查。
 //!
 //! 拼接语义的前提：同 chunk 模块直接文本拼接，绑定必须原同名可达；
-//! 任何需要 scope 重写（重命名绑定、同 chunk 具名重导出）或运行时
-//! 命名空间合成（星号语义、同 chunk 动态边界）的形态都显式诊断拒绝，
-//! 不产出猜测文本。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
+//! 同 chunk 具名重导出沿目标模块的导出事实解析为 chunk 内绑定名，与
+//! deferred Local 导出同一机制发 `export { <绑定名> [as <导出名>] };`，
+//! 事实链离开本 chunk 时与跨 chunk 分支同形态发 `export { … } from`；
+//! 解析不到绑定事实的形态（只有星号来源、具名来自表达式 default、来源链
+//! 成环）与需要 scope 重写（重命名绑定）或运行时命名空间合成（星号语义、
+//! 同 chunk 动态边界）的形态都显式诊断拒绝，不产出猜测文本。跨 chunk 引用在第一遍只写占位符（chunk 间可成环，
 //! 不能提前定名），指纹与替换由 `manifest` 层的两遍法完成。
 //!
 //! Style 目标节点的边在本层只负责 JS 侧文本处置：副作用/空绑定形态的
@@ -90,6 +93,12 @@ pub(crate) fn assemble_chunk(
     let mut merged: BTreeMap<usize, Bindings> = BTreeMap::new();
     let mut side_effects: BTreeSet<usize> = BTreeSet::new();
     let mut deferred: Vec<DeferredExport> = Vec::new();
+    // 导出事实去重：同 chunk 重导出链的落点与落点模块自身的 Local/Default
+    // 事实是同一 chunk 绑定的同一导出名（`X as X` 即典型），跨 chunk 同形态
+    // export-from 也按 (chunk, 目标导出名, 导出名) 合一；同一绑定同一名字只
+    // 发一条导出，不同绑定同名仍由 `check_names` 判冲突。
+    let mut emitted_bindings: HashSet<(String, String)> = HashSet::new();
+    let mut emitted_reexports: HashSet<(usize, String, String)> = HashSet::new();
     // JSON 值节点：(节点, 绑定名) 去重（同 chunk 同名绑定共享一条 const），
     // 原始文本按节点缓存（读失败缓存 `None`，诊断不重复报）。
     let mut json_locals: BTreeSet<(usize, String)> = BTreeSet::new();
@@ -398,20 +407,43 @@ pub(crate) fn assemble_chunk(
                         continue;
                     };
                     if target_chunk == chunk_index {
-                        // 评估结论（缺口 3 附带项）：同 chunk 重导出可以闭合——
-                        // 把目标模块的导出名解析为 chunk 内绑定名后发
-                        // `export { <绑定名> as exported };`，与 deferred Local
-                        // 导出同一机制。该机制属 emit 层新工作块，未实现前保持
+                        // 同 chunk 具名重导出：目标导出名沿导出事实链解析为
+                        // chunk 内绑定名，与 deferred Local 同一机制决议；
+                        // 链离开本 chunk 时按跨 chunk 同形态发 export-from。
+                        // 解析不到绑定事实（星号来源、表达式 default、成环）
                         // 显式拒绝，不做名字猜测。
-                        errors.push(
-                            PackDiagnostic::new(
-                                "vmz::pack::emit::reexport_rename_unsupported",
-                                format!(
-                                    "同 chunk 重导出 `export {{ {local} as {exported} }} from '{source}'` 需要导出名到绑定名映射，未实现"
-                                ),
-                            )
-                            .with_path(module_path.clone()),
-                        );
+                        match resolve_same_chunk_reexport(
+                            context,
+                            chunk_index,
+                            target,
+                            local,
+                            &module_path,
+                            errors,
+                        ) {
+                            Some(ReexportBinding::Declared(binding)) => {
+                                deferred.push(DeferredExport {
+                                    local: binding,
+                                    exported: exported.clone(),
+                                    module: module_path.clone(),
+                                    is_default: false,
+                                });
+                            }
+                            Some(ReexportBinding::External { chunk, name }) => {
+                                if emitted_reexports.insert((chunk, name.clone(), exported.clone())) {
+                                    let clause = if name == *exported {
+                                        name
+                                    } else {
+                                        format!("{name} as {exported}")
+                                    };
+                                    exports_text.push_str(&format!(
+                                        "export {{ {clause} }} from {};\n",
+                                        json_string(&placeholder(chunk))
+                                    ));
+                                    export_names.push((exported.clone(), module_path.clone()));
+                                }
+                            }
+                            None => {}
+                        }
                         continue;
                     }
                     let clause = if local == exported {
@@ -769,6 +801,13 @@ pub(crate) fn assemble_chunk(
         if !resolvable.contains(item.local.as_str()) {
             continue;
         }
+        let key = (
+            item.local.clone(),
+            if item.is_default { "default".to_string() } else { item.exported.clone() },
+        );
+        if !emitted_bindings.insert(key) {
+            continue;
+        }
         if item.is_default {
             exports_text.push_str(&format!("export {{ {} as default }};\n", item.local));
             export_names.push(("default".to_string(), item.module.clone()));
@@ -964,6 +1003,107 @@ fn edge_target_node(
             );
             None
         }
+    }
+}
+
+/// 同 chunk 具名重导出的事实解析结果。
+enum ReexportBinding {
+    /// 目标导出名解析为 chunk 内绑定名：交给 deferred Local 机制发
+    /// `export { <绑定名> [as <导出名>] };`。
+    Declared(String),
+    /// 来源链离开本 chunk：与跨 chunk 分支同形态发
+    /// `export { <目标导出名> [as <导出名>] } from <占位符>;`。
+    External { chunk: usize, name: String },
+}
+
+/// 同 chunk 具名重导出 → 绑定事实：从目标模块的导出事实逐跳解析
+/// （`Local` 与具名 `Default` 落在 chunk 内绑定名；`ReexportNamed` 沿边
+/// 继续走，跨 chunk 即停）。只有星号来源、表达式 default、来源链成环
+/// 解析不出绑定，显式拒绝。
+fn resolve_same_chunk_reexport(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+    target: usize,
+    name: &str,
+    module_path: &str,
+    errors: &mut Vec<PackDiagnostic>,
+) -> Option<ReexportBinding> {
+    let unsupported = |message: String| {
+        PackDiagnostic::new("vmz::pack::emit::reexport_rename_unsupported", message)
+            .with_path(module_path.to_string())
+    };
+    let mut visited: BTreeSet<usize> = BTreeSet::new();
+    let mut node = target;
+    let mut name = name.to_string();
+    loop {
+        if !visited.insert(node) {
+            errors.push(unsupported(format!(
+                "同 chunk 重导出 `{name}` 的来源链成环，无绑定事实可解析，未实现"
+            )));
+            return None;
+        }
+        let record = &context.graph.nodes[node].record;
+        let mut next: Option<(usize, String)> = None;
+        for export in &record.exports {
+            match export {
+                ExportFact::Local { local, exported, type_only, .. } => {
+                    if !type_only && exported == &name {
+                        return Some(ReexportBinding::Declared(local.clone()));
+                    }
+                }
+                ExportFact::Default { local, .. } => {
+                    if name != "default" {
+                        continue;
+                    }
+                    match local {
+                        Some(binding) => {
+                            return Some(ReexportBinding::Declared(binding.clone()));
+                        }
+                        None => {
+                            errors.push(unsupported(
+                                "同 chunk 重导出 `default`：`export default <表达式>` 无绑定名可引用，未实现"
+                                    .to_string(),
+                            ));
+                            return None;
+                        }
+                    }
+                }
+                ExportFact::ReexportNamed { source, local, exported, type_only, .. } => {
+                    if *type_only || exported != &name {
+                        continue;
+                    }
+                    let Some(step) = edge_target_node(
+                        context,
+                        &context.graph.nodes[node],
+                        EdgeKind::ReexportNamed,
+                        source,
+                        module_path,
+                        errors,
+                    ) else {
+                        return None;
+                    };
+                    let Some(step_chunk) = chunk_of_node(context, step, module_path, errors) else {
+                        return None;
+                    };
+                    if step_chunk == chunk_index {
+                        next = Some((step, local.clone()));
+                        break;
+                    }
+                    return Some(ReexportBinding::External { chunk: step_chunk, name: local.clone() });
+                }
+                _ => {}
+            }
+        }
+        if let Some((step, step_name)) = next {
+            node = step;
+            name = step_name;
+            continue;
+        }
+        errors.push(unsupported(format!(
+            "同 chunk 重导出 `{name}` 在目标模块 `{}` 的具名导出事实中解析不到绑定（星号来源不展开），未实现",
+            normalize_path(&context.graph.nodes[node].resolved.path)
+        )));
+        return None;
     }
 }
 
