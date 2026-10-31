@@ -2204,3 +2204,73 @@ fn unresolved_relative_dynamic_import_still_errors() {
         "{errors:?}"
     );
 }
+
+/// 跨 chunk 求值保留：入口只静态导入目标模块的未被消费导出时，绑定 import
+/// 不会合成，但目标模块可观察求值，必须补一条 chunk 级副作用 import——否则
+/// 目标及其传递副作用在运行时不会执行，减枝就改变了程序行为。
+#[test]
+fn cross_chunk_evaluation_is_preserved_without_used_bindings() {
+    let root = temp_tree(
+        "evalpreserve",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry-a.js",
+                "import { unused } from './b.js';\nexport const a = 1;\n",
+            ),
+            (
+                "src/entry-b.js",
+                "import { used } from './b.js';\nexport const b = used;\n",
+            ),
+            ("src/b.js", "console.log('b-side');\nexport const used = 1;\nexport const unused = 2;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("a".to_string(), root.join("src/entry-a.js")),
+            ("b".to_string(), root.join("src/entry-b.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "a".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["a".into()]),
+            },
+            EntryUse {
+                entry_logical: "b".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["b".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let shared =
+        plan.artifacts.iter().find(|a| a.chunk_id.starts_with("shared/")).expect("shared chunk");
+    assert!(shared.modules.iter().any(|m| m.ends_with("src/b.js")), "{:?}", shared.modules);
+    assert!(shared.code.contains("console.log('b-side')"), "{}", shared.code);
+
+    let entry_a = plan.artifacts.iter().find(|a| a.chunk_id == "entry/a").unwrap();
+    assert!(
+        entry_a.code.contains(&format!("import \"./{}\";", shared.file_name)),
+        "{}",
+        entry_a.code
+    );
+    // 未被消费的绑定不合成具名 import，也不把 `unused` 带进文本。
+    assert!(!entry_a.code.contains("unused"), "{}", entry_a.code);
+
+    let entry_b = plan.artifacts.iter().find(|a| a.chunk_id == "entry/b").unwrap();
+    assert!(
+        entry_b.code.contains(&format!("import {{ used }} from \"./{}\";", shared.file_name)),
+        "{}",
+        entry_b.code
+    );
+}

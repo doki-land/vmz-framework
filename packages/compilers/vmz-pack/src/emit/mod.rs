@@ -7,6 +7,11 @@
 //!   保留 URL 构造外壳；chunk 与资产同目录写出，运行时解析成立），再经
 //!   `vmz_generator::js::erase_types` 擦除 TypeScript 类型语法；跨 chunk
 //!   的 import/export 语义用合成语句表达。
+//! - 求值保留：链接层按可观察求值保留的静态边目标
+//!   （[`crate::link::effectful_modules`]），如果它的 import / re-export
+//!   文本没有进入本 chunk（绑定未被使用、重导出未被消费、或目标自身没有
+//!   可拼接的活跃语句），装配最后补一条 chunk 级副作用 import。否则目标
+//!   模块及其传递副作用在运行时不会被求值，减枝就改变了程序行为。
 //! - 文件名 = chunk id slug + 内容指纹（sha256 前 8 hex）。chunk 间引用
 //!   可能成环，不能拓扑展开，故用占位符两遍法：第一遍装配含占位符的
 //!   文本并定指纹，第三遍把占位符替换为 `./<目标文件名>`。
@@ -56,7 +61,7 @@ use std::path::{Component, Path, PathBuf};
 use crate::chunk::ChunkPlan;
 use crate::diag::PackDiagnostic;
 use crate::graph::ModuleGraph;
-use crate::link::{LinkPlan, LinkedModule};
+use crate::link::{effectful_modules, LinkPlan, LinkedModule};
 
 pub use write::write_emit;
 
@@ -170,6 +175,9 @@ pub(crate) struct EmitContext<'a> {
     pub node_chunk: Vec<Option<usize>>,
     /// 链接层保留集合。
     pub retained: Vec<bool>,
+    /// 图级可观察求值表（与 [`crate::link::effectful_modules`] 同一规则，
+    /// 由 [`plan_emit`] 计算一次，装配层不另判副作用）。
+    pub effectful: Vec<bool>,
     /// 节点 → 链接结果。
     pub linked: Vec<Option<&'a LinkedModule>>,
     /// chunk 成员模块源码（按 `resolved.path` 重读）。
@@ -305,7 +313,16 @@ pub fn plan_emit(
         return Err(errors);
     }
 
-    let context = EmitContext { graph, chunks, node_chunk, retained, linked, sources, asset_index };
+    let context = EmitContext {
+        graph,
+        chunks,
+        node_chunk,
+        retained,
+        effectful: effectful_modules(graph),
+        linked,
+        sources,
+        asset_index,
+    };
 
     // 第一遍装配（含占位符）与行级映射段。
     let mut codes: Vec<String> = Vec::with_capacity(chunks.chunks.len());

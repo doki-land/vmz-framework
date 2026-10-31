@@ -116,6 +116,9 @@ pub(crate) fn assemble_chunk(
     let mut export_names: Vec<(String, String)> = Vec::new();
     let mut merged: BTreeMap<usize, Bindings> = BTreeMap::new();
     let mut side_effects: BTreeSet<usize> = BTreeSet::new();
+    // 已被本 chunk 文本引用的目标 chunk（合成 import、副作用 import 与
+    // export-from）。求值保留阶段据此判定是否还需要补一条副作用 import。
+    let mut referenced_chunks: BTreeSet<usize> = BTreeSet::new();
     let mut deferred: Vec<DeferredExport> = Vec::new();
     // 导出事实去重：同 chunk 重导出链的落点与落点模块自身的 Local/Default
     // 事实是同一 chunk 绑定的同一导出名（`X as X` 即典型），跨 chunk 同形态
@@ -525,6 +528,7 @@ pub(crate) fn assemble_chunk(
                                 });
                             }
                             Some(ReexportBinding::External { chunk, name }) => {
+                                referenced_chunks.insert(chunk);
                                 if emitted_reexports.insert((chunk, name.clone(), exported.clone())) {
                                     let clause = if name == *exported {
                                         name
@@ -552,6 +556,7 @@ pub(crate) fn assemble_chunk(
                         json_string(&placeholder(target_chunk))
                     ));
                     export_names.push((exported.clone(), module_path.clone()));
+                    referenced_chunks.insert(target_chunk);
                 }
                 ExportFact::ReexportAll { source, .. } => {
                     if !used_reexport(linked, export_index, is_all) {
@@ -618,6 +623,7 @@ pub(crate) fn assemble_chunk(
                                             json_string(&placeholder(chunk))
                                         ));
                                         export_names.push((exported, module_path.clone()));
+                                        referenced_chunks.insert(chunk);
                                     }
                                 }
                                 None => {}
@@ -629,6 +635,7 @@ pub(crate) fn assemble_chunk(
                         "export * from {};\n",
                         json_string(&placeholder(target_chunk))
                     ));
+                    referenced_chunks.insert(target_chunk);
                     // (c) 收集目标模块直接非类型导出名（不递归星号链）。
                     collect_direct_exports(context, target, &mut export_names);
                 }
@@ -671,6 +678,7 @@ pub(crate) fn assemble_chunk(
                         json_string(&placeholder(target_chunk))
                     ));
                     export_names.push((namespace.clone(), module_path.clone()));
+                    referenced_chunks.insert(target_chunk);
                 }
             }
         }
@@ -824,9 +832,10 @@ pub(crate) fn assemble_chunk(
                         } else {
                             (target_chunk, None)
                         };
-                        let bindings = merged.entry(synth_chunk).or_default();
                         // 未被引用的绑定不合成：目标 chunk 可能已剪除该声明，
-                        // 合成会产出引用不存在导出的错误 JS。
+                        // 合成会产出引用不存在导出的错误 JS。使用判定必须先于
+                        // `merged` 条目创建，否则空绑定会让「本 chunk 引用了目标
+                        // chunk」的判定失真。
                         if !binding_is_used(
                             record,
                             source,
@@ -837,6 +846,7 @@ pub(crate) fn assemble_chunk(
                         ) {
                             continue;
                         }
+                        let bindings = merged.entry(synth_chunk).or_default();
                         match &binding.imported {
                             ImportedName::Default => match external_name {
                                 // 事实链落点是其它 chunk 的具名导出（同 chunk
@@ -885,6 +895,39 @@ pub(crate) fn assemble_chunk(
                 }
                 ImportKind::Dynamic => unreachable!("动态导入已在上面 continue"),
             }
+        }
+    }
+
+    // 求值保留：链接层按可观察求值保留的静态边目标，如果它的 import /
+    // re-export 文本没有进入本 chunk（绑定未被使用、重导出未被消费、或目标
+    // 自身没有可拼接的活跃语句），必须补一条副作用 import。否则目标模块在
+    // 运行时不会被求值，减枝会丢掉它（以及它传递依赖）的可观察副作用。
+    // 目标模块可拼进别的位置或本身无副作用时都不补：求值不可观察的纯目标
+    // 由合成 import（导出被使用时）或整条边剪除处理。
+    referenced_chunks.extend(merged.keys().copied());
+    referenced_chunks.extend(side_effects.iter().copied());
+    for &node_index in &chunk.modules {
+        let Some(node) = context.graph.nodes.get(node_index) else { continue };
+        for edge in &node.static_edges {
+            let Ok(id) = edge.target.as_ref() else { continue };
+            let Some(target) = context.graph.index_of(id) else { continue };
+            if context.graph.nodes[target].kind != NodeKind::Js {
+                continue;
+            }
+            if !context.retained.get(target).copied().unwrap_or(false) {
+                continue;
+            }
+            if !context.effectful.get(target).copied().unwrap_or(true) {
+                continue;
+            }
+            let Some(target_chunk) = context.node_chunk.get(target).copied().flatten() else {
+                continue;
+            };
+            if target_chunk == chunk_index || referenced_chunks.contains(&target_chunk) {
+                continue;
+            }
+            side_effects.insert(target_chunk);
+            referenced_chunks.insert(target_chunk);
         }
     }
 
