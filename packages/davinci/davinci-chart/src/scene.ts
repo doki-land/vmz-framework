@@ -4,17 +4,19 @@
 // in [0, 1], band uses one step per category). This module is the only place
 // that turns those ranges into pixels, so `compile` never guesses a viewport.
 // It emits mark geometry plus axis baselines, tick labels and a minimal legend
-// — no theme, motion or interaction state.
+// — no motion or interaction state. Presentation colors and fonts come from a
+// `ChartTheme` resolved here, never chosen by the renderer.
 //
 // Node identity comes from the plan's stable row `key` (bar / point) or the
 // series value (line), never from the position of an item in a temporary
 // array. The plan is also the only source of the series grouping domain.
 
-import { rgb8, type FontSpec, type PathCommand, type RGBA } from "@doki-land/davinci-types";
+import type { PathCommand, RGBA } from "@doki-land/davinci-types";
 import { estimateTextSize, type SemanticNode, type SemanticScene } from "@doki-land/davinci-scene";
 import type { ChartCompilePlan } from "./compile.js";
 import { column, type DataColumn } from "./data.js";
-import { apply, bandwidth, type Scale } from "./scale.js";
+import { apply, bandwidth, formatTickLabel, niceLinearTicks, type Scale } from "./scale.js";
+import { DEFAULT_CHART_THEME, type ChartTheme } from "./theme.js";
 
 /** Plot padding in logical pixels. */
 export interface ScenePadding {
@@ -49,50 +51,45 @@ interface PositionedMark {
 }
 
 const DEFAULT_PADDING = 16;
-// Base fill for ungrouped marks (no color/series encoding). Grouped marks use
-// LEGEND_PALETTE via `seriesColor` so each series is visually distinct.
-const MARK_FILL: RGBA = rgb8(51, 51, 51);
 const LINE_STROKE_WIDTH = 2;
 const POINT_RADIUS = 5;
 const BAR_RATIO = 0.72;
 
-// Guides (baselines, ticks, labels, legend) share one muted palette so the
-// marks stay visually dominant.
-const AXIS_STROKE = { color: rgb8(160, 160, 160), width: 1 };
-const LABEL_COLOR: RGBA = rgb8(85, 85, 85);
-const LABEL_FONT: FontSpec = { family: "sans-serif", sizePx: 11 };
-const LEGEND_FONT: FontSpec = { family: "sans-serif", sizePx: 11 };
 const TICK_LENGTH = 4;
 const LABEL_GAP = 6;
 const LEGEND_SWATCH = 10;
 const LEGEND_SWATCH_GAP = 6;
 const LEGEND_EDGE_GAP = 6;
 const LEGEND_ITEM_STEP = 18;
-const MAX_TICK_DECIMALS = 6;
-const MAX_TICKS = 12;
-const LEGEND_PALETTE: ReadonlyArray<RGBA> = [
-    rgb8(31, 119, 180),
-    rgb8(255, 127, 14),
-    rgb8(44, 160, 44),
-    rgb8(214, 39, 40),
-    rgb8(148, 103, 189),
-    rgb8(140, 86, 75),
-];
 
-/** Given a series label, return its LEGEND_PALETTE index (stable across callers). */
+/** Options for the scene build. */
+export interface ChartSceneOptions {
+    /** Presentation tokens; defaults to `DEFAULT_CHART_THEME`. */
+    readonly theme?: ChartTheme;
+}
+
+/** Given a series label, return its palette index (stable across callers). */
 function seriesPaletteIndex(categories: ReadonlyArray<string>, series: string): number {
     const idx = categories.indexOf(series);
     return idx < 0 ? 0 : idx;
 }
 
-/** Given a series label, return its palette color. Falls back to MARK_FILL when ungrouped. */
-function seriesColor(categories: ReadonlyArray<string> | undefined, series: string | null): RGBA {
-    if (!categories || categories.length === 0 || series === null) return MARK_FILL;
-    return LEGEND_PALETTE[seriesPaletteIndex(categories, series) % LEGEND_PALETTE.length];
+/** Given a series label, return its theme palette color. Falls back to
+ *  `theme.markFill` when the chart is ungrouped. */
+function seriesColor(theme: ChartTheme, categories: ReadonlyArray<string> | undefined, series: string | null): RGBA {
+    if (!categories || categories.length === 0 || series === null) return theme.markFill;
+    const palette = theme.seriesPalette;
+    if (palette.length === 0) return theme.markFill;
+    return palette[seriesPaletteIndex(categories, series) % palette.length];
+}
+
+function axisStroke(theme: ChartTheme): { color: RGBA; width: number } {
+    return { color: theme.axisStroke, width: theme.axisStrokeWidth };
 }
 
 /** Build a SemanticScene from a ChartCompilePlan and a pixel viewport. */
-export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): SemanticScene {
+export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, options?: ChartSceneOptions): SemanticScene {
+    const theme = options?.theme ?? DEFAULT_CHART_THEME;
     const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
     const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
     const seriesCategories = plan.series.field !== null ? plan.series.categories : undefined;
@@ -100,7 +97,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
     // Compute adaptive plot padding so axis labels and tick marks do not get
     // clipped. Defaults are only a floor — Y-axis label width and X-axis
     // label height expand left and bottom padding as needed.
-    const padding = adaptivePadding(viewport, plan, xEnc, yEnc);
+    const padding = adaptivePadding(viewport, plan, xEnc, yEnc, theme);
     const plot = plotRect(viewport, padding);
     const children: SemanticNode[] = [];
 
@@ -112,10 +109,10 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport): Sem
 
         if (xScale && yScale && xCol && yCol) {
             const rows = positionedRows(plan, xScale, yScale, xCol, yCol);
-            children.push(buildAxis("x-axis", plot, xScale, "horizontal"));
-            children.push(buildAxis("y-axis", plot, yScale, "vertical"));
-            children.push(...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories));
-            children.push(...buildLegend(plan, plot));
+            children.push(buildAxis("x-axis", plot, xScale, "horizontal", theme));
+            children.push(buildAxis("y-axis", plot, yScale, "vertical", theme));
+            children.push(...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories, theme));
+            children.push(...buildLegend(plan, plot, theme));
         }
     }
 
@@ -135,6 +132,7 @@ function adaptivePadding(
     plan: ChartCompilePlan,
     xEnc: { field: string; channel: string } | undefined,
     yEnc: { field: string; channel: string } | undefined,
+    theme: ChartTheme,
 ): ScenePadding {
     const userOverride = viewport.padding;
     const base =
@@ -157,7 +155,7 @@ function adaptivePadding(
     if (yScale) {
         const ticks = axisTickLabels(yScale);
         const maxWidth = ticks.reduce(
-            (acc, label) => Math.max(acc, estimateTextSize(label, LABEL_FONT.sizePx).width),
+            (acc, label) => Math.max(acc, estimateTextSize(label, theme.labelFont.sizePx).width),
             0,
         );
         const needed = TICK_LENGTH + LABEL_GAP + maxWidth + 2; // +2 safety
@@ -168,7 +166,7 @@ function adaptivePadding(
     if (xScale) {
         const ticks = axisTickLabels(xScale);
         const maxHeight = ticks.reduce(
-            (acc, label) => Math.max(acc, estimateTextSize(label, LABEL_FONT.sizePx).height),
+            (acc, label) => Math.max(acc, estimateTextSize(label, theme.labelFont.sizePx).height),
             0,
         );
         const needed = TICK_LENGTH + LABEL_GAP + maxHeight + 2;
@@ -201,16 +199,17 @@ function buildMarks(
     xScale: Scale,
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
 ): SemanticNode[] {
     switch (plan.spec.mark) {
         case "bar":
         case "rect":
-            return buildBars(plan, rows, plot, xScale, yScale, seriesCategories);
+            return buildBars(plan, rows, plot, xScale, yScale, seriesCategories, theme);
         case "line":
-            return buildLines(rows, seriesCategories);
+            return buildLines(rows, seriesCategories, theme);
         case "point":
         case "circle":
-            return buildPoints(plan, rows, seriesCategories);
+            return buildPoints(plan, rows, seriesCategories, theme);
         default:
             return [];
     }
@@ -223,6 +222,7 @@ function buildBars(
     xScale: Scale,
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
 ): SemanticNode[] {
     const bandWidth = xScale.kind === "band" ? bandwidth(xScale) : 0;
     const step = bandWidth > 0 ? bandWidth : plot.w / Math.max(1, rows.length);
@@ -238,7 +238,7 @@ function buildBars(
         y: Math.min(row.y, baseline),
         w,
         h: Math.abs(baseline - row.y),
-        fill: { color: seriesColor(seriesCategories, row.series) },
+        fill: { color: seriesColor(theme, seriesCategories, row.series) },
     }));
 }
 
@@ -255,6 +255,7 @@ function zeroBaseline(yScale: Scale, plot: PlotRect): number {
 function buildLines(
     rows: ReadonlyArray<PositionedMark>,
     seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
 ): SemanticNode[] {
     const series = new Map<string, PositionedMark[]>();
     for (const row of rows) {
@@ -277,7 +278,7 @@ function buildLines(
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
-            stroke: { color: seriesColor(seriesCategories, name), width: LINE_STROKE_WIDTH },
+            stroke: { color: seriesColor(theme, seriesCategories, name), width: LINE_STROKE_WIDTH },
         });
     }
     return nodes;
@@ -287,6 +288,7 @@ function buildPoints(
     plan: ChartCompilePlan,
     rows: ReadonlyArray<PositionedMark>,
     seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
 ): SemanticNode[] {
     return rows.map((row) => ({
         kind: "ellipse" as const,
@@ -297,7 +299,7 @@ function buildPoints(
         cy: row.y,
         rx: POINT_RADIUS,
         ry: POINT_RADIUS,
-        fill: { color: seriesColor(seriesCategories, row.series) },
+        fill: { color: seriesColor(theme, seriesCategories, row.series) },
     }));
 }
 
@@ -314,30 +316,40 @@ function buildAxis(
     plot: PlotRect,
     scale: Scale,
     orientation: "horizontal" | "vertical",
+    theme: ChartTheme,
 ): SemanticNode {
     const ticks = axisTicks(scale);
-    const nodes: SemanticNode[] = [axisBaseline(id, plot, orientation)];
+    const nodes: SemanticNode[] = [axisBaseline(id, plot, orientation, theme)];
 
     if (orientation === "horizontal") {
         const baseline = plot.y + plot.h;
         ticks.forEach((tick, i) => {
-            nodes.push(shortLine(`${id}:tick:${i}`, tick.position, baseline, tick.position, baseline + TICK_LENGTH));
-            const height = estimateTextSize(tick.label, LABEL_FONT.sizePx).height;
-            nodes.push(labelNode(`${id}:label:${i}`, tick.label, tick.position, baseline + TICK_LENGTH + height / 2));
+            nodes.push(
+                shortLine(`${id}:tick:${i}`, tick.position, baseline, tick.position, baseline + TICK_LENGTH, theme),
+            );
+            const height = estimateTextSize(tick.label, theme.labelFont.sizePx).height;
+            nodes.push(
+                labelNode(`${id}:label:${i}`, tick.label, tick.position, baseline + TICK_LENGTH + height / 2, theme),
+            );
         });
     } else {
         ticks.forEach((tick, i) => {
-            nodes.push(shortLine(`${id}:tick:${i}`, plot.x - TICK_LENGTH, tick.position, plot.x, tick.position));
-            const width = estimateTextSize(tick.label, LABEL_FONT.sizePx).width;
+            nodes.push(shortLine(`${id}:tick:${i}`, plot.x - TICK_LENGTH, tick.position, plot.x, tick.position, theme));
+            const width = estimateTextSize(tick.label, theme.labelFont.sizePx).width;
             const x = Math.max(width / 2 + 1, plot.x - TICK_LENGTH - LABEL_GAP - width / 2);
-            nodes.push(labelNode(`${id}:label:${i}`, tick.label, x, tick.position));
+            nodes.push(labelNode(`${id}:label:${i}`, tick.label, x, tick.position, theme));
         });
     }
 
     return { kind: "group", id, role: "chart.axis", children: nodes };
 }
 
-function axisBaseline(id: string, plot: PlotRect, orientation: "horizontal" | "vertical"): SemanticNode {
+function axisBaseline(
+    id: string,
+    plot: PlotRect,
+    orientation: "horizontal" | "vertical",
+    theme: ChartTheme,
+): SemanticNode {
     const baseline = plot.y + plot.h;
     const commands: PathCommand[] =
         orientation === "horizontal"
@@ -354,11 +366,18 @@ function axisBaseline(id: string, plot: PlotRect, orientation: "horizontal" | "v
         id: `${id}:baseline`,
         role: "chart.axis",
         path: { commands },
-        stroke: AXIS_STROKE,
+        stroke: axisStroke(theme),
     };
 }
 
-function shortLine(id: string, x1: number, y1: number, x2: number, y2: number): SemanticNode {
+function shortLine(
+    id: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    theme: ChartTheme,
+): SemanticNode {
     return {
         kind: "path",
         id,
@@ -369,12 +388,20 @@ function shortLine(id: string, x1: number, y1: number, x2: number, y2: number): 
                 { kind: "line", to: { x: x2, y: y2 } },
             ],
         },
-        stroke: AXIS_STROKE,
+        stroke: axisStroke(theme),
     };
 }
 
-function labelNode(id: string, text: string, x: number, y: number): SemanticNode {
-    return { kind: "text", id, role: "chart.axis", text, font: LABEL_FONT, anchor: { x, y }, color: LABEL_COLOR };
+function labelNode(id: string, text: string, x: number, y: number, theme: ChartTheme): SemanticNode {
+    return {
+        kind: "text",
+        id,
+        role: "chart.axis",
+        text,
+        font: theme.labelFont,
+        anchor: { x, y },
+        color: theme.labelColor,
+    };
 }
 
 /** Ticks derived from the scale domain — never from a hardcoded list. */
@@ -389,13 +416,13 @@ function axisTicks(scale: Scale): AxisTick[] {
             const [lo, hi] = scale.domain;
             const values = lo > 0 && hi > 0 ? [lo, Math.sqrt(lo * hi), hi] : [lo, hi];
             return values
-                .map((value) => ({ label: formatTick(value, 2), position: project(scale, value) }))
+                .map((value) => ({ label: formatTickLabel(value, 2), position: project(scale, value) }))
                 .filter((tick) => Number.isFinite(tick.position));
         }
         case "linear": {
-            const { values, decimals } = niceTicks(scale.domain);
+            const { values, decimals } = niceLinearTicks(scale.domain);
             return values
-                .map((value) => ({ label: formatTick(value, decimals), position: project(scale, value) }))
+                .map((value) => ({ label: formatTickLabel(value, decimals), position: project(scale, value) }))
                 .filter((tick) => Number.isFinite(tick.position));
         }
         default:
@@ -408,61 +435,13 @@ function axisTickLabels(scale: Scale): string[] {
     return axisTicks(scale).map((t) => t.label);
 }
 
-/** 4–6 evenly spaced "nice" values covering the domain (single value when flat). */
-function niceTicks(domain: [number, number]): { values: number[]; decimals: number } {
-    let [lo, hi] = domain;
-    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { values: [], decimals: 0 };
-    if (lo > hi) [lo, hi] = [hi, lo];
-    if (lo === hi) {
-        const single = normalizeNumber(lo);
-        return { values: [single], decimals: decimalsForStep(Math.abs(single) || 1) };
-    }
-
-    const rawStep = (hi - lo) / 4;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-    const normalized = rawStep / magnitude;
-    const step = (normalized <= 1 ? 1 : normalized <= 2.5 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
-    const decimals = decimalsForStep(step);
-
-    const first = Math.ceil(lo / step - 1e-9);
-    const last = Math.floor(hi / step + 1e-9);
-    const values: number[] = [];
-    for (let i = first; i <= last && values.length < MAX_TICKS; i++) {
-        values.push(normalizeNumber(i * step));
-    }
-    if (values.length === 0) values.push(normalizeNumber((lo + hi) / 2));
-    return { values, decimals };
-}
-
-function decimalsForStep(step: number): number {
-    if (!(step > 0) || !Number.isFinite(step)) return 0;
-    let decimals = 0;
-    while (decimals < MAX_TICK_DECIMALS && Math.abs(Number(step.toFixed(decimals)) - step) > step * 1e-6) {
-        decimals += 1;
-    }
-    return decimals;
-}
-
-function formatTick(value: number, decimals: number): string {
-    if (!Number.isFinite(value)) return "";
-    const places = Math.min(Math.max(decimals, 0), MAX_TICK_DECIMALS);
-    let text = value.toFixed(places);
-    if (text.includes(".")) text = text.replace(/0+$/, "").replace(/\.$/, "");
-    return text === "-0" ? "0" : text;
-}
-
-/** Kill floating point tails such as 0.30000000000000004. */
-function normalizeNumber(value: number): number {
-    return Number(value.toPrecision(12));
-}
-
 /** Color swatches live in the plot's upper-right corner, clear of the ticks. */
-function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
+function buildLegend(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme): SemanticNode[] {
     if (plan.series.field === null) return [];
     const categories = plan.series.categories;
     if (categories.length === 0) return [];
 
-    const size = LEGEND_FONT.sizePx;
+    const size = theme.legendFont.sizePx;
     const widths = categories.map((category) => estimateTextSize(category, size).width);
     const blockWidth = LEGEND_SWATCH + LEGEND_SWATCH_GAP + Math.max(...widths);
     const right = plot.x + plot.w - LEGEND_EDGE_GAP;
@@ -473,7 +452,7 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
     categories.slice(0, capacity).forEach((category, i) => {
         // Use the same palette index as `seriesColor` so legend swatches match
         // mark colors one-for-one.
-        const color = LEGEND_PALETTE[seriesPaletteIndex(categories, category) % LEGEND_PALETTE.length];
+        const color = seriesColor(theme, categories, category);
         const top = plot.y + LEGEND_EDGE_GAP + i * LEGEND_ITEM_STEP;
         items.push({
             kind: "rect",
@@ -492,9 +471,9 @@ function buildLegend(plan: ChartCompilePlan, plot: PlotRect): SemanticNode[] {
             id: `legend:label:${i}`,
             role: "chart.legend",
             text: category,
-            font: LEGEND_FONT,
+            font: theme.legendFont,
             anchor: { x: left + LEGEND_SWATCH + LEGEND_SWATCH_GAP + widths[i] / 2, y: top + LEGEND_ITEM_STEP / 2 },
-            color: LABEL_COLOR,
+            color: theme.labelColor,
         });
     });
 

@@ -24,11 +24,23 @@
  *   duplicate keys are reported (`davinci.chart.duplicate-key`) and stay
  *   unique, an unknown `keyField` is an error, and the plan — not the scene —
  *   owns the series grouping domain
+ * - `ChartTheme` tokens resolve every presentation color and font — the default
+ *   palette and neutrals serialize as hex, a custom theme replaces them
+ *   everywhere with no leftover hardcoded color, legend swatches share the
+ *   series mark color, and nice ticks stay domain-derived
  * - diagram spec → layout → builder → DisplayScene → SVG carries nodes, edges,
  *   labels, and ids that survive a spec update
  */
 
-import { buildScene, compile, fromRows } from '../../../../../davinci/davinci-chart/src/index.ts';
+import {
+    DEFAULT_CHART_THEME,
+    buildScene,
+    compile,
+    formatTickLabel,
+    fromRows,
+    niceLinearTicks,
+} from '../../../../../davinci/davinci-chart/src/index.ts';
+import { rgb8 } from '../../../../../davinci/davinci-types/src/index.ts';
 import { renderSvg, resolve } from '../../../../../davinci/davinci-scene/src/index.ts';
 import {
     buildScene as buildDiagramScene,
@@ -622,6 +634,74 @@ console.log('charts-render: the plan owns the series grouping domain…');
         fail('unkeyed charts must carry an empty grouping domain');
     }
     if (ungrouped.marks.some((m) => m.series !== null)) fail('ungrouped marks must have series null');
+}
+
+console.log('charts-render: theme tokens drive every presentation color…');
+{
+    const colorSpec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'category', channel: 'x' },
+            { field: 'value', channel: 'y' },
+            { field: 'region', channel: 'color' },
+        ],
+    };
+    const colorRows = [
+        { category: 'alpha', value: 3, region: 'A' },
+        { category: 'beta', value: 7, region: 'B' },
+    ];
+
+    // Default theme: the reference palette and neutrals serialize as hex.
+    const def = pipeline(colorSpec, colorRows);
+    if (!def.svg.includes('fill="#1f77b4"')) fail(`default palette first color want #1f77b4: ${def.svg.slice(0, 400)}`);
+    if (!def.svg.includes('fill="#ff7f0e"')) fail('default palette second color want #ff7f0e');
+    if (!def.svg.includes('stroke="#a0a0a0"')) fail('default axis stroke want #a0a0a0');
+    if (!def.svg.includes('fill="#555555"')) fail('default label color want #555555');
+
+    // A legend swatch and its marks resolve the same palette index.
+    const legend = guideGroups(def.semantic, 'chart.legend')[0];
+    const swatchA = legend.children.find((n) => n.kind === 'rect');
+    const barA = def.semantic.root.children.find((n) => n.kind === 'rect' && n.id === 'bar:0');
+    if (!swatchA || !barA) fail('grouped chart needs both a legend swatch and a bar');
+    if (JSON.stringify(swatchA.fill.color) !== JSON.stringify(barA.fill.color)) {
+        fail('legend swatch must match the series mark color');
+    }
+
+    // Custom theme: every token is honored, nothing of the default survives.
+    const custom = {
+        ...DEFAULT_CHART_THEME,
+        seriesPalette: [rgb8(255, 0, 0)],
+        markFill: rgb8(0, 0, 0),
+        axisStroke: rgb8(10, 20, 30),
+        labelColor: rgb8(1, 2, 3),
+    };
+    const themed = buildScene(compile(colorSpec, fromRows(colorRows)), { width: WIDTH, height: HEIGHT }, { theme: custom });
+    const themedSvg = renderSvg(resolve(themed, { width: WIDTH, height: HEIGHT }));
+    if (!themedSvg.includes('fill="#ff0000"')) fail(`custom palette want #ff0000: ${themedSvg.slice(0, 400)}`);
+    if (!themedSvg.includes('stroke="#0a141e"')) fail('custom axis stroke want #0a141e');
+    if (!themedSvg.includes('fill="#010203"')) fail('custom label color want #010203');
+    if (themedSvg.includes('#1f77b4') || themedSvg.includes('#a0a0a0') || themedSvg.includes('#555555')) {
+        fail('custom theme must not leak a default color');
+    }
+
+    // Ungrouped marks fall back to `markFill`, never the categorical palette.
+    const plainPlan = compile(barSpec, fromRows(barRows));
+    const plainSvg = renderSvg(
+        resolve(buildScene(plainPlan, { width: WIDTH, height: HEIGHT }, { theme: custom }), { width: WIDTH, height: HEIGHT }),
+    );
+    if (!plainSvg.includes('fill="#000000"')) fail(`ungrouped bars want markFill #000000: ${plainSvg.slice(0, 400)}`);
+}
+
+console.log('charts-render: nice ticks stay domain-derived…');
+{
+    const { values, decimals } = niceLinearTicks([0, 7]);
+    if (values.join(',') !== '0,2,4,6') fail(`niceLinearTicks([0,7]) want 0,2,4,6, got ${values.join(',')}`);
+    if (decimals !== 0) fail(`[0, 7] decimals want 0, got ${decimals}`);
+    const flat = niceLinearTicks([3, 3]);
+    if (flat.values.join(',') !== '3') fail(`flat domain wants a single tick, got ${flat.values.join(',')}`);
+    if (formatTickLabel(2.5, 1) !== '2.5') fail('tick label must keep the needed decimal');
+    if (formatTickLabel(4, 2) !== '4') fail('tick label must drop trailing zeros');
+    if (formatTickLabel(-0, 0) !== '0') fail('tick label must never print -0');
 }
 
 // ─── Diagram: topology → layout → DisplayScene → SVG ─────────────────────

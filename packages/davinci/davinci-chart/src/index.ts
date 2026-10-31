@@ -6,3 +6,4 @@ export * from "./scale.js";
 export * from "./statistic.js";
 export * from "./compile.js";
 export * from "./scene.js";
+export * from "./theme.js";

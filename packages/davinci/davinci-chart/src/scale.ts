@@ -114,3 +114,60 @@ export function bandwidth(s: Scale): number {
     const step = (r1 - r0) / s.domain.length;
     return step * (1 - padding * 2);
 }
+
+// ─── Tick generation (scale concern: domain values → tick values) ────────
+
+const MAX_TICKS = 12;
+const MAX_TICK_DECIMALS = 6;
+
+/** 4–6 evenly spaced "nice" values covering the domain (single value when
+ *  flat). Tick placement is derived from the domain, never from a hardcoded
+ *  list, so axes stay honest when data changes. */
+export function niceLinearTicks(domain: [number, number]): { values: number[]; decimals: number } {
+    let [lo, hi] = domain;
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { values: [], decimals: 0 };
+    if (lo > hi) [lo, hi] = [hi, lo];
+    if (lo === hi) {
+        const single = normalizeTickNumber(lo);
+        return { values: [single], decimals: decimalsForStep(Math.abs(single) || 1) };
+    }
+
+    const rawStep = (hi - lo) / 4;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const normalized = rawStep / magnitude;
+    const step = (normalized <= 1 ? 1 : normalized <= 2.5 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+    const decimals = decimalsForStep(step);
+
+    const first = Math.ceil(lo / step - 1e-9);
+    const last = Math.floor(hi / step + 1e-9);
+    const values: number[] = [];
+    for (let i = first; i <= last && values.length < MAX_TICKS; i++) {
+        values.push(normalizeTickNumber(i * step));
+    }
+    if (values.length === 0) values.push(normalizeTickNumber((lo + hi) / 2));
+    return { values, decimals };
+}
+
+/** Minimal-decimal label for a tick value — trailing zeros dropped, never
+ *  `-0`, never a floating point tail. */
+export function formatTickLabel(value: number, decimals: number): string {
+    if (!Number.isFinite(value)) return "";
+    const places = Math.min(Math.max(decimals, 0), MAX_TICK_DECIMALS);
+    let text = value.toFixed(places);
+    if (text.includes(".")) text = text.replace(/0+$/, "").replace(/\.$/, "");
+    return text === "-0" ? "0" : text;
+}
+
+function decimalsForStep(step: number): number {
+    if (!(step > 0) || !Number.isFinite(step)) return 0;
+    let decimals = 0;
+    while (decimals < MAX_TICK_DECIMALS && Math.abs(Number(step.toFixed(decimals)) - step) > step * 1e-6) {
+        decimals += 1;
+    }
+    return decimals;
+}
+
+/** Kill floating point tails such as 0.30000000000000004. */
+function normalizeTickNumber(value: number): number {
+    return Number(value.toPrecision(12));
+}
