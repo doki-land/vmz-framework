@@ -42,6 +42,11 @@
 //!   本 chunk 自身产物文件的引用：命名空间是真实 Module Namespace，名字集
 //!   按 chunk 粒度加宽，发非致命诊断（`namespace_widened`、
 //!   `dynamic_same_chunk_widened`），与跨 chunk 加宽合同同构。
+//! - opaque 模块（scope 事实不完整，见 `isolated` 模块文档）不走平铺切片：
+//!   chunk 层已划为 singleton，本层按整文件发射真 ESM，说明符原地重写，
+//!   剪枝只到模块级，发非致命诊断 `vmz::pack::emit::module_isolated`
+//!   携带精确原因清单，chunk id `isolated/…` 前缀即 manifest 标注
+//!   （Living §同 chunk 作用域隔离：隔离即独立发射）。
 //!
 //! [`plan_emit`] 是纯计算（只按 [`crate::graph::ModuleNode::resolved`] 路径
 //! 重读模块源码与资源字节，IO 姿态与 `graph` 层一致）；[`write_emit`]
@@ -51,6 +56,7 @@
 //! 拒绝。
 
 mod assemble;
+mod isolated;
 mod manifest;
 mod style;
 mod write;
@@ -61,7 +67,7 @@ use std::path::{Component, Path, PathBuf};
 use crate::chunk::ChunkPlan;
 use crate::diag::PackDiagnostic;
 use crate::graph::ModuleGraph;
-use crate::link::{effectful_modules, LinkPlan, LinkedModule};
+use crate::link::{LinkPlan, LinkedModule, effectful_modules};
 
 pub use write::write_emit;
 
@@ -381,13 +387,22 @@ fn collect_assets(
             }
             let Some(Some(module_link)) = linked.get(node) else { continue };
             let module_path = normalize_path(&module_node.resolved.path);
+            // 独立发射的 opaque 模块按整文件存活：文件内不删语句，
+            // 资产判定同样按全部语句而非链接切片。
+            let whole_file = chunk.modules.len() == 1 && module_node.record.is_scope_incomplete();
             for asset in &module_node.record.assets {
                 // 资产只随活跃语句存活：span 被某条活跃顶层语句包含。
-                let live = module_link.active_statements.iter().any(|&index| {
-                    module_node.record.statements.get(index).is_some_and(|statement| {
+                let live = if whole_file {
+                    module_node.record.statements.iter().any(|statement| {
                         statement.span.0 <= asset.span.0 && asset.span.1 <= statement.span.1
                     })
-                });
+                } else {
+                    module_link.active_statements.iter().any(|&index| {
+                        module_node.record.statements.get(index).is_some_and(|statement| {
+                            statement.span.0 <= asset.span.0 && asset.span.1 <= statement.span.1
+                        })
+                    })
+                };
                 if !live {
                     continue;
                 }

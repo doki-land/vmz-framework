@@ -104,6 +104,13 @@ pub(crate) fn assemble_chunk(
     let chunk = &context.chunks.chunks[chunk_index];
     let errors_before = errors.len();
 
+    // opaque 模块（scope 事实不完整）：chunk 层已强制 singleton 分区，
+    // 平铺拼接前提不成立，改走整文件独立发射真 ESM（Living §同 chunk
+    // 作用域隔离：隔离即独立发射）。
+    if super::isolated::is_isolated_chunk(context, chunk_index) {
+        return super::isolated::assemble_isolated(context, chunk_index, errors, warnings);
+    }
+
     let mut body = String::new();
     let mut segments: Vec<ChunkSegment> = Vec::new();
     let mut body_line: u32 = 0;
@@ -401,9 +408,11 @@ pub(crate) fn assemble_chunk(
                     }
                     if replacements.contains_key(span) {
                         errors.push(
-                            inconsistent(format!("绑定重写 span {span:?} 与切片内既有替换区间冲突"))
-                                .with_path(module_path.clone())
-                                .with_span(statement.span),
+                            inconsistent(format!(
+                                "绑定重写 span {span:?} 与切片内既有替换区间冲突"
+                            ))
+                            .with_path(module_path.clone())
+                            .with_span(statement.span),
                         );
                         continue;
                     }
@@ -529,7 +538,8 @@ pub(crate) fn assemble_chunk(
                             }
                             Some(ReexportBinding::External { chunk, name }) => {
                                 referenced_chunks.insert(chunk);
-                                if emitted_reexports.insert((chunk, name.clone(), exported.clone())) {
+                                if emitted_reexports.insert((chunk, name.clone(), exported.clone()))
+                                {
                                     let clause = if name == *exported {
                                         name
                                     } else {
@@ -610,9 +620,11 @@ pub(crate) fn assemble_chunk(
                                     });
                                 }
                                 Some(ReexportBinding::External { chunk, name }) => {
-                                    if emitted_reexports
-                                        .insert((chunk, name.clone(), exported.clone()))
-                                    {
+                                    if emitted_reexports.insert((
+                                        chunk,
+                                        name.clone(),
+                                        exported.clone(),
+                                    )) {
                                         let clause = if name == exported {
                                             name
                                         } else {
@@ -1057,8 +1069,7 @@ fn contains_identifier(haystack: &str, needle: &str) -> bool {
     }
     let bytes = haystack.as_bytes();
     let pattern = needle.as_bytes();
-    let is_ident_byte =
-        |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b >= 0x80;
+    let is_ident_byte = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b >= 0x80;
     let mut from = 0usize;
     while from < bytes.len() {
         let Some(offset) = bytes[from..].windows(pattern.len()).position(|w| w == pattern) else {
@@ -1164,7 +1175,9 @@ fn plan_binding_rewrite(
     let mut spans: Vec<(usize, usize)> = Vec::with_capacity(binding.references.len());
     for span in &binding.references {
         if source.get(span.0..span.1) != Some(old) {
-            return Err(format!("`{old}` 的引用 span {span:?} 切片回原文不是本名（源码与事实漂移）"));
+            return Err(format!(
+                "`{old}` 的引用 span {span:?} 切片回原文不是本名（源码与事实漂移）"
+            ));
         }
         let in_active = active_spans.iter().any(|outer| contains(*outer, *span));
         let in_stripped = stripped_spans.iter().any(|outer| contains(*outer, *span));
@@ -1337,8 +1350,10 @@ fn plan_same_chunk_bindings(
                     decisions.insert((import_index, binding_index), BindingDecision::Handled);
                 }
                 Some(ReexportBinding::External { chunk, name }) => {
-                    decisions
-                        .insert((import_index, binding_index), BindingDecision::External { chunk, name });
+                    decisions.insert(
+                        (import_index, binding_index),
+                        BindingDecision::External { chunk, name },
+                    );
                 }
                 None => {
                     // 具名同名（shorthand）：名字经拼接直接可达（星号来源不
@@ -1419,8 +1434,7 @@ fn plan_declaration_renames(
             continue;
         }
         for &node_index in nodes {
-            if let Some(rewrite) = try_plan_declaration_rename(context, node_index, name, &scans)
-            {
+            if let Some(rewrite) = try_plan_declaration_rename(context, node_index, name, &scans) {
                 plans.entry(node_index).or_default().insert(name.clone(), rewrite);
             }
         }
@@ -1503,7 +1517,7 @@ fn try_plan_declaration_rename(
 
 /// 替换文本偏移 → 切片原文偏移：落在替换新文本内取替换起点，
 /// 否则扣除此前替换的长度增量；结果夹到切片长度。
-fn map_replaced_offset(
+pub(crate) fn map_replaced_offset(
     replaced_off: usize,
     raw: &str,
     base: usize,
@@ -1698,9 +1712,8 @@ fn resolve_same_chunk_reexport(
     code: &str,
     errors: &mut Vec<PackDiagnostic>,
 ) -> Option<ReexportBinding> {
-    let unsupported = |message: String| {
-        PackDiagnostic::new(code, message).with_path(module_path.to_string())
-    };
+    let unsupported =
+        |message: String| PackDiagnostic::new(code, message).with_path(module_path.to_string());
     let mut visited: BTreeSet<usize> = BTreeSet::new();
     let mut node = target;
     let mut name = name.to_string();
@@ -1758,7 +1771,10 @@ fn resolve_same_chunk_reexport(
                         next = Some((step, local.clone()));
                         break;
                     }
-                    return Some(ReexportBinding::External { chunk: step_chunk, name: local.clone() });
+                    return Some(ReexportBinding::External {
+                        chunk: step_chunk,
+                        name: local.clone(),
+                    });
                 }
                 _ => {}
             }
@@ -1778,7 +1794,7 @@ fn resolve_same_chunk_reexport(
 
 /// 节点 → 所属 chunk 索引；未保留/未分包显式拒绝（调用方已保证保留的
 /// 静态导入路径不会走到拒绝分支）。
-fn chunk_of_node(
+pub(crate) fn chunk_of_node(
     context: &EmitContext<'_>,
     node: usize,
     module_path: &str,
@@ -1812,7 +1828,7 @@ fn chunk_of_node(
 /// 读取 JSON 值节点的原始文本：按 chunk 装配缓存，读失败显式拒绝
 /// （`vmz::pack::emit::read_failed`，与模块/样式重读同口径），失败缓存
 /// `None` 不重复报诊断。
-fn json_text(
+pub(crate) fn json_text(
     context: &EmitContext<'_>,
     node: usize,
     cache: &mut HashMap<usize, Option<String>>,
@@ -1860,8 +1876,7 @@ fn target_has_active_star(
     };
     let record = &context.graph.nodes[target].record;
     for (index, export) in record.exports.iter().enumerate() {
-        if matches!(export, ExportFact::ReexportAll { .. })
-            && used_reexport(linked, index, is_all)
+        if matches!(export, ExportFact::ReexportAll { .. }) && used_reexport(linked, index, is_all)
         {
             errors.push(
                 PackDiagnostic::new(

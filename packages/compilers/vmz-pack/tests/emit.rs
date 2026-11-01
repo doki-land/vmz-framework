@@ -958,10 +958,7 @@ fn hidden_rename_lands_on_declaration_name() {
         "hidden",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            (
-                "src/entry.js",
-                "import { shared } from './a.js';\nexport const main = shared;\n",
-            ),
+            ("src/entry.js", "import { shared } from './a.js';\nexport const main = shared;\n"),
             ("src/a.js", "let value;\nexport { value as shared };\n"),
         ],
     );
@@ -1040,10 +1037,7 @@ fn namespace_import_same_chunk_self_reference() {
     assert_eq!(plan.artifacts.len(), 1);
     let artifact = &plan.artifacts[0];
     let code = &artifact.code;
-    assert!(
-        code.contains(&format!("import * as ns from \"./{}\";", artifact.file_name)),
-        "{code}"
-    );
+    assert!(code.contains(&format!("import * as ns from \"./{}\";", artifact.file_name)), "{code}");
     assert!(code.contains("ns.value"), "{code}");
     assert!(code.contains("export { value }"), "{code}");
     assert!(
@@ -1061,7 +1055,10 @@ fn renamed_import_exported_via_deferred_local() {
         "deferred",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            ("src/entry.js", "import { util as helper } from './lib.js';\nexport { helper as api };\n"),
+            (
+                "src/entry.js",
+                "import { util as helper } from './lib.js';\nexport { helper as api };\n",
+            ),
             ("src/lib.js", "export const util = 1;\n"),
         ],
     );
@@ -1187,8 +1184,7 @@ fn shadowed_only_import_binding_is_pruned() {
 
     let two = plan.artifacts.iter().find(|a| a.chunk_id == "entry/two").unwrap();
     assert!(
-        two.code
-            .contains(&format!("import {{ shared }} from \"./{}\";", shared.file_name)),
+        two.code.contains(&format!("import {{ shared }} from \"./{}\";", shared.file_name)),
         "{}",
         two.code
     );
@@ -1361,10 +1357,7 @@ fn same_chunk_namespace_reexport_emits_self_reference() {
     let artifact = &plan.artifacts[0];
     let code = &artifact.code;
     // 自引用指向 chunk 自身最终文件名，不留占位符与原始说明符。
-    assert!(
-        code.contains(&format!("export * as ns from \"./{}\";", artifact.file_name)),
-        "{code}"
-    );
+    assert!(code.contains(&format!("export * as ns from \"./{}\";", artifact.file_name)), "{code}");
     assert!(!code.contains("__vmz_chunk_"), "{code}");
     assert!(!code.contains("./impl.js"), "{code}");
     // 命名空间经 chunk 导出面可达源模块导出。
@@ -1410,10 +1403,7 @@ fn same_chunk_dynamic_import_rewrites_to_self_chunk() {
     assert_eq!(plan.artifacts.len(), 1, "循环依赖收缩为同一 chunk");
     let artifact = &plan.artifacts[0];
     let code = &artifact.code;
-    assert!(
-        code.contains(&format!("import(\"./{}\")", artifact.file_name)),
-        "{code}"
-    );
+    assert!(code.contains(&format!("import(\"./{}\")", artifact.file_name)), "{code}");
     assert!(!code.contains("__vmz_chunk_"), "{code}");
     assert!(!code.contains("./lib.js"), "{code}");
     assert_eq!(artifact.dynamic, vec![artifact.file_name.clone()], "动态映射如实记录自引用");
@@ -1434,7 +1424,10 @@ fn same_chunk_reexport_same_name_emits_single_binding_export() {
         "reexportsame",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            ("src/entry.js", "import { helper } from './barrel.js';\nexport const main = helper;\n"),
+            (
+                "src/entry.js",
+                "import { helper } from './barrel.js';\nexport const main = helper;\n",
+            ),
             ("src/barrel.js", "export { helper as helper } from './lib.js';\n"),
             ("src/lib.js", "export function helper() { return 1 }\n"),
         ],
@@ -1518,9 +1511,7 @@ fn same_chunk_reexport_rename_exports_to_other_chunks() {
         let artifact =
             plan.artifacts.iter().find(|a| a.chunk_id == format!("entry/{logical}")).unwrap();
         assert!(
-            artifact
-                .code
-                .contains(&format!("import {{ alias }} from \"./{}\";", shared.file_name)),
+            artifact.code.contains(&format!("import {{ alias }} from \"./{}\";", shared.file_name)),
             "{}",
             artifact.code
         );
@@ -1535,10 +1526,7 @@ fn same_chunk_reexport_chain_leaving_chunk_emits_export_from() {
     let root = temp_tree(
         "reexportexternal",
         &[
-            (
-                "package.json",
-                r#"{"name":"app","version":"0.0.0"}"#,
-            ),
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             (
                 "src/entry.js",
                 "export { thing } from './barrel.js';\nexport const load = () => import('./impl.js');\n",
@@ -1569,7 +1557,10 @@ fn same_chunk_reexport_chain_leaving_chunk_emits_export_from() {
     let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/main").unwrap();
     // 链路落点 `value` 直接以 chunk 对外导出名 `thing` 发 export-from，恰好一条。
     assert_eq!(
-        entry.code.matches(&format!("export {{ value as thing }} from \"./{}\";", target.file_name)).count(),
+        entry
+            .code
+            .matches(&format!("export {{ value as thing }} from \"./{}\";", target.file_name))
+            .count(),
         1,
         "{}",
         entry.code
@@ -1621,7 +1612,10 @@ fn same_chunk_reexport_of_expression_default_is_rejected() {
         "reexportexprdefault",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            ("src/entry.js", "import { answer } from './barrel.js';\nexport const main = answer;\n"),
+            (
+                "src/entry.js",
+                "import { answer } from './barrel.js';\nexport const main = answer;\n",
+            ),
             ("src/barrel.js", "export { default as answer } from './lib.js';\n"),
             ("src/lib.js", "export default 42;\n"),
         ],
@@ -2219,15 +2213,12 @@ fn cross_chunk_evaluation_is_preserved_without_used_bindings() {
         "evalpreserve",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry-a.js", "import { unused } from './b.js';\nexport const a = 1;\n"),
+            ("src/entry-b.js", "import { used } from './b.js';\nexport const b = used;\n"),
             (
-                "src/entry-a.js",
-                "import { unused } from './b.js';\nexport const a = 1;\n",
+                "src/b.js",
+                "console.log('b-side');\nexport const used = 1;\nexport const unused = 2;\n",
             ),
-            (
-                "src/entry-b.js",
-                "import { used } from './b.js';\nexport const b = used;\n",
-            ),
-            ("src/b.js", "console.log('b-side');\nexport const used = 1;\nexport const unused = 2;\n"),
         ],
     );
     let graph = build_graph(
@@ -2330,4 +2321,188 @@ fn pure_target_without_symbol_use_does_not_join_shared_partition() {
     assert!(one.depends_on.is_empty(), "{:?}", one.depends_on);
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
     assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+}
+
+/// opaque 模块（direct eval）：chunk 层 singleton 分区，emit 层整文件
+/// 独立发射真 ESM——死语句不剪、export 原文保留、跨 chunk 说明符原地
+/// 重写、剪除目标的 import 整句删除、死语句里的资产仍按整文件存活搬迁。
+#[test]
+fn isolated_opaque_module_emits_whole_file() {
+    let root = temp_tree(
+        "isolated",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { alpha } from './opaque.js';\nimport { helper } from './lib.js';\nexport const run = alpha + helper;\n",
+            ),
+            ("src/lib.js", "export function helper() { return 2 }\n"),
+            ("src/ghost.js", "export const ghost = 3;\n"),
+            (
+                "src/opaque.js",
+                "import { helper } from './lib.js';\nimport { ghost } from './ghost.js';\neval('1');\nexport const alpha = helper();\nfunction dead() { return ghost + new URL('./logo.png', import.meta.url); }\n",
+            ),
+            ("src/logo.png", "PNGDATA"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(
+        chunks
+            .chunks
+            .iter()
+            .any(|chunk| chunk.id == "isolated/src/opaque.js" && chunk.modules.len() == 1),
+        "{:?}",
+        chunks.chunks.iter().map(|c| (&c.id, &c.modules)).collect::<Vec<_>>()
+    );
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let isolated = plan.artifacts.iter().find(|a| a.chunk_id == "isolated/src/opaque.js").unwrap();
+    assert!(isolated.file_name.starts_with("isolated-src-opaque.js-"), "{}", isolated.file_name);
+    let code = &isolated.code;
+    // 整文件发射：死语句与原生导出全部保留（剪枝只到模块级）。
+    assert!(code.contains("function dead"), "{code}");
+    assert!(code.contains("eval('1')"), "{code}");
+    assert!(code.contains("export const alpha"), "{code}");
+    // 跨 chunk 说明符原地重写为目标 chunk 的产物文件。
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/main").unwrap();
+    assert!(code.contains(&format!("from \"./{}\"", entry.file_name)), "{code}");
+    // 剪除目标：整条 import 语句删除。
+    assert!(!code.contains("ghost.js"), "{code}");
+    // 死语句里的资产仍按整文件存活重写。
+    assert!(code.contains("new URL(\"./assets/logo-"), "{code}");
+    assert_eq!(plan.assets.len(), 1);
+    // 消费者 chunk 合成指向 isolated 产物的跨 chunk import。
+    assert!(
+        entry.code.contains(&format!("import {{ alpha }} from \"./{}\"", isolated.file_name)),
+        "{}",
+        entry.code
+    );
+    // 隔离降级如实报告（诊断携带精确原因清单）。
+    let diagnostic = plan
+        .diagnostics
+        .iter()
+        .find(|item| item.code == "vmz::pack::emit::module_isolated")
+        .expect("module_isolated 诊断");
+    assert!(diagnostic.message.contains("direct-eval"), "{}", diagnostic.message);
+    // 整文件行级映射非空。
+    let map: serde_json::Value = serde_json::from_str(&isolated.source_map).unwrap();
+    assert!(!map["mappings"].as_str().unwrap().is_empty(), "{}", isolated.source_map);
+}
+
+/// isolated 模块内的 JSON/Style 目标：JSON default 整句替换为 `const`
+/// 内联（字节保真），CSS 导入语句删除且级联照常聚合为独立产物。
+#[test]
+fn isolated_module_synthesizes_json_and_aggregates_style() {
+    let root = temp_tree(
+        "isolatedjson",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { out } from './opaque.js';\nexport const run = out;\n"),
+            (
+                "src/opaque.js",
+                "import data from './conf.json';\nimport './theme.css';\neval('1');\nexport const out = data.x;\n",
+            ),
+            ("src/conf.json", "{\"x\": 1}"),
+            ("src/theme.css", "body { color: red }"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let isolated = plan.artifacts.iter().find(|a| a.chunk_id == "isolated/src/opaque.js").unwrap();
+    assert!(isolated.code.contains("const data = {\"x\": 1};"), "{}", isolated.code);
+    assert!(!isolated.code.contains("conf.json"), "{}", isolated.code);
+    assert!(!isolated.code.contains("theme.css"), "{}", isolated.code);
+    assert_eq!(plan.styles.len(), 1, "{:?}", plan.styles);
+    assert!(plan.styles[0].content.contains("color: red"), "{}", plan.styles[0].content);
+}
+
+/// 动态边界进入 isolated chunk：消费者的动态 import 说明符重写为
+/// isolated 产物文件，动态映射如实报告。
+#[test]
+fn dynamic_boundary_rewrites_to_isolated_chunk() {
+    let root = temp_tree(
+        "isolateddyn",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "export const load = () => import('./opaque.js');\n"),
+            ("src/opaque.js", "eval('1');\nexport const alpha = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["load".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let isolated = plan.artifacts.iter().find(|a| a.chunk_id == "isolated/src/opaque.js").unwrap();
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/main").unwrap();
+    assert!(
+        entry.code.contains(&format!("import(\"./{}\")", isolated.file_name)),
+        "{}",
+        entry.code
+    );
+    assert_eq!(plan.dynamic_files, vec![(entry.file_name.clone(), isolated.file_name.clone())]);
+}
+
+/// 顶层 `return` 无法作为独立 ESM 文件发射：显式拒绝，不产出错误 JS。
+#[test]
+fn isolated_top_level_return_is_rejected() {
+    let root = temp_tree(
+        "isolatedret",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { v } from './opaque.js';\nexport const run = v;\n"),
+            ("src/opaque.js", "eval('1');\nexport const v = 1;\nreturn;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let Err(diagnostics) = plan_emit(&graph, &link_plan, &chunks, &options()) else {
+        panic!("顶层 return 的 isolated 模块必须显式拒绝");
+    };
+    assert!(
+        codes(&diagnostics).contains(&"vmz::pack::emit::isolated_unemittable".to_string()),
+        "{:?}",
+        codes(&diagnostics)
+    );
 }
