@@ -464,7 +464,7 @@ fn class_expression_facts_mirror_class_declaration() {
 fn scope_bindings_project_declaration_and_reference_spans() {
     let source = "import { helper } from './lib.js';\nconst value = helper(1);\nfunction use(): number { const helper = 2; return helper; }\nexport { use };\n";
     let record = ok(source);
-    assert!(!record.scope_incomplete, "{:?}", record.diagnostics);
+    assert!(!record.is_scope_incomplete(), "{:?}", record.diagnostics);
     let names: Vec<&str> = record.scope_bindings.iter().map(|b| b.name.as_str()).collect();
     assert_eq!(names, ["helper", "value", "use"]);
 
@@ -490,7 +490,7 @@ fn scope_bindings_project_declaration_and_reference_spans() {
 fn type_reference_sets_flag_without_span() {
     let source = "class Flag {}\nconst on: Flag = new Flag();\n";
     let record = ok(source);
-    assert!(!record.scope_incomplete, "{:?}", record.diagnostics);
+    assert!(!record.is_scope_incomplete(), "{:?}", record.diagnostics);
     let flag = record.scope_bindings.iter().find(|b| b.name == "Flag").expect("class 绑定事实");
     assert!(flag.has_type_references, "注解位置 `: Flag` 必须置标志");
     assert_eq!(flag.references.len(), 1, "类型位置不得记 span：{:?}", flag.references);
@@ -498,11 +498,12 @@ fn type_reference_sets_flag_without_span() {
 }
 
 /// `eval` 触发上游 incomplete：引用可能缺失，消费者必须拒绝任何绑定改名；
-/// 本层原样透传，不做名字匹配补洞。
+/// 本层原样透传精确原因，不做名字匹配补洞。
 #[test]
-fn scope_incomplete_is_passed_through_from_oak() {
+fn scope_incomplete_reasons_are_passed_through_from_oak() {
     let record = ok("const a = 1;\neval('a');\n");
-    assert!(record.scope_incomplete);
+    assert_eq!(record.scope_incomplete_reasons, vec![vmz_pack::module::ScopeIncompleteReason::DirectEval]);
+    assert!(record.is_scope_incomplete());
 }
 
 /// `export const { a } = x`：导出名来自 declarator 绑定名。

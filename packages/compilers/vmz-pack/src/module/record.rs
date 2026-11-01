@@ -24,17 +24,46 @@ pub struct ModuleRecord {
     /// 模块级绑定 scope 事实（Oak `module_scope_facts` 投影），
     /// 供打包层做 rename-safe 的绑定重写。
     pub scope_bindings: Vec<ScopeBindingFact>,
-    /// scope 事实可能缺引用时为 `true`；消费者必须拒绝任何绑定改名。
-    pub scope_incomplete: bool,
+    /// scope 事实可能缺引用的精确原因（Oak `module_scope_facts` 投影），
+    /// 空即完整；非空时消费者必须拒绝任何绑定改名。
+    pub scope_incomplete_reasons: Vec<ScopeIncompleteReason>,
     /// 非致命诊断；解析失败走 `Err`，不进入本结构。
     pub diagnostics: Vec<PackDiagnostic>,
+}
+
+/// scope 事实缺引用的精确原因，逐字镜像上游
+/// `oak_typescript::scope::ScopeIncompleteReason`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScopeIncompleteReason {
+    /// 直接 `eval(...)` 调用：运行时可按名字读写绑定。
+    DirectEval,
+    /// 含 `${...}` 的模板字符串：AST 不承载插值内表达式。
+    TemplateInterpolation,
+    /// JSX 树：AST 不暴露其中的标识符引用。
+    Jsx,
+    /// 与绑定名同拼写的成员键：AST 分不清 `foo:` 与 `[foo]:`。
+    AmbiguousMemberKey,
+    /// `interface` 声明：parser 不记录成员，体内引用不可见。
+    InterfaceBody,
+    /// `namespace` 声明：成员不被遍历。
+    Namespace,
+    /// 空绑定名 token。
+    EmptyBindingName,
+    /// 零宽声明 span 的绑定 token。
+    ZeroWidthDeclarationSpan,
+    /// 重复的模块级绑定名：只保留首个条目。
+    DuplicateBinding,
+    /// declarator 的绑定名与绑定 span 数量不一致。
+    BindingSpanMismatch,
+    /// 函数之外的 `return`：模块无法作为独立 ESM 文件发射。
+    TopLevelReturn,
 }
 
 /// 一个模块级绑定的 scope 事实。
 ///
 /// 语义与上游 `oak_typescript::scope::ModuleBindingFacts` 一致：
 /// `references` 是值位置引用（源序，遮蔽排除），类型位置只给标志
-/// 不给 span。`scope_incomplete` 为 `true` 时两者都不可信。
+/// 不给 span。[`ModuleRecord::scope_incomplete_reasons`] 非空时两者都不可信。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScopeBindingFact {
     /// 绑定名。
@@ -62,9 +91,14 @@ impl ModuleRecord {
             assets: Vec::new(),
             flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
             scope_bindings: Vec::new(),
-            scope_incomplete: false,
+            scope_incomplete_reasons: Vec::new(),
             diagnostics: Vec::new(),
         }
+    }
+
+    /// scope 事实是否可能缺引用（原因清单非空）。
+    pub fn is_scope_incomplete(&self) -> bool {
+        !self.scope_incomplete_reasons.is_empty()
     }
 }
 

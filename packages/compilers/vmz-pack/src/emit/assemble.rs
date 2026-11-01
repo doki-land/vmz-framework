@@ -1092,7 +1092,7 @@ fn precise_binding_used(
     active_spans: &[(usize, usize)],
     export_spans: &[(usize, usize)],
 ) -> Option<bool> {
-    if record.scope_incomplete {
+    if record.is_scope_incomplete() {
         return None;
     }
     let binding = record.scope_bindings.iter().find(|item| item.name == name)?;
@@ -1149,7 +1149,7 @@ fn plan_binding_rewrite(
     active_spans: &[(usize, usize)],
     stripped_spans: &[(usize, usize)],
 ) -> Result<BindingRewrite, String> {
-    if record.scope_incomplete {
+    if record.is_scope_incomplete() {
         return Err(format!("消费者模块 scope 事实不完整，无法证明 `{old}` 的全部引用"));
     }
     if record.scope_bindings.iter().any(|binding| binding.name == new) {
@@ -1438,7 +1438,7 @@ fn try_plan_declaration_rename(
 ) -> Option<BindingRewrite> {
     let scan = scans.get(&node_index)?;
     let record = &context.graph.nodes.get(node_index)?.record;
-    if record.scope_incomplete {
+    if record.is_scope_incomplete() {
         return None;
     }
     for export in &record.exports {

@@ -37,7 +37,7 @@ use oak_typescript::scope::module_scope_facts;
 
 use super::record::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
-    ModuleRecord, ScopeBindingFact, StatementEffect, StatementFact,
+    ModuleRecord, ScopeBindingFact, ScopeIncompleteReason, StatementEffect, StatementFact,
 };
 use crate::diag::PackDiagnostic;
 
@@ -90,9 +90,45 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
     // TLA 资格直接取 Oak root 级正式事实，不扫语句树、不猜测。
     collector.record.flags.has_tla = root.has_top_level_await();
     // scope 事实直接取 Oak 正式投影：builder 未开启类型擦除（默认关闭），
-    // 值引用与遮蔽排除由上游保证；`incomplete` 原样透传，本层不做名字匹配补洞。
+    // 值引用与遮蔽排除由上游保证；不完整原因逐字镜像透传，本层不做名字匹配补洞。
     let scope = module_scope_facts(&root);
-    collector.record.scope_incomplete = scope.incomplete;
+    collector.record.scope_incomplete_reasons = scope
+        .incomplete_reasons
+        .into_iter()
+        .map(|reason| match reason {
+            oak_typescript::scope::ScopeIncompleteReason::DirectEval => {
+                ScopeIncompleteReason::DirectEval
+            }
+            oak_typescript::scope::ScopeIncompleteReason::TemplateInterpolation => {
+                ScopeIncompleteReason::TemplateInterpolation
+            }
+            oak_typescript::scope::ScopeIncompleteReason::Jsx => ScopeIncompleteReason::Jsx,
+            oak_typescript::scope::ScopeIncompleteReason::AmbiguousMemberKey => {
+                ScopeIncompleteReason::AmbiguousMemberKey
+            }
+            oak_typescript::scope::ScopeIncompleteReason::InterfaceBody => {
+                ScopeIncompleteReason::InterfaceBody
+            }
+            oak_typescript::scope::ScopeIncompleteReason::Namespace => {
+                ScopeIncompleteReason::Namespace
+            }
+            oak_typescript::scope::ScopeIncompleteReason::EmptyBindingName => {
+                ScopeIncompleteReason::EmptyBindingName
+            }
+            oak_typescript::scope::ScopeIncompleteReason::ZeroWidthDeclarationSpan => {
+                ScopeIncompleteReason::ZeroWidthDeclarationSpan
+            }
+            oak_typescript::scope::ScopeIncompleteReason::DuplicateBinding => {
+                ScopeIncompleteReason::DuplicateBinding
+            }
+            oak_typescript::scope::ScopeIncompleteReason::BindingSpanMismatch => {
+                ScopeIncompleteReason::BindingSpanMismatch
+            }
+            oak_typescript::scope::ScopeIncompleteReason::TopLevelReturn => {
+                ScopeIncompleteReason::TopLevelReturn
+            }
+        })
+        .collect();
     collector.record.scope_bindings = scope
         .bindings
         .into_iter()
@@ -224,7 +260,7 @@ impl<'a> Collector<'a> {
                 assets: Vec::new(),
                 flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
                 scope_bindings: Vec::new(),
-                scope_incomplete: false,
+                scope_incomplete_reasons: Vec::new(),
                 diagnostics: Vec::new(),
             },
         }
