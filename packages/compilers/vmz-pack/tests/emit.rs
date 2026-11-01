@@ -820,13 +820,16 @@ fn bootstrap_dynamic_map_emits_async_chunks() {
     assert_eq!(plan.entry_files, vec![("bootstrap".to_string(), entry.file_name.clone())]);
 }
 
-/// 同 chunk 两个模块声明同名绑定：拼接会产生非法重复声明，显式拒绝。
+/// 同 chunk 两个模块导出面同名（`export const value` × 2）：面兜底接管，
+/// 不再显式拒绝。声明认领者全部改名 `{name}__vmz{node}`，canonical（无跨
+/// chunk pin 时取最小节点）一侧发 `export { fresh as value }` 保持面名，
+/// 非 canonical 一侧的面导出丢弃；消费者与各自声明引用随落点名重写。
 /// `b.js` 的值声明必须被活跃语句引用，否则纯且未使用的声明会被剪除，
 /// 不再与 `a.js` 的导出构成冲突。
 #[test]
-fn name_conflict_is_rejected() {
+fn exported_face_name_conflict_is_renamed_to_canonical() {
     let root = temp_tree(
-        "conflict",
+        "faceconflict",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             ("src/entry.js", "import { value } from './a.js';\nexport const main = value;\n"),
@@ -845,9 +848,63 @@ fn name_conflict_is_rejected() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
-    assert!(codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()), "{errors:?}");
-    assert!(errors.iter().any(|d| d.message.contains("value")), "{errors:?}");
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    // 两侧声明都改名，面只保留 canonical（`a.js`，最小节点）一条 `as value`。
+    assert!(code.contains("const value__vmz1 = 1"), "{code}");
+    assert!(code.contains("const value__vmz2 = 2"), "{code}");
+    assert!(code.contains("export { value__vmz1 as value }"), "{code}");
+    assert_eq!(code.matches(" as value }").count(), 1, "{code}");
+    assert!(!code.contains("export { value__vmz2 as value }"), "{code}");
+    assert!(!code.contains("export { value }"), "{code}");
+    // 消费者落到 canonical 改名后的声明，非 canonical 一侧引用随自身声明。
+    assert!(code.contains("const main = value__vmz1"), "{code}");
+    assert!(code.contains("console.log(value__vmz2)"), "{code}");
+}
+
+/// 同 chunk `declared × binding` 面碰撞（两步重导出 `import` 绑定再
+/// `export`）：canonical 为最小认领者（重导出绑定一侧），面名保持且只发
+/// 一条 `export { 最终声明名 as decode }`；消费者沿事实链落到改名后的最终
+/// 声明名，非 canonical 声明一侧的面导出丢弃。
+#[test]
+fn face_conflict_with_reexport_binding_resolves_to_final_declaration() {
+    let root = temp_tree(
+        "facechain",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/inner.js", "export function decode(s){ return s }\n"),
+            ("src/mdurl.js", "import { decode } from './inner.js';\nexport { decode };\n"),
+            ("src/entities.js", "export function decode(s){ return s + '!' }\n"),
+            (
+                "src/entry.js",
+                "import { decode } from './mdurl.js';\nimport { decode as ent } from './entities.js';\nexport const run = [decode('x'), ent('y')];\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    // 节点序（BFS）：entry=0、mdurl=1、entities=2、inner=3。面只有一条
+    // `as decode`，落点是重导出链最终声明（inner，改名 `decode__vmz3`）。
+    assert_eq!(code.matches(" as decode }").count(), 1, "{code}");
+    assert!(code.contains("export { decode__vmz3 as decode }"), "{code}");
+    assert!(!code.contains("decode__vmz2 as decode"), "{code}");
+    assert!(!code.contains("export { decode }"), "{code}");
+    // 两个消费者绑定各自落到最终声明的改名后名字。
+    assert!(code.contains("decode__vmz3('x')"), "{code}");
+    assert!(code.contains("decode__vmz2('y')"), "{code}");
 }
 
 /// 同 chunk 冲突声明中未被导出事实消费的一侧改名 `{name}__vmz{node}`：
