@@ -2079,6 +2079,118 @@ fn same_chunk_star_reexport_expands_direct_named_exports() {
     assert!(!code.contains("./barrel.js"), "{code}");
 }
 
+/// homepage `plannerCopy` 形态最小复现：同一面名两个声明认领者，全部消费者
+/// 同 chunk（一个同名 local、一个改名 local），无跨 chunk 面消费。兜底应
+/// 把两个声明都改名、消费者重写到各自落点 fresh 名，chunk 面只发 canonical
+/// 一条别名导出，不产出 `name_conflict`。
+#[test]
+fn face_collision_two_claimants_same_chunk_consumers_renames_both() {
+    let root = temp_tree(
+        "twoclaimants",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { plannerCopy } from './locales.js';\nimport { plannerCopy as labels } from './copy.js';\nexport const run = plannerCopy() + labels();\n",
+            ),
+            ("src/locales.js", "export function plannerCopy() { return 'l'; }\n"),
+            ("src/copy.js", "export function plannerCopy() { return 'c'; }\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    // 两个声明都落到 fresh 名。
+    assert!(code.contains("function plannerCopy__vmz"), "{code}");
+    // 面恰好一条别名导出。
+    assert_eq!(code.matches("as plannerCopy }").count(), 1, "{code}");
+    // 消费者重写：entry 文本不再出现裸 `plannerCopy()` 引用。
+    assert!(!code.contains("export { plannerCopy }"), "{code}");
+}
+
+/// homepage `plannerCopy`/`fromCodePoint` 假钉复现：跨 chunk 消费者从认领者
+/// 模块导入其它面名（`helper`）不得钉住碰撞面名的 canonical。只钉碰撞面名
+/// 时 pins 唯一（`b`），兜底成立：两个声明都改名、面只发 canonical 一条，
+/// 不产出 `name_conflict`。
+#[test]
+fn face_collision_cross_chunk_consumer_of_other_face_does_not_pin() {
+    let root = temp_tree(
+        "falsepin",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/a.js",
+                "export function collide() { return 'a'; }\nexport function helper() { return 'h'; }\n",
+            ),
+            ("src/b.js", "export function collide() { return 'b'; }\n"),
+            ("src/c.js", "import { collide } from './a.js';\nexport const use = collide();\n"),
+            (
+                "src/one.js",
+                "import { use } from './c.js';\nimport { collide } from './b.js';\nimport { helper } from './a.js';\nexport const x = [use, collide(), helper];\n",
+            ),
+            (
+                "src/two.js",
+                "import { use } from './c.js';\nimport { collide } from './b.js';\nimport { helper } from './a.js';\nexport const y = [use, collide(), helper];\n",
+            ),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/one.js")),
+            ("two".to_string(), root.join("src/two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["x".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["y".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let shared = plan
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.modules.iter().any(|m| m.ends_with("src/b.js")))
+        .expect("shared chunk with b");
+    let code = &shared.code;
+    // 两个声明认领者都落到 fresh 名。
+    assert!(code.contains("function collide__vmz"), "{code}");
+    // chunk 面恰好一条 `collide` 别名导出（canonical 来自 b）。
+    assert_eq!(code.matches("as collide }").count(), 1, "{code}");
+    assert_eq!(code.matches("export { collide }").count(), 0, "{code}");
+    // 消费侧按面名 `collide` 从共享 chunk 合成导入。
+    for artifact in plan.artifacts.iter().filter(|a| a.chunk_id.starts_with("entry/")) {
+        assert!(artifact.code.contains("collide"), "{}", artifact.code);
+        assert!(artifact.code.contains("shared-"), "{}", artifact.code);
+    }
+}
+
 /// 同 chunk `export *` 的来源自身含活跃 `export *`（名字经链流入不可
 /// 枚举）：保持显式拒绝，不递归收集。
 #[test]

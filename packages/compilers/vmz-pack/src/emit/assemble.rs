@@ -2171,6 +2171,11 @@ fn plan_face_renames(
                         },
                         _ => continue,
                     };
+                    // 只钉碰撞面名本身：消费者从认领者模块导入其它面名
+                    // （如 `plannerKicker`）不消费该面名，不得钉住认领者。
+                    if face != name.as_str() {
+                        continue;
+                    }
                     if let Some(pin) = pin_claimant(context, chunk_index, target, face, &owners) {
                         pins.insert(pin);
                     }
