@@ -1080,27 +1080,19 @@ fn renamed_import_exported_via_deferred_local() {
     assert!(!code.contains("helper"), "{code}");
 }
 
-/// 守卫反例：类型位置引用、嵌套遮蔽、消费者同名绑定三类 scope 完整但重写
-/// 不安全的形态维持 `binding_rename_unsupported` 显式拒绝。
+/// 守卫反例：类型位置引用这类改名成任何名字都救不了的形态维持
+/// `binding_rename_unsupported` 显式拒绝。
+/// 落点名碰撞类失败（嵌套遮蔽、消费者同名绑定）已由落点改名兜底救活，
+/// 见 `landing_rename_*` 用例。
 /// `eval` 不再属于守卫反例：scope 事实不完整触发同 chunk 作用域隔离
 /// （Living §同 chunk 作用域隔离），模块被拆入 isolated chunk 独立发射，
 /// 见 `isolated_*` 用例。
 #[test]
 fn binding_rename_guards_reject() {
-    let cases: [(&str, &str); 3] = [
-        (
-            "type",
-            "import { value as v } from './a.js';\nlet on: v = null;\nexport const main = v;\n",
-        ),
-        (
-            "shadow",
-            "import { value as v } from './a.js';\nexport const main = (() => { const value = 2; return v; })();\n",
-        ),
-        (
-            "collision",
-            "import { value as v } from './a.js';\nconst value = 3;\nexport const main = v + value;\n",
-        ),
-    ];
+    let cases: [(&str, &str); 1] = [(
+        "type",
+        "import { value as v } from './a.js';\nlet on: v = null;\nexport const main = v;\n",
+    )];
     for (name, entry_src) in cases {
         let root = temp_tree(
             &format!("renameguard-{name}"),
@@ -1130,6 +1122,124 @@ fn binding_rename_guards_reject() {
             "case `{name}`: {errors:?}"
         );
     }
+}
+
+/// 落点改名兜底：消费者重写因落点名碰撞失败时，落点声明模块的绑定自身
+/// 改名 `{landing}__vmz{node}`，导出面经 `export { fresh as 原名 }` 保持
+/// 原声明名（多 default 模块的具名面同样稳定），全部消费者重写为 fresh 名。
+#[test]
+fn landing_rename_resolves_collision_and_keeps_face() {
+    let root = temp_tree(
+        "landingface",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import fn from './a.js';\nimport { use } from './c.js';\nconst value = 3;\nexport const main = fn + value + use;\n",
+            ),
+            ("src/a.js", "export default function value() { return 1; }\n"),
+            ("src/b.js", "export default 42;\n"),
+            (
+                "src/c.js",
+                "import val from './a.js';\nimport bb from './b.js';\nexport const use = val + bb;\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    // 面名稳定：具名 default 落点被改名后仍按原声明名成面。
+    assert!(code.contains("export { value__vmz") && code.contains("as value };"), "{code}");
+    // 消费者重写：`fn` 与 `val` 都指向 fresh 落点名。
+    assert!(code.contains("main = value__vmz"), "{code}");
+    assert!(code.contains("use = value__vmz"), "{code}");
+    assert!(!code.contains("fn +"), "{code}");
+    assert!(!code.contains("val +"), "{code}");
+}
+
+/// 同名消费者转重写：落点因其它模块的碰撞被改名后，原本直接拼接免重写的
+/// 同名消费者引用同样改写为 fresh 名，chunk 内引用不断链。
+#[test]
+fn landing_rename_rewrites_same_name_consumer() {
+    let root = temp_tree(
+        "landingsame",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { normalize } from './a.js';\nimport { nb } from './b.js';\nexport const main = normalize + nb;\n",
+            ),
+            ("src/a.js", "export const normalize = 1;\n"),
+            (
+                "src/b.js",
+                "import { normalize as n } from './a.js';\nconst normalize = 2;\nexport const nb = n + normalize;\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    // 导出面保持 `normalize`，发射绑定为 fresh 名。
+    assert!(code.contains("export { normalize__vmz") && code.contains("as normalize };"), "{code}");
+    // 同名消费者（entry）与改名消费者（b 的 `n`）都指向 fresh 名。
+    assert!(code.contains("main = normalize__vmz"), "{code}");
+    assert!(code.contains("nb = normalize__vmz"), "{code}");
+}
+
+/// 嵌套遮蔽形态由落点改名兜底救活：消费者活跃文本按词边界含落点名时，
+/// 落点自身改名，消费者重写指向 fresh 名，嵌套同名声明不受影响。
+#[test]
+fn landing_rename_resolves_nested_shadow() {
+    let root = temp_tree(
+        "landingshadow",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { value as v } from './a.js';\nexport const main = (() => { const value = 2; return v; })();\n",
+            ),
+            ("src/a.js", "export const value = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("export { value__vmz") && code.contains("as value };"), "{code}");
+    assert!(code.contains("return value__vmz"), "{code}");
+    assert!(code.contains("const value = 2"), "{code}");
 }
 
 /// 未使用绑定精确剪枝：scope 事实完整时绑定 used 当且仅当引用 span 落在
