@@ -24,7 +24,7 @@ enum RootId {
 /// 一个 chunk：稳定 id、来源、执行序内的节点与跨 chunk 依赖。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chunk {
-    /// 稳定 chunk id（`entry/…`、`async/…`、`shared/…`），同输入必同输出。
+    /// 稳定 chunk id（`entry/…`、`async/…`、`shared/…`、`isolated/…`），同输入必同输出。
     pub id: String,
     /// chunk 的来源根形态。
     pub origin: ChunkOrigin,
@@ -85,6 +85,15 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
         }
     }
 
+    // opaque 模块（scope 事实不完整，精确原因清单非空）禁止进入共享 chunk：
+    // chunk 层强制 singleton 分区，emit 层独立发射真 ESM 文件（Living
+    // §同 chunk 作用域隔离：隔离即独立发射）。名字层面的 `rename_unsafe`
+    // 标记不触发隔离，判定只依据不完整原因清单。
+    let mut isolated = vec![false; node_count];
+    for (index, node) in graph.nodes.iter().enumerate() {
+        isolated[index] = retained[index] && node.record.is_scope_incomplete();
+    }
+
     // 依赖边 = 可观察求值目标 ∪ 本模块传播了符号需求的目标。前者是 ESM 求值
     // 语义（求值本模块必然求值它的可观察静态依赖），后者是真正被合成 import /
     // export-from 引用的目标。未被任何活跃语句消费、也不可观察求值的纯目标是
@@ -124,7 +133,30 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
     }
 
     // 强连通收缩：单元按 min 成员节点号重编号，成员内部升序。
-    let units = strong_components(node_count, &retained, &forward, &reverse);
+    // opaque 成员从单元拆出为独立 singleton 单元：隔离模块不与任何其它模块
+    // 共享 chunk。拆分只删边不造环——同 chunk 内仍无环；跨 chunk 的环由产物
+    // 层占位符两遍法解决，独立发射的真 ESM 文件天然保持 live binding 与
+    // 求值顺序，不需要同 chunk 平铺来维持。
+    let raw_units = strong_components(node_count, &retained, &forward, &reverse);
+    let mut units: Vec<Vec<usize>> = Vec::with_capacity(raw_units.len());
+    let mut unit_isolated: Vec<bool> = Vec::with_capacity(raw_units.len());
+    for members in raw_units {
+        let opaque: Vec<usize> = members.iter().copied().filter(|m| isolated[*m]).collect();
+        if opaque.is_empty() {
+            units.push(members);
+            unit_isolated.push(false);
+            continue;
+        }
+        let rest: Vec<usize> = members.into_iter().filter(|m| !isolated[*m]).collect();
+        for node in opaque {
+            units.push(vec![node]);
+            unit_isolated.push(true);
+        }
+        if !rest.is_empty() {
+            units.push(rest);
+            unit_isolated.push(false);
+        }
+    }
     let mut unit_of = vec![usize::MAX; node_count];
     for (unit, members) in units.iter().enumerate() {
         for &member in members {
@@ -195,10 +227,16 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
         }
     }
 
-    // 签名相同的单元合成一个 chunk 分区。
+    // 签名相同的单元合成一个 chunk 分区；isolated 单元禁止合并，各自成组，
+    // id 以模块相对路径标签派生，保证唯一稳定。
     let mut groups: BTreeMap<BTreeSet<RootId>, Vec<usize>> = BTreeMap::new();
+    let mut solos: Vec<(usize, BTreeSet<RootId>)> = Vec::new();
     for (unit, signature) in signatures.iter().enumerate() {
-        groups.entry(signature.clone()).or_default().push(unit);
+        if unit_isolated[unit] {
+            solos.push((unit, signature.clone()));
+        } else {
+            groups.entry(signature.clone()).or_default().push(unit);
+        }
     }
 
     struct Draft {
@@ -208,22 +246,14 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
     }
     let mut drafts: Vec<Draft> = Vec::new();
     for (signature, group_units) in &groups {
-        let (id, origin) = match signature.iter().next() {
-            Some(&RootId::Entry(index)) if signature.len() == 1 => {
-                let logical = graph.entries[index].logical.clone();
-                (format!("entry/{logical}"), ChunkOrigin::Entry { logical })
-            }
-            Some(&RootId::Async(node)) if signature.len() == 1 => {
-                let label = relative_label(graph, &graph.nodes[node].resolved.path);
-                (format!("async/{label}"), ChunkOrigin::Async { root_node: node })
-            }
-            _ => {
-                let labels: Vec<String> =
-                    signature.iter().map(|&root| root_label(graph, root)).collect();
-                (format!("shared/{}", labels.join("+")), ChunkOrigin::Shared { roots: labels })
-            }
-        };
+        let origin = chunk_origin(graph, signature);
+        let id = chunk_id(graph, &origin);
         drafts.push(Draft { id, origin, units: group_units.clone() });
+    }
+    for (unit, signature) in &solos {
+        let origin = chunk_origin(graph, signature);
+        let label = relative_label(graph, &graph.nodes[units[*unit][0]].resolved.path);
+        drafts.push(Draft { id: format!("isolated/{label}"), origin, units: vec![*unit] });
     }
     drafts.sort_by(|a, b| a.id.cmp(&b.id));
 
@@ -358,6 +388,30 @@ fn root_label(graph: &ModuleGraph, root: RootId) -> String {
     match root {
         RootId::Entry(index) => graph.entries[index].logical.clone(),
         RootId::Async(node) => relative_label(graph, &graph.nodes[node].resolved.path),
+    }
+}
+
+/// 分区来源根：单入口根、单异步根；其余（多根共同可达与防御性零根）为共享。
+fn chunk_origin(graph: &ModuleGraph, signature: &BTreeSet<RootId>) -> ChunkOrigin {
+    match signature.iter().next() {
+        Some(&RootId::Entry(index)) if signature.len() == 1 => {
+            ChunkOrigin::Entry { logical: graph.entries[index].logical.clone() }
+        }
+        Some(&RootId::Async(node)) if signature.len() == 1 => ChunkOrigin::Async { root_node: node },
+        _ => ChunkOrigin::Shared {
+            roots: signature.iter().map(|&root| root_label(graph, root)).collect(),
+        },
+    }
+}
+
+/// 分区 id：由来源根确定性派生（isolated 分区由调用处按模块标签另行命名）。
+fn chunk_id(graph: &ModuleGraph, origin: &ChunkOrigin) -> String {
+    match origin {
+        ChunkOrigin::Entry { logical } => format!("entry/{logical}"),
+        ChunkOrigin::Async { root_node } => {
+            format!("async/{}", relative_label(graph, &graph.nodes[*root_node].resolved.path))
+        }
+        ChunkOrigin::Shared { roots } => format!("shared/{}", roots.join("+")),
     }
 }
 

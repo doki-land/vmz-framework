@@ -1083,11 +1083,14 @@ fn renamed_import_exported_via_deferred_local() {
     assert!(!code.contains("helper"), "{code}");
 }
 
-/// 守卫反例：类型位置引用、嵌套遮蔽、`scope_incomplete`、消费者同名绑定
-/// 四类都会让重写不安全，全部维持 `binding_rename_unsupported` 显式拒绝。
+/// 守卫反例：类型位置引用、嵌套遮蔽、消费者同名绑定三类 scope 完整但重写
+/// 不安全的形态维持 `binding_rename_unsupported` 显式拒绝。
+/// `eval` 不再属于守卫反例：scope 事实不完整触发同 chunk 作用域隔离
+/// （Living §同 chunk 作用域隔离），模块被拆入 isolated chunk 独立发射，
+/// 见 `isolated_*` 用例。
 #[test]
 fn binding_rename_guards_reject() {
-    let cases: [(&str, &str); 4] = [
+    let cases: [(&str, &str); 3] = [
         (
             "type",
             "import { value as v } from './a.js';\nlet on: v = null;\nexport const main = v;\n",
@@ -1096,7 +1099,6 @@ fn binding_rename_guards_reject() {
             "shadow",
             "import { value as v } from './a.js';\nexport const main = (() => { const value = 2; return v; })();\n",
         ),
-        ("eval", "import { value as v } from './a.js';\neval('x');\nexport const main = v;\n"),
         (
             "collision",
             "import { value as v } from './a.js';\nconst value = 3;\nexport const main = v + value;\n",
