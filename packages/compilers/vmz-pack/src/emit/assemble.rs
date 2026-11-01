@@ -128,7 +128,7 @@ pub(crate) fn assemble_chunk(
     // (a) 活跃声明名 / (b) 合成 import 绑定 local / (c) 对外导出名。
     let mut declared: Vec<(String, String)> = Vec::new();
     let mut import_locals: Vec<(String, usize, String)> = Vec::new();
-    let mut same_chunk_locals: BTreeSet<String> = BTreeSet::new();
+    let mut same_chunk_locals: BTreeSet<(String, String)> = BTreeSet::new();
     let mut export_names: Vec<(String, String)> = Vec::new();
     let mut merged: BTreeMap<usize, Bindings> = BTreeMap::new();
     let mut side_effects: BTreeSet<usize> = BTreeSet::new();
@@ -614,12 +614,23 @@ pub(crate) fn assemble_chunk(
                                     Some(map) => renamed_local(map, &name),
                                     None => name,
                                 };
-                                deferred.push(DeferredExport {
-                                    local,
-                                    exported: exported.clone(),
-                                    module: module_path.clone(),
-                                    is_default: false,
-                                });
+                                // 落点声明活跃性判定：落点声明已被链接层
+                                // 剪除时面导出随之消失（与 deferred Local
+                                // 同一剪枝语义），不登记、不发射，避免引用
+                                // 不存在的绑定。依赖序保证落点模块先处理。
+                                let landing_path =
+                                    normalize_path(&context.graph.nodes[decl_node].resolved.path);
+                                if declared.iter().any(|(d, m)| *d == local && *m == landing_path) {
+                                    // 落点名对重导出模块同样可解析（deferred
+                                    // 定稿的 per-module 判定需要）。
+                                    same_chunk_locals.insert((local.clone(), module_path.clone()));
+                                    deferred.push(DeferredExport {
+                                        local,
+                                        exported: exported.clone(),
+                                        module: module_path.clone(),
+                                        is_default: false,
+                                    });
+                                }
                             }
                             Some(ReexportBinding::External { chunk, name }) => {
                                 referenced_chunks.insert(chunk);
@@ -701,12 +712,25 @@ pub(crate) fn assemble_chunk(
                                         Some(map) => renamed_local(map, &name),
                                         None => name,
                                     };
-                                    deferred.push(DeferredExport {
-                                        local,
-                                        exported,
-                                        module: module_path.clone(),
-                                        is_default: false,
-                                    });
+                                    // 星号枚举含未被任何消费者需求的导出：
+                                    // 落点声明已被剪除时该面名不发射（与
+                                    // 具名重导出同一活跃性判定）。
+                                    let landing_path = normalize_path(
+                                        &context.graph.nodes[decl_node].resolved.path,
+                                    );
+                                    if declared
+                                        .iter()
+                                        .any(|(d, m)| *d == local && *m == landing_path)
+                                    {
+                                        same_chunk_locals
+                                            .insert((local.clone(), module_path.clone()));
+                                        deferred.push(DeferredExport {
+                                            local,
+                                            exported,
+                                            module: module_path.clone(),
+                                            is_default: false,
+                                        });
+                                    }
                                 }
                                 Some(ReexportBinding::External { chunk, name }) => {
                                     if emitted_reexports.insert((
@@ -1093,15 +1117,25 @@ pub(crate) fn assemble_chunk(
 
     // 决议延后的 Local/Default 导出：local 必须在 chunk 内可解析
     // （活跃声明、同 chunk 接受绑定或已合成 import 绑定），否则说明
-    // 声明已被链接层剪除，导出随之消失（未用纯导出剪枝语义）。
-    let resolvable: HashSet<&str> = declared
-        .iter()
-        .map(|(name, _)| name.as_str())
-        .chain(same_chunk_locals.iter().map(String::as_str))
-        .chain(import_locals.iter().map(|(local, _, _)| local.as_str()))
-        .collect();
+    // 声明已被链接层剪除，导出随之消失（未用纯导出剪枝语义）。可解析性
+    // 按模块判定：deferred 的 local 必须是其来源模块自身的活跃声明、同
+    // chunk 导入绑定或跨 chunk 合成绑定——chunk 级同名不算（否则会引用
+    // 到别的模块的同名声明，面导出张冠李戴）。
+    let mut resolvable: HashMap<&str, HashSet<&str>> = HashMap::new();
+    for (name, module) in &declared {
+        resolvable.entry(module.as_str()).or_default().insert(name.as_str());
+    }
+    for (name, module) in &same_chunk_locals {
+        resolvable.entry(module.as_str()).or_default().insert(name.as_str());
+    }
+    for (local, _, module) in &import_locals {
+        resolvable.entry(module.as_str()).or_default().insert(local.as_str());
+    }
     for item in &deferred {
-        if !resolvable.contains(item.local.as_str()) {
+        if !resolvable
+            .get(item.module.as_str())
+            .is_some_and(|names| names.contains(item.local.as_str()))
+        {
             continue;
         }
         // 面名 canonical 丢弃：被面兜底改名的面名，chunk 面只发 canonical
@@ -1463,7 +1497,7 @@ fn plan_same_chunk_bindings(
     module_path: &str,
     rename_plans: &BTreeMap<usize, BTreeMap<String, BindingRewrite>>,
     merged: &mut BTreeMap<usize, Bindings>,
-    same_chunk_locals: &mut BTreeSet<String>,
+    same_chunk_locals: &mut BTreeSet<(String, String)>,
     import_locals: &mut Vec<(String, usize, String)>,
     warnings: &mut Vec<PackDiagnostic>,
     errors: &mut Vec<PackDiagnostic>,
@@ -1560,7 +1594,7 @@ fn plan_same_chunk_bindings(
                         None => binding_name,
                     };
                     if landing == consumer {
-                        same_chunk_locals.insert(consumer.to_string());
+                        same_chunk_locals.insert((consumer.to_string(), module_path.to_string()));
                     } else {
                         match plan_binding_rewrite(
                             record,
@@ -1571,6 +1605,10 @@ fn plan_same_chunk_bindings(
                             &stripped_spans,
                         ) {
                             Ok(rewrite) => {
+                                // 重导出绑定的 deferred 导出以落点名为 local：
+                                // 该名字对本模块同样可解析。
+                                same_chunk_locals
+                                    .insert((landing.clone(), module_path.to_string()));
                                 if renames.insert(consumer.to_string(), rewrite).is_some() {
                                     errors.push(
                                         PackDiagnostic::new(
@@ -1607,7 +1645,7 @@ fn plan_same_chunk_bindings(
                     // 具名同名（shorthand）：名字经拼接直接可达（星号来源不
                     // 展开的既有口径）；其余形态解析器已给出拒绝诊断。
                     if consumer == source_name {
-                        same_chunk_locals.insert(consumer.to_string());
+                        same_chunk_locals.insert((consumer.to_string(), module_path.to_string()));
                     } else {
                         errors.append(&mut scratch);
                     }
@@ -1870,8 +1908,10 @@ fn plan_landing_renames(
     plans
 }
 
-/// 面名认领者解析：目标模块的导出事实链把面名 `face` 落到认领者模块时
-/// 返回该模块（跨 chunk 即停，不认领）。
+/// 面名认领者解析：目标模块的导出事实链把面名 `face` 落到认领者模块的
+/// **同名绑定**时返回该模块（跨 chunk 即停，不认领）。落点绑定名必须
+/// 等于面名：认领者的面 `X` 由名为 `X` 的绑定承载，消费者导入其它面名
+/// （如 `Y`）落到同一模块不构成对 `X` 的认领。
 fn pin_claimant(
     context: &EmitContext<'_>,
     chunk_index: usize,
@@ -1889,7 +1929,11 @@ fn pin_claimant(
         "vmz::pack::emit::name_conflict",
         &mut scratch,
     ) {
-        Some(ReexportBinding::Declared { node, .. }) if claimants.contains(&node) => Some(node),
+        Some(ReexportBinding::Declared { node, name })
+            if name == face && claimants.contains(&node) =>
+        {
+            Some(node)
+        }
         _ => None,
     }
 }
@@ -1947,12 +1991,37 @@ fn plan_face_renames(
     }
     let mut plans: BTreeMap<usize, BTreeMap<String, BindingRewrite>> = BTreeMap::new();
     let mut canonicals: BTreeMap<String, String> = BTreeMap::new();
+    // 多 default 模块时 chunk 无统一 `default` 面，`export default <X>` 的
+    // 面名是绑定名本身——此时 default-local 认领者也持有该面名的导出。
+    let multi_default = chunk_default_bindings(context, chunk_index).len() > 1;
     for (name, nodes) in &decl_nodes {
         let mut claimants: BTreeSet<usize> = nodes.clone();
         if let Some(extra) = binding_nodes.get(name) {
             claimants.extend(extra.iter().copied());
         }
         if claimants.len() < 2 {
+            continue;
+        }
+        // canonical 候选 = 面所有者：以 `Local{X→X}` 具名导出该面的声明
+        // 认领者、导入绑定认领者，以及 `multi_default` 下面名落到绑定名的
+        // default-local 认领者。单一 default 模块的 default-local 只拥有
+        // `default` 面，不拥有面 `X`，不能当 canonical（否则面 `X` 的导出
+        // 会被全部丢弃）。
+        let mut owners: BTreeSet<usize> = BTreeSet::new();
+        for &node in &claimants {
+            let record = &context.graph.nodes[node].record;
+            let named = record.exports.iter().any(|export| match export {
+                ExportFact::Local { local, exported, type_only, .. } => {
+                    !type_only && local == name && exported == name
+                }
+                ExportFact::Default { local: Some(local), .. } => multi_default && local == name,
+                _ => false,
+            });
+            if named {
+                owners.insert(node);
+            }
+        }
+        if owners.is_empty() {
             continue;
         }
         let mut rewrites: BTreeMap<usize, BindingRewrite> = BTreeMap::new();
@@ -2102,8 +2171,7 @@ fn plan_face_renames(
                         },
                         _ => continue,
                     };
-                    if let Some(pin) = pin_claimant(context, chunk_index, target, face, &claimants)
-                    {
+                    if let Some(pin) = pin_claimant(context, chunk_index, target, face, &owners) {
                         pins.insert(pin);
                     }
                 }
@@ -2114,7 +2182,7 @@ fn plan_face_renames(
                 if context.node_chunk[target] != Some(chunk_index) {
                     continue;
                 }
-                if let Some(pin) = pin_claimant(context, chunk_index, target, name, &claimants) {
+                if let Some(pin) = pin_claimant(context, chunk_index, target, name, &owners) {
                     pins.insert(pin);
                 }
             }
@@ -2141,7 +2209,7 @@ fn plan_face_renames(
                 if context.node_chunk[target] != Some(chunk_index) {
                     continue;
                 }
-                if let Some(pin) = pin_claimant(context, chunk_index, target, face, &claimants) {
+                if let Some(pin) = pin_claimant(context, chunk_index, target, face, &owners) {
                     pins.insert(pin);
                 }
             }
@@ -2151,7 +2219,7 @@ fn plan_face_renames(
         }
         let canonical = match pins.iter().next() {
             Some(&pin) => pin,
-            None => *claimants.iter().next().expect("claimants 非空"),
+            None => *owners.iter().next().expect("owners 非空"),
         };
         for (node, rewrite) in rewrites {
             plans.entry(node).or_default().insert(name.clone(), rewrite);
