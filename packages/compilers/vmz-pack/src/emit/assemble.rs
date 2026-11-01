@@ -9,7 +9,9 @@
 //! 超集，只多留不误剪）。
 //! 同 chunk 静态 import 绑定沿目标模块导出事实链解析落点绑定名：落点与
 //! 消费者本地名不一致时对消费者做 scope 重写——其绑定的值引用 span 改写
-//! 为落点名，守卫全部成立才执行（上游 `scope_incomplete` 未置位、绑定无
+//! 为落点名（对象简写属性 token 同时充当属性键，按上游
+//! `shorthand_reference_spans` 改写为 `<旧名>: <新名>` 保住键），
+//! 守卫全部成立才执行（上游 `scope_incomplete` 未置位、绑定无
 //! 类型位置引用、落点名按词边界不出现在消费者文本、引用 span 切片回原文
 //! 且落点可判定）；仅落点名碰撞类失败触发落点改名兜底——落点声明模块的
 //! 绑定自身改名 `{landing}__vmz{node}`（被导出绑定允许改名，deferred 导出
@@ -428,8 +430,9 @@ pub(crate) fn assemble_chunk(
                 replacements
                     .insert(specifier_span, json_string(&format!("./{}", artifact.file_name)));
             }
-            // scope 重写：消费者绑定名在其值引用 span 上改写为 chunk 绑定名。
-            for rewrite in renames.values() {
+            // scope 重写：消费者绑定名在其值引用 span 上改写为 chunk 绑定名；
+            // 简写属性 token 同时充当属性键，改写为 `<旧名>: <新名>` 保住键。
+            for (old, rewrite) in &renames {
                 for span in &rewrite.spans {
                     if !contains(statement.span, *span) {
                         continue;
@@ -444,7 +447,12 @@ pub(crate) fn assemble_chunk(
                         );
                         continue;
                     }
-                    replacements.insert(*span, rewrite.new_name.clone());
+                    let text = if rewrite.shorthand_spans.contains(span) {
+                        format!("{old}: {}", rewrite.new_name)
+                    } else {
+                        rewrite.new_name.clone()
+                    };
+                    replacements.insert(*span, text);
                 }
             }
             // 表达式 default 物化：`export default <表达式>` 的前缀改写为
@@ -1133,6 +1141,9 @@ struct BindingRewrite {
     /// 落在活跃语句内的值引用 span（import/export 子句内的不发射，不入表；
     /// 声明改名时另含声明 token 自身）。
     spans: Vec<(usize, usize)>,
+    /// `spans` 中属于对象字面量简写属性 token 的 span：token 同时充当
+    /// 属性键，重写必须发 `<旧名>: <新名>` 而非裸新名。
+    shorthand_spans: Vec<(usize, usize)>,
 }
 
 /// 同 chunk 静态 import 绑定的预决议结果。
@@ -1383,6 +1394,7 @@ fn plan_binding_rewrite(
         )));
     }
     let mut spans: Vec<(usize, usize)> = Vec::with_capacity(binding.references.len());
+    let mut shorthand_spans: Vec<(usize, usize)> = Vec::new();
     for span in &binding.references {
         if source.get(span.0..span.1) != Some(old) {
             return Err(RewriteFailure::reject(format!(
@@ -1395,6 +1407,9 @@ fn plan_binding_rewrite(
             // 活跃语句切片即发射文本（export 包裹声明时切片含声明体），
             // 其中的引用必须全部重写。
             spans.push(*span);
+            if binding.shorthand_reference_spans.contains(span) {
+                shorthand_spans.push(*span);
+            }
         } else if !in_stripped {
             return Err(RewriteFailure::reject(format!(
                 "`{old}` 的引用 span {span:?} 既不在活跃语句也不在被移除的 import/export 子句内，无法判定发射归属"
@@ -1416,7 +1431,7 @@ fn plan_binding_rewrite(
             )));
         }
     }
-    Ok(BindingRewrite { new_name: new.to_string(), spans })
+    Ok(BindingRewrite { new_name: new.to_string(), spans, shorthand_spans })
 }
 
 /// 同 chunk 静态 import 绑定预决议：先于语句切片执行，产出 scope 重写计划
@@ -1644,8 +1659,9 @@ fn chunk_scans<'ctx>(
 /// `check_names` 发 `name_conflict` 显式拒绝（保守方向只多拒绝不漏引用）：
 /// - `scope_incomplete` 置位或绑定无 scope 事实：引用清单不可信/给不全；
 /// - `has_type_references`：类型位置引用无 span，无法一并改写；
-/// - `rename_unsafe`：声明 token 在解构模式内、或值引用是对象简写属性
-///   token，改写会连带改变属性键语义；
+/// - `rename_unsafe`：声明 token 在解构模式内，改写会连带改变属性键语义
+///   （值引用是对象简写属性 token 不构成拒绝：该 span 改写为
+///   `<旧名>: <新名>`，属性键保持不变）；
 /// - 声明/引用 span 切片回原文不是本名（事实与源码漂移），或引用发射
 ///   归属不可判定（既不在活跃语句、也不在被剪除语句与 import/export 子句）；
 /// - fresh 名与 chunk 内任何活跃声明名相同，或按词边界出现在任一模块的
@@ -1887,12 +1903,16 @@ fn try_plan_declaration_rename(
         return None;
     }
     let mut spans = vec![binding.declaration];
+    let mut shorthand_spans: Vec<(usize, usize)> = Vec::new();
     for span in &binding.references {
         if scan.source.get(span.0..span.1) != Some(name) {
             return None;
         }
         if scan.active_spans.iter().any(|outer| contains(*outer, *span)) {
             spans.push(*span);
+            if binding.shorthand_reference_spans.contains(span) {
+                shorthand_spans.push(*span);
+            }
             continue;
         }
         // 被剪除语句与 import/export 子句内的引用不进产物文本；其余位置
@@ -1918,7 +1938,7 @@ fn try_plan_declaration_rename(
             }
         }
     }
-    Some(BindingRewrite { new_name: fresh, spans })
+    Some(BindingRewrite { new_name: fresh, spans, shorthand_spans })
 }
 
 /// 替换文本偏移 → 切片原文偏移：落在替换新文本内取替换起点，

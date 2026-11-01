@@ -138,6 +138,11 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
             references: binding.references.into_iter().map(range).collect(),
             has_type_references: binding.has_type_references,
             rename_unsafe: binding.rename_unsafe,
+            shorthand_reference_spans: binding
+                .shorthand_reference_spans
+                .into_iter()
+                .map(range)
+                .collect(),
         })
         .collect();
     Ok(collector.record)

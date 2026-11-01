@@ -1124,6 +1124,77 @@ fn binding_rename_guards_reject() {
     }
 }
 
+/// 消费者重写的简写属性引用：`{ html }` 的 token 同时充当属性键，
+/// 重写必须发 `{ html: <落点名> }` 保住键，不得改写成 `{ <落点名> }`。
+#[test]
+fn shorthand_reference_rewrite_keeps_property_key() {
+    let root = temp_tree(
+        "shorthandconsumer",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { normalize as html } from './a.js';\nexport const main = omission({ html });\n",
+            ),
+            ("src/a.js", "export const normalize = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("omission({ html: normalize })"), "{code}");
+    assert!(!code.contains("omission({ normalize })"), "{code}");
+    assert!(!code.contains("omission({ html })"), "{code}");
+}
+
+/// 声明改名的简写属性引用：冲突声明改名后，其活跃文本内的简写 token
+/// 改写为 `{ 原名: <fresh> }`，属性键不变、值指向改名后的绑定。
+#[test]
+fn declaration_rename_rewrites_shorthand_reference() {
+    let root = temp_tree(
+        "shorthanddecl",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/a.js", "function body() { return 1; }\nexport const a = omission({ body });\n"),
+            ("src/b.js", "function body() { return 2; }\nexport const b = body();\n"),
+            (
+                "src/entry.js",
+                "import { a } from './a.js';\nimport { b } from './b.js';\nexport const main = a + b;\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    // a 的 `body` 简写引用保住属性键、值指向 fresh 名。
+    assert!(code.contains("{ body: body__vmz"), "{code}");
+    // 两侧声明都改名，chunk 文本内不再有裸 `function body`。
+    assert!(!code.contains("function body {"), "{code}");
+    assert!(code.contains("b = body__vmz"), "{code}");
+}
+
 /// 落点改名兜底：消费者重写因落点名碰撞失败时，落点声明模块的绑定自身
 /// 改名 `{landing}__vmz{node}`，导出面经 `export { fresh as 原名 }` 保持
 /// 原声明名（多 default 模块的具名面同样稳定），全部消费者重写为 fresh 名。
