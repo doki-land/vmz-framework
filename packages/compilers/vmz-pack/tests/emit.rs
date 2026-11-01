@@ -1604,10 +1604,11 @@ fn same_chunk_reexport_from_star_source_is_rejected() {
     );
 }
 
-/// 重导出 `export { default as x } from`：`export default <表达式>` 没有
-/// 绑定名可引用，解析不到绑定事实，显式拒绝。
+/// 重导出 `export { default as x } from`：`export default <表达式>` 物化为
+/// `const <物化绑定> = <表达式>`，重导出链落点即物化名，与 chunk 的
+/// `default` 面同一绑定两条导出；生成行回指原 `export default` 行。
 #[test]
-fn same_chunk_reexport_of_expression_default_is_rejected() {
+fn same_chunk_reexport_of_expression_default_materializes_binding() {
     let root = temp_tree(
         "reexportexprdefault",
         &[
@@ -1631,11 +1632,170 @@ fn same_chunk_reexport_of_expression_default_is_rejected() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
-    assert!(
-        codes(&errors).contains(&"vmz::pack::emit::reexport_rename_unsupported".to_string()),
-        "{errors:?}"
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    assert_eq!(plan.artifacts.len(), 1);
+    let artifact = &plan.artifacts[0];
+    let code = &artifact.code;
+    // 物化：原 `export default` 前缀改写为 const 声明，求值位置不变。
+    assert!(code.contains("const __vmz_default_2 = 42"), "{code}");
+    assert!(!code.contains("export default"), "{code}");
+    // 消费者 `answer` 经 scope 重写直接引用物化绑定。
+    assert!(code.contains("const main = __vmz_default_2"), "{code}");
+    // 同一绑定两条导出面：chunk 唯一 default 模块的 `default` 面 + 重导出名。
+    assert!(code.contains("export { __vmz_default_2 as default }"), "{code}");
+    assert!(code.contains("export { __vmz_default_2 as answer }"), "{code}");
+    // 行级映射：物化 const 所在生成行回指 lib.js 的 `export default` 行。
+    let mappings = decode_mappings(
+        &serde_json::from_str::<serde_json::Value>(&artifact.source_map).unwrap()["mappings"]
+            .as_str()
+            .unwrap(),
     );
+    let lib_index = artifact.modules.iter().position(|m| m.ends_with("src/lib.js")).unwrap() as u32;
+    let synth_line =
+        code.lines().position(|line| line.starts_with("const __vmz_default_")).unwrap();
+    assert_eq!(mappings[synth_line].as_slice(), &[(0, lib_index, 0, 0)], "{mappings:?}");
+}
+
+/// 同 chunk 消费表达式 default：`import cfg from` 的消费者绑定重写为物化
+/// 绑定名，chunk 内不产出任何 import 语句。
+#[test]
+fn expression_default_import_same_chunk_rewrites_consumer() {
+    let root = temp_tree(
+        "exprdefaultimport",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import cfg from './lib.js';\nexport const main = cfg.v;\n"),
+            ("src/lib.js", "export default { v: 1 };\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("const __vmz_default_1 = { v: 1 }"), "{code}");
+    assert!(code.contains("const main = __vmz_default_1.v"), "{code}");
+    assert!(code.contains("export { __vmz_default_1 as default }"), "{code}");
+    assert!(!code.contains("export default"), "{code}");
+    assert!(!code.contains("import"), "{code}");
+}
+
+/// 同 chunk 多个表达式 default（barrel 按名消费）：chunk 无统一 `default`
+/// 面，各物化绑定按自身名字成具名面，不再 `name_conflict`。
+#[test]
+fn multi_expression_default_chunk_emits_named_faces() {
+    let root = temp_tree(
+        "multidefault",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "import { a, b } from './barrel.js';\nexport const main = [a.n, b.n];\n",
+            ),
+            (
+                "src/barrel.js",
+                "export { default as a } from './l1.js';\nexport { default as b } from './l2.js';\n",
+            ),
+            ("src/l1.js", "export default { n: 1 };\n"),
+            ("src/l2.js", "export default { n: 2 };\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["main".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    let code = &plan.artifacts[0].code;
+    assert!(code.contains("const __vmz_default_"), "{code}");
+    assert!(code.contains("as a }"), "{code}");
+    assert!(code.contains("as b }"), "{code}");
+    // 多 default 面：chunk 不发任何 `as default`。
+    assert!(!code.contains("as default"), "{code}");
+    assert!(!code.contains("export default"), "{code}");
+    assert!(!code.contains("name_conflict"), "{code}");
+}
+
+/// 跨 chunk 消费多 default chunk：目标 chunk 无统一 `default` 面，消费按
+/// 来源模块的面名（物化绑定名）具名导入，两侧口径一致。
+#[test]
+fn cross_chunk_default_import_of_multi_default_chunk_uses_face_name() {
+    let root = temp_tree(
+        "crossdefault",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/one.js",
+                "import a from './l1.js';\nimport b from './l2.js';\nexport const x = [a.n, b.n];\n",
+            ),
+            (
+                "src/two.js",
+                "import a from './l1.js';\nimport b from './l2.js';\nexport const y = [a.n, b.n];\n",
+            ),
+            ("src/l1.js", "export default { n: 1 };\n"),
+            ("src/l2.js", "export default { n: 2 };\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("one".to_string(), root.join("src/one.js")),
+            ("two".to_string(), root.join("src/two.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "one".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["x".into()]),
+            },
+            EntryUse {
+                entry_logical: "two".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["y".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let shared = plan
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.modules.iter().any(|m| m.ends_with("src/l1.js")))
+        .expect("shared chunk with l1");
+    let shared_code = &shared.code;
+    // 多 default 模块的 chunk：物化 const + 具名面导出，无 `default` 面。
+    assert!(shared_code.contains("const __vmz_default_"), "{shared_code}");
+    assert!(shared_code.contains("export { __vmz_default_"), "{shared_code}");
+    assert!(!shared_code.contains("as default"), "{shared_code}");
+    for artifact in plan.artifacts.iter().filter(|a| a.chunk_id.starts_with("entry/")) {
+        let code = &artifact.code;
+        // 消费侧按面名具名导入（`import { <面名> as local } from`）。
+        assert!(code.contains("import { __vmz_default_"), "{code}");
+        assert!(!code.contains("export default"), "{code}");
+    }
 }
 
 /// 同 chunk `export *`：目标模块直接非类型具名导出沿事实链展开为具名

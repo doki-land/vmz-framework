@@ -24,9 +24,13 @@
 //! 事实链离开本 chunk 时与跨 chunk 分支同形态发 `export { … } from`；
 //! 同 chunk `export *` 枚举目标模块直接非类型具名导出（不递归星号链、
 //! `default` 不随星号传播），逐个沿同一事实链机制展开为具名导出；
-//! 解析不到绑定事实的形态（具名解析落在星号来源、具名来自表达式
-//! default、来源链成环、星号来源自身含活跃星号链）显式诊断拒绝，
-//! 不产出猜测文本。
+//! 解析不到绑定事实的形态（具名解析落在星号来源、来源链成环、星号
+//! 来源自身含活跃星号链）显式诊断拒绝，不产出猜测文本。
+//! 同 chunk `export default <表达式>` 物化为 `const <绑定名> = <表达式>`
+//! （绑定名按节点索引确定性生成，求值位置不变），导出面与具名 default
+//! 同一 deferred 机制合成：chunk 内唯一 default 模块时面名保持 `default`；
+//! 多个 default 模块时 chunk 无统一 `default` 面，各按发射绑定名成具名面，
+//! 跨 chunk 消费按同一口径解析面名后具名导入。
 //! `export * as ns` 与同 chunk 动态边界改写为对本 chunk 自身产物文件的
 //! 引用（第三遍占位符替换同样成立）：命名空间是原生 ESM 的真实
 //! Module Namespace，名字集按 chunk 粒度加宽，发非致命诊断
@@ -143,6 +147,14 @@ pub(crate) fn assemble_chunk(
     // 替换表注入切片。守卫不成立的冲突维持由 `check_names` 显式拒绝。
     let declaration_renames = plan_declaration_renames(context, chunk_index);
 
+    // 表达式 default 物化与 default 面快照：本 chunk 活跃 default 导出事实
+    // → 发射绑定名。唯一 default 模块时面名 `default`，多个时无统一
+    // `default` 面、各按绑定名成具名面。跨 chunk 消费侧用同一口径解析
+    // 面名（`default_faces` 按目标 chunk 缓存）。
+    let default_bindings = chunk_default_bindings(context, chunk_index);
+    let multi_default = default_bindings.len() > 1;
+    let mut default_faces: HashMap<usize, BTreeMap<usize, String>> = HashMap::new();
+
     for &node_index in &chunk.modules {
         let Some(node) = context.graph.nodes.get(node_index) else { continue };
         let Some(linked) = context.linked[node_index] else { continue };
@@ -150,6 +162,13 @@ pub(crate) fn assemble_chunk(
         let module_path = normalize_path(&node.resolved.path);
         let record = &node.record;
         let source_lines = vmz_generator::js::SourceLines::new(source);
+        // 表达式 default 物化目标：本模块首个 `export default <表达式>` 事实
+        // 的语句 span；语句切片命中时加前缀替换（活跃性由切片循环天然保证，
+        // 与 `chunk_default_bindings` 同一口径）。
+        let expr_default_span = record.exports.iter().find_map(|export| match export {
+            ExportFact::Default { local: None, span } => Some(*span),
+            _ => None,
+        });
 
         // 绑定使用判定输入：活跃语句 span、export 子句 span 与语法名字
         // 回退集。回退集是保守超集（含属性名与遮蔽标识符），只在 scope
@@ -419,6 +438,26 @@ pub(crate) fn assemble_chunk(
                     replacements.insert(*span, rewrite.new_name.clone());
                 }
             }
+            // 表达式 default 物化：`export default <表达式>` 的前缀改写为
+            // `const <物化绑定> = `，求值位置不变；导出面交给 deferred 机制。
+            if Some(statement.span) == expr_default_span {
+                let binding = expr_default_binding(node_index);
+                let Some(offset) = expression_default_prefix_len(raw) else {
+                    errors.push(
+                        inconsistent(format!(
+                            "`export default <表达式>` 切片前缀形态与事实不符（源码与事实漂移）"
+                        ))
+                        .with_path(module_path.clone())
+                        .with_span(statement.span),
+                    );
+                    continue;
+                };
+                replacements.insert(
+                    (statement.span.0, statement.span.0 + offset),
+                    format!("const {binding} = "),
+                );
+                declared.push((binding, module_path.clone()));
+            }
             let replaced = match apply_replacements(raw, statement.span.0, &replacements) {
                 Ok(text) => text,
                 Err(diagnostic) => {
@@ -477,24 +516,41 @@ pub(crate) fn assemble_chunk(
                         });
                     }
                 }
-                ExportFact::Default { local, span } => match local {
-                    Some(name) => deferred.push(DeferredExport {
-                        local: renamed_local(&renames, name),
-                        exported: "default".to_string(),
-                        module: module_path.clone(),
-                        is_default: true,
-                    }),
-                    None => {
-                        // `export default <表达式>` 的文本在语句切片里自带，
-                        // 切片活跃即占位一个 `default` 导出名。
-                        let active = linked.active_statements.iter().any(|&index| {
+                ExportFact::Default { local, span } => {
+                    // 导出面决议：chunk 内唯一 default 模块时保持 `default`
+                    // 面；多个 default 模块时无统一 `default` 面，各按发射
+                    // 绑定名成具名面（与 `default_face` 同一口径）。表达式
+                    // default 的发射绑定是物化名，活跃性按 export 语句 span
+                    // 匹配活跃语句（与链接层 `activate_span` 同口径）。
+                    let binding = match local {
+                        Some(name) => renamed_local(&renames, name),
+                        None => expr_default_binding(node_index),
+                    };
+                    let active = match local {
+                        Some(_) => true,
+                        None => linked.active_statements.iter().any(|&index| {
                             record.statements.get(index).is_some_and(|item| item.span == *span)
-                        });
-                        if active {
-                            export_names.push(("default".to_string(), module_path.clone()));
-                        }
+                        }),
+                    };
+                    if !active {
+                        continue;
                     }
-                },
+                    deferred.push(if multi_default {
+                        DeferredExport {
+                            local: binding.clone(),
+                            exported: binding,
+                            module: module_path.clone(),
+                            is_default: false,
+                        }
+                    } else {
+                        DeferredExport {
+                            local: binding,
+                            exported: "default".to_string(),
+                            module: module_path.clone(),
+                            is_default: true,
+                        }
+                    });
+                }
                 ExportFact::ReexportNamed { source, local, exported, type_only, .. } => {
                     if *type_only || !used_reexport(linked, export_index, is_named) {
                         continue;
@@ -517,8 +573,8 @@ pub(crate) fn assemble_chunk(
                         // 同 chunk 具名重导出：目标导出名沿导出事实链解析为
                         // chunk 内绑定名，与 deferred Local 同一机制决议；
                         // 链离开本 chunk 时按跨 chunk 同形态发 export-from。
-                        // 解析不到绑定事实（星号来源、表达式 default、成环）
-                        // 显式拒绝，不做名字猜测。
+                        // 解析不到绑定事实（星号来源、成环）显式拒绝，
+                        // 不做名字猜测。
                         match resolve_same_chunk_reexport(
                             context,
                             chunk_index,
@@ -868,7 +924,23 @@ pub(crate) fn assemble_chunk(
                                     bindings.named.insert((name, binding.local.clone()));
                                 }
                                 None => {
-                                    bindings.defaults.insert(binding.local.clone());
+                                    // 跨 chunk default：目标 chunk 有多个 default
+                                    // 模块时无统一 `default` 面，按来源模块的
+                                    // 面名具名导入（与发射侧同一口径）。
+                                    let face = default_face(
+                                        context,
+                                        synth_chunk,
+                                        target,
+                                        &mut default_faces,
+                                    );
+                                    match face {
+                                        Some(face) if face != "default" => {
+                                            bindings.named.insert((face, binding.local.clone()));
+                                        }
+                                        _ => {
+                                            bindings.defaults.insert(binding.local.clone());
+                                        }
+                                    }
                                 }
                             },
                             ImportedName::Namespace => {
@@ -1085,6 +1157,98 @@ fn contains_identifier(haystack: &str, needle: &str) -> bool {
         from = start + 1;
     }
     false
+}
+
+/// 表达式 default 的物化绑定名：`export default <表达式>` 在同 chunk 装配中
+/// 物化为 `const <本名> = <表达式>`，按节点索引确定性生成，不与产物占位符
+/// 前缀 `__vmz_chunk_` 重叠。
+fn expr_default_binding(node_index: usize) -> String {
+    format!("__vmz_default_{node_index}")
+}
+
+/// `export default <表达式>` 切片中被物化替换的前缀长度：`export` 与
+/// `default` 关键字及其间空白（表达式起点前的字节数）。关键字粘连、
+/// 空表达式等形态不符返回 `None`（源码与事实漂移，调用方显式拒绝）。
+fn expression_default_prefix_len(raw: &str) -> Option<usize> {
+    let bytes = raw.as_bytes();
+    let is_ident_byte = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b >= 0x80;
+    let skip_ws = |mut i: usize| {
+        while i < bytes.len() && matches!(bytes[i], b' ' | b'\t' | b'\r' | b'\n' | 0x0c) {
+            i += 1;
+        }
+        i
+    };
+    let start = skip_ws(0);
+    if raw.get(start..start + "export".len()) != Some("export") {
+        return None;
+    }
+    let after_export = start + "export".len();
+    if bytes.get(after_export).copied().is_some_and(is_ident_byte) {
+        return None;
+    }
+    let after_export = skip_ws(after_export);
+    if raw.get(after_export..after_export + "default".len()) != Some("default") {
+        return None;
+    }
+    let after_default = after_export + "default".len();
+    if bytes.get(after_default).copied().is_some_and(is_ident_byte) {
+        return None;
+    }
+    let expr = skip_ws(after_default);
+    (expr < bytes.len()).then_some(expr)
+}
+
+/// chunk 的 default 导出面快照：活跃 default 导出事实 → 发射绑定名。
+/// 具名 default 落声明名（声明改名守卫已排除被导出绑定，名字即发射名）；
+/// 表达式 default 落物化绑定名，活跃性按 export 语句 span 匹配活跃语句
+/// （与链接层 `activate_span` 同口径）。发射侧与消费侧共用本快照口径，
+/// 保证面名决议一致。
+fn chunk_default_bindings(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+) -> BTreeMap<usize, String> {
+    let mut bindings = BTreeMap::new();
+    for &node_index in &context.chunks.chunks[chunk_index].modules {
+        let Some(node) = context.graph.nodes.get(node_index) else { continue };
+        let Some(linked) = context.linked[node_index] else { continue };
+        let record = &node.record;
+        for export in &record.exports {
+            let ExportFact::Default { local, span } = export else { continue };
+            let active = linked.active_statements.iter().any(|&index| {
+                record.statements.get(index).is_some_and(|statement| match local {
+                    None => statement.span == *span,
+                    Some(name) => statement.declared_names.iter().any(|item| item == name),
+                })
+            });
+            if active {
+                bindings.entry(node_index).or_insert_with(|| match local {
+                    Some(name) => name.clone(),
+                    None => expr_default_binding(node_index),
+                });
+                break;
+            }
+        }
+    }
+    bindings
+}
+
+/// 目标 chunk 中某模块 default 导出的面名：独立发射 chunk 是真 ESM 文件，
+/// 恒为 `default`；平铺 chunk 内唯一 default 模块时为 `default`，多个时无
+/// 统一 `default` 面、按该模块的发射绑定名成面。`None` 表示该模块在本
+/// chunk 无活跃 default 导出（调用方按既有 `default` 面回退）。
+fn default_face(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+    node_index: usize,
+    cache: &mut HashMap<usize, BTreeMap<usize, String>>,
+) -> Option<String> {
+    if super::isolated::is_isolated_chunk(context, chunk_index) {
+        return Some("default".to_string());
+    }
+    let bindings =
+        cache.entry(chunk_index).or_insert_with(|| chunk_default_bindings(context, chunk_index));
+    let binding = bindings.get(&node_index)?.clone();
+    Some(if bindings.len() == 1 { "default".to_string() } else { binding })
 }
 
 /// 精确判定绑定是否被发射文本消费（仅在 scope 事实可信时有结论）：
@@ -1697,8 +1861,9 @@ enum ReexportBinding {
 }
 
 /// 同 chunk 具名重导出 → 绑定事实：从目标模块的导出事实逐跳解析
-/// （`Local` 与具名 `Default` 落在 chunk 内绑定名；`ReexportNamed` 沿边
-/// 继续走，跨 chunk 即停）。只有星号来源、表达式 default、来源链成环
+/// （`Local` 与具名 `Default` 落在 chunk 内绑定名；表达式 `Default` 落在
+/// 物化绑定名；`ReexportNamed` 沿边继续走，跨 chunk 即停，落点名为
+/// `default` 时按目标 chunk 的面名映射）。只有星号来源、来源链成环
 /// 解析不出绑定，显式拒绝。`code` 由调用方按语境给出（重导出语境与
 /// import 绑定预决议语境共用本解析器）。
 /// `Declared` 落点必然沿非类型导出事实行走，声明改名守卫已排除被导出
@@ -1737,18 +1902,12 @@ fn resolve_same_chunk_reexport(
                     if name != "default" {
                         continue;
                     }
-                    match local {
-                        Some(binding) => {
-                            return Some(ReexportBinding::Declared(binding.clone()));
-                        }
-                        None => {
-                            errors.push(unsupported(
-                                "同 chunk 重导出 `default`：`export default <表达式>` 无绑定名可引用，未实现"
-                                    .to_string(),
-                            ));
-                            return None;
-                        }
-                    }
+                    // 具名 default 落声明名；表达式 default 落物化绑定名
+                    //（装配侧同语句切片处物化为 `const <物化名> = <表达式>`）。
+                    return Some(ReexportBinding::Declared(match local {
+                        Some(binding) => binding.clone(),
+                        None => expr_default_binding(node),
+                    }));
                 }
                 ExportFact::ReexportNamed { source, local, exported, type_only, .. } => {
                     if *type_only || exported != &name {
@@ -1771,10 +1930,15 @@ fn resolve_same_chunk_reexport(
                         next = Some((step, local.clone()));
                         break;
                     }
-                    return Some(ReexportBinding::External {
-                        chunk: step_chunk,
-                        name: local.clone(),
-                    });
+                    // 落点名 `default` 按目标 chunk 的面名映射：多 default
+                    // 模块的 chunk 无统一 `default` 面，消费走面名具名形态。
+                    let name = if local == "default" {
+                        default_face(context, step_chunk, step, &mut HashMap::new())
+                            .unwrap_or_else(|| local.clone())
+                    } else {
+                        local.clone()
+                    };
+                    return Some(ReexportBinding::External { chunk: step_chunk, name });
                 }
                 _ => {}
             }
@@ -1909,9 +2073,8 @@ fn collect_direct_exports(
                     export_names.push((exported.clone(), module_path.clone()));
                 }
             }
-            ExportFact::Default { .. } => {
-                export_names.push(("default".to_string(), module_path.clone()));
-            }
+            // ESM 星号语义：`default` 不随 `export *` 传播，不参与收集。
+            ExportFact::Default { .. } => {}
             ExportFact::ReexportNamed { exported, type_only, .. } => {
                 if !type_only {
                     export_names.push((exported.clone(), module_path.clone()));
