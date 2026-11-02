@@ -1,7 +1,6 @@
 {
     "brand": {
-        "primary": "#1677FF",
-        "energy": "#FAAD14"
+        "primary": "#1677FF"
     },
     "scale": {
         "50": "#E6F4FF",
@@ -39,13 +38,6 @@
         "default": "#E5E6EB",
         "subtle": "#F0F1F3",
         "strong": "#C9CDD4"
-    },
-    "status": {
-        "success": "#52C41A",
-        "warning": "#FAAD14",
-        "error": "#FF4D4F",
-        "analysis": "#722ED1",
-        "runtime": "#13C2C2"
     },
     "font": {
         "sans": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Roboto, \"Helvetica Neue\", Arial, sans-serif",

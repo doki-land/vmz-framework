@@ -29,10 +29,6 @@
             "value": "#4096FF"
         },
         {
-            "key": { "path": ["brand", "energy"] },
-            "value": "#FFC53D"
-        },
-        {
             "key": { "path": ["surface", "paper"] },
             "value": "#1A1D21"
         },
