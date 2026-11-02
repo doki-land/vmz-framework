@@ -47,7 +47,7 @@ fn planner_copy_same_chunk_collision_with_isolated_pin_resolves() {
                  import { buildDeployPlan, DEFAULT_ANSWERS } from '../deploy/planner.js';\n\
                  import { plannerCopy as plannerLabels } from '../deploy/planner-copy.js';\n\
                  export default class Page {\n\
-                     copy() { return plannerCopy() + plannerCopyFailedLabel() + plannerCopyError(); }\n\
+                     copy() { return `${plannerCopy()} ${plannerCopyFailedLabel()} ${plannerCopyError()}`; }\n\
                      run() { return buildDeployPlan(DEFAULT_ANSWERS) + plannerLabels('zh-hans'); }\n\
                  }\n",
             ),
@@ -87,10 +87,7 @@ fn planner_copy_same_chunk_collision_with_isolated_pin_resolves() {
     let chunks = plan_chunks(&graph, &link_plan);
     // planner.js 的模板插值使其成为 isolated 单模块 chunk。
     assert!(
-        chunks
-            .chunks
-            .iter()
-            .any(|c| c.id.starts_with("isolated/") && c.modules.len() == 1),
+        chunks.chunks.iter().any(|c| c.id.starts_with("isolated/") && c.modules.len() == 1),
         "template-interpolation module must be isolated"
     );
     let plan = plan_emit(&graph, &link_plan, &chunks, &options())
@@ -100,11 +97,8 @@ fn planner_copy_same_chunk_collision_with_isolated_pin_resolves() {
         "{:?}",
         plan.diagnostics
     );
-    let entry = plan
-        .artifacts
-        .iter()
-        .find(|a| a.chunk_id.starts_with("entry/"))
-        .expect("entry chunk");
+    let entry =
+        plan.artifacts.iter().find(|a| a.chunk_id.starts_with("entry/")).expect("entry chunk");
     // 两个声明都改名落 fresh 名，面只发 canonical 一条别名导出。
     assert!(entry.code.contains("function plannerCopy__vmz"), "{}", entry.code);
     assert_eq!(entry.code.matches("as plannerCopy }").count(), 1, "{}", entry.code);
@@ -115,7 +109,10 @@ fn planner_copy_same_chunk_collision_with_isolated_pin_resolves() {
     let isolated = plan
         .artifacts
         .iter()
-        .find(|a| a.chunk_id.starts_with("isolated/") && a.modules.iter().any(|m| m.ends_with("src/deploy/planner.js")))
+        .find(|a| {
+            a.chunk_id.starts_with("isolated/")
+                && a.modules.iter().any(|m| m.ends_with("src/deploy/planner.js"))
+        })
         .expect("isolated planner chunk");
     let import_line = isolated
         .code
@@ -125,6 +122,26 @@ fn planner_copy_same_chunk_collision_with_isolated_pin_resolves() {
     assert!(
         import_line.contains("plannerCopy__vmz"),
         "isolated consumer must import the copy claimant's split face, got: {import_line}"
+    );
+    // 页面同样被隔离（编译产物含模板插值）：其 `plannerCopy as plannerLabels`
+    // 也必须落到 copy.js 的分裂面，而 `plannerCopy`（locales 具名导入）落
+    // canonical 面。
+    let page = plan
+        .artifacts
+        .iter()
+        .find(|a| {
+            a.chunk_id.starts_with("isolated/")
+                && a.modules.iter().any(|m| m.ends_with("src/pages/deploy-planner.client.js"))
+        })
+        .expect("isolated page chunk");
+    let labels_line = page
+        .code
+        .lines()
+        .find(|line| line.contains("plannerLabels") && line.contains("import"))
+        .unwrap_or("");
+    assert!(
+        labels_line.contains("plannerCopy__vmz") && labels_line.contains("as plannerLabels"),
+        "page alias import must read the split face, got: {labels_line}"
     );
 }
 

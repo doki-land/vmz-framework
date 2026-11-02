@@ -26,7 +26,9 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::diag::PackDiagnostic;
 use crate::graph::{EdgeKind, NodeKind};
-use crate::module::{ExportFact, ImportKind, ImportedName, ScopeIncompleteReason};
+use crate::module::{
+    ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ScopeIncompleteReason,
+};
 
 use super::assemble::{
     AssembledChunk, ChunkSegment, apply_replacements, chunk_of_node, json_text, map_replaced_offset,
@@ -253,6 +255,46 @@ pub(crate) fn assemble_isolated(
                         else {
                             continue;
                         };
+                        // 面名分裂后，绑定名必须映射到本模块事实链认领者的发射
+                        // 面名（如 `plannerCopy__vmzN as plannerCopy`）：只重写
+                        // 说明符会把跨 chunk 消费绑到 canonical 认领者（真实
+                        // 事故：static 装配期 `plannerCopy()` 调到了同名 locales
+                        // getter）。任一绑定面名漂移即整句重建，不再原地改写。
+                        let face_map = import
+                            .bindings
+                            .iter()
+                            .filter(|binding| !binding.inline_type_only)
+                            .map(|binding| {
+                                let source_name = match &binding.imported {
+                                    ImportedName::Default => "default".to_string(),
+                                    ImportedName::Name(name) => name.clone(),
+                                    ImportedName::Namespace => String::new(),
+                                };
+                                let emitted = if source_name.is_empty() {
+                                    source_name.clone()
+                                } else {
+                                    super::assemble::resolve_emitted_face(
+                                        context,
+                                        target_chunk,
+                                        target,
+                                        &source_name,
+                                    )
+                                };
+                                (binding, source_name, emitted)
+                            })
+                            .collect::<Vec<_>>();
+                        let needs_rebuild = face_map.iter().any(|(_, source_name, emitted)| {
+                            !source_name.is_empty() && *emitted != *source_name
+                        });
+                        if needs_rebuild {
+                            let text = rebuild_static_import(
+                                import,
+                                &face_map,
+                                &placeholder(target_chunk),
+                            );
+                            replacements.insert(import.span, text);
+                            continue;
+                        }
                         match import.specifier_span {
                             Some(span) => {
                                 replacements.insert(span, json_string(&placeholder(target_chunk)));
@@ -349,6 +391,22 @@ pub(crate) fn assemble_isolated(
                 else {
                     continue;
                 };
+                // 具名重导出的来源名同样要过面名分裂映射（与 import 同合同）：
+                // 来源名漂移时整句重建为 `export { <发射面名> as <对外名> }`。
+                if let ExportFact::ReexportNamed { local, exported, .. } = export {
+                    let emitted =
+                        super::assemble::resolve_emitted_face(context, target_chunk, target, local);
+                    if emitted != *local {
+                        let text = format!(
+                            "export {{ {} as {} }} from {};",
+                            emitted,
+                            exported,
+                            json_string(&placeholder(target_chunk))
+                        );
+                        replacements.insert(span, text);
+                        continue;
+                    }
+                }
                 match source_span {
                     Some(specifier_span) => {
                         replacements
@@ -436,6 +494,84 @@ pub(crate) fn assemble_isolated(
     }
 
     Some(AssembledChunk { code: erased, segments })
+}
+
+/// 面名分裂命中时的整句 import 重建：绑定按事实重排（default → 命名空间 →
+/// 具名子句），具名子句的来源名写发射面名（与本地名不同时 `as <本地名>`
+/// 保住本地绑定）。内联 `type` 绑定不参与面分裂，原文保留进具名子句。
+/// `face_map` 逐项对应非内联类型绑定与其发射面名（命名空间项为空串）。
+fn rebuild_static_import(
+    import: &ImportFact,
+    face_map: &[(&ImportBinding, String, String)],
+    placeholder_spec: &str,
+) -> String {
+    let mut default_part: Option<String> = None;
+    let mut namespace_part: Option<String> = None;
+    let mut named: Vec<String> = Vec::new();
+    for binding in &import.bindings {
+        if binding.inline_type_only {
+            let inner = match &binding.imported {
+                ImportedName::Name(name) => name.clone(),
+                ImportedName::Default => "default".to_string(),
+                ImportedName::Namespace => continue,
+            };
+            named.push(if inner == binding.local {
+                format!("type {inner}")
+            } else {
+                format!("type {inner} as {}", binding.local)
+            });
+            continue;
+        }
+        let emitted = face_map
+            .iter()
+            .find(|(b, _, _)| std::ptr::eq(*b, binding))
+            .map(|(_, _, emitted)| emitted.clone())
+            .unwrap_or_default();
+        match &binding.imported {
+            ImportedName::Default => {
+                if emitted.is_empty() || emitted == "default" {
+                    default_part = Some(binding.local.clone());
+                } else {
+                    named.push(format!("{emitted} as {}", binding.local));
+                }
+            }
+            ImportedName::Namespace => {
+                namespace_part = Some(format!("* as {}", binding.local));
+            }
+            ImportedName::Name(name) => {
+                let face = if emitted.is_empty() { name.clone() } else { emitted };
+                named.push(if face == binding.local {
+                    face
+                } else {
+                    format!("{face} as {}", binding.local)
+                });
+            }
+        }
+    }
+    let mut lhs = String::from("import ");
+    let mut need_sep = false;
+    if let Some(def) = default_part {
+        lhs.push_str(&def);
+        need_sep = true;
+    }
+    if let Some(ns) = namespace_part {
+        if need_sep {
+            lhs.push_str(", ");
+        }
+        lhs.push_str(&ns);
+        need_sep = true;
+    }
+    if !named.is_empty() {
+        if need_sep {
+            lhs.push_str(", ");
+        }
+        lhs.push_str(&format!("{{ {} }}", named.join(", ")));
+        need_sep = true;
+    }
+    if !need_sep {
+        return format!("import {};", json_string(placeholder_spec));
+    }
+    format!("{lhs} from {};", json_string(placeholder_spec))
 }
 
 /// CJS 模块的互操作壳发射（独立发射的 CJS 分支）。
