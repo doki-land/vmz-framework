@@ -72,6 +72,69 @@ if (!html.includes('class="shiki custom"') || !html.includes('data-lang="vos"'))
 }
 delete process.env.VMZ_DIST;
 
+console.log('plugin-shiki: null prop normalization (SSR regression)…');
+// Component props are nullable and a bound `null` overrides the prop default in
+// compiled components; runtime entries must normalize null theme/lang to the
+// defaults before touching the highlighter instead of crashing SSR.
+const recordingTextmate = path.join(tmp, 'recording-textmate.mjs');
+fs.writeFileSync(
+    recordingTextmate,
+    `export async function createVmzHighlighter() {
+  return {
+    codeToHtml(code, opts) {
+      globalThis.__vmzShikiProbe = (globalThis.__vmzShikiProbe || []).concat([{ lang: opts?.lang, theme: opts?.theme }]);
+      return '<pre class="shiki custom"><code>' + code + '</code></pre>';
+    },
+  };
+}
+`,
+    'utf8',
+);
+resetShikiRuntimeForTests();
+configureShiki({ textmate: pathToFileURL(recordingTextmate).href });
+const { highlightSync } = await import(pathToFileURL(distRuntime).href);
+const nullHtml = await highlight('const x = 1', null as unknown as string, null as unknown as string);
+if (!nullHtml.includes('class="shiki')) fail(`null theme/lang rejected the render: ${nullHtml.slice(0, 120)}`);
+const probeCalls = (globalThis as { __vmzShikiProbe?: Array<{ lang?: string; theme?: string }> }).__vmzShikiProbe || [];
+if (probeCalls.length !== 1) fail(`expected exactly one highlighter call, got ${JSON.stringify(probeCalls)}`);
+if (probeCalls[0]?.lang !== 'text' || probeCalls[0]?.theme !== 'vitesse-dark') {
+    fail(`null theme/lang not normalized at the highlighter boundary: ${JSON.stringify(probeCalls)}`);
+}
+const syncNull = highlightSync('const y = 2', null as unknown as string, null as unknown as string);
+if (!syncNull.includes('<pre')) fail(`highlightSync with null theme/lang did not render: ${syncNull.slice(0, 120)}`);
+
+console.log('plugin-shiki: render failure degrades…');
+// A highlighter whose codeToHtml throws must not take the page down: async and
+// sync entries both degrade to an escaped <pre> shell.
+const throwingTextmate = path.join(tmp, 'throwing-textmate.mjs');
+fs.writeFileSync(
+    throwingTextmate,
+    `export async function createVmzHighlighter() {
+  return {
+    codeToHtml() {
+      throw new Error("Cannot read properties of null (reading 'default')");
+    },
+  };
+}
+`,
+    'utf8',
+);
+resetShikiRuntimeForTests();
+configureShiki({ textmate: pathToFileURL(throwingTextmate).href });
+let fellBack = false;
+try {
+    const degraded = await highlight('a < b', 'ts', 'vitesse-dark');
+    fellBack = degraded.includes('shiki-fallback') && degraded.includes('a &lt; b');
+} catch {
+    fellBack = false;
+}
+if (!fellBack) fail('render failure did not degrade to escaped <pre>');
+const syncDegraded = highlightSync('c < d', 'ts', 'vitesse-dark');
+if (!syncDegraded.includes('shiki-fallback') || !syncDegraded.includes('c &lt; d')) {
+    fail(`highlightSync did not degrade after render failure: ${syncDegraded.slice(0, 120)}`);
+}
+
+
 console.log('plugin-shiki: package exports…');
 const pkg = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'package.json'), 'utf8'));
 if (!String(pkg.exports['.'].default).includes('dist/')) fail('main export must target dist/');

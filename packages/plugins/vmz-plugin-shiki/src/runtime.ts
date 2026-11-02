@@ -13,6 +13,24 @@ export type ShikiRuntimeConfig = {
 };
 
 const DEFAULT_TEXTMATE = 'vmz-textmate/shiki';
+const DEFAULT_THEME = 'vitesse-dark';
+const DEFAULT_LANG = 'text';
+
+/**
+ * Component props are nullable (`theme: string | null = null`) and a bound
+ * `null` overrides the prop default in the compiled component, so runtime
+ * entry points normalize before touching Shiki: `createHighlighter` rejects
+ * falsy theme/lang getters deep inside `@shikijs/core` (`normalizeGetter`
+ * dereferences the resolved module), which used to surface as a page-level
+ * SSR failure.
+ */
+function normalizeTheme(theme: string | null | undefined): string {
+    return typeof theme === 'string' && theme.trim() ? theme : DEFAULT_THEME;
+}
+
+function normalizeLang(lang: string | null | undefined): string {
+    return typeof lang === 'string' && lang.trim() ? lang : DEFAULT_LANG;
+}
 
 /**
  * Shiki writes `background-color` and `color` inline on `<pre>`, which makes
@@ -110,7 +128,9 @@ async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighte
         };
         const factory = mod.createVmzHighlighter ?? mod.createHighlighter ?? mod.default?.createVmzHighlighter;
         if (typeof factory === 'function') {
-            return factory({ themes, langs: [] });
+            // `return await` (not `return`): a rejected factory promise must be
+            // caught here so the generic Shiki path below still runs.
+            return await factory({ themes, langs: [] });
         }
     } catch {
         /* try generic shiki below */
@@ -132,7 +152,8 @@ export async function prewarmShiki(opts: { themes?: string[] } = {}): Promise<Co
     if (pending) return pending;
     pending = (async () => {
         await resolveRuntimeConfig();
-        const themes = opts.themes?.length ? opts.themes : config.themes?.length ? config.themes : ['vitesse-dark'];
+        const requested = opts.themes?.length ? opts.themes : config.themes?.length ? config.themes : [DEFAULT_THEME];
+        const themes = requested.map((theme) => normalizeTheme(theme));
         const fromTextmate = await loadTextmateHighlighter(themes);
         cached = fromTextmate ?? (await loadGenericHighlighter(themes));
         return cached!;
@@ -140,12 +161,20 @@ export async function prewarmShiki(opts: { themes?: string[] } = {}): Promise<Co
     return pending;
 }
 
-export async function highlight(code: string, lang = 'text', theme = 'vitesse-dark'): Promise<string> {
-    const highlighter = await prewarmShiki({ themes: [theme] });
+export async function highlight(code: string, lang = 'text', theme: string | null = DEFAULT_THEME): Promise<string> {
+    const safeTheme = normalizeTheme(theme);
+    const safeLang = normalizeLang(lang);
+    let highlighter: CodeHighlighter;
+    try {
+        highlighter = await prewarmShiki({ themes: [safeTheme] });
+    } catch {
+        // Highlighter bootstrap failure must not take the page down.
+        return fallbackPre(code);
+    }
     try {
         return highlighter.codeToHtml(code ?? '', {
-            lang: lang || 'text',
-            theme,
+            lang: safeLang,
+            theme: safeTheme,
             transformers: [stripPreInlineStyle],
         });
     } catch {
@@ -154,12 +183,12 @@ export async function highlight(code: string, lang = 'text', theme = 'vitesse-da
 }
 
 /** Sync highlight when prewarmed; otherwise escaped `<pre><code>`. */
-export function highlightSync(code: string, lang = 'text', theme = 'vitesse-dark'): string {
+export function highlightSync(code: string, lang = 'text', theme: string | null = DEFAULT_THEME): string {
     if (!cached) return fallbackPre(code);
     try {
         return cached.codeToHtml(code ?? '', {
-            lang: lang || 'text',
-            theme,
+            lang: normalizeLang(lang),
+            theme: normalizeTheme(theme),
             transformers: [stripPreInlineStyle],
         });
     } catch {
