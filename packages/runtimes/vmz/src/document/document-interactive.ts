@@ -230,15 +230,23 @@ export interface RenderIslandShellsOpts {
 /** Render SSR island shells (no script — resume later). */
 export function renderIslandShellsHtml(opts: RenderIslandShellsOpts): { searchHtml: string; playgroundHtml: string } {
     const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const zh = opts.locale.toLowerCase().startsWith('zh');
+    const label = zh ? '搜索文档' : 'Search docs';
+    const hint = zh ? '搜索需要 JavaScript；无脚本时请使用导航。' : 'Search needs JavaScript; use the navigation without it.';
+    // Static form skeleton: readable without JS; `assets/vmz-document.js`
+    // wires it to the search index (framework-owned enhancement module).
     const search = `
   <div
     data-vmz-island="DocumentSearch"
     data-vmz-resume="island"
     data-vmz-search-index="${esc(opts.searchIndexHref)}"
+    class="doc-search"
     role="search"
-    aria-label="Document search"
+    aria-label="${esc(label)}"
   >
-    <p class="doc-search-fallback">Search requires Island resume; use navigation without JavaScript.</p>
+    <input type="search" class="doc-search__input" placeholder="${esc(label)}" aria-label="${esc(label)}" autocomplete="off" aria-expanded="false" />
+    <ol class="doc-search__results" role="listbox" hidden></ol>
+    <p class="doc-search__hint">${esc(hint)}</p>
   </div>`;
 
     const playgrounds = (opts.islands?.islands || [])

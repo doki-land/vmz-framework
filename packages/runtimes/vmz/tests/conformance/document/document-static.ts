@@ -67,7 +67,16 @@ if (!fs.existsSync(zhIndex)) fail(`missing ${zhIndex}`);
 if (!fs.existsSync(zhInstall)) fail(`missing ${zhInstall}`);
 
 const html = fs.readFileSync(zhIndex, 'utf8');
-if (/<script[\s>]/i.test(html)) fail('no-JS gate: index.html must not require <script>');
+// no-JS readable gate: the only script allowed is the framework enhancement
+// module (search + copy); the page content must not depend on it.
+const scriptTags = html.match(/<script[^>]*>/gi) || [];
+const foreignScripts = scriptTags.filter((t) => !/\/assets\/vmz-document\.js/.test(t));
+if (foreignScripts.length) fail(`unexpected <script> beyond the document enhancement module: ${foreignScripts.join(' ')}`);
+if (!scriptTags.some((t) => /src="\/assets\/vmz-document\.js"/.test(t) && /type="module"/.test(t))) {
+    fail('document enhancement module not referenced');
+}
+const clientJsPath = path.join(outDir, 'assets', 'vmz-document.js');
+if (!fs.existsSync(clientJsPath)) fail('missing assets/vmz-document.js');
 if (!/<nav[^>]*aria-label="Documents"/i.test(html)) fail('missing Documents nav landmark');
 if (!/<main\b/i.test(html)) fail('missing main landmark');
 if (!html.includes('欢迎阅读') && !html.includes('VMZ')) fail('body content missing');
@@ -80,6 +89,10 @@ if (!html.includes('class="doc-breadcrumb"')) fail('missing document breadcrumb'
 if (!html.includes('href="/docs/zh-hans/guide/install"')) fail('nav links must be route-form (no .html file paths)');
 if (/href="\.\/[^"]*\.html"/i.test(html)) fail('relative .html file links must not appear in the document page');
 if (/href="[^"]*\.md["#]/i.test(html)) fail('author .md links must be rewritten to routes');
+// Search shell: static form skeleton wired to the index artifact.
+if (!/data-vmz-search-index="[^"]*document\.search\.json"/i.test(html)) fail('search shell must point at document.search.json');
+if (!/class="doc-search__input"/i.test(html)) fail('missing static search input (no-JS skeleton)');
+if (manifest.build?.clientJs !== 'assets/vmz-document.js') fail(`manifest.build.clientJs ${manifest.build?.clientJs}`);
 
 const viewPath = path.join(outDir, 'views', 'zh-hans', 'index.view.json');
 if (!fs.existsSync(viewPath)) fail(`missing view fragment ${viewPath}`);
@@ -92,6 +105,26 @@ const installHtml = fs.readFileSync(zhInstall, 'utf8');
 if (!/id="requirements"/i.test(installHtml)) {
     fail(`install page missing requirements anchor`);
 }
+// Heading self anchors are build-time markup (no-JS usable), h2+ only.
+if (!/<h2 id="requirements">Requirements<a href="#requirements" class="h-anchor"/i.test(installHtml)) {
+    fail(`install page missing h-anchor self link on Requirements heading`);
+}
+if (/<h1 id="[^"]*"[^>]*>[^<]*<a [^>]*class="h-anchor"/i.test(installHtml)) {
+    fail('h1 page title must not carry a self anchor');
+}
+
+console.log(': fence highlight via engines.code (fixture declares shiki)…');
+const evidencePage = path.join(outDir, 'docs', 'zh-hans', 'guide', 'evidence.html');
+if (!fs.existsSync(evidencePage)) fail(`missing ${evidencePage}`);
+const evidenceHtml = fs.readFileSync(evidencePage, 'utf8');
+// The fixture ts fence must be statically colored at build time: token spans
+// carry the theme colors inline, while the pre surface is token-owned (the
+// Shiki inline background is stripped).
+if (!/<pre[^>]*><code[^>]*>[\s\S]*<span style="color:/i.test(evidenceHtml)) {
+    fail('ts fence missing static shiki token spans (engines.code not wired?)');
+}
+const preTag = evidenceHtml.match(/<pre[^>]*>/i)?.[0] || '';
+if (/style=/i.test(preTag)) fail(`pre inline style must be stripped (token-owned surface): ${preTag}`);
 
 console.log(': broken link must fail check…');
 const badDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-d1-bad-'));

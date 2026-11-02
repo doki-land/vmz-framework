@@ -83,19 +83,79 @@ export const DOCUMENT_BASE_CSS = `/* vmz document layer — canonical document s
     font-weight: 500;
 }
 
-.doc-search-fallback {
+.doc-search {
     margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--vmz-line-default, #e5e6eb);
+    position: relative;
+}
+
+.doc-search__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4375rem 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: var(--vmz-text-ink, #1f2329);
+    background: var(--vmz-surface-paper, #ffffff);
+    border: 1px solid var(--vmz-line-default, #e5e6eb);
+    border-radius: 6px;
+}
+
+.doc-search__input:focus-visible {
+    outline: 2px solid var(--vmz-brand-primary, #1677ff);
+    outline-offset: 1px;
+}
+
+.doc-search__results {
+    list-style: none;
+    margin: 0.375rem 0 0;
+    padding: 0.25rem;
+    display: grid;
+    gap: 1px;
+    background: var(--vmz-surface-paper, #ffffff);
+    border: 1px solid var(--vmz-line-default, #e5e6eb);
+    border-radius: 6px;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
+.doc-search__results[hidden] {
+    display: none;
+}
+
+.doc-search__results a {
+    display: block;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--vmz-text-steel, #51565d);
+    text-decoration: none;
+    border-radius: 4px;
+    overflow-wrap: break-word;
+}
+
+.doc-search__ctx {
+    color: var(--vmz-text-muted, #6b7178);
+}
+
+.doc-search__results li[aria-selected="true"] a,
+.doc-search__results a:hover {
+    background: var(--vmz-surface-mist, #f7f8fa);
+    color: var(--vmz-text-ink, #1f2329);
+}
+
+.doc-search__empty {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--vmz-text-muted, #6b7178);
+}
+
+.doc-search__hint {
+    margin: 0.375rem 0 0;
     font-size: 0.75rem;
     line-height: 1.5;
     color: var(--vmz-text-muted, #6b7178);
-    border-top: 1px solid var(--vmz-line-default, #e5e6eb);
-    padding-top: 0.75rem;
-}
-
-[data-vmz-island="DocumentSearch"] {
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--vmz-line-default, #e5e6eb);
 }
 
 /* Content grid --------------------------------------------------------- */
@@ -245,6 +305,7 @@ export const DOCUMENT_BASE_CSS = `/* vmz document layer — canonical document s
     text-decoration: underline;
     text-underline-offset: 2px;
     text-decoration-color: var(--vmz-line-strong, #c9cdd4);
+    overflow-wrap: break-word;
 }
 
 .doc-content main a:hover {
@@ -276,6 +337,7 @@ export const DOCUMENT_BASE_CSS = `/* vmz document layer — canonical document s
 
 /* Code blocks: near-black surface, token chrome, theme-owned syntax colors */
 .doc-content main pre {
+    position: relative;
     margin: 0 0 1.375rem;
     padding: 1.125rem 1.25rem;
     overflow-x: auto;
@@ -286,6 +348,52 @@ export const DOCUMENT_BASE_CSS = `/* vmz document layer — canonical document s
     font-size: 0.84375rem;
     line-height: 1.7;
     tab-size: 4;
+}
+
+/* Copy button (injected by assets/vmz-document.js; hidden without JS) */
+.doc-copy {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.1875rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--vmz-text-muted, #6b7178);
+    background: var(--vmz-surface-mist, #f7f8fa);
+    border: 1px solid var(--vmz-line-default, #e5e6eb);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+pre:hover .doc-copy,
+pre:focus-within .doc-copy,
+.doc-copy:focus-visible {
+    opacity: 1;
+}
+
+.doc-copy--done {
+    color: var(--vmz-status-success-accent, #237804);
+}
+
+/* Heading self anchors (build-time, no-JS usable) */
+.h-anchor {
+    margin-left: 0.4em;
+    font-size: 0.8em;
+    font-weight: 400;
+    text-decoration: none;
+    color: var(--vmz-text-muted, #6b7178);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.doc-content main h2:hover .h-anchor,
+.doc-content main h3:hover .h-anchor,
+.doc-content main h4:hover .h-anchor,
+.h-anchor:focus-visible {
+    opacity: 1;
 }
 
 .doc-content main pre code {

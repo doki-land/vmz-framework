@@ -70,9 +70,13 @@ if (!(islands.islands || []).some((i) => i.kind === 'playground' && i.fence?.pla
 const evidenceHtml = path.join(outDir, 'docs', 'zh-hans', 'guide', 'evidence.html');
 if (!fs.existsSync(evidenceHtml)) fail(`missing ${evidenceHtml}`);
 const html = fs.readFileSync(evidenceHtml, 'utf8');
-if (/<script[\s>]/i.test(html)) fail('no-JS gate: evidence.html must not include <script>');
+// no-JS readable: only the framework enhancement module may appear as script.
+const foreignScripts = (html.match(/<script[^>]*>/gi) || []).filter((t) => !/\/assets\/vmz-document\.js/.test(t));
+if (foreignScripts.length) fail(`unexpected <script> beyond vmz-document.js: ${foreignScripts.join(' ')}`);
+if (!fs.existsSync(path.join(outDir, 'assets', 'vmz-document.js'))) fail('missing assets/vmz-document.js');
 if (!/data-vmz-hydrate="island-only"/i.test(html)) fail('missing body data-vmz-hydrate=island-only');
 if (!/data-vmz-island="DocumentSearch"/i.test(html)) fail('missing DocumentSearch island shell');
+if (!/class="doc-search__input"/i.test(html)) fail('missing static search input skeleton');
 if (!/data-vmz-island="DocumentPlayground:/i.test(html)) fail('missing DocumentPlayground island shell');
 if (!/data-vmz-search-index="[^"]*document\.search\.json"/i.test(html)) {
     fail('DocumentSearch must point at document.search.json');

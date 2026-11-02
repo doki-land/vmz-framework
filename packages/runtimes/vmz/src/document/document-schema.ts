@@ -158,6 +158,8 @@ export interface DocumentBuildMeta {
     designsCss?: string | null;
     /** Framework document base stylesheet href (`assets/vmz-document.css`). */
     documentCss?: string | null;
+    /** Framework client enhancement href (`assets/vmz-document.js`). */
+    clientJs?: string | null;
     hostShell?: string;
     pages?: Array<{ route: string; htmlPath: string; viewPath: string }>;
     evidence?: string;

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkDocuments, manifestHasErrors } from './document-check.js';
 import { DOCUMENT_BASE_CSS } from './document-base-css.js';
+import { DOCUMENT_CLIENT_HREF, DOCUMENT_CLIENT_JS } from './document-client.js';
 import { resolveDocumentDesignsCss } from './document-designs.js';
 import { enrichDocumentContent, pageHtmlRel, pageRoute, routeHrefForDocLink, type AnalyzedMarkdown, type DocumentHeading, type DocumentNavItem } from './document-enrich.js';
 import { enrichDocumentEvidence } from './document-evidence.js';
@@ -116,6 +117,10 @@ export async function buildDocuments(opts: BuildDocumentsOpts): Promise<BuildDoc
     const baseCssPath = path.join(outDir, designs.baseHref);
     fs.mkdirSync(path.dirname(baseCssPath), { recursive: true });
     fs.writeFileSync(baseCssPath, DOCUMENT_BASE_CSS, 'utf8');
+    // Framework client enhancement (search + copy) ships with every build.
+    const clientPath = path.join(outDir, DOCUMENT_CLIENT_HREF);
+    fs.mkdirSync(path.dirname(clientPath), { recursive: true });
+    fs.writeFileSync(clientPath, DOCUMENT_CLIENT_JS, 'utf8');
     if (designs.tokensCss && designs.tokensHref) {
         const cssPath = path.join(outDir, designs.tokensHref);
         fs.mkdirSync(path.dirname(cssPath), { recursive: true });
@@ -171,6 +176,7 @@ export async function buildDocuments(opts: BuildDocumentsOpts): Promise<BuildDoc
             html: bodyHtml,
             designsCss: designs.tokensHref,
             documentCss: designs.baseHref,
+            clientJs: DOCUMENT_CLIENT_HREF,
             noJsReadable: true,
             hydrate: 'island-only',
             hostShell: useCompiledShell ? 'compiled-layout' : false,
@@ -218,6 +224,7 @@ export async function buildDocuments(opts: BuildDocumentsOpts): Promise<BuildDoc
             designs: designs.source,
             designsCss: designs.tokensHref,
             documentCss: designs.baseHref,
+            clientJs: DOCUMENT_CLIENT_HREF,
             hostShell: useCompiledShell ? 'compiled-layout' : 'standalone',
             pages: written,
             evidence: 'document.evidence.json',
@@ -326,9 +333,11 @@ interface RenderStaticHtmlOpts {
 }
 
 /**
- * No-JS readable static HTML: nav + main landmarks, Island shells without scripts.
- * Integrated mounts wrap content in compiled DocumentLayout (SiteHeader/SiteFooter SSR);
- * standalone mounts emit the same `.site.site--docs > .doc-body` skeleton themselves.
+ * No-JS readable static HTML: nav + main landmarks, Island shells, and exactly
+ * one deferred framework enhancement module (`assets/vmz-document.js` — search
+ * filter + copy buttons). Integrated mounts wrap content in compiled
+ * DocumentLayout (SiteHeader/SiteFooter SSR); standalone mounts emit the same
+ * `.site.site--docs > .doc-body` skeleton themselves.
  */
 function renderStaticHtml({
     title,
@@ -348,14 +357,16 @@ function renderStaticHtml({
     if (tokensHref) cssHrefs.push(`/${tokensHref}`);
     cssHrefs.push(`/${baseHref}`);
 
+    const enhancement = `<script type="module" src="/${DOCUMENT_CLIENT_HREF}"></script>`;
     const bodyInner = useCompiledShell
-        ? compiledLayoutHtml || ''
+        ? `${compiledLayoutHtml || ''}\n  ${enhancement}`
         : `  <a class="skip-link" href="#main">Skip to content</a>
   <div class="site site--docs">
     <div class="doc-body">
 ${slotHtml}
     </div>
   </div>
+  ${enhancement}
 `;
 
     const native = requireNativeAddon();
@@ -371,16 +382,22 @@ ${slotHtml}
     });
 }
 
-/** Render-pass hooks: fence highlight + author link → route-form rewrite. */
+/** Render-pass hooks: fence highlight + author link → route-form rewrite + heading anchors. */
 function documentRenderHooks(
     page: PageRecord,
     routeBase: string,
     pageKeySet: Map<string, Set<string>>,
     routing: LocalesRouting,
     highlighter: DocumentCodeHighlighter | null,
-): { highlight?: (code: string, lang: string) => string; resolveHref?: (href: string) => string | null } {
+): {
+    highlight?: (code: string, lang: string) => string;
+    resolveHref?: (href: string) => string | null;
+    headingAnchor?: (heading: { id: string; text: string; level: number }) => string | null;
+} {
     return {
         resolveHref: (href) => routeHrefForDocLink(href, page.identity.pageKey, page.identity.locale, routeBase, pageKeySet, routing),
+        // Self-links on h2+ (the h1 is the page title — anchoring it is noise).
+        headingAnchor: (h) => (h.level >= 2 ? `#${h.id}` : null),
         ...(highlighter ? { highlight: (code: string, lang: string) => highlighter.highlightFenceInline(code, lang) } : {}),
     };
 }

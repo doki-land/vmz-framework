@@ -13,6 +13,8 @@
         "@vmz/core": "workspace:*"
     },
     "devDependencies": {
+        "@vmz/plugin-markdown-it": "workspace:*",
+        "@vmz/plugin-shiki": "workspace:*",
         "vmz": "workspace:*"
     }
 }
