@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="diagram" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @click="_onClick" @keydown="_onKeydown" class="vmz-ui-charts__diagram" :style="hostStyle" :data-theme="_themeName()" tabindex="0" role="img" :aria-label="_ariaLabel()" :aria-describedby="_srId()">
+    <div data-vmz-ui-charts="diagram" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @click="_onClick" @keydown="_onKeydown" :data-theme="_themeName()" tabindex="0" role="img" :aria-label="_ariaLabel()" :aria-describedby="_srId()" class="vmz-ui-charts__diagram" :style="hostStyle">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">
             No diagram spec.
         </div>
@@ -16,10 +16,12 @@
                 {{ d.message }}
             </div>
         </div>
-        <div v-if="_tooltip.visible" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()" aria-live="polite">
+        <div v-if="_tooltip.visible" aria-live="polite" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()">
             {{ _tooltip.text }}
         </div>
-        <div class="vmz-ui-charts__sr" :id="_srId()">{{ _summary() }}</div>
+        <div :id="_srId()" class="vmz-ui-charts__sr">
+            {{ _summary() }}
+        </div>
     </div>
 </template>
 <style>
@@ -32,15 +34,15 @@
     box-sizing: border-box;
 }
 .vmz-ui-charts__diagram[data-theme="dark"] {
-    background: var(--vmz-surface-paper-dark, #0b1220);
-    border-color: var(--vmz-line-default-dark, #1f2937);
+    background: var(--vmz-surface-paper, #0b1220);
+    border-color: var(--vmz-line-default, #1f2937);
 }
 .vmz-ui-charts__diagram:focus-visible {
-    outline: 2px solid #1677ff;
+    outline: 2px solid var(--vmz-brand-primary, #1677ff);
     outline-offset: 2px;
 }
 .vmz-ui-charts__diagram[data-theme="dark"]:focus-visible {
-    outline-color: #60a5fa;
+    outline-color: var(--vmz-brand-primary, #60a5fa);
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__svg {
     width: 100%;
@@ -57,12 +59,22 @@
     transition: opacity 0.15s ease;
 }
 @keyframes vmz-diagram-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: none; }
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 @media (prefers-reduced-motion: reduce) {
-    .vmz-ui-charts__diagram .vmz-ui-charts__svg svg { animation: none; }
-    .vmz-ui-charts__diagram .vmz-ui-charts__svg svg [data-dvz-id] { transition: none; }
+    .vmz-ui-charts__diagram .vmz-ui-charts__svg svg {
+        animation: none;
+    }
+    .vmz-ui-charts__diagram .vmz-ui-charts__svg svg [data-dvz-id] {
+        transition: none;
+    }
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__empty {
     width: 100%;
@@ -78,7 +90,7 @@
     top: 0;
     left: 0;
     right: 0;
-    background: #b91c1c;
+    background: var(--vmz-status-danger-foreground, #b91c1c);
     color: #fff;
     font-size: 0.75rem;
     padding: 4px 8px;
@@ -98,24 +110,24 @@
     border-top: 1px solid var(--vmz-line-default, #e5e5e5);
 }
 .vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__diag {
-    background: color-mix(in srgb, var(--vmz-surface-paper-dark, #0b1220) 88%, transparent);
-    border-top-color: var(--vmz-line-default-dark, #1f2937);
+    background: color-mix(in srgb, var(--vmz-surface-paper, #0b1220) 88%, transparent);
+    border-top-color: var(--vmz-line-default, #1f2937);
     color: #e5e7eb;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item {
     padding: 1px 0;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item[data-sev="error"] {
-    color: #b91c1c;
+    color: var(--vmz-status-danger-foreground, #b91c1c);
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item[data-sev="warning"] {
-    color: #b7791f;
+    color: var(--vmz-status-warning-foreground, #b7791f);
 }
 .vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__diag-item[data-sev="error"] {
-    color: #f87171;
+    color: var(--vmz-status-danger-foreground, #f87171);
 }
 .vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__diag-item[data-sev="warning"] {
-    color: #fbbf24;
+    color: var(--vmz-status-warning-foreground, #fbbf24);
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__tooltip {
     position: absolute;
