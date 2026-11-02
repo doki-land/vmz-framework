@@ -6,3 +6,4 @@ export * from "./version.js";
 export * from "./validate.js";
 export * from "./resolve.js";
 export * from "./svg.js";
+export * from "./canvas.js";

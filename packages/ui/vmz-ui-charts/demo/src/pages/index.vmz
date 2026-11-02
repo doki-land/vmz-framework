@@ -1,32 +1,42 @@
 <template>
-    <main class="gallery" :data-theme="dark ? 'dark' : 'light'">
+    <main :data-theme="dark ? 'dark' : 'light'" class="gallery">
         <header class="gallery__head">
             <div>
-                <p class="gallery__kicker">@vmz/ui-charts · DaVinci</p>
-                <h1>Chart gallery</h1>
+                <p class="gallery__kicker">
+                    @vmz/ui-charts · DaVinci
+                </p>
+                <h1>
+                    Chart gallery
+                </h1>
                 <p class="gallery__lead">
                     同一套 ChartSpec + DataSnapshot 驱动全部卡片:SVG 由 DaVinci 引擎输出,组件只负责绑定、容器尺寸与交互。
                 </p>
             </div>
-            <button type="button" class="gallery__theme" @click="() => toggleDark()">
+            <button type="button" @click="() => toggleDark()" class="gallery__theme">
                 {{ dark ? "Light mode" : "Dark mode" }}
             </button>
         </header>
-
-        <section v-for="item in examples" :key="item.id" class="card" :id="item.id">
+        <section v-for="item in examples" :key="item.id" :id="item.id" class="card">
             <header class="card__head">
-                <h2>{{ item.title }}</h2>
-                <p>{{ item.note }}</p>
+                <h2>
+                    {{ item.title }}
+                </h2>
+                <p>
+                    {{ item.note }}
+                </p>
             </header>
             <div class="card__canvas">
                 <Chart :spec="item.spec" :data="item.rows" :height="300" theme="light" :label="item.title" />
             </div>
         </section>
-
         <section class="card">
             <header class="card__head">
-                <h2>暗色主题 · 跟随切换</h2>
-                <p>本区图表响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。</p>
+                <h2>
+                    暗色主题 · 跟随切换
+                </h2>
+                <p>
+                    本区图表响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。
+                </p>
             </header>
             <div class="card__canvas">
                 <Chart :spec="darkLineSpec" :data="darkLineRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed line" />
@@ -41,48 +51,70 @@
                 <Chart :spec="darkRadarSpec" :data="darkRadarRows" :height="300" :theme="dark ? 'dark' : 'light'" label="dark themed radar" />
             </div>
         </section>
-
         <section class="card">
             <header class="card__head">
-                <h2>主题定制 · 品牌令牌</h2>
-                <p>themeTokens 浅合并到亮暗基础主题,色板/网格/透明度逐项可换。</p>
+                <h2>
+                    主题定制 · 品牌令牌
+                </h2>
+                <p>
+                    themeTokens 浅合并到亮暗基础主题,色板/网格/透明度逐项可换。
+                </p>
             </header>
             <div class="card__canvas">
                 <Chart :spec="brandSpec" :data="brandRows" :height="300" :theme="dark ? 'dark' : 'light'" :themeTokens="brandTokens" label="brand themed stacked area" />
             </div>
         </section>
-
         <section class="card">
             <header class="card__head">
-                <h2>数据表视图 · 可切换降级</h2>
-                <p>同一 Chart 组件切到原生表格渲染,图表形态下读屏器也能经 aria-describedby 拿到隐藏表格。</p>
+                <h2>
+                    数据表视图 · 可切换降级
+                </h2>
+                <p>
+                    同一 Chart 组件切到原生表格渲染,图表形态下读屏器也能经 aria-describedby 拿到隐藏表格。
+                </p>
             </header>
-            <button type="button" class="gallery__theme" @click="() => toggleTable()">{{ tableView ? "Chart view" : "Table view" }}</button>
+            <button type="button" @click="() => toggleTable()" class="gallery__theme">
+                {{ tableView ? "Chart view" : "Table view" }}
+            </button>
             <div class="card__canvas">
                 <Chart :spec="tableSpec" :data="tableRows" :height="300" :theme="dark ? 'dark' : 'light'" :tableView="tableView" label="weekly visitors by product" />
             </div>
         </section>
-
         <section class="card">
             <header class="card__head">
-                <h2>流程图 · 编译管线</h2>
-                <p>边裁剪到节点边界,箭头真实绘制,边标签带底衬不被线段穿过。</p>
+                <h2>
+                    流程图 · 编译管线
+                </h2>
+                <p>
+                    边裁剪到节点边界,箭头真实绘制,边标签带底衬不被线段穿过。
+                </p>
             </header>
             <div class="card__canvas">
                 <Diagram :spec="diagramSpec" :theme="dark ? 'dark' : 'light'" label="ChartSpec to Display Scene pipeline" />
             </div>
         </section>
-
         <section class="card">
             <header class="card__head">
-                <h2>性能 · 10000 点折线</h2>
-                <p>构建期生成 10000 行数据,页面实测编译与渲染耗时(刷新复测)。</p>
+                <h2>
+                    性能 · 10000 点折线
+                </h2>
+                <p>
+                    构建期生成 10000 行数据,页面实测编译与渲染耗时(刷新复测)。
+                </p>
             </header>
             <div class="card__canvas">
                 <Chart :spec="perfLineSpec" :data="perfLineData" :height="300" :theme="dark ? 'dark' : 'light'" label="10000 point line" />
             </div>
+            <div class="card__canvas">
+                <Chart :spec="perfLineSpec" :data="perfSmallData" :height="300" renderer="canvas" :theme="dark ? 'dark' : 'light'" label="5000 point line on canvas" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="perfBigSpec" :data="perfBigData" :height="300" renderer="canvas" :theme="dark ? 'dark' : 'light'" label="60000 point line on canvas" />
+            </div>
             <ul class="perf">
-                <li v-for="line in perfReport" :key="line">{{ line }}</li>
+                <li v-for="line in perfReport" :key="line">
+                    {{ line }}
+                </li>
             </ul>
         </section>
     </main>
@@ -203,7 +235,7 @@
  * 10k-point chart, so the numbers describe exactly what is on screen.
  */
 import { buildScene, compile, fromRows } from "@doki-land/davinci/chart";
-import { renderSvg, resolve } from "@doki-land/davinci/scene";
+import { renderCanvas, renderSvg, resolve } from "@doki-land/davinci/scene";
 import { rgb8 } from "@doki-land/davinci/types";
 import {
     FLOW_DIAGRAM,
@@ -227,6 +259,15 @@ export default class IndexPage {
                 ],
             },
             perfLineData: perfLineRows(10000),
+            perfBigSpec: {
+                mark: "line",
+                encoding: [
+                    { field: "t", channel: "x" },
+                    { field: "v", channel: "y" },
+                ],
+            },
+            perfBigData: perfLineRows(60000),
+            perfSmallData: perfLineRows(5000),
             darkLineSpec: {
                 mark: "line",
                 encoding: [
@@ -288,6 +329,9 @@ export default class IndexPage {
     public brandSpec: any = null;
     public brandRows: any[] = [];
     public brandTokens: any = null;
+    public perfBigSpec: any = null;
+    public perfBigData: any[] = [];
+    public perfSmallData: any[] = [];
     public perfReport: string[] = ["measuring…"];
 
     toggleDark() {
@@ -299,13 +343,13 @@ export default class IndexPage {
     }
 
     onMount() {
-        this.perfReport = measurePipeline(this.perfLineSpec, this.perfLineData);
+        this.perfReport = measurePipeline(this.perfLineSpec, this.perfLineData, this.perfBigData);
     }
 }
 
 /** Measure each pipeline stage separately on the 10k fixture plus a 2k
  *  scatter render, reporting medians of a few deterministic runs. */
-function measurePipeline(spec, rows) {
+function measurePipeline(spec, rows, bigRows) {
     const report = [];
     const snapshot = fromRows(rows);
 
@@ -323,6 +367,37 @@ function measurePipeline(spec, rows) {
         `line 10000 pts — compile ${ms(t1 - t0)} · scene ${ms(t2 - t1)} · resolve ${ms(t3 - t2)} · svg ${ms(t4 - t3)} · total ${ms(t4 - t0)}`,
     );
     report.push(`line 10000 pts — svg ${Math.round(svg.length / 1024)} KiB`);
+
+    // 60000 点：共享管线一次，两套后端各自计时（canvas 用离屏画布实测绘制）。
+    const bigSnapshot = fromRows(bigRows);
+    const b0 = performance.now();
+    const bigPlan = compile(spec, bigSnapshot);
+    const b1 = performance.now();
+    const bigSemantic = buildScene(bigPlan, { width: 820, height: 300 });
+    const b2 = performance.now();
+    const bigDisplay = resolve(bigSemantic, { width: 820, height: 300 });
+    const b3 = performance.now();
+    const bigSvg = renderSvg(bigDisplay);
+    const b4 = performance.now();
+    report.push(
+        `line 60000 pts — compile ${ms(b1 - b0)} · scene ${ms(b2 - b1)} · resolve ${ms(b3 - b2)} · svg ${ms(b4 - b3)} · svg ${(bigSvg.length / 1048576).toFixed(2)} MiB`,
+    );
+    // 构建期预渲染也会跑 onMount,此时没有真实 canvas——守卫后可正常降级,浏览器端拿到实测。
+    const off = document.createElement("canvas");
+    off.width = 820;
+    off.height = 300;
+    const ctx = typeof off.getContext === "function" ? off.getContext("2d") : null;
+    if (ctx) {
+        renderCanvas(bigDisplay, ctx);
+        const c0 = performance.now();
+        renderCanvas(bigDisplay, ctx);
+        const c1 = performance.now();
+        renderCanvas(bigDisplay, ctx);
+        const c2 = performance.now();
+        report.push(`line 60000 pts — canvas paint ${ms(c1 - c0)} / ${ms(c2 - c1)}(同一场景,两次实测)`);
+    } else {
+        report.push("line 60000 pts — canvas paint 构建期无 canvas 环境,浏览器端复测");
+    }
 
     const scatterSpec = {
         mark: "point",

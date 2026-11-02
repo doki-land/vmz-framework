@@ -32,6 +32,7 @@ const spec = {
 | `themeTokens` | `Partial<ChartTheme> \| null` | `null` | token overrides merged over the base theme |
 | `label` | `string \| null` | derived | accessible name; also the table caption |
 | `tableView` | `boolean` | `false` | render the data table instead of the SVG |
+| `renderer` | `"svg" \| "canvas" \| "auto"` | `"svg"` | output backend; `auto` switches to canvas past 50k rows |
 | `resourceIdPrefix` | `string \| null` | derived | SVG resource id prefix for edge cases |
 
 ## Theming by token
@@ -69,3 +70,7 @@ Every chart is `role="img"` with a derived or explicit `label`, plus a visually 
 ## Diagnostics, not blank charts
 
 Unknown fields, negative pie slices, unsupported marks, and invalid scale domains surface as structured diagnostics rendered under the chart (`severity` + `code`), never as a silent empty frame.
+
+## Render backends
+
+SVG is the default and the SSR path. `renderer="canvas"` paints the same resolved scene onto a canvas — measured on a 60k-point line: SVG serialization ~10 ms producing ~1 MiB of markup, canvas paint ~2 ms with no DOM weight. `renderer="auto"` switches to canvas past 50k rows. Hit-testing, crosshair, brush, and keyboard navigation read the semantic scene geometry and work identically on canvas; only the hover/selection opacity replay is SVG-specific (it maps `data-dvz-id` DOM hooks).

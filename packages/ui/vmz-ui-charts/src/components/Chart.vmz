@@ -9,6 +9,7 @@
             </div>
             <div v-if="tableView" v-html="_tableHtml()" class="vmz-ui-charts__table-view" />
             <div v-if="!tableView" v-html="markup()" class="vmz-ui-charts__svg" />
+            <canvas v-if="_useCanvas() && !tableView" class="vmz-ui-charts__canvas" />
         </div>
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
             <div v-for="(d, i) in diagnostics" :key="i" :data-sev="d.severity" class="vmz-ui-charts__diag-item">
@@ -283,6 +284,7 @@ import {
     type Scale,
 } from "@doki-land/davinci/chart";
 import {
+    renderCanvas,
     renderSvg,
     resolve,
     resolveResourceIdPrefix,
@@ -345,6 +347,9 @@ export default class Chart {
     /** 主题令牌覆盖：按字段浅合并到当前亮/暗基础主题上（如品牌色板、网格
      *  颜色、面积透明度）。null 时用内置主题。 */
     public themeTokens: Partial<ChartTheme> | null = null;
+    /** 渲染后端：`"svg"`（默认）| `"canvas"` | `"auto"`（行数超过 50000 自动
+     *  切 canvas）。SSR 始终回退 SVG。 */
+    public renderer: string | null = null;
 
     /** 交互 runtime state。 */
     public state: RuntimeState | null = null;
@@ -508,7 +513,65 @@ export default class Chart {
     public markup(): string {
         if (this._zeroSize()) return "";
         const scene = this.scene();
-        return scene ? renderSvg(scene, { resourceIdPrefix: this._resourcePrefix() }) : "";
+        if (!scene) return "";
+        // canvas 模式：SVG 输出为空，绘制调度到 microtask（此时 canvas 已挂载）。
+        if (this._useCanvas()) {
+            this._scheduleCanvasPaint(scene);
+            return "";
+        }
+        return renderSvg(scene, { resourceIdPrefix: this._resourcePrefix() });
+    }
+
+    // ---- Canvas 后端（>50k 点或显式 canvas；SVG 仍是默认与 SSR 降级） ----
+
+    /** 是否用 canvas 后端：表格视图与 SSR 永不用；auto 按行数阈值切换。 */
+    public _useCanvas(): boolean {
+        if (this.tableView) return false;
+        if (typeof document === "undefined") return false;
+        if (this.renderer === "canvas") return true;
+        if (this.renderer === "auto") {
+            const rows = this.data ? this.data.length : this.snapshot ? this.snapshot.rowCount : 0;
+            return rows > 50000;
+        }
+        return false;
+    }
+
+    /** 调度一次 canvas 绘制（microtask 去重）。
+     *  注意：渲染期不得写响应式字段（会再触发渲染形成自激回路），待绘 scene
+     *  与去重标记都走非响应式 expando。 */
+    public _scheduleCanvasPaint(scene: DisplayScene): void {
+        const bag = this as any;
+        bag.__pendingScene = scene;
+        if (bag.__paintQueued) return;
+        bag.__paintQueued = true;
+        queueMicrotask(this._flushCanvasPaint.bind(this));
+    }
+
+    public _flushCanvasPaint(): void {
+        (this as any).__paintQueued = false;
+        this._paintCanvas();
+    }
+
+    /** 把缓存的 display scene 画进 canvas（DPR 感知，逻辑坐标系不变）。 */
+    public _paintCanvas(): void {
+        const scene = (this as any).__pendingScene as DisplayScene | null | undefined;
+        if (!scene) return;
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof root.querySelector !== "function") return;
+        const canvas: any = root.querySelector("canvas.vmz-ui-charts__canvas");
+        if (!canvas || typeof canvas.getContext !== "function") return;
+        const dpr = typeof devicePixelRatio === "number" && devicePixelRatio > 0 ? devicePixelRatio : 1;
+        const w = this._effWidth();
+        const h = this._effHeight();
+        const bw = Math.max(1, Math.round(w * dpr));
+        const bh = Math.max(1, Math.round(h * dpr));
+        if (canvas.width !== bw) canvas.width = bw;
+        if (canvas.height !== bh) canvas.height = bh;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        renderCanvas(scene, ctx);
     }
 
     public get hostStyle(): string {
@@ -600,6 +663,9 @@ export default class Chart {
         this._attachResizeObserver();
         this._attachThemeMedia();
         this._attachWheel();
+        // canvas 模式的首帧：markup 在挂载前已跑，此时元素已存在，补一次绘制。
+        const pending = (this as any).__pendingScene as DisplayScene | null | undefined;
+        if (this._useCanvas() && pending) this._scheduleCanvasPaint(pending);
     }
 
     onUnmount() {
@@ -837,7 +903,8 @@ export default class Chart {
                 dots.push({ x: pl.points[i].x * scaleX, y: pl.points[i].y * scaleY, color: pl.color });
                 const mark = this._plan ? this._plan.marks.find((m) => m.key === pl.keys[i]) : undefined;
                 if (mark && this._plan) {
-                    const seriesName = mark.series !== null ? mark.series : pl.id;
+                    // 无分组时回退到 y 字段名而不是内部节点 id。
+                    const seriesName = mark.series !== null ? mark.series : yEnc ? yEnc.field : pl.id;
                     if (yEnc) {
                         parts.push(`${seriesName}: ${formatCell(readCell(this._plan.resolvedData, yEnc.field, mark.rowIndex))}`);
                     }

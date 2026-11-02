@@ -93,6 +93,7 @@ import {
 import { rgb8 } from '../../../../../davinci/davinci-types/src/index.ts';
 import {
     estimateTextSize,
+    renderCanvas,
     renderSvg,
     resolve,
     resolveResourceIdPrefix,
@@ -573,7 +574,7 @@ console.log('charts-render: overflow truncates labels into their slot…');
     for (const child of legendGroup.children) {
         const w = child.kind === 'rect' ? child.w : estimateTextSize(child.text, 12).width;
         const cx = child.kind === 'rect' ? child.x + child.w / 2 : child.anchor.x;
-        if (cx + w / 2 > narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
+        if (cx + w / 2> narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
         const cy = child.kind === 'rect' ? child.y + child.h / 2 : child.anchor.y;
         if (cy >= narrowPlotTop) fail('legend strip must stay above the plot');
     }
@@ -2032,6 +2033,137 @@ console.log('charts-render: line and area marks carry polyline hit regions with 
         const iTop = insightArea.hitRegion.polyline.points[0].y;
         if (!(iTop < cTop)) fail('the stacked area vertex must sit above the base series vertex');
     }
+}
+
+// ─── Canvas backend (parallel renderer over the same DisplayScene) ───────
+
+console.log('charts-render: the canvas backend paints every display leaf…');
+{
+    // Recording 2D stub — the renderer only needs the Canvas2DLike surface.
+    function recorder() {
+        return {
+            calls: [],
+            fillStyle: null,
+            strokeStyle: null,
+            lineWidth: 1,
+            font: '',
+            textAlign: '',
+            textBaseline: '',
+            save() {},
+            restore() {},
+            transform(a, b, c, d, e, f) {
+                this.calls.push(['transform', a, b, c, d, e, f]);
+            },
+            beginPath() {
+                this.calls.push(['beginPath']);
+            },
+            closePath() {
+                this.calls.push(['closePath']);
+            },
+            moveTo(x, y) {
+                this.calls.push(['moveTo', x, y]);
+            },
+            lineTo(x, y) {
+                this.calls.push(['lineTo', x, y]);
+            },
+            quadraticCurveTo() {
+                this.calls.push(['quadratic']);
+            },
+            bezierCurveTo() {
+                this.calls.push(['cubic']);
+            },
+            ellipse(cx, cy, rx, ry, rot, start, end, ccw) {
+                this.calls.push(['ellipse', cx, cy, rx, ry, rot, start, end, ccw]);
+            },
+            rect(x, y, w, h) {
+                this.calls.push(['rect', x, y, w, h]);
+            },
+            clip() {
+                this.calls.push(['clip']);
+            },
+            fill() {
+                this.calls.push(['fill', String(this.fillStyle)]);
+            },
+            fillRect(x, y, w, h) {
+                this.calls.push(['fillRect', x, y, w, h, String(this.fillStyle)]);
+            },
+            stroke() {
+                this.calls.push(['stroke', String(this.strokeStyle), this.lineWidth]);
+            },
+            fillText(text, x, y) {
+                this.calls.push(['fillText', text, x, y, this.font, this.textAlign]);
+            },
+            setLineDash(segments) {
+                this.calls.push(['dash', segments.length]);
+            },
+        };
+    }
+    // Every display leaf must produce exactly its paint ops: fill+stroke as
+    // styled, text as one fillText, images skipped by design.
+    function expectedOps(node) {
+        if (node.kind === 'group') return node.children.reduce((a, c) => a + expectedOps(c), 0);
+        if (node.kind === 'text') return 1;
+        if (node.kind === 'image') return 0;
+        return (node.fill ? 1 : 0) + (node.stroke ? 1 : 0);
+    }
+    const { display } = pipeline(barSpec, barRows);
+    const rec = recorder();
+    renderCanvas(display, rec);
+    const paintOps = rec.calls.filter((c) => c[0] === 'fill' || c[0] === 'stroke' || c[0] === 'fillText').length;
+    const wantOps = expectedOps(display.root);
+    if (paintOps !== wantOps) fail(`canvas paint ops ${paintOps} must equal display leaf ops ${wantOps}`);
+    // Bars reach the canvas as palette-filled shapes, labels as centered text.
+    const fills = rec.calls.filter((c) => c[0] === 'fill').map((c) => c[1]);
+    const brandFills = fills.filter((f) => f === '#1677ff').length;
+    if (brandFills !== 3) fail(`want 3 palette-filled bars on canvas, got ${brandFills}`);
+    const texts = rec.calls.filter((c) => c[0] === 'fillText');
+    if (texts.length === 0) fail('tick labels must paint as fillText');
+    if (!texts.every((t) => t[5] === 'center')) fail('canvas text must stay center-aligned like the SVG anchor');
+
+    // Pie arcs convert from SVG endpoint arcs to canvas center ellipses.
+    const pieDisplay = pipeline(
+        {
+            mark: 'pie',
+            keyField: 'kind',
+            encoding: [
+                { field: 'value', channel: 'theta' },
+                { field: 'kind', channel: 'color' },
+            ],
+        },
+        [
+            { kind: 'a', value: 3 },
+            { kind: 'b', value: 1 },
+        ],
+    ).display;
+    const pieRec = recorder();
+    renderCanvas(pieDisplay, pieRec);
+    const arcCalls = pieRec.calls.filter((c) => c[0] === 'ellipse' && c[3] > 20 && c[3] === c[4]);
+    if (arcCalls.length < 2) fail(`pie slices must convert arcs to ellipse calls, got ${arcCalls.length}`);
+    // Slices sweep clockwise in the y-down plane: anticlockwise must be false.
+    if (!arcCalls.every((c) => c[8] === false)) fail('pie arcs must keep the sweep direction');
+
+    // Clipped nodes map to canvas clip regions (hand-built clipped scene).
+    const clippedRec = recorder();
+    renderCanvas(
+        resolve(
+            {
+                version: '/v0',
+                root: {
+                    kind: 'group',
+                    id: 'g',
+                    role: 'group',
+                    clip: { x: 10, y: 10, w: 40, h: 40 },
+                    children: [{ kind: 'rect', id: 'r', role: 'decorative', x: 0, y: 0, w: 100, h: 100 }],
+                },
+            },
+            { width: 100, height: 100 },
+        ),
+        clippedRec,
+    );
+    if (!clippedRec.calls.some((c) => c[0] === 'clip')) fail('world clips must become canvas clip regions');
+
+    // The facade dist exposes the same renderer.
+    if (typeof facadeScene.renderCanvas !== 'function') fail('the facade must export renderCanvas');
 }
 
 console.log('charts-render: the published facade dist is byte-identical to the internals…');
