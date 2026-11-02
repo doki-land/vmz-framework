@@ -66,6 +66,55 @@ const QUARTER_SALES: GalleryExample = {
     ],
 };
 
+const DODGE_SALES: GalleryExample = {
+    id: "bar-dodge",
+    title: "柱状 · 分组并列(dodge)",
+    note: "同一季度两区域并列不重叠,顺序与图例一致,共享零基线。",
+    spec: {
+        mark: "bar",
+        encoding: [
+            { field: "quarter", channel: "x" },
+            { field: "sales", channel: "y" },
+            { field: "region", channel: "color" },
+        ],
+    },
+    rows: [
+        { quarter: "Q1", sales: 42, region: "North" },
+        { quarter: "Q2", sales: 68, region: "North" },
+        { quarter: "Q3", sales: 55, region: "North" },
+        { quarter: "Q4", sales: 81, region: "North" },
+        { quarter: "Q1", sales: 36, region: "South" },
+        { quarter: "Q2", sales: 52, region: "South" },
+        { quarter: "Q3", sales: 61, region: "South" },
+        { quarter: "Q4", sales: 74, region: "South" },
+    ],
+};
+
+const STACK_SALES: GalleryExample = {
+    id: "bar-stack",
+    title: "柱状 · 堆叠总量(stack)",
+    note: "区域沿零基线堆叠,y 域覆盖总量;每段 tooltip 仍是真实行值。",
+    spec: {
+        mark: "bar",
+        seriesLayout: "stack",
+        encoding: [
+            { field: "quarter", channel: "x" },
+            { field: "sales", channel: "y" },
+            { field: "region", channel: "color" },
+        ],
+    },
+    rows: [
+        { quarter: "Q1", sales: 42, region: "North" },
+        { quarter: "Q2", sales: 68, region: "North" },
+        { quarter: "Q3", sales: 55, region: "North" },
+        { quarter: "Q4", sales: 81, region: "North" },
+        { quarter: "Q1", sales: 36, region: "South" },
+        { quarter: "Q2", sales: 52, region: "South" },
+        { quarter: "Q3", sales: 61, region: "South" },
+        { quarter: "Q4", sales: 74, region: "South" },
+    ],
+};
+
 const AREA_TRAFFIC: GalleryExample = {
     id: "area-traffic",
     title: "面积 · 流量构成",
@@ -173,6 +222,8 @@ const BAD_SPEC: GalleryExample = {
 export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     WEEK_VISITORS,
     QUARTER_SALES,
+    DODGE_SALES,
+    STACK_SALES,
     AREA_TRAFFIC,
     SCATTER_LATENCY,
     NEGATIVE_DELTAS,

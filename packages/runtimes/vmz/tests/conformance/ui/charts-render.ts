@@ -1384,6 +1384,181 @@ console.log('charts-render: preserveNodeIds binds DOM back to stable identity…
     if (plain.includes('data-dvz-id')) fail('default render must not emit data-dvz-id');
 }
 
+// ─── Series layouts: dodge + stack ───────────────────────────────────────
+
+const groupRows = [
+    { quarter: 'Q1', sales: 40, region: 'North' },
+    { quarter: 'Q2', sales: 70, region: 'North' },
+    { quarter: 'Q1', sales: 30, region: 'South' },
+    { quarter: 'Q2', sales: 50, region: 'South' },
+];
+
+console.log('charts-render: grouped bars dodge side by side by default…');
+{
+    const spec = {
+        mark: 'bar',
+        encoding: [
+            { field: 'quarter', channel: 'x' },
+            { field: 'sales', channel: 'y' },
+            { field: 'region', channel: 'color' },
+        ],
+    };
+    const { semantic, svg } = pipeline(spec, groupRows);
+    const bars = semantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    if (bars.length !== 4) fail(`want 4 dodged bars, got ${bars.length}`);
+    // Q1 pair shares the slot but never overlaps: the two Q1 bars are disjoint.
+    const q1 = bars.filter((b) => b.id === 'bar:0' || b.id === 'bar:2');
+    if (q1.length !== 2) fail(`want Q1 pair, got ${q1.map((b) => b.id)}`);
+    const overlap = Math.min(q1[0].x + q1[0].w, q1[1].x + q1[1].w) - Math.max(q1[0].x, q1[1].x);
+    if (overlap > 1e-9) fail(`dodged bars must not overlap, overlap=${overlap}`);
+    // First-appearance order: North (palette 0) sits left of South.
+    if (!(q1[0].x < q1[1].x)) fail('North must dodge left of South');
+    // Every bar still hangs from the zero baseline.
+    const baseline = Math.max(...bars.map((b) => b.y + b.h));
+    for (const b of bars) {
+        if (Math.abs(b.y + b.h - baseline) > 1e-9) fail(`dodged bar must share the zero baseline: ${b.id}`);
+    }
+    if (count(svg, '<rect') !== 4 + 2) fail(`svg want 4 bars + 2 legend swatches, got ${count(svg, '<rect')}`);
+}
+
+console.log('charts-render: stack accumulates from the zero baseline…');
+{
+    const spec = {
+        mark: 'bar',
+        seriesLayout: 'stack',
+        encoding: [
+            { field: 'quarter', channel: 'x' },
+            { field: 'sales', channel: 'y' },
+            { field: 'region', channel: 'color' },
+        ],
+    };
+    const { plan, semantic, svg } = pipeline(spec, groupRows);
+    const bars = semantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    if (bars.length !== 4) fail(`want 4 stacked bars, got ${bars.length}`);
+    // Q1 total = 70: the South bar must start where North ends (same x slot).
+    const north = bars.find((b) => b.id === 'bar:0');
+    const south = bars.find((b) => b.id === 'bar:2');
+    if (Math.abs(north.x - south.x) > 1e-9) fail('stacked bars share one x slot');
+    if (Math.abs(south.y - north.y) < 1e-9) fail('stacked bars must not coincide');
+    // south.y + south.h == north.y (South stacks on top of North).
+    if (Math.abs(south.y + south.h - north.y) > 1e-9) {
+        fail(`stack must be flush: south bottom ${south.y + south.h} vs north top ${north.y}`);
+    }
+    // The y domain covers the stacked totals (Q2 = 120), even though nice
+    // ticks stop at a round value below it.
+    const yDomain = plan.scales.get('y').domain;
+    if (yDomain[1] < 120) fail(`stacked domain must cover totals, got [${yDomain}]`);
+    if (yDomain[0] > 0) fail('stacked domain must include the zero baseline');
+    if (count(svg, '<rect') !== 4 + 2) fail('stacked bars + swatches must serialize');
+    if (svg.includes('NaN')) fail('stacked svg must not carry NaN');
+
+    // Plan-level contract: stackBase in data units, first-appearance order.
+    const southMark = plan.marks.find((m) => m.key === '2');
+    if (southMark.stackBase === undefined) fail('stacked marks must carry stackBase');
+    if (Math.abs(southMark.stackBase - 40) > 1e-9) fail(`South Q1 base want 40, got ${southMark.stackBase}`);
+}
+
+console.log('charts-render: stack separates positive and negative totals…');
+{
+    const spec = {
+        mark: 'bar',
+        seriesLayout: 'stack',
+        encoding: [
+            { field: 'quarter', channel: 'x' },
+            { field: 'delta', channel: 'y' },
+            { field: 'region', channel: 'color' },
+        ],
+    };
+    const rows = [
+        { quarter: 'Q1', delta: 10, region: 'North' },
+        { quarter: 'Q1', delta: -6, region: 'South' },
+        { quarter: 'Q1', delta: 4, region: 'West' },
+    ];
+    const { semantic } = pipeline(spec, rows);
+    const bars = semantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    const north = bars.find((b) => b.id === 'bar:0');
+    const south = bars.find((b) => b.id === 'bar:1');
+    const west = bars.find((b) => b.id === 'bar:2');
+    // Positives stack up (West on top of North), negatives hang from zero.
+    if (Math.abs(west.y + west.h - north.y) > 1e-9) fail('positive stack must be flush');
+    // Zero sits inside the plot; South hangs from zero downward.
+    const zeroPixel = north.y + north.h;
+    if (Math.abs(south.y - zeroPixel) > 1e-9) fail(`negative stack must hang from zero: ${south.y} vs ${zeroPixel}`);
+    if (south.h <= 0) fail('negative stacked bar must keep a positive height');
+}
+
+console.log('charts-render: stacked area draws a ribbon, not a zero drop…');
+{
+    const spec = {
+        mark: 'area',
+        seriesLayout: 'stack',
+        encoding: [
+            { field: 'day', channel: 'x' },
+            { field: 'requests', channel: 'y' },
+            { field: 'service', channel: 'color' },
+        ],
+    };
+    const rows = [
+        { day: 1, requests: 10, service: 'api' },
+        { day: 2, requests: 20, service: 'api' },
+        { day: 1, requests: 5, service: 'web' },
+        { day: 2, requests: 8, service: 'web' },
+    ];
+    const { semantic, svg } = pipeline(spec, rows);
+    const areas = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (areas.length !== 2) fail(`want 2 stacked areas, got ${areas.length}`);
+    // The top series (web) must not touch the zero baseline — its closing edge
+    // walks the api curve back.
+    const web = areas.find((a) => a.id === 'area:web');
+    const ys = web.path.commands.map((c) => c.to?.y).filter((v) => Number.isFinite(v));
+    const baseline = Math.max(...ys);
+    const apiBottom = areas.find((a) => a.id === 'area:api');
+    const apiMaxY = Math.max(...apiBottom.path.commands.map((c) => c.to?.y).filter((v) => Number.isFinite(v)));
+    if (Math.abs(baseline - apiMaxY) > 1e-9 && baseline >= apiMaxY) {
+        fail('web ribbon bottom must follow the api top, not the zero baseline');
+    }
+    if (svg.includes('NaN')) fail('stacked area must not carry NaN');
+}
+
+console.log('charts-render: layout misuse is diagnosed, never silent…');
+{
+    const lineSpec = {
+        mark: 'line',
+        seriesLayout: 'stack',
+        encoding: [
+            { field: 'd', channel: 'x' },
+            { field: 'v', channel: 'y' },
+            { field: 's', channel: 'color' },
+        ],
+    };
+    const rows = [
+        { d: 1, v: 2, s: 'A' },
+        { d: 2, v: 3, s: 'B' },
+    ];
+    const plan = compile(lineSpec, fromRows(rows));
+    const err = plan.diagnostics.items.find((d) => d.code === 'davinci.chart.unsupported-layout');
+    if (!err) fail('stack on line must raise davinci.chart.unsupported-layout');
+    if (err.severity !== 'error') fail(`unsupported-layout must be an error, got ${err.severity}`);
+    if (plan.marks.some((m) => m.stackBase !== undefined)) fail('refused layout must not carry stack offsets');
+
+    const noSeries = compile(
+        { mark: 'bar', seriesLayout: 'stack', encoding: barSpec.encoding },
+        fromRows(barRows),
+    );
+    if (!noSeries.diagnostics.items.some((d) => d.code === 'davinci.chart.layout-without-series')) {
+        fail('stack without a series channel must raise layout-without-series');
+    }
+    if (noSeries.marks.some((m) => m.stackBase !== undefined)) fail('no-series layout must not stack');
+
+    const dodgeLine = compile(
+        { mark: 'line', seriesLayout: 'dodge', encoding: lineSpec.encoding },
+        fromRows(rows),
+    );
+    if (!dodgeLine.diagnostics.items.some((d) => d.code === 'davinci.chart.layout-ignored')) {
+        fail('dodge on line must raise layout-ignored');
+    }
+}
+
 console.log('charts-render: the published facade dist is byte-identical to the internals…');
 {
     // Two independent code paths — internal workspace sources (all sections

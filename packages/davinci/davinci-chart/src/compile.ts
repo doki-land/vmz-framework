@@ -31,6 +31,11 @@ export interface ChartSpec {
     readonly scales?: ReadonlyMap<string, Scale>;
     /** Facet field (optional — produces one plan row per facet). */
     readonly facetField?: string;
+    /** How grouped (series) marks share the x slot. `undefined` is the
+     *  natural per-mark default: `bar`/`rect` dodge side by side, everything
+     *  else overlaps. `stack` accumulates positive and negative values
+     *  separately from the zero baseline (bars and areas only). */
+    readonly seriesLayout?: "overlap" | "stack" | "dodge";
     /** Field whose value names each row. Marks carry this key as identity, so
      *  re-sorting or filtering rows never renumbers them. Without `keyField`
      *  keys are positional (`"0"`, `"1"`, …) and only stable while the row
@@ -58,6 +63,9 @@ export interface PlanMark {
     readonly series: string | null;
     /** Encoded channel values (scale-applied). */
     readonly channels: ReadonlyMap<string, number | string>;
+    /** Stacked layout only: the data-unit baseline this mark starts from
+     *  (cumulative sum of same-sign values below it in its x slot). */
+    readonly stackBase?: number;
 }
 
 /** Full compile plan — scene builder consumes this. */
@@ -85,6 +93,14 @@ const positionChannels: ReadonlySet<string> = new Set(["x", "y"]);
  *  builder; `compile` refuses anything else instead of rendering an empty
  *  chart with no explanation. */
 const implementedMarks: ReadonlySet<string> = new Set(["bar", "rect", "line", "point", "circle", "area"]);
+
+/** Resolve the effective series layout. `undefined` is the natural per-mark
+ *  default: grouped bars dodge, everything else overlaps. */
+export function resolveSeriesLayout(spec: ChartSpec, hasSeries: boolean): "overlap" | "stack" | "dodge" {
+    if (!hasSeries) return "overlap";
+    if (spec.seriesLayout) return spec.seriesLayout;
+    return spec.mark === "bar" || spec.mark === "rect" ? "dodge" : "overlap";
+}
 
 /** Compile a ChartSpec against a DataSnapshot. */
 export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
@@ -142,6 +158,90 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     }
     const usedKeys = new Set<string>();
 
+    // ── Series layout pre-pass (stack offsets live in the plan, geometry in
+    // the scene builder) ─────────────────────────────────────────────────
+    const layout = resolveSeriesLayout(spec, seriesCol !== undefined);
+    if (spec.seriesLayout && !seriesCol) {
+        diagnostics.push(
+            diag(
+                "info",
+                "davinci.chart.layout-without-series",
+                `seriesLayout "${spec.seriesLayout}" needs a color / series / group channel and is ignored without one`,
+                spec.seriesLayout,
+            ),
+        );
+    }
+    if (layout === "stack" && spec.mark !== "bar" && spec.mark !== "rect" && spec.mark !== "area") {
+        diagnostics.push(
+            diag(
+                "error",
+                "davinci.chart.unsupported-layout",
+                `seriesLayout "stack" is only meaningful for bar, rect and area marks, not "${String(spec.mark)}"`,
+                String(spec.mark),
+            ),
+        );
+    }
+    if (layout === "dodge" && spec.mark !== "bar" && spec.mark !== "rect") {
+        diagnostics.push(
+            diag(
+                "info",
+                "davinci.chart.layout-ignored",
+                `seriesLayout "dodge" only affects bar / rect marks and is ignored for "${String(spec.mark)}"`,
+                String(spec.mark),
+            ),
+        );
+    }
+
+    /** Stacked baseline per row in data units (same-sign cumulative). */
+    let stackOffsets: Map<number, number> | null = null;
+    /** Stacked y extent [lo, hi] across all x slots. */
+    let stackExtent: [number, number] | null = null;
+    const stackable = spec.mark === "bar" || spec.mark === "rect" || spec.mark === "area";
+    if (layout === "stack" && stackable) {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol && seriesCol) {
+            stackOffsets = new Map();
+            let hi = 0;
+            let lo = 0;
+            const byX = new Map<string, number[]>();
+            for (let r = 0; r < data.rowCount; r++) {
+                const xv = xCol.values[r];
+                if (xv === null || xv === undefined) continue;
+                const key = String(xv);
+                const bucket = byX.get(key);
+                if (bucket) bucket.push(r);
+                else byX.set(key, [r]);
+            }
+            for (const rows of byX.values()) {
+                let pos = 0;
+                let neg = 0;
+                // Stack in series first-appearance order so the visual order
+                // matches the legend exactly.
+                for (const category of seriesCategories) {
+                    for (const r of rows) {
+                        const cell = seriesCol.values[r];
+                        if (cell === null || cell === undefined || String(cell) !== category) continue;
+                        const v = yCol.values[r];
+                        if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                        if (v >= 0) {
+                            stackOffsets.set(r, pos);
+                            pos += v;
+                        } else {
+                            stackOffsets.set(r, neg);
+                            neg += v;
+                        }
+                    }
+                }
+                if (pos > hi) hi = pos;
+                if (neg < lo) lo = neg;
+            }
+            stackExtent = [lo, hi];
+        }
+    }
+
     for (const enc of spec.encoding) {
         const col = column(data, enc.field);
         if (!col) {
@@ -188,6 +288,10 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 );
                 if (numeric.length === 0) {
                     scales.set(enc.channel, { kind: "linear", domain: [0, 1], range: [0, 1] });
+                } else if (stackExtent && enc.channel === "y") {
+                    // Stacked marks span the cumulative extent, not the raw
+                    // column range — the zero baseline stays included.
+                    scales.set(enc.channel, { kind: "linear", domain: stackExtent, range: [0, 1] });
                 } else {
                     // Bar-like marks are measured from a zero baseline, so the
                     // quantitative domain includes zero when values are one-sided.
@@ -300,7 +404,13 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
         // Rows without a usable x / y position never become marks; the rest
         // still keep their original row index and key so ids do not renumber.
-        if (positioned) marks.push({ rowIndex: r, key, series, channels });
+        if (positioned) {
+            if (stackOffsets) {
+                marks.push({ rowIndex: r, key, series, channels, stackBase: stackOffsets.get(r) ?? 0 });
+            } else {
+                marks.push({ rowIndex: r, key, series, channels });
+            }
+        }
     }
 
     const seriesDomain: SeriesDomain = { field: seriesCol ? (seriesEnc?.field ?? null) : null, categories: seriesCategories };

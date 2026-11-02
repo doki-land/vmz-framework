@@ -24,7 +24,7 @@ import {
     type SemanticNode,
     type SemanticScene,
 } from "@doki-land/davinci-scene";
-import type { ChartCompilePlan } from "./compile.js";
+import { resolveSeriesLayout, type ChartCompilePlan } from "./compile.js";
 import { column, type DataColumn } from "./data.js";
 import { apply, bandwidth, formatTickLabel, niceLinearTicks, type Scale } from "./scale.js";
 import { DEFAULT_CHART_THEME, type ChartTheme } from "./theme.js";
@@ -58,6 +58,10 @@ interface PositionedMark {
     readonly key: string;
     readonly x: number;
     readonly y: number;
+    /** Raw y value in data units (stack geometry needs it). */
+    readonly yRaw: number | null;
+    /** Stacked baseline in data units, when the plan carries one. */
+    readonly stackBase: number | null;
     readonly series: string | null;
 }
 
@@ -209,7 +213,16 @@ function positionedRows(
         const x = project(xScale, xCol.values[mark.rowIndex] ?? null);
         const y = project(yScale, yCol.values[mark.rowIndex] ?? null);
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-        rows.push({ rowIndex: mark.rowIndex, key: mark.key, x, y, series: mark.series });
+        const rawY = yCol.values[mark.rowIndex] ?? null;
+        rows.push({
+            rowIndex: mark.rowIndex,
+            key: mark.key,
+            x,
+            y,
+            yRaw: typeof rawY === "number" && Number.isFinite(rawY) ? rawY : null,
+            stackBase: mark.stackBase ?? null,
+            series: mark.series,
+        });
     }
     return rows;
 }
@@ -223,14 +236,15 @@ function buildMarks(
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
 ): SemanticNode[] {
+    const layout = resolveSeriesLayout(plan.spec, seriesCategories !== undefined);
     switch (plan.spec.mark) {
         case "bar":
         case "rect":
-            return buildBars(plan, rows, plot, xScale, yScale, seriesCategories, theme);
+            return buildBars(plan, rows, plot, xScale, yScale, seriesCategories, theme, layout);
         case "line":
             return buildLines(rows, seriesCategories, theme);
         case "area":
-            return buildAreas(rows, plot, yScale, seriesCategories, theme);
+            return buildAreas(rows, plot, yScale, seriesCategories, theme, layout);
         case "point":
         case "circle":
             return buildPoints(plan, rows, seriesCategories, theme);
@@ -251,28 +265,51 @@ function buildBars(
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
+    layout: "overlap" | "stack" | "dodge",
 ): SemanticNode[] {
     const bandWidth = xScale.kind === "band" ? bandwidth(xScale) : 0;
     const step = bandWidth > 0 ? bandWidth : plot.w / Math.max(1, rows.length);
-    const w = step * BAR_RATIO;
-    const baseline = zeroBaseline(yScale, plot);
     // Rounded caps read well on positive bars; skip the radius when the bar
     // is shorter than the radius or hangs below zero (it would invert).
     const radius = (h: number): number => (h >= BAR_RADIUS * 2 ? BAR_RADIUS : 0);
 
     return rows.map((row) => {
-        const h = Math.abs(baseline - row.y);
+        let x = row.x;
+        let yTop = row.y;
+        let yBottom = zeroBaseline(yScale, plot);
+
+        if (layout === "stack" && row.stackBase !== null && row.yRaw !== null) {
+            // Stacked: span from the cumulative base to base + value. The y
+            // scale domain already covers the stacked extent (compile).
+            const a = project(yScale, row.stackBase);
+            const b = project(yScale, row.stackBase + row.yRaw);
+            yTop = Math.min(a, b);
+            yBottom = Math.max(a, b);
+        }
+
+        let w = step * BAR_RATIO;
+        if (layout === "dodge" && seriesCategories && seriesCategories.length > 0 && row.series !== null) {
+            // Dodged: subdivide the band slot into one sub-slot per series in
+            // first-appearance order, so a group of n bars fills the slot.
+            const n = seriesCategories.length;
+            const subWidth = (step * BAR_RATIO) / n;
+            const subIndex = seriesPaletteIndex(seriesCategories, row.series);
+            x = row.x - (step * BAR_RATIO) / 2 + subIndex * subWidth + subWidth / 2;
+            w = subWidth;
+        }
+
+        const h = Math.abs(yBottom - yTop);
         return {
             kind: "rect" as const,
             id: `${plan.spec.mark}:${row.key}`,
             role: "chart.mark" as const,
             source: { domain: "chart", path: ["mark", row.key] },
-            x: row.x - w / 2,
-            y: Math.min(row.y, baseline),
+            x: x - w / 2,
+            y: Math.min(yTop, yBottom),
             w,
             h,
-            rx: radius(h),
-            ry: radius(h),
+            rx: layout === "stack" ? 0 : radius(h),
+            ry: layout === "stack" ? 0 : radius(h),
             fill: { color: seriesColor(theme, seriesCategories, row.series) },
         };
     });
@@ -330,18 +367,35 @@ function buildAreas(
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
+    layout: "overlap" | "stack" | "dodge",
 ): SemanticNode[] {
     const baseline = zeroBaseline(yScale, plot);
     const nodes: SemanticNode[] = [];
     for (const [name, rowsInSeries] of groupBySeries(rows)) {
         const sorted = [...rowsInSeries].sort((a, b) => a.x - b.x || a.rowIndex - b.rowIndex);
         const color = seriesColor(theme, seriesCategories, name);
-        const commands: PathCommand[] = [
-            { kind: "move", to: { x: sorted[0].x, y: baseline } },
-            ...sorted.map((row): PathCommand => ({ kind: "line", to: { x: row.x, y: row.y } })),
-            { kind: "line", to: { x: sorted[sorted.length - 1].x, y: baseline } },
-            { kind: "close" },
-        ];
+        let commands: PathCommand[];
+        if (layout === "stack") {
+            // Stacked area: top edge follows base + value, the closing edge
+            // walks the cumulative base back — a ribbon, not a zero drop.
+            const top = sorted.map((row): PathCommand => {
+                const base = row.stackBase ?? 0;
+                const value = row.yRaw ?? 0;
+                return { kind: "line", to: { x: row.x, y: project(yScale, base + value) } };
+            });
+            const bottom = [...sorted].reverse().map((row): PathCommand => {
+                const base = row.stackBase ?? 0;
+                return { kind: "line", to: { x: row.x, y: project(yScale, base) } };
+            });
+            commands = [{ kind: "move", to: { x: sorted[0].x, y: project(yScale, sorted[0].stackBase ?? 0) } }, ...top, ...bottom, { kind: "close" }];
+        } else {
+            commands = [
+                { kind: "move", to: { x: sorted[0].x, y: baseline } },
+                ...sorted.map((row): PathCommand => ({ kind: "line", to: { x: row.x, y: row.y } })),
+                { kind: "line", to: { x: sorted[sorted.length - 1].x, y: baseline } },
+                { kind: "close" },
+            ];
+        }
         nodes.push({
             kind: "path",
             id: `area:${name}`,

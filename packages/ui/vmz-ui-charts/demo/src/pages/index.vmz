@@ -13,7 +13,7 @@
             </button>
         </header>
 
-        <section v-for="item in examples" :key="item.id" class="card">
+        <section v-for="item in examples" :key="item.id" class="card" :id="item.id">
             <header class="card__head">
                 <h2>{{ item.title }}</h2>
                 <p>{{ item.note }}</p>
