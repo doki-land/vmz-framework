@@ -93,7 +93,21 @@ if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconDef')) {
     fail('Icon must import shared registry.ts via resolveIconDef');
 }
 const categoriesDir = path.join(iconsRoot, 'src', 'icons');
-const REQUIRED_CATEGORIES = ['action', 'feature', 'navigation', 'status', 'tool'];
+const CATEGORY_PREFIX = {
+    action: 'action',
+    brand: 'brand',
+    commerce: 'commerce',
+    data: 'data',
+    feature: 'feature',
+    file: 'file',
+    media: 'media',
+    navigation: 'nav',
+    social: 'social',
+    status: 'status',
+    tool: 'tool',
+};
+const REQUIRED_CATEGORIES = Object.keys(CATEGORY_PREFIX);
+const EXPECTED_MIN_ICONS = 117;
 const categoryFiles = fs.existsSync(categoriesDir)
     ? fs.readdirSync(categoriesDir).filter((name) => name.endsWith('.ts'))
     : [];
@@ -108,6 +122,15 @@ for (const category of REQUIRED_CATEGORIES) {
 for (const [category] of categorySources) {
     if (!registrySrc.includes(`./icons/${category}.ts`)) {
         fail(`registry.ts must import ./icons/${category}.ts — orphan category module`);
+    }
+}
+for (const [category, source] of categorySources) {
+    const prefix = CATEGORY_PREFIX[category];
+    if (!prefix) fail(`src/icons/${category}.ts is not a registered category — add it to CATEGORY_PREFIX or remove it`);
+    for (const keyMatch of source.matchAll(/^\s*'([^']+)':\s*\{/gm)) {
+        if (!keyMatch[1].startsWith(`${prefix}.`)) {
+            fail(`src/icons/${category}.ts holds "${keyMatch[1]}" which belongs to the ${keyMatch[1].split('.')[0]} category`);
+        }
     }
 }
 const mergedIconSrc = [...categorySources.values()].join('\n');
@@ -165,8 +188,8 @@ if (/strokeWidth:\s*[0-9]/.test(mergedIconSrc)) {
 }
 for (const dotsBlock of mergedIconSrc.matchAll(/dots:\s*\[([\s\S]*?)\]/g)) {
     for (const radiusMatch of dotsBlock[1].matchAll(/r:\s*([0-9.]+)/g)) {
-        if (Number(radiusMatch[1]) < 1.35) {
-            fail(`filled dot radius ${radiusMatch[1]} is below the 1.35 optical weight floor`);
+        if (Number(radiusMatch[1]) < 1.5) {
+            fail(`filled dot radius ${radiusMatch[1]} is below the 1.5 optical weight floor`);
         }
     }
 }
@@ -188,8 +211,8 @@ for (const [category, source] of categorySources) {
         }
     }
 }
-if (iconKeys.length < 69) {
-    fail(`registry must keep at least 69 semantic marks, got ${iconKeys.length}`);
+if (iconKeys.length < EXPECTED_MIN_ICONS) {
+    fail(`registry must not shrink below ${EXPECTED_MIN_ICONS} semantic marks, got ${iconKeys.length}`);
 }
 
 for (const px of ['16px', '20px', '24px']) {
