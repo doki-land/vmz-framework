@@ -153,9 +153,7 @@ pub(crate) fn assemble_chunk(
     let preplan = match context.preplans.get(chunk_index).and_then(|item| item.as_ref()) {
         Some(preplan) => preplan,
         None => {
-            errors.push(
-                inconsistent(format!("chunk `{}` 缺少改名预决议", chunk.id)),
-            );
+            errors.push(inconsistent(format!("chunk `{}` 缺少改名预决议", chunk.id)));
             return None;
         }
     };
@@ -892,12 +890,11 @@ pub(crate) fn assemble_chunk(
                     continue;
                 }
                 errors.push(
-                    PackDiagnostic::new(
-                        "vmz::pack::emit::edge_unresolved",
-                        format!(
-                            "静态导入 `{}` 目标未解析，无法拼接或合成 import",
-                            import.specifier
-                        ),
+                    super::edge_unresolved(
+                        "静态导入",
+                        &import.specifier,
+                        "无法拼接或合成 import",
+                        edge.target.as_ref().err(),
                     )
                     .with_path(module_path.clone())
                     .with_span(import.span),
@@ -1070,12 +1067,9 @@ pub(crate) fn assemble_chunk(
                                 // chunk 预决议时已解析到发射名，不重复解析）。
                                 let emitted = match external_name {
                                     Some(name) => name,
-                                    None => resolve_emitted_face(
-                                        context,
-                                        synth_chunk,
-                                        target,
-                                        name,
-                                    ),
+                                    None => {
+                                        resolve_emitted_face(context, synth_chunk, target, name)
+                                    }
                                 };
                                 bindings.named.insert((emitted, binding.local.clone()));
                             }
@@ -1267,7 +1261,10 @@ pub(crate) struct ChunkPreplan {
 /// 单个 chunk 的改名预决议：同 chunk 声明改名 + 面名歧义分裂 + 落点改名兜底，
 /// 三路计划合并为一张节点改名表与一张面名发射表。隔离 chunk 不参与拼接，
 /// 返回 `None`。
-pub(crate) fn plan_chunk_renames(context: &EmitContext<'_>, chunk_index: usize) -> Option<ChunkPreplan> {
+pub(crate) fn plan_chunk_renames(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+) -> Option<ChunkPreplan> {
     if super::isolated::is_isolated_chunk(context, chunk_index) {
         return None;
     }
@@ -1317,11 +1314,7 @@ pub(crate) fn resolve_emitted_face(
         ) {
             Some(ReexportBinding::Declared { node: landing, .. }) => {
                 let path = normalize_path(&context.graph.nodes[landing].resolved.path);
-                return context
-                    .face_aliases
-                    .get(&(path, face.clone()))
-                    .cloned()
-                    .unwrap_or(face);
+                return context.face_aliases.get(&(path, face.clone())).cloned().unwrap_or(face);
             }
             Some(ReexportBinding::External { chunk, node, name }) => {
                 current_chunk = chunk;
@@ -2105,7 +2098,8 @@ fn plan_face_renames(
     context: &EmitContext<'_>,
     chunk_index: usize,
     scans: &BTreeMap<usize, ChunkModuleScan<'_>>,
-) -> (BTreeMap<usize, BTreeMap<String, BindingRewrite>>, BTreeMap<String, BTreeMap<String, String>>) {
+) -> (BTreeMap<usize, BTreeMap<String, BindingRewrite>>, BTreeMap<String, BTreeMap<String, String>>)
+{
     let chunk = &context.chunks.chunks[chunk_index];
     let face_exported = |record: &ModuleRecord, name: &str| -> bool {
         record.exports.iter().any(|export| match export {
@@ -2381,10 +2375,8 @@ fn plan_face_renames(
             None => *owners.iter().next().expect("owners 非空"),
         };
         let mut emission: BTreeMap<String, String> = BTreeMap::new();
-        emission.insert(
-            normalize_path(&context.graph.nodes[canonical].resolved.path),
-            name.clone(),
-        );
+        emission
+            .insert(normalize_path(&context.graph.nodes[canonical].resolved.path), name.clone());
         // 面名分裂：被钉住的非 canonical 声明认领者以 fresh 名自身为发射面名，
         // 跨 chunk 消费者经 `resolve_emitted_face` 落到各自认领者的发射名；
         // 未被钉住的非 canonical 认领者不进表，面导出随 deferred 定稿丢弃。
@@ -2616,9 +2608,11 @@ fn edge_target_node(
     };
     let Ok(id) = edge.target.as_ref() else {
         errors.push(
-            PackDiagnostic::new(
-                "vmz::pack::emit::edge_unresolved",
-                format!("重导出 `{specifier}` 目标未解析，无法合成 export-from"),
+            super::edge_unresolved(
+                "重导出",
+                specifier,
+                "无法合成 export-from",
+                edge.target.as_ref().err(),
             )
             .with_path(module_path.to_string()),
         );

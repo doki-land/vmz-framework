@@ -13,7 +13,7 @@ use vmz_pack::resolve::{Resolved, Target};
 fn node(path: &str) -> ModuleNode {
     ModuleNode {
         kind: NodeKind::Js,
-        resolved: Resolved { path: PathBuf::from(path), package: None },
+        resolved: Resolved { path: PathBuf::from(path), package: None, stub: false },
         record: ModuleRecord::empty(Some(path.to_string())),
         static_edges: Vec::new(),
         dynamic_edges: Vec::new(),
@@ -45,11 +45,8 @@ fn dynamic_edge(specifier: &str, target: &str) -> ModuleEdge {
 }
 
 fn graph(entries: &[(&str, &str)], nodes: Vec<ModuleNode>) -> ModuleGraph {
-    let node_index = nodes
-        .iter()
-        .enumerate()
-        .map(|(index, node)| (node.resolved.path.clone(), index))
-        .collect();
+    let node_index =
+        nodes.iter().enumerate().map(|(index, node)| (node.resolved.path.clone(), index)).collect();
     ModuleGraph {
         target: Target::Browser,
         root: PathBuf::from("/"),

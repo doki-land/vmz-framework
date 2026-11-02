@@ -57,11 +57,15 @@ pub enum EdgeKind {
     Dynamic,
 }
 
-/// 节点类别：JS 模块、不透明样式节点或不透明 JSON 值节点。
+/// 节点类别：JS 模块、CJS 模块、不透明样式节点或不透明 JSON 值节点。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
-    /// JS/TS 模块：经 Oak 事实收集参与链接与分包。
+    /// JS/TS 模块（ESM）：经 Oak 事实收集参与链接与分包。
     Js,
+    /// CommonJS 模块：图边由 `require` 事实给出，发射时装填互操作壳
+    /// （`module`/`exports`/`require` 材料 + default/具名导出合成），
+    /// 绝不按 ESM 语句剪枝。
+    Cjs,
     /// `.css` 样式节点：不透明，绝不按 JS 源码解析，只承载有序副作用边。
     Style,
     /// `.json` 值节点：不透明，绝不按 JS 源码解析，只承载 default 值绑定边。
@@ -124,6 +128,19 @@ impl ModuleGraph {
 /// 入口本身解析失败（读文件/parse）记入图级诊断并跳过该入口；
 /// 依赖边解析失败保留为 `Err` 诊断边，遍历不因单点失败中断。
 pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -> ModuleGraph {
+    build_graph_with_origins(entries, target, root, &HashMap::new())
+}
+
+/// [`build_graph`] 的 provenance 变体：`origins` 把 canonical 产物路径映射回
+/// 其源文件（编译投影关系，如 `dist/components/Icon.client.js` →
+/// `node_modules/@vmz/ui/src/components/Icon.vmz`）。裸说明符与 `#imports`
+/// 的包发现以来源位置为上溯起点，使产物图表现得像模块仍住在源包里。
+pub fn build_graph_with_origins(
+    entries: &[(String, PathBuf)],
+    target: Target,
+    root: &Path,
+    origins: &HashMap<PathBuf, PathBuf>,
+) -> ModuleGraph {
     let mut graph = ModuleGraph {
         target,
         // 与节点路径同口径 canonicalize，否则 `\\?\` 前缀差异使相对标签退化为绝对路径。
@@ -134,7 +151,11 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
         diagnostics: Vec::new(),
     };
     let mut by_id: HashMap<ModuleId, usize> = HashMap::new();
-    let mut queue: VecDeque<ModuleId> = VecDeque::new();
+    // 队列携带完整 Resolved：stub（browser 别名 `false` 目标）等身份
+    // 不能从路径重建（合成路径不落盘、canonicalize 会失败）。
+    let mut queue: VecDeque<Resolved> = VecDeque::new();
+    // 边目标的完整解析结果侧表：expand 逐边登记，BFS 优先取用。
+    let mut edge_resolved: HashMap<ModuleId, Resolved> = HashMap::new();
 
     for (logical, entry_path) in entries {
         let canonical = match entry_canonical(entry_path) {
@@ -167,6 +188,7 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
         let resolved = Resolved {
             path: canonical.clone(),
             package: crate::resolve::package_of_path(&canonical),
+            stub: false,
         };
         graph.entries.push(GraphEntry { logical: logical.clone(), id: canonical.clone() });
         if by_id.contains_key(&canonical) {
@@ -174,13 +196,15 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
         }
         let index = graph.nodes.len();
         by_id.insert(canonical.clone(), index);
-        graph.nodes.push(placeholders::pending(resolved));
-        queue.push_back(canonical.clone());
+        graph.nodes.push(placeholders::pending(resolved.clone()));
+        queue.push_back(resolved);
     }
 
-    while let Some(id) = queue.pop_front() {
+    while let Some(resolved) = queue.pop_front() {
+        let id = resolved.path.clone();
         let index = by_id[&id];
-        let node = expand(&graph.nodes[index].resolved, target, root, &mut graph.diagnostics);
+        let node =
+            expand(&resolved, target, root, origins, &mut edge_resolved, &mut graph.diagnostics);
         let edges_static = node.static_edges.clone();
         let edges_dynamic = node.dynamic_edges.clone();
         graph.nodes[index] = node;
@@ -192,13 +216,15 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
             if by_id.contains_key(target_id) {
                 continue;
             }
-            let Some(resolved) = resolved_from_id(target_id) else {
+            let Some(resolved) =
+                edge_resolved.get(target_id).cloned().or_else(|| resolved_from_id(target_id))
+            else {
                 continue;
             };
             let index = graph.nodes.len();
             by_id.insert(target_id.clone(), index);
-            graph.nodes.push(placeholders::pending(resolved));
-            queue.push_back(target_id.clone());
+            graph.nodes.push(placeholders::pending(resolved.clone()));
+            queue.push_back(resolved);
         }
     }
 
@@ -207,10 +233,13 @@ pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -
 }
 
 /// 展开单个文件为节点：读源码 → Oak 事实 → 逐说明符解析身份。
+/// `edge_resolved` 逐边登记完整解析结果（stub 等身份不能只按路径重建）。
 fn expand(
     resolved: &Resolved,
     target: Target,
     root: &Path,
+    origins: &HashMap<PathBuf, PathBuf>,
+    edge_resolved: &mut HashMap<ModuleId, Resolved>,
     graph_diags: &mut Vec<PackDiagnostic>,
 ) -> ModuleNode {
     let path = &resolved.path;
@@ -231,6 +260,18 @@ fn expand(
     if path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("json")) {
         return ModuleNode {
             kind: NodeKind::Json,
+            resolved: resolved.clone(),
+            record: ModuleRecord::empty(Some(path.display().to_string())),
+            static_edges: Vec::new(),
+            dynamic_edges: Vec::new(),
+            diagnostics: Vec::new(),
+        };
+    }
+    // browser 别名 `false` 的合成 stub：不落盘、不读源，等价
+    // `module.exports = {}` 的 CJS 空模块（emit 层装填壳后即此语义）。
+    if resolved.stub {
+        return ModuleNode {
+            kind: NodeKind::Cjs,
             resolved: resolved.clone(),
             record: ModuleRecord::empty(Some(path.display().to_string())),
             static_edges: Vec::new(),
@@ -272,6 +313,8 @@ fn expand(
         }
     };
 
+    let origin = origins.get(path).cloned();
+    let format = crate::resolve::module_format(path);
     let mut static_edges = Vec::new();
     let mut dynamic_edges = Vec::new();
 
@@ -296,15 +339,38 @@ fn expand(
                 import.specifier.as_str(),
                 import.kind == crate::module::ImportKind::Dynamic,
                 path,
+                origin.as_deref(),
                 target,
                 root,
                 &record,
+                edge_resolved,
             ),
         };
         if kind == EdgeKind::Dynamic {
             dynamic_edges.push(edge);
         } else {
             static_edges.push(edge);
+        }
+    }
+
+    // CJS 模块的依赖边来自 `require` 事实（同步执行，与静态边同序）。
+    // ESM import 语法在 CJS 模块里属于混合写法，import 边照常建立。
+    if format == crate::resolve::ModuleFormat::Cjs {
+        for require in &record.requires {
+            static_edges.push(ModuleEdge {
+                specifier: require.specifier.clone(),
+                kind: EdgeKind::Static,
+                target: edge_target(
+                    require.specifier.as_str(),
+                    false,
+                    path,
+                    origin.as_deref(),
+                    target,
+                    root,
+                    &record,
+                    edge_resolved,
+                ),
+            });
         }
     }
 
@@ -330,12 +396,25 @@ fn expand(
         static_edges.push(ModuleEdge {
             specifier: specifier.to_string(),
             kind,
-            target: edge_target(specifier, false, path, target, root, &record),
+            target: edge_target(
+                specifier,
+                false,
+                path,
+                origin.as_deref(),
+                target,
+                root,
+                &record,
+                edge_resolved,
+            ),
         });
     }
 
     ModuleNode {
-        kind: NodeKind::Js,
+        kind: if format == crate::resolve::ModuleFormat::Cjs {
+            NodeKind::Cjs
+        } else {
+            NodeKind::Js
+        },
         resolved: resolved.clone(),
         record,
         static_edges,
@@ -345,13 +424,18 @@ fn expand(
 }
 
 /// 说明符 → 目标身份。动态空说明符（非字面量）直接产诊断，不猜。
+/// `origin` 为产物文件的投影来源（canonical 源文件路径），裸说明符包发现以其为起点。
+/// 命中的完整解析结果登记进 `edge_resolved`（stub 等身份不能只按路径重建）。
+#[allow(clippy::too_many_arguments)]
 fn edge_target(
     specifier: &str,
     dynamic: bool,
     importer: &Path,
+    origin: Option<&Path>,
     target: Target,
     root: &Path,
     record: &ModuleRecord,
+    edge_resolved: &mut HashMap<ModuleId, Resolved>,
 ) -> Result<ModuleId, PackDiagnostic> {
     if specifier.is_empty() {
         let diagnostic = record
@@ -373,14 +457,28 @@ fn edge_target(
         importer: importer.to_path_buf(),
         target,
         root: root.to_path_buf(),
+        origin: origin.map(Path::to_path_buf),
     };
     // `node:` 内建说明符不进入文件解析：身份是运行时外部模块，统一诊断码
     // 供 emit 层按「原样保留」处置（动态 import 合法，静态见 emit 合同）。
-    if crate::resolve::is_node_builtin_specifier(specifier) {
+    // Node target 上裸名内建（CJS 包常见的 `require('fs')` 形态）同为外部模块。
+    if crate::resolve::is_node_builtin_specifier(specifier)
+        || (target == Target::Node && crate::resolve::is_node_builtin_name(specifier))
+    {
         return Err(crate::resolve::node_builtin_diagnostic(specifier, importer));
     }
     match resolve(&request) {
-        Ok(resolved) => Ok(resolved.path),
+        Ok(resolved) => {
+            // 相对解析不附带包身份（见 resolve 层口径）；图节点身份需要包归属，
+            // 按落点路径回溯补齐，与旧 `resolved_from_id` 行为一致。
+            let resolved = if resolved.package.is_some() || resolved.stub {
+                resolved
+            } else {
+                Resolved { package: crate::resolve::package_of_path(&resolved.path), ..resolved }
+            };
+            edge_resolved.insert(resolved.path.clone(), resolved.clone());
+            Ok(resolved.path)
+        }
         Err(mut diagnostic) => {
             if dynamic {
                 diagnostic.message = format!("dynamic import: {}", diagnostic.message);
@@ -401,7 +499,7 @@ fn entry_canonical(path: &Path) -> Result<ModuleId, PackDiagnostic> {
 }
 
 fn resolved_from_id(id: &ModuleId) -> Option<Resolved> {
-    Some(Resolved { path: id.clone(), package: crate::resolve::package_of_path(id) })
+    Some(Resolved { path: id.clone(), package: crate::resolve::package_of_path(id), stub: false })
 }
 
 mod placeholders {

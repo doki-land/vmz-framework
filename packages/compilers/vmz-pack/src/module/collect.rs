@@ -37,7 +37,8 @@ use oak_typescript::scope::module_scope_facts;
 
 use super::record::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
-    ModuleRecord, ScopeBindingFact, ScopeIncompleteReason, StatementEffect, StatementFact,
+    ModuleRecord, RequireFact, ScopeBindingFact, ScopeIncompleteReason, StatementEffect,
+    StatementFact,
 };
 use crate::diag::PackDiagnostic;
 
@@ -45,6 +46,8 @@ use crate::diag::PackDiagnostic;
 const PARSE_FAILED: &str = "vmz::pack::module::parse_failed";
 /// 动态 import 说明符不是字符串字面量，无法静态解析。
 const DYNAMIC_IMPORT_UNRESOLVED: &str = "vmz::pack::module::dynamic_import_unresolved";
+/// `require(...)` 说明符不是字符串字面量，CJS 互操作无法静态装填。
+const REQUIRE_NONLITERAL: &str = "vmz::pack::module::require_nonliteral";
 /// import 形态无法提取模块说明符（如 `import.meta`、残缺语句）。
 const IMPORT_WITHOUT_SPECIFIER: &str = "vmz::pack::module::import_without_specifier";
 /// Oak 无法给出完整语句事实（绑定名缺失、误解析形态等），
@@ -263,7 +266,13 @@ impl<'a> Collector<'a> {
                 exports: Vec::new(),
                 statements: Vec::new(),
                 assets: Vec::new(),
-                flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
+                requires: Vec::new(),
+                cjs_named_exports: Vec::new(),
+                flags: ModuleFlags {
+                    has_tla: false,
+                    dynamic_import_nonliteral: false,
+                    require_nonliteral: false,
+                },
                 scope_bindings: Vec::new(),
                 scope_incomplete_reasons: Vec::new(),
                 diagnostics: Vec::new(),
@@ -277,6 +286,67 @@ impl<'a> Collector<'a> {
             diagnostic = diagnostic.with_path(path.clone());
         }
         self.record.diagnostics.push(diagnostic.with_span(span));
+    }
+
+    /// CJS 具名导出检测（cjs-module-lexer 同类的保守形状，只认顶层语句）：
+    /// `exports.name = …`、`module.exports.name = …`、`module.exports = { name, name: … }`。
+    /// 是否生效由图层的模块格式判定决定；ESM 模块上的同名赋值不导出任何东西，
+    /// 这里只记录事实。
+    fn detect_cjs_named_exports(&mut self, statement: &Statement) {
+        let Statement::ExpressionStatement(statement) = statement else { return };
+        let ExpressionKind::AssignmentExpression { left, right, .. } = &*statement.expression.kind
+        else {
+            return;
+        };
+        let ExpressionKind::MemberExpression { object, property, computed, .. } = &*left.kind
+        else {
+            return;
+        };
+        if *computed {
+            return;
+        }
+        let ExpressionKind::Identifier(property_name) = &*property.kind else { return };
+        // `exports.name = …`
+        if matches!(&*object.kind, ExpressionKind::Identifier(name) if name == "exports") {
+            push_unique_name(&mut self.record.cjs_named_exports, property_name);
+            return;
+        }
+        // `module.exports.name = …`：对象是 `module.exports` 成员表达式。
+        if let ExpressionKind::MemberExpression {
+            object: module_object,
+            property: module_property,
+            computed: false,
+            ..
+        } = &*object.kind
+        {
+            if matches!(&*module_object.kind, ExpressionKind::Identifier(name) if name == "module")
+                && matches!(&*module_property.kind, ExpressionKind::Identifier(name) if name == "exports")
+            {
+                push_unique_name(&mut self.record.cjs_named_exports, property_name);
+            }
+            return;
+        }
+        // `module.exports = { … }` 字面量键（仅标识符键；计算键不按名导出）。
+        if matches!(&*object.kind, ExpressionKind::Identifier(name) if name == "module")
+            && property_name == "exports"
+        {
+            if let ExpressionKind::ObjectLiteral { properties } = &*right.kind {
+                for property in properties {
+                    if let ObjectProperty::Property { name, .. } = property {
+                        if name
+                            .chars()
+                            .next()
+                            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '$')
+                            && name
+                                .chars()
+                                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+                        {
+                            push_unique_name(&mut self.record.cjs_named_exports, name);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// 遍历语句列表；空 import 指纹先与后一条表达式语句配对成动态 import
@@ -339,6 +409,7 @@ impl<'a> Collector<'a> {
             {
                 continue;
             }
+            self.detect_cjs_named_exports(statement);
             match statement {
                 Statement::ImportDeclaration(_) => {}
                 Statement::ExportDeclaration(export) => {
@@ -819,6 +890,30 @@ impl<'a> Collector<'a> {
                     && is_import_keyword_at(self.source, expression.span.start)
                 {
                     self.push_dynamic(range(expression.span.clone()), func);
+                }
+                // CJS `require('<lit>')`：自由 `require` 标识符 + 单实参。
+                // 说明符事实供图层建边；非字面量在 CJS 模块上必须显式拒绝。
+                else if args.len() == 1
+                    && matches!(&*func.kind, ExpressionKind::Identifier(name) if name == "require")
+                {
+                    let span = range(expression.span.clone());
+                    match &*args[0].kind {
+                        ExpressionKind::StringLiteral(text) => {
+                            self.record.requires.push(RequireFact {
+                                specifier: text.clone(),
+                                specifier_span: Some(range(args[0].span.clone())),
+                                span,
+                            });
+                        }
+                        _ => {
+                            self.record.flags.require_nonliteral = true;
+                            self.diagnostic(
+                                REQUIRE_NONLITERAL,
+                                "require 的模块说明符不是字符串字面量，CJS 互操作无法静态装填",
+                                span,
+                            );
+                        }
+                    }
                 }
                 self.walk_expr(func);
                 for argument in args {

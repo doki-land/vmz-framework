@@ -540,8 +540,16 @@ fn face_split_keeps_distinct_pinned_claimants() {
     let shared = plan
         .artifacts
         .iter()
-        .find(|a| a.modules.iter().any(|m| m.ends_with("src/a.js")) && a.modules.iter().any(|m| m.ends_with("src/b.js")))
-        .unwrap_or_else(|| panic!("expected a shared chunk containing a.js and b.js: {:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()));
+        .find(|a| {
+            a.modules.iter().any(|m| m.ends_with("src/a.js"))
+                && a.modules.iter().any(|m| m.ends_with("src/b.js"))
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected a shared chunk containing a.js and b.js: {:?}",
+                plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+            )
+        });
     assert!(shared.code.contains("const value__vmz2 = 'a'"), "{}", shared.code);
     assert!(shared.code.contains("const value__vmz3 = 'b'"), "{}", shared.code);
     assert!(shared.code.contains("export { value__vmz2 as value }"), "{}", shared.code);
@@ -611,11 +619,7 @@ fn face_split_unrenamable_claimant_stays_rejected() {
     let Err(errors) = plan_emit(&graph, &link_plan, &chunks, &options()) else {
         panic!("unrenamable pinned claimant must keep the explicit name_conflict rejection")
     };
-    assert!(
-        codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()),
-        "{:?}",
-        errors
-    );
+    assert!(codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()), "{:?}", errors);
 }
 /// 隔离模块（scope 事实不完整）整文件独立发射、剪枝只到模块级：文件内
 /// 语句文本全部存活，包括未被消费的函数体内的引用。链接层必须把这类模块
@@ -652,11 +656,13 @@ fn isolated_module_keeps_referenced_exports_alive() {
     let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
 
     // `helper` 的声明与导出必须存活于某个 chunk。
-    let provider = plan
-        .artifacts
-        .iter()
-        .find(|a| a.code.contains("function helper"))
-        .unwrap_or_else(|| panic!("helper declaration pruned: {:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()));
+    let provider =
+        plan.artifacts.iter().find(|a| a.code.contains("function helper")).unwrap_or_else(|| {
+            panic!(
+                "helper declaration pruned: {:?}",
+                plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+            )
+        });
     assert!(provider.code.contains("export { helper }"), "{}", provider.code);
     // 隔离 chunk 的 import 说明符必须指向该 chunk 的产物文件。
     let isolated = plan
@@ -993,6 +999,7 @@ fn bootstrap_dynamic_map_emits_async_chunks() {
                 r#"{
                     "name": "fake-pkg",
                     "version": "1.0.0",
+                    "type": "module",
                     "exports": {
                         ".": { "browser": "./browser.js", "import": "./import.js", "default": "./default.js" }
                     }
@@ -2802,7 +2809,7 @@ fn incomplete_facts_member_is_rejected() {
 
     let mut app_node = ModuleNode {
         kind: NodeKind::Js,
-        resolved: Resolved { path: app.clone(), package: None },
+        resolved: Resolved { path: app.clone(), package: None, stub: false },
         record: ModuleRecord::empty(Some(app.display().to_string())),
         static_edges: vec![ModuleEdge {
             specifier: "./pending.js".to_string(),
@@ -2822,7 +2829,7 @@ fn incomplete_facts_member_is_rejected() {
     });
     let mut pending_node = ModuleNode {
         kind: NodeKind::Js,
-        resolved: Resolved { path: pending.clone(), package: None },
+        resolved: Resolved { path: pending.clone(), package: None, stub: false },
         record: ModuleRecord::empty(Some(pending.display().to_string())),
         static_edges: Vec::new(),
         dynamic_edges: Vec::new(),
@@ -2883,7 +2890,7 @@ fn missing_source_file_is_rejected() {
     let gone = root.join("gone.js");
     let node = ModuleNode {
         kind: NodeKind::Js,
-        resolved: Resolved { path: gone.clone(), package: None },
+        resolved: Resolved { path: gone.clone(), package: None, stub: false },
         record: ModuleRecord::empty(Some(gone.display().to_string())),
         static_edges: Vec::new(),
         dynamic_edges: Vec::new(),
@@ -3276,4 +3283,282 @@ fn isolated_top_level_return_is_rejected() {
         "{:?}",
         codes(&diagnostics)
     );
+}
+
+/// 依赖组件投影端到端：`dist/components/Widget.client.js` 由
+/// `deps/ui/src/components/Widget.vmz` 编译而来，其裸导入 `@probe/core-x`
+/// 只在源包自己的 node_modules 里可见。无 origins 时 emit 拒绝且消息链上
+/// 底层解析原因；带 origins 时解析成功、说明符重写为 chunk 相对路径。
+#[test]
+fn projected_component_resolves_bare_imports_from_source_origin() {
+    let root = temp_tree(
+        "origins",
+        &[
+            ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "app/dist/entry.js",
+                "import Widget from './components/Widget.client.js';\nexport const run = Widget;\n",
+            ),
+            (
+                "app/dist/components/Widget.client.js",
+                "import { marker } from '@probe/core-x';\nconst label = marker;\nexport default label;\n",
+            ),
+            ("deps/ui/package.json", r#"{"name":"@probe/ui","version":"0.0.0"}"#),
+            ("deps/ui/src/components/Widget.vmz", "<template><span /></template>\n"),
+            (
+                "deps/ui/node_modules/@probe/core-x/package.json",
+                r#"{"name":"@probe/core-x","version":"0.0.0","type":"module","exports":{".":"./dist/index.js"}}"#,
+            ),
+            (
+                "deps/ui/node_modules/@probe/core-x/dist/index.js",
+                "export const marker = 'vendored';\n",
+            ),
+        ],
+    );
+    let emitted = fs::canonicalize(root.join("app/dist/components/Widget.client.js")).unwrap();
+    let source = fs::canonicalize(root.join("deps/ui/src/components/Widget.vmz")).unwrap();
+    let entry = vec![("main".to_string(), root.join("app/dist/entry.js"))];
+    let uses = || {
+        vec![EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }]
+    };
+
+    // 无 provenance：emit 拒绝，消息必须链上底层 resolve 原因（不只是「未解析」）。
+    let graph = vmz_pack::graph::build_graph(&entry, Target::Browser, &root.join("app"));
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(&graph, &uses());
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    let diag = errors
+        .iter()
+        .find(|d| d.code == "vmz::pack::emit::edge_unresolved")
+        .expect("edge_unresolved");
+    assert!(diag.message.contains("@probe/core-x"), "{diag:?}");
+    assert!(diag.message.contains("vmz::pack::resolve::not_found"), "{diag:?}");
+
+    // 有 provenance：包从源树解析进图，chunk 不留裸说明符。
+    let origins = std::collections::HashMap::from([(emitted, source)]);
+    let graph = vmz_pack::graph::build_graph_with_origins(
+        &entry,
+        Target::Browser,
+        &root.join("app"),
+        &origins,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    assert!(
+        graph.nodes.iter().any(|n| n.resolved.path.ends_with("core-x/dist/index.js")),
+        "{:?}",
+        graph.nodes.iter().map(|n| n.resolved.path.clone()).collect::<Vec<_>>()
+    );
+    let link_plan = link(&graph, &uses());
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    for artifact in &plan.artifacts {
+        assert!(!artifact.code.contains("@probe/core-x"), "{}", artifact.code);
+    }
+    assert!(
+        plan.artifacts.iter().any(|a| a.code.contains("vendored")),
+        "{:?}",
+        plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
+}
+
+/// CJS 互操作端到端：应用动态 import 一个纯 CJS 包（无 `type` 字段），
+/// 包内部经 require 链到另一个 CJS 文件；`browser` 对象字段把入口别名到
+/// 浏览器实现。产物必须是可执行的 ESM 壳（module/exports/require 装填、
+/// default + 具名导出快照），不留 `module.exports` 原文裸奔。
+#[test]
+fn cjs_package_vendored_with_interop_shell() {
+    let root = temp_tree(
+        "cjs",
+        &[
+            ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "app/dist/entry.js",
+                "export async function run() { const m = await import('cjs-pkg'); return m.default.twice(21); }\n",
+            ),
+            (
+                "app/node_modules/cjs-pkg/package.json",
+                r#"{"name":"cjs-pkg","version":"1.0.0","main":"./lib/index.js","browser":{"./lib/index.js":"./lib/browser.js"}}"#,
+            ),
+            ("app/node_modules/cjs-pkg/lib/index.js", "module.exports = require('./server')\n"),
+            (
+                "app/node_modules/cjs-pkg/lib/browser.js",
+                "const util = require('./util')\nexports.twice = function (n) { return util.double(n) }\n",
+            ),
+            (
+                "app/node_modules/cjs-pkg/lib/util.js",
+                "function double(n) { return n * 2 }\nmodule.exports = exports = { double };\n",
+            ),
+            ("app/node_modules/cjs-pkg/lib/server.js", "throw new Error('server-only')\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[("main".to_string(), root.join("app/dist/entry.js"))],
+        Target::Browser,
+        &root.join("app"),
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    // browser 别名：入口落到 browser.js；server.js 不进图。
+    assert!(
+        graph.nodes.iter().any(|n| n.resolved.path.ends_with("lib/browser.js")),
+        "{:?}",
+        graph.nodes.iter().map(|n| n.resolved.path.clone()).collect::<Vec<_>>()
+    );
+    assert!(!graph.nodes.iter().any(|n| n.resolved.path.ends_with("lib/server.js")));
+    // CJS 节点类别正确。
+    assert!(
+        graph.nodes.iter().filter(|n| n.kind == vmz_pack::graph::NodeKind::Cjs).count() == 2,
+        "{:?}",
+        graph.nodes.iter().map(|n| (n.resolved.path.clone(), n.kind)).collect::<Vec<_>>()
+    );
+
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    let mut saw_shell = false;
+    for artifact in &plan.artifacts {
+        if artifact.code.contains("lib/browser.js")
+            || artifact.modules.iter().any(|m| m.ends_with("lib/browser.js"))
+        {
+            saw_shell = true;
+            assert!(artifact.code.contains("let module = { exports: {} };"), "{}", artifact.code);
+            assert!(artifact.code.contains("function require(id)"), "{}", artifact.code);
+            assert!(artifact.code.contains("export default __vmz_exports"), "{}", artifact.code);
+            assert!(artifact.code.contains("as twice"), "{}", artifact.code);
+            assert!(!artifact.code.contains("module.exports ="), "{}", artifact.code);
+        }
+    }
+    assert!(saw_shell, "{:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+}
+
+/// CJS 反例：应用静态具名导入一个未检测到的名字，链接层必须结构化拒绝。
+#[test]
+fn cjs_unknown_named_import_is_structured_failure() {
+    let root = temp_tree(
+        "cjs-unknown",
+        &[
+            ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("app/dist/entry.js", "import { nope } from 'cjs-pkg';\nexport const run = nope;\n"),
+            (
+                "app/node_modules/cjs-pkg/package.json",
+                r#"{"name":"cjs-pkg","version":"1.0.0","main":"./lib/index.js"}"#,
+            ),
+            ("app/node_modules/cjs-pkg/lib/index.js", "exports.known = 1;\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[("main".to_string(), root.join("app/dist/entry.js"))],
+        Target::Browser,
+        &root.join("app"),
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    assert!(
+        link_plan.diagnostics.iter().any(|d| d.code == "vmz::pack::link::unknown_export"),
+        "{:?}",
+        link_plan.diagnostics
+    );
+}
+
+/// 多文件源码包正例：入口经嵌套目录相对导入与 `index` 解析完整进图，
+/// 缺文件的相对导入是结构化失败（说明符 + 来源模块）。
+#[test]
+fn multi_file_package_relative_imports_and_missing_file_diagnostic() {
+    let files: &[(&str, &str)] = &[
+        ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+        ("app/dist/entry.js", "export async function run() { return import('src-pkg'); }\n"),
+        (
+            "app/node_modules/src-pkg/package.json",
+            r#"{"name":"src-pkg","version":"0.0.0","type":"module","exports":{".":"./src/index.js"}}"#,
+        ),
+        (
+            "app/node_modules/src-pkg/src/index.js",
+            "export { client } from './client.js';\nexport { nested } from './nested/index.js';\n",
+        ),
+        ("app/node_modules/src-pkg/src/client.js", "export const client = 1;\n"),
+        (
+            "app/node_modules/src-pkg/src/nested/index.js",
+            "export { nested } from './deep/more.js';\n",
+        ),
+        ("app/node_modules/src-pkg/src/nested/deep/more.js", "export const nested = 2;\n"),
+    ];
+    let root = temp_tree("multifile", files);
+    let graph = build_graph(
+        &[("main".to_string(), root.join("app/dist/entry.js"))],
+        Target::Browser,
+        &root.join("app"),
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    // 入口 + client + nested/index + deep/more = 4 个包内节点 + entry = 5。
+    assert_eq!(
+        graph.nodes.len(),
+        5,
+        "{:?}",
+        graph.nodes.iter().map(|n| n.resolved.path.clone()).collect::<Vec<_>>()
+    );
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    // 缺文件的相对导入：结构化失败，消息含说明符与来源模块。
+    let root = temp_tree(
+        "multifile-missing",
+        &[
+            files[0],
+            files[1],
+            files[2],
+            (
+                "app/node_modules/src-pkg/src/index.js",
+                "export { client } from './gone/missing.js';\n",
+            ),
+        ],
+    );
+    let graph = build_graph(
+        &[("main".to_string(), root.join("app/dist/entry.js"))],
+        Target::Browser,
+        &root.join("app"),
+    );
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
+    let diag = errors
+        .iter()
+        .find(|d| d.code == "vmz::pack::emit::edge_unresolved")
+        .expect("edge_unresolved");
+    assert!(diag.message.contains("./gone/missing.js"), "{diag:?}");
+    assert!(diag.message.contains("vmz::pack::resolve::not_found"), "{diag:?}");
 }

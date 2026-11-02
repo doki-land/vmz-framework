@@ -209,10 +209,7 @@ fn json_import_becomes_opaque_value_node() {
 fn json_entry_is_rejected() {
     let root = temp_tree(
         "jsonentry",
-        &[
-            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            ("src/d.json", "{\"k\":1}\n"),
-        ],
+        &[("package.json", r#"{"name":"app","version":"0.0.0"}"#), ("src/d.json", "{\"k\":1}\n")],
     );
     let graph =
         build_graph(&[("main".to_string(), root.join("src/d.json"))], Target::Browser, &root);

@@ -106,7 +106,7 @@ fn side_effect_imports_retain_evaluation() {
             ("src/styles.css", "body { color: red; }\n"),
             (
                 "node_modules/side-pkg/package.json",
-                r#"{"name":"side-pkg","version":"0.0.0","main":"index.js"}"#,
+                r#"{"name":"side-pkg","version":"0.0.0","type":"module","main":"index.js"}"#,
             ),
             (
                 "node_modules/side-pkg/index.js",
@@ -265,12 +265,12 @@ fn dual_package_instances_stay_distinct() {
             ),
             (
                 "node_modules/pkg/package.json",
-                r#"{"name":"pkg","version":"1.0.0","main":"index.js"}"#,
+                r#"{"name":"pkg","version":"1.0.0","type":"module","main":"index.js"}"#,
             ),
             ("node_modules/pkg/index.js", "export function pk(){ return 1 }\n"),
             (
                 "node_modules/mid/package.json",
-                r#"{"name":"mid","version":"0.0.0","main":"index.js"}"#,
+                r#"{"name":"mid","version":"0.0.0","type":"module","main":"index.js"}"#,
             ),
             (
                 "node_modules/mid/index.js",
@@ -278,7 +278,7 @@ fn dual_package_instances_stay_distinct() {
             ),
             (
                 "node_modules/mid/node_modules/pkg/package.json",
-                r#"{"name":"pkg","version":"2.0.0","main":"index.js"}"#,
+                r#"{"name":"pkg","version":"2.0.0","type":"module","main":"index.js"}"#,
             ),
             ("node_modules/mid/node_modules/pkg/index.js", "export function pk(){ return 2 }\n"),
         ],

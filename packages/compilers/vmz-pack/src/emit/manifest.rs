@@ -69,8 +69,7 @@ pub(crate) fn finalize(
     // 行级 source map v3：`sources` 按 chunk 成员节点序（与 manifest
     // `modules` 同口径，chunk 内节点不重复），`sourcesContent` 内嵌原模块
     // 文本使 map 自包含；map 文件名恒 `<file_name>.map`，内容不上 wire。
-    let map_file_names: Vec<String> =
-        file_names.iter().map(|name| format!("{name}.map")).collect();
+    let map_file_names: Vec<String> = file_names.iter().map(|name| format!("{name}.map")).collect();
     let mut final_codes: Vec<String> = Vec::with_capacity(file_names.len());
     let mut source_maps: Vec<String> = Vec::with_capacity(file_names.len());
     for (index, chunk) in context.chunks.chunks.iter().enumerate() {
@@ -94,8 +93,7 @@ pub(crate) fn finalize(
             })
             .collect();
         mapped.sort_by_key(|segment| (segment.gen_line, segment.gen_col));
-        source_maps
-            .push(source_map_json(&file_names[index], &sources, &sources_content, &mapped));
+        source_maps.push(source_map_json(&file_names[index], &sources, &sources_content, &mapped));
         let mut text = codes[index].clone();
         if !text.ends_with('\n') {
             text.push('\n');

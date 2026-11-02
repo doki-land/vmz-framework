@@ -250,6 +250,39 @@ pub fn plan_emit(
         }
     }
 
+    // 保留模块的静态/重导出 Err 边一律是构建失败：真实 ESM 在加载期解析全部
+    // 静态依赖，与需求活跃性无关——语句被剪枝不等于说明符可以悬空。动态边不
+    // 在此列（懒加载边界由 emit 的 import 处置路径按活跃性处理）；`node:` 等
+    // 内建外部模块是合法保留原文（emit 路径自带静态内建的专项拒绝）。
+    for (node_index, node) in graph.nodes.iter().enumerate() {
+        if !retained[node_index] {
+            continue;
+        }
+        for edge in &node.static_edges {
+            let Err(diagnostic) = edge.target.as_ref() else { continue };
+            if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN {
+                continue;
+            }
+            errors.push(
+                edge_unresolved(
+                    match edge.kind {
+                        crate::graph::EdgeKind::ReexportNamed
+                        | crate::graph::EdgeKind::ReexportAll
+                        | crate::graph::EdgeKind::ReexportNamespace => "重导出",
+                        _ => "静态导入",
+                    },
+                    &edge.specifier,
+                    "保留模块的静态依赖在加载期必须可解析",
+                    Some(diagnostic),
+                )
+                .with_path(normalize_path(&node.resolved.path)),
+            );
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
     // 前置拒绝 + 重读源码。
     let mut sources: HashMap<usize, String> = HashMap::new();
     for chunk in &chunks.chunks {
@@ -271,12 +304,18 @@ pub fn plan_emit(
             if module_node.record.path.is_none() {
                 reasons.push("record-path-missing".to_string());
             }
-            let statement_gaps = module_node
-                .record
-                .diagnostics
-                .iter()
-                .filter(|diagnostic| diagnostic.code == STATEMENT_FACT_INCOMPLETE)
-                .count();
+            // 语句事实缺口只影响平铺拼接的剪枝/改名前提；CJS 模块整文件发射，
+            // 无剪枝无改名，缺口不构成拒绝理由（require 事实仍完整收集）。
+            let statement_gaps = if module_node.kind == crate::graph::NodeKind::Cjs {
+                0
+            } else {
+                module_node
+                    .record
+                    .diagnostics
+                    .iter()
+                    .filter(|diagnostic| diagnostic.code == STATEMENT_FACT_INCOMPLETE)
+                    .count()
+            };
             if statement_gaps > 0 {
                 reasons.push(format!("statement-fact-incomplete x{statement_gaps}"));
             }
@@ -293,6 +332,11 @@ pub fn plan_emit(
             match std::fs::read_to_string(&module_node.resolved.path) {
                 Ok(source) => {
                     sources.insert(node, source);
+                }
+                Err(err) if module_node.resolved.stub => {
+                    // browser 别名 `false` 的合成 stub：不落盘，发射时以空源装填。
+                    sources.insert(node, String::new());
+                    let _ = err;
                 }
                 Err(err) => {
                     errors.push(
@@ -519,4 +563,19 @@ fn asset_unresolved(module_path: &str, specifier: &str, reason: &str) -> PackDia
         format!("资源 `{specifier}` 无法解析为可读文件: {reason}"),
     )
     .with_path(module_path.to_string())
+}
+
+/// 边上保留的解析诊断是失败原因的唯一载体——链进 `edge_unresolved` 消息，
+/// 否则调用方只能看到「未解析」而看不到为什么（包未找到 / 封装拒绝 / 条件不适用）。
+pub(crate) fn edge_unresolved(
+    subject: &str,
+    specifier: &str,
+    action: &str,
+    underlying: Option<&PackDiagnostic>,
+) -> PackDiagnostic {
+    let reason = underlying.map(|d| format!("（{}: {}）", d.code, d.message)).unwrap_or_default();
+    PackDiagnostic::new(
+        "vmz::pack::emit::edge_unresolved",
+        format!("{subject} `{specifier}` 目标未解析{reason}，{action}"),
+    )
 }

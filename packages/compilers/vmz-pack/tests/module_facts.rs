@@ -502,7 +502,10 @@ fn type_reference_sets_flag_without_span() {
 #[test]
 fn scope_incomplete_reasons_are_passed_through_from_oak() {
     let record = ok("const a = 1;\neval('a');\n");
-    assert_eq!(record.scope_incomplete_reasons, vec![vmz_pack::module::ScopeIncompleteReason::DirectEval]);
+    assert_eq!(
+        record.scope_incomplete_reasons,
+        vec![vmz_pack::module::ScopeIncompleteReason::DirectEval]
+    );
     assert!(record.is_scope_incomplete());
 }
 

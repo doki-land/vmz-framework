@@ -58,6 +58,7 @@ fn attempt(
         importer: tree.root.join(importer_rel),
         target,
         root: tree.root.clone(),
+        origin: None,
     })
 }
 
@@ -528,6 +529,7 @@ fn root_fallback_walks_from_project_root_when_importer_chain_has_none() {
         importer: tree.root.join("outside/nested/page.js"),
         target: Target::Node,
         root: tree.root.join("proj"),
+        origin: None,
     })
     .expect("root fallback finds the package");
 
@@ -535,4 +537,87 @@ fn root_fallback_walks_from_project_root_when_importer_chain_has_none() {
     let pkg = resolved.package.expect("identity via root walk");
     assert_eq!(pkg.version.as_deref(), Some("4.5.6"));
     assert_eq!(pkg.root, tree.canon("proj/node_modules/only-here"));
+}
+
+/// 投影 provenance：产物 importer 自己的树上看不到包，但来源（源文件）的
+/// 树上可见——裸说明符从来源位置起上溯（Node realpath 语义）。
+#[test]
+fn origin_walks_from_source_tree_for_bare_specifiers() {
+    let tree = Tree::new();
+    // 应用投影产物：dist 树内没有 core-x。
+    tree.file("app/dist/components/Widget.client.js", "export {};\n");
+    tree.file("app/package.json", r#"{ "name": "app", "version": "0.0.0" }"#);
+    // 依赖组件源：自己的 node_modules 里可见 core-x（pnpm peer 链接形态）。
+    tree.file(
+        "pkg/src/components/Widget.vmz",
+        "<template><span /></template><script client>export default class Widget {}</script>\n",
+    );
+    tree.file("pkg/package.json", r#"{ "name": "@probe/ui", "version": "0.0.0" }"#);
+    tree.file(
+        "pkg/node_modules/@probe/core-x/package.json",
+        r#"{ "name": "@probe/core-x", "version": "0.0.0", "exports": { ".": "./dist/index.js" } }"#,
+    );
+    tree.file("pkg/node_modules/@probe/core-x/dist/index.js", "export const marker = 1;\n");
+
+    let resolved = resolve(&ResolveRequest {
+        specifier: "@probe/core-x".to_string(),
+        importer: tree.root.join("app/dist/components/Widget.client.js"),
+        target: Target::Browser,
+        root: tree.root.join("app"),
+        origin: Some(tree.canon("pkg/src/components/Widget.vmz")),
+    })
+    .expect("origin tree resolves the package");
+    assert_eq!(resolved.path, tree.canon("pkg/node_modules/@probe/core-x/dist/index.js"));
+
+    // 无 origin 时同一 importer 必须失败，且诊断点名上溯起点。
+    let failure = unwrap_err(resolve(&ResolveRequest {
+        specifier: "@probe/core-x".to_string(),
+        importer: tree.root.join("app/dist/components/Widget.client.js"),
+        target: Target::Browser,
+        root: tree.root.join("app"),
+        origin: None,
+    }));
+    assert_eq!(failure.code, "vmz::pack::resolve::not_found");
+    assert!(failure.message.contains("自 `"), "{failure:?}");
+}
+
+/// browser 对象字段：入口路径别名 + `false` stub + 说明符级内建别名。
+#[test]
+fn browser_field_object_aliases_entry_and_stubs_builtin() {
+    let tree = Tree::new();
+    tree.file("app/src/main.js", "export {};\n");
+    tree.file("app/package.json", r#"{ "name": "app", "version": "0.0.0" }"#);
+    tree.file(
+        "app/node_modules/cjs-pkg/package.json",
+        r#"{
+            "name": "cjs-pkg",
+            "version": "1.0.0",
+            "main": "./lib/index.js",
+            "browser": { "./lib/index.js": "./lib/browser.js", "fs": false }
+        }"#,
+    );
+    tree.file("app/node_modules/cjs-pkg/lib/index.js", "module.exports = require('./server')\n");
+    tree.file("app/node_modules/cjs-pkg/lib/browser.js", "exports.ok = 1;\n");
+    tree.file("app/node_modules/cjs-pkg/lib/server.js", "exports.no = 1;\n");
+
+    // 路径别名：包入口落到 browser.js。
+    let resolved = attempt(&tree, "cjs-pkg", "app/src/main.js", Target::Browser)
+        .expect("browser alias resolves");
+    assert_eq!(resolved.path, tree.canon("app/node_modules/cjs-pkg/lib/browser.js"));
+    assert!(!resolved.stub);
+
+    // 说明符别名：`fs: false` 合成 stub。
+    let stubbed = resolve(&ResolveRequest {
+        specifier: "fs".to_string(),
+        importer: tree.root.join("app/node_modules/cjs-pkg/lib/browser.js"),
+        target: Target::Browser,
+        root: tree.root.join("app"),
+        origin: None,
+    })
+    .expect("fs stub resolves");
+    assert!(stubbed.stub, "{stubbed:?}");
+
+    // Node target 不应用别名：入口仍落 index.js。
+    let node = attempt(&tree, "cjs-pkg", "app/src/main.js", Target::Node).expect("node entry");
+    assert_eq!(node.path, tree.canon("app/node_modules/cjs-pkg/lib/index.js"));
 }

@@ -19,6 +19,14 @@ pub struct ModuleRecord {
     pub statements: Vec<StatementFact>,
     /// 资源引用事实（`new URL('<literal>', …)` 形态）。
     pub assets: Vec<AssetFact>,
+    /// `require('<literal>')` 调用事实（CJS 互操作的图边来源）。
+    /// ESM 模块也可能出现 require 文本（`createRequire` 形态）；是否建边由
+    /// 图层的模块格式判定决定。
+    pub requires: Vec<RequireFact>,
+    /// CJS 具名导出检测：`exports.x =` / `module.exports.x =` /
+    /// `module.exports = { … }` 字面量键，顶层顺序去重。
+    /// 只在模块为 CJS 格式时生效（图层的格式判定）。
+    pub cjs_named_exports: Vec<String>,
     /// 模块级标志。
     pub flags: ModuleFlags,
     /// 模块级绑定 scope 事实（Oak `module_scope_facts` 投影），
@@ -93,7 +101,13 @@ impl ModuleRecord {
             exports: Vec::new(),
             statements: Vec::new(),
             assets: Vec::new(),
-            flags: ModuleFlags { has_tla: false, dynamic_import_nonliteral: false },
+            requires: Vec::new(),
+            cjs_named_exports: Vec::new(),
+            flags: ModuleFlags {
+                has_tla: false,
+                dynamic_import_nonliteral: false,
+                require_nonliteral: false,
+            },
             scope_bindings: Vec::new(),
             scope_incomplete_reasons: Vec::new(),
             diagnostics: Vec::new(),
@@ -264,6 +278,17 @@ pub struct AssetFact {
     pub span: (usize, usize),
 }
 
+/// 一条 `require('<literal>')` 调用事实。
+#[derive(Debug, Clone, PartialEq)]
+pub struct RequireFact {
+    /// 说明符原文（引号内文本）。
+    pub specifier: String,
+    /// 说明符字面量 span（含引号）。
+    pub specifier_span: Option<(usize, usize)>,
+    /// 整个 `require(...)` 调用表达式 span（诊断锚点）。
+    pub span: (usize, usize),
+}
+
 /// 模块级标志。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleFlags {
@@ -276,4 +301,6 @@ pub struct ModuleFlags {
     /// 存在无法静态解析说明符的动态 import（对应
     /// `vmz::pack::module::dynamic_import_unresolved` 诊断）。
     pub dynamic_import_nonliteral: bool,
+    /// 存在非字符串字面量的 `require(...)` 调用（CJS 模块上必须显式拒绝）。
+    pub require_nonliteral: bool,
 }

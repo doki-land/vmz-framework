@@ -276,8 +276,11 @@ impl<'g> Linker<'g> {
         // 模块级：文件内全部语句、import 绑定、重导出与动态边文本都会进入产物。
         // 若仍按符号需求剪枝，目标 chunk 会把「未被消费」的导出剪除，而本模块
         // 保留的引用文本随之断链（死代码里的名字也必须解析成立）。升级为
-        // Execute 全量需求语义，与整文件存活口径一致。
-        if self.graph.nodes[node].record.is_scope_incomplete() {
+        // Execute 全量需求语义，与整文件存活口径一致。CJS 模块同为整文件发射
+        // （互操作壳引用全部语句与 require 边），同一升级。
+        if self.graph.nodes[node].record.is_scope_incomplete()
+            || self.graph.nodes[node].kind == NodeKind::Cjs
+        {
             self.demand(Demand::Execute(node));
         }
     }
@@ -332,6 +335,14 @@ impl<'g> Linker<'g> {
     fn provides(&self, node: usize, name: &str, visiting: &mut HashSet<usize>) -> bool {
         if !visiting.insert(node) {
             return true;
+        }
+        // CJS 互操作壳的导出面：`default`（module.exports）+ 检测到的具名导出，
+        // 与 emit 层包装合成的导出语句同一份事实。
+        if self.graph.nodes[node].kind == NodeKind::Cjs {
+            let provided = name == "default"
+                || self.graph.nodes[node].record.cjs_named_exports.iter().any(|n| n == name);
+            visiting.remove(&node);
+            return provided;
         }
         let provided = self.graph.nodes[node].record.exports.iter().any(|export| match export {
             ExportFact::Local { exported, type_only, .. } => !type_only && exported == name,
@@ -408,6 +419,19 @@ impl<'g> Linker<'g> {
         if self.graph.nodes[node].kind == NodeKind::Json {
             // JSON 值节点无导出事实：`default` 即值本身，具名/命名空间与
             // 重导出形态由 `emit` 层显式拒绝；这里只保留节点（demand 已 retain）。
+            return;
+        }
+        // CJS 互操作壳：导出面 = default + 检测到的具名集合（与 provides 同一份
+        // 事实）。命中即整模块执行保留（无语句级剪枝）；未检测到的具名是
+        // 结构化 unknown_export，不静默放行到运行时 SyntaxError。
+        if self.graph.nodes[node].kind == NodeKind::Cjs {
+            let provided = name == "default"
+                || self.graph.nodes[node].record.cjs_named_exports.iter().any(|n| n == name);
+            if provided {
+                self.demand(Demand::Execute(node));
+            } else {
+                self.unknown_export(node, name);
+            }
             return;
         }
         let exports: Vec<_> = self.graph.nodes[node].record.exports.iter().cloned().collect();
@@ -523,8 +547,7 @@ impl<'g> Linker<'g> {
             let active_before = self.active[node].len();
             let demands_before = self.seen_demands.len();
             for index in indexes {
-                let refs =
-                    self.graph.nodes[node].record.statements[index].referenced_names.clone();
+                let refs = self.graph.nodes[node].record.statements[index].referenced_names.clone();
                 for name in refs {
                     if !self.propagate_import_binding(node, &name) {
                         self.activate_declared(node, &name);

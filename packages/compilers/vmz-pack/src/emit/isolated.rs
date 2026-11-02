@@ -35,6 +35,7 @@ use super::{EmitContext, PLACEHOLDER_PREFIX, json_string, normalize_path, placeh
 
 /// 该 chunk 是否为 opaque 独立发射单元（单成员且 scope 事实不完整）。
 /// 判定只依据模块事实，与 chunk 层的 singleton 分区同一谓词。
+/// CJS 模块同为独立发射：互操作壳只在单文件 chunk 里成立。
 pub(crate) fn is_isolated_chunk(context: &EmitContext<'_>, chunk_index: usize) -> bool {
     let chunk = &context.chunks.chunks[chunk_index];
     chunk.modules.len() == 1
@@ -42,7 +43,7 @@ pub(crate) fn is_isolated_chunk(context: &EmitContext<'_>, chunk_index: usize) -
             .graph
             .nodes
             .get(chunk.modules[0])
-            .is_some_and(|node| node.record.is_scope_incomplete())
+            .is_some_and(|node| node.record.is_scope_incomplete() || node.kind == NodeKind::Cjs)
 }
 
 /// 独立发射装配：整文件文本 + 全文件替换表 → 类型擦除 → 行级映射段。
@@ -56,6 +57,9 @@ pub(crate) fn assemble_isolated(
     let errors_before = errors.len();
     let node_index = chunk.modules.first()?;
     let node = context.graph.nodes.get(*node_index)?;
+    if node.kind == NodeKind::Cjs {
+        return assemble_cjs(context, chunk_index, *node_index, errors, warnings);
+    }
     let source = context.sources.get(node_index)?;
     let module_path = normalize_path(&node.resolved.path);
     let record = &node.record;
@@ -161,12 +165,11 @@ pub(crate) fn assemble_isolated(
                         continue;
                     }
                     errors.push(
-                        PackDiagnostic::new(
-                            "vmz::pack::emit::edge_unresolved",
-                            format!(
-                                "静态导入 `{}` 目标未解析，独立发射无法重写说明符",
-                                import.specifier
-                            ),
+                        super::edge_unresolved(
+                            "静态导入",
+                            &import.specifier,
+                            "独立发射无法重写说明符",
+                            edge.target.as_ref().err(),
                         )
                         .with_path(module_path.clone())
                         .with_span(import.span),
@@ -239,7 +242,7 @@ pub(crate) fn assemble_isolated(
                             }
                         }
                     }
-                    NodeKind::Js => {
+                    NodeKind::Js | NodeKind::Cjs => {
                         if !context.retained[target] {
                             // 目标被链接层剪除：绑定必无活跃消费路径可达，整句删除。
                             replacements.insert(import.span, String::new());
@@ -301,9 +304,11 @@ pub(crate) fn assemble_isolated(
         };
         let Ok(id) = edge.target.as_ref() else {
             errors.push(
-                PackDiagnostic::new(
-                    "vmz::pack::emit::edge_unresolved",
-                    format!("重导出 `{source}` 目标未解析，独立发射无法重写说明符"),
+                super::edge_unresolved(
+                    "重导出",
+                    source,
+                    "独立发射无法重写说明符",
+                    edge.target.as_ref().err(),
                 )
                 .with_path(module_path.clone())
                 .with_span(span),
@@ -334,7 +339,7 @@ pub(crate) fn assemble_isolated(
                 .with_path(module_path.clone())
                 .with_span(span),
             ),
-            NodeKind::Js => {
+            NodeKind::Js | NodeKind::Cjs => {
                 if !context.retained[target] {
                     // 目标剪除：消费该重导出的需求必不存在（否则目标已保留），整句删除。
                     replacements.insert(span, String::new());
@@ -431,6 +436,299 @@ pub(crate) fn assemble_isolated(
     }
 
     Some(AssembledChunk { code: erased, segments })
+}
+
+/// CJS 模块的互操作壳发射（独立发射的 CJS 分支）。
+///
+/// 壳合同：
+/// - 头部为每个去重后的 require 说明符合成一条 hoisted 静态 import
+///   （default 绑定 = 目标模块的 `module.exports`），并装填 `module`/
+///   `exports` 材料与按说明符查表的局部 `require`；require 调用点不改写——
+///   惰性 require 的运行时语义由查表函数保留（hoisted import 使目标提前
+///   求值，与 Node 的差异仅在循环/惰性形态下可观察）。
+/// - 源文本只重写资源引用与动态 import 说明符（与 ESM 独立发射同路径）；
+///   `import type` 整句删除。
+/// - 尾部合成 `export default module.exports` 与检测到的具名导出快照
+///   （Node 对 CJS 的具名导出同为求值后快照语义）。
+/// - 拒绝形态全部结构化：混入运行时 ESM import/export 语法
+///   （`cjs_esm_syntax`）、非字面量 require（`cjs_require_nonliteral`）、
+///   与壳材料同名的顶层绑定（`cjs_shim_collision`）、require ESM/JSON/CSS
+///   目标（各自显式诊断码）。
+fn assemble_cjs(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+    node_index: usize,
+    errors: &mut Vec<PackDiagnostic>,
+    warnings: &mut Vec<PackDiagnostic>,
+) -> Option<AssembledChunk> {
+    let errors_before = errors.len();
+    let node = context.graph.nodes.get(node_index)?;
+    let record = &node.record;
+    let module_path = normalize_path(&node.resolved.path);
+    let source = context.sources.get(&node_index).cloned().unwrap_or_default();
+
+    if source.contains(PLACEHOLDER_PREFIX) {
+        errors.push(
+            PackDiagnostic::new(
+                "vmz::pack::emit::placeholder_collision",
+                "源文本包含产物占位符前缀，替换会有歧义",
+            )
+            .with_path(module_path.clone()),
+        );
+        return None;
+    }
+
+    // 混入运行时 ESM 语法在 Node 里即 SyntaxError，打包层同样显式拒绝。
+    if record.imports.iter().any(|import| !import.type_only && import.kind != ImportKind::Dynamic)
+        || !record.exports.is_empty()
+    {
+        errors.push(
+            PackDiagnostic::new(
+                "vmz::pack::emit::cjs_esm_syntax",
+                "CJS 模块混入运行时 ESM import/export 语法：Node 同样拒绝该形态，打包层不猜测混合语义",
+            )
+            .with_path(module_path.clone()),
+        );
+    }
+    if record.flags.require_nonliteral {
+        errors.push(
+            PackDiagnostic::new(
+                "vmz::pack::emit::cjs_require_nonliteral",
+                "CJS 模块含非字符串字面量 require：无法静态装填依赖表",
+            )
+            .with_path(module_path.clone()),
+        );
+    }
+    // 壳材料名（`module`/`exports`/`require`）与顶层声明冲突时拒绝。
+    for binding in &record.scope_bindings {
+        if matches!(binding.name.as_str(), "module" | "exports" | "require") {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::cjs_shim_collision",
+                    format!(
+                        "CJS 模块顶层声明了壳材料名 `{}`：互操作装填会与之冲突，显式拒绝",
+                        binding.name
+                    ),
+                )
+                .with_path(module_path.clone()),
+            );
+        }
+    }
+
+    // 去重后的 require 说明符 → hoisted import 绑定与查表 case。
+    // 内建外部模块（`node:` 任意 target、裸名内建仅 Node target 解析到此）不生成
+    // hoisted import：Node target 上由 `createRequire` 兜底真实装载；Browser
+    // target 上查表未命中即抛错（如实，不假装可解析）。
+    let mut header = String::new();
+    let mut cases = String::new();
+    let mut has_builtin_require = false;
+    let mut seen: Vec<&str> = Vec::new();
+    for require in &record.requires {
+        let specifier = require.specifier.as_str();
+        if seen.contains(&specifier) {
+            continue;
+        }
+        seen.push(specifier);
+        let binding = format!("__vmz_require_{}", seen.len() - 1);
+        let Some(edge) = node
+            .static_edges
+            .iter()
+            .find(|edge| edge.kind == EdgeKind::Static && edge.specifier == specifier)
+        else {
+            errors.push(
+                inconsistent(format!("require `{specifier}` 找不到对应静态边"))
+                    .with_path(module_path.clone()),
+            );
+            continue;
+        };
+        let Ok(id) = edge.target.as_ref() else {
+            if matches!(
+                edge.target.as_ref().err(),
+                Some(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN
+            ) {
+                has_builtin_require = true;
+                continue;
+            }
+            errors.push(
+                super::edge_unresolved(
+                    "require",
+                    specifier,
+                    "互操作壳无法装填依赖",
+                    edge.target.as_ref().err(),
+                )
+                .with_path(module_path.clone())
+                .with_span(require.span),
+            );
+            continue;
+        };
+        let Some(target) = context.graph.index_of(id) else {
+            errors.push(
+                inconsistent(format!("require `{specifier}` 目标不在图中"))
+                    .with_path(module_path.clone()),
+            );
+            continue;
+        };
+        match context.graph.nodes[target].kind {
+            NodeKind::Cjs => {
+                let Some(target_chunk) = chunk_of_node(context, target, &module_path, errors)
+                else {
+                    continue;
+                };
+                header.push_str(&format!(
+                    "import {binding} from {};\n",
+                    json_string(&placeholder(target_chunk))
+                ));
+                cases.push_str(&format!("case {}: return {binding};\n", json_string(specifier)));
+            }
+            NodeKind::Js => {
+                errors.push(
+                    PackDiagnostic::new(
+                        "vmz::pack::emit::cjs_require_esm",
+                        format!(
+                            "require `{specifier}` 的目标是 ESM 模块：CJS 同步 require 不能装载 ESM（Node 同形拒绝），请改动态 import"
+                        ),
+                    )
+                    .with_path(module_path.clone())
+                    .with_span(require.span),
+                );
+            }
+            NodeKind::Json => {
+                errors.push(
+                    PackDiagnostic::new(
+                        "vmz::pack::emit::cjs_require_json_unsupported",
+                        format!("require `{specifier}` 的目标是 JSON：CJS require JSON 未实现"),
+                    )
+                    .with_path(module_path.clone())
+                    .with_span(require.span),
+                );
+            }
+            NodeKind::Style => {
+                errors.push(
+                    PackDiagnostic::new(
+                        "vmz::pack::emit::cjs_require_style_unsupported",
+                        format!("require `{specifier}` 的目标是 CSS：样式节点不透明，无模块导出"),
+                    )
+                    .with_path(module_path.clone())
+                    .with_span(require.span),
+                );
+            }
+        }
+    }
+
+    let mut replacements: BTreeMap<(usize, usize), String> = BTreeMap::new();
+    // `import type` 整句删除（无运行时边）。
+    for import in &record.imports {
+        if import.type_only {
+            replacements.insert(import.span, String::new());
+        }
+    }
+    // 动态 import：与 ESM 独立发射同一处置。
+    for import in &record.imports {
+        if import.kind == ImportKind::Dynamic {
+            plan_dynamic_import(
+                context,
+                node,
+                import,
+                &module_path,
+                &mut replacements,
+                errors,
+                warnings,
+            );
+        }
+    }
+    // 资源引用：整文件存活，与 ESM 独立发射同一路径。
+    for asset in &record.assets {
+        let key = (module_path.clone(), asset.specifier.clone());
+        let Some(artifact) = context.asset_index.get(&key) else { continue };
+        let Some(specifier_span) = asset.specifier_span else {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::asset_unrewritable",
+                    format!(
+                        "资源 `{}` 字面量 span 缺失，无法重写 `new URL` 第一参数",
+                        asset.specifier
+                    ),
+                )
+                .with_path(module_path.clone())
+                .with_span(asset.span),
+            );
+            continue;
+        };
+        replacements.insert(specifier_span, json_string(&format!("./{}", artifact.file_name)));
+    }
+
+    if errors.len() > errors_before {
+        return None;
+    }
+
+    let replaced = match apply_replacements(&source, 0, &replacements) {
+        Ok(text) => text,
+        Err(diagnostic) => {
+            errors.push(diagnostic.with_path(module_path.clone()));
+            return None;
+        }
+    };
+    let (body, _deletions) = match vmz_generator::js::erase_types_with_deletions(&replaced) {
+        Ok(pair) => pair,
+        Err(err) => {
+            errors.push(
+                PackDiagnostic::new(
+                    "vmz::pack::emit::erase_failed",
+                    format!("TypeScript 类型擦除失败: {err}"),
+                )
+                .with_path(module_path.clone()),
+            );
+            return None;
+        }
+    };
+
+    // 壳文本：header（合成 import）+ shim（材料与查表 require）+ body + footer。
+    // Node target 且存在内建 require 时经 `createRequire` 真实装载；Browser
+    // target 的查表未命中是显式抛错。
+    let node_fallback = has_builtin_require && context.graph.target == crate::resolve::Target::Node;
+    if node_fallback {
+        header.push_str("import { createRequire as __vmz_createRequire } from \"node:module\";\n");
+    }
+    let fallback = if node_fallback {
+        "default: return __vmz_cjs_require(id);"
+    } else {
+        "default: throw new Error(\"vmz-pack: unbound require \" + id);"
+    };
+    let shim = format!(
+        "let module = {{ exports: {{}} }};\nlet exports = module.exports;\n{create_require}function require(id) {{\nswitch (id) {{\n{cases}{fallback}\n}}\n}}\n",
+        create_require = if node_fallback {
+            "const __vmz_cjs_require = __vmz_createRequire(import.meta.url);\n"
+        } else {
+            ""
+        },
+    );
+    let mut footer =
+        String::from("const __vmz_exports = module.exports;\nexport default __vmz_exports;\n");
+    for (index, name) in record.cjs_named_exports.iter().enumerate() {
+        footer.push_str(&format!(
+            "const __vmz_named_{index} = __vmz_exports.{name};\nexport {{ __vmz_named_{index} as {name} }};\n"
+        ));
+    }
+
+    let head_lines = header.matches('\n').count() + shim.matches('\n').count();
+    // 源文件缺尾换行时 body 末行会与 footer 首行粘连：补一个换行
+    // （不改既有行的行号口径）。
+    let body = if body.ends_with('\n') { body } else { format!("{body}\n") };
+    let code = format!("{header}{shim}{body}{footer}");
+
+    // 行级映射：替换与擦除都保持行结构（说明符同行改写、擦除为空格化），
+    // body 第 i 行即源文件第 i 行；合成的壳行无原文来源，不产段。
+    let mut segments: Vec<ChunkSegment> = Vec::new();
+    for (line_index, _line) in body.split('\n').enumerate() {
+        segments.push(ChunkSegment {
+            gen_line: (head_lines + line_index) as u32,
+            source: module_path.clone(),
+            src_line: line_index as u32,
+            src_col: 0,
+        });
+    }
+
+    Some(AssembledChunk { code, segments })
 }
 
 /// 动态 import 的独立发射处置：与平铺路径同一分类，说明符原地重写。
@@ -534,7 +832,7 @@ fn plan_dynamic_import(
             .with_path(module_path.to_string())
             .with_span(import.span),
         ),
-        NodeKind::Js => {
+        NodeKind::Js | NodeKind::Cjs => {
             if !context.retained[target] {
                 // 链接层剪除的动态目标：引用只可能落在死代码路径，文本
                 // 原样保留并如实报告，不指向不存在的产物。

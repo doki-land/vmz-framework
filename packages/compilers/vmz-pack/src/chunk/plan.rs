@@ -88,10 +88,12 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
     // opaque 模块（scope 事实不完整，精确原因清单非空）禁止进入共享 chunk：
     // chunk 层强制 singleton 分区，emit 层独立发射真 ESM 文件（Living
     // §同 chunk 作用域隔离：隔离即独立发射）。名字层面的 `rename_unsafe`
-    // 标记不触发隔离，判定只依据不完整原因清单。
+    // 标记不触发隔离，判定只依据不完整原因清单。CJS 模块同理强制隔离：
+    // 互操作壳与 `module`/`exports`/`require` 材料只在独立文件里成立。
     let mut isolated = vec![false; node_count];
     for (index, node) in graph.nodes.iter().enumerate() {
-        isolated[index] = retained[index] && node.record.is_scope_incomplete();
+        isolated[index] = retained[index]
+            && (node.record.is_scope_incomplete() || node.kind == crate::graph::NodeKind::Cjs);
     }
 
     // 依赖边 = 可观察求值目标 ∪ 本模块传播了符号需求的目标。前者是 ESM 求值
@@ -105,12 +107,11 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
             continue;
         }
         used_targets[module.node].extend(module.used_targets.iter().copied());
-        used_targets[module.node]
-            .extend(module.used_reexports.iter().map(|used| match used {
-                UsedReexport::Named { target_node, .. }
-                | UsedReexport::All { target_node, .. }
-                | UsedReexport::Namespace { target_node, .. } => *target_node,
-            }));
+        used_targets[module.node].extend(module.used_reexports.iter().map(|used| match used {
+            UsedReexport::Named { target_node, .. }
+            | UsedReexport::All { target_node, .. }
+            | UsedReexport::Namespace { target_node, .. } => *target_node,
+        }));
     }
     let mut forward: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); node_count];
     let mut reverse: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); node_count];
@@ -397,7 +398,9 @@ fn chunk_origin(graph: &ModuleGraph, signature: &BTreeSet<RootId>) -> ChunkOrigi
         Some(&RootId::Entry(index)) if signature.len() == 1 => {
             ChunkOrigin::Entry { logical: graph.entries[index].logical.clone() }
         }
-        Some(&RootId::Async(node)) if signature.len() == 1 => ChunkOrigin::Async { root_node: node },
+        Some(&RootId::Async(node)) if signature.len() == 1 => {
+            ChunkOrigin::Async { root_node: node }
+        }
         _ => ChunkOrigin::Shared {
             roots: signature.iter().map(|&root| root_label(graph, root)).collect(),
         },
