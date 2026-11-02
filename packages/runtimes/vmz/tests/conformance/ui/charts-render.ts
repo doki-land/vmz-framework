@@ -10,9 +10,9 @@
  * - axes carry baselines, short tick marks and data-derived labels (numeric
  *   4–6 ticks, band one per category) with minimal decimals, and horizontal
  *   grid lines sit behind the marks at every y tick except the baseline
- * - a legend appears only when a color / series channel exists, laid out as a
- *   strip above the plot so it never covers data; overflowing entries collapse
- *   into an explicit `+N` marker
+ * - a legend appears only when a color / series channel exists, laid out as
+ *   rows above the plot so it never covers data; entries wrap across up to
+ *   three rows and overflowing entries collapse into an explicit `+N` marker
  * - theme tokens drive every presentation color and font in both light and
  *   dark variants; font stacks quote each family entry individually
  * - unimplemented marks are refused with `davinci.chart.unsupported-mark`
@@ -546,8 +546,8 @@ console.log('charts-render: overflow truncates labels into their slot…');
         fail('truncated x labels must not collide');
     }
 
-    // Long legend entries truncate into the strip above the plot, the first
-    // category is always kept, and dropped ones leave an explicit +N marker.
+    // Long legend entries wrap into multiple rows above the plot instead of
+    // clipping; both categories survive on a narrow viewport.
     const legendSpec = {
         mark: 'bar',
         encoding: [
@@ -566,18 +566,66 @@ console.log('charts-render: overflow truncates labels into their slot…');
     const legendSemantic = buildScene(legendPlan, narrow);
     const legendGroup = guideGroups(legendSemantic, 'chart.legend')[0];
     const legendTexts = legendGroup.children.filter((n) => n.kind === 'text');
-    if (!legendTexts.some((t) => t.text.endsWith('…'))) fail('long legend entries must truncate');
-    if (!legendTexts.some((t) => t.text === '+1')) fail(`dropped legend entries must leave a +1 marker: ${legendTexts.map((t) => t.text)}`);
+    const entryLabels = legendTexts.map((t) => t.text);
+    // The first entry is wider than the narrow row: kept, truncated into it.
+    if (!entryLabels.some((t) => t.startsWith('europe') && t.endsWith('…'))) {
+        fail(`the first entry must be kept and truncated, got ${entryLabels}`);
+    }
+    // The second wraps onto its own row intact — no +N drop for two entries.
+    if (!entryLabels.some((t) => t === 'asia-pacific')) fail(`the second entry must survive on its own row, got ${entryLabels}`);
+    if (legendTexts.some((t) => t.id === 'legend:overflow')) fail('two entries must not overflow');
+    const legendSwatches = legendGroup.children.filter((n) => n.kind === 'rect');
+    const rowYs = new Set(legendSwatches.map((s) => s.y));
+    if (rowYs.size !== 2) fail(`the two entries must wrap onto two rows, got ${rowYs.size}`);
     // The strip stays inside the viewport and strictly above the plot marks.
     const narrowBars = legendSemantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
     const narrowPlotTop = Math.min(...narrowBars.map((b) => b.y));
     for (const child of legendGroup.children) {
         const w = child.kind === 'rect' ? child.w : estimateTextSize(child.text, 12).width;
         const cx = child.kind === 'rect' ? child.x + child.w / 2 : child.anchor.x;
-        if (cx + w / 2> narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
+        if (cx + w / 2 > narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
         const cy = child.kind === 'rect' ? child.y + child.h / 2 : child.anchor.y;
         if (cy >= narrowPlotTop) fail('legend strip must stay above the plot');
     }
+
+    // Past the row cap the rest collapse into an explicit +N marker on the
+    // last row — never a silent drop, never a fourth row.
+    const manyPlan = compile(
+        legendSpec,
+        fromRows(
+            ['north', 'south', 'east', 'west', 'central', 'coastal', 'alpine', 'metro', 'rural', 'island'].map(
+                (region, i) => ({ category: `c${i}`, value: i + 2, region }),
+            ),
+        ),
+    );
+    const manySemantic = buildScene(manyPlan, narrow);
+    const manyLegend = guideGroups(manySemantic, 'chart.legend')[0];
+    const manySwatches = manyLegend.children.filter((n) => n.kind === 'rect');
+    const manyRowYs = [...new Set(manySwatches.map((s) => s.y))].sort((a, b) => a - b);
+    if (manyRowYs.length !== 3) fail(`ten regions must cap at 3 legend rows, got ${manyRowYs.length}`);
+    const overflow = manyLegend.children.find((n) => n.id === 'legend:overflow');
+    if (!overflow) fail('capped legend must carry an overflow marker');
+    const placed = manySwatches.length;
+    if (overflow.text !== `+${10 - placed}`) fail(`marker must count dropped series, got ${overflow.text} for ${placed} placed`);
+    // The marker sits on the last row: swatch top is rowTop + (rowH-10)/2.
+    const rowH = legendRowHeightRef();
+    const lastRowTop = manyRowYs[manyRowYs.length - 1] - (rowH - 10) / 2;
+    if (Math.abs(overflow.anchor.y - (lastRowTop + rowH / 2)) > 1e-9) {
+        fail('overflow marker must sit on the last legend row');
+    }
+    const manyBars = manySemantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    const manyPlotTop = Math.min(...manyBars.map((b) => b.y));
+    if (manyRowYs[manyRowYs.length - 1] >= manyPlotTop) fail('the last legend row must stay above the plot');
+
+    // Row pitch is constant: adjacent rows differ by rowHeight + row gap.
+    if (manyRowYs.length > 1 && Math.abs(manyRowYs[1] - manyRowYs[0] - (manyRowYs[2] - manyRowYs[1])) > 1e-9) {
+        fail('legend rows must keep a constant pitch');
+    }
+}
+
+/** Row height the legend uses at the default 12px legend font. */
+function legendRowHeightRef() {
+    return Math.max(10, estimateTextSize('Ag', 12).height);
 }
 
 console.log('charts-render: empty data is not an error…');

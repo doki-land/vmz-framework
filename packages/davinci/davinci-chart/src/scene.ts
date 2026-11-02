@@ -79,6 +79,9 @@ const LEGEND_SWATCH_GAP = 6;
 const LEGEND_ITEM_GAP = 16;
 const LEGEND_LABEL_BUDGET = 120;
 const LEGEND_BOTTOM_GAP = 10;
+/** Legend rows wrap instead of clipping; past the cap the rest become `+N`. */
+const LEGEND_MAX_ROWS = 3;
+const LEGEND_ROW_GAP = 6;
 
 /** Options for the scene build. */
 export interface ChartSceneOptions {
@@ -114,13 +117,16 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
 
     // The legend reserves its own strip above the plot, so it can never
     // cover data. Base padding (from axis labels) fixes the plot width, the
-    // legend is laid out against that width once, and its strip height feeds
-    // the top padding before the final plot rect is computed.
+    // legend wraps into rows against that width once, and its strip height
+    // feeds the top padding before the final plot rect is computed.
     const basePadding = adaptivePadding(viewport, plan, xEnc, yEnc, theme);
     const legendWidth = Math.max(0, dimension(viewport.width) - basePadding.left - basePadding.right);
-    const legendItems =
-        plan.series.field !== null ? layoutLegendItems(plan.series.categories, legendWidth, theme) : [];
-    const legendHeight = legendItems.length > 0 ? legendRowHeight(theme) + LEGEND_BOTTOM_GAP : 0;
+    const legendRows =
+        plan.series.field !== null ? layoutLegendRows(plan.series.categories, legendWidth, theme) : [];
+    const legendHeight =
+        legendRows.length > 0
+            ? legendRows.length * legendRowHeight(theme) + (legendRows.length - 1) * LEGEND_ROW_GAP + LEGEND_BOTTOM_GAP
+            : 0;
     const padding: ScenePadding = { ...basePadding, top: basePadding.top + legendHeight };
     const plot = plotRect(viewport, padding);
 
@@ -130,7 +136,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
         const children: SemanticNode[] = [];
         if (plot.w > 0 && plot.h > 0) {
             children.push(...buildPie(plan, plot, seriesCategories, theme));
-            children.push(...buildLegend(plan, plot, legendItems, theme));
+            children.push(...buildLegend(plan, plot, legendRows, theme));
         }
         return {
             version: SCENE_VERSION,
@@ -150,7 +156,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
         const children: SemanticNode[] = [];
         if (plot.w > 0 && plot.h > 0) {
             children.push(...buildRadar(plan, plot, seriesCategories, theme));
-            children.push(...buildLegend(plan, plot, legendItems, theme));
+            children.push(...buildLegend(plan, plot, legendRows, theme));
         }
         return {
             version: SCENE_VERSION,
@@ -168,7 +174,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
     if (plan.spec.facetField) {
         const children: SemanticNode[] = [
             ...buildFacets(plan, plot, seriesCategories, theme),
-            ...buildLegend(plan, plot, legendItems, theme),
+            ...buildLegend(plan, plot, legendRows, theme),
         ];
         return {
             version: SCENE_VERSION,
@@ -185,7 +191,7 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
 
     if (xEnc && yEnc && plot.w > 0 && plot.h > 0) {
         children.push(...buildCartesianPanel(plan, plot, seriesCategories, theme, ""));
-        children.push(...buildLegend(plan, plot, legendItems, theme));
+        children.push(...buildLegend(plan, plot, legendRows, theme));
     }
 
     return {
@@ -1151,119 +1157,158 @@ function legendRowHeight(theme: ChartTheme): number {
     return Math.max(LEGEND_SWATCH, estimateTextSize("Ag", theme.legendFont.sizePx).height);
 }
 
-/** Lay out legend entries left to right on one row against a fixed width.
- *  The first category is always kept (truncated into the row if needed) so
- *  a legend never collapses into a bare overflow marker; entries that would
- *  overflow are dropped and `buildLegend` adds an explicit `+N` marker. The
- *  marker's own width is reserved up front via a bounded fixed-point pass,
- *  so the strip never overflows and never pretends the chart has fewer
- *  series than the data does. */
-function layoutLegendItems(
+/** Lay out legend entries left to right, wrapping into up to
+ *  `LEGEND_MAX_ROWS` rows against a fixed width. Entries that would overflow
+ *  the capped rows are dropped and `buildLegend` adds an explicit `+N`
+ *  marker whose width is reserved up front via a bounded fixed-point pass.
+ *  An entry opening a row wider than the row squeezes into it (truncated),
+ *  so one long label never breaks the strip. */
+function layoutLegendRows(
     categories: ReadonlyArray<string>,
     availableWidth: number,
     theme: ChartTheme,
-): LegendItem[] {
+): LegendItem[][] {
     const size = theme.legendFont.sizePx;
     let reserve = 0;
     for (let pass = 0; pass < 4; pass++) {
-        const items = layoutItemsInto(categories, Math.max(0, availableWidth - reserve), size);
-        const dropped = categories.length - items.length;
-        if (dropped === 0) return items;
+        const rows = wrapItemsIntoRows(categories, Math.max(0, availableWidth), size, reserve);
+        const placed = rows.reduce((a, r) => a + r.length, 0);
+        const dropped = categories.length - placed;
+        if (dropped === 0) return rows;
         const marker = estimateTextSize(`+${dropped}`, size).width + LEGEND_ITEM_GAP;
-        if (marker === reserve) return items;
+        if (marker === reserve) return rows;
         reserve = marker;
     }
-    return layoutItemsInto(categories, Math.max(0, availableWidth - reserve), size);
+    return wrapItemsIntoRows(categories, Math.max(0, availableWidth), size, reserve);
 }
 
-/** Greedy single-row layout into `width`; the first category squeezes into
- *  the row instead of dropping when nothing fits. */
-function layoutItemsInto(categories: ReadonlyArray<string>, width: number, size: number): LegendItem[] {
+/** Greedy wrap into rows; the last row's budget keeps `lastRowReserve` px
+ *  for the overflow marker. */
+function wrapItemsIntoRows(
+    categories: ReadonlyArray<string>,
+    width: number,
+    size: number,
+    lastRowReserve: number,
+): LegendItem[][] {
+    const rows: LegendItem[][] = [[]];
     let used = 0;
-    const items: LegendItem[] = [];
     for (const category of categories) {
-        const label = truncateToWidth(category, LEGEND_LABEL_BUDGET, size);
-        const labelWidth = estimateTextSize(label, size).width;
-        const itemWidth = LEGEND_SWATCH + LEGEND_SWATCH_GAP + labelWidth;
-        if (items.length === 0 && itemWidth > width) {
-            const budget = Math.max(0, width - LEGEND_SWATCH - LEGEND_SWATCH_GAP);
-            const squeezed = truncateToWidth(category, budget, size);
-            const squeezedWidth = estimateTextSize(squeezed, size).width;
-            items.push({
-                category,
-                label: squeezed,
-                labelWidth: squeezedWidth,
-                width: LEGEND_SWATCH + LEGEND_SWATCH_GAP + squeezedWidth,
-            });
-            continue;
+        let rowIndex = rows.length - 1;
+        let budget = Math.max(0, width - (rowIndex === LEGEND_MAX_ROWS - 1 ? lastRowReserve : 0));
+        let item = measureLegendItem(category, size);
+        let step = (rows[rowIndex].length === 0 ? 0 : LEGEND_ITEM_GAP) + item.width;
+        if (used + step > budget) {
+            if (rows[rowIndex].length > 0 && rowIndex + 1 < LEGEND_MAX_ROWS) {
+                rows.push([]);
+                used = 0;
+                rowIndex++;
+                budget = Math.max(0, width - (rowIndex === LEGEND_MAX_ROWS - 1 ? lastRowReserve : 0));
+                step = item.width;
+            } else if (rows[rowIndex].length > 0) {
+                // Row cap reached — remaining categories collapse into `+N`.
+                break;
+            }
+            if (item.width > budget) {
+                // A row opener wider than the row squeezes into it instead of
+                // dropping — the legend never collapses into a bare marker.
+                item = squeezeLegendItem(category, budget, size);
+                step = item.width;
+                if (item.width <= 0) continue;
+            }
         }
-        const step = items.length === 0 ? itemWidth : LEGEND_ITEM_GAP + itemWidth;
-        if (used + step > width) break;
-        items.push({ category, label, labelWidth, width: itemWidth });
+        rows[rowIndex].push(item);
         used += step;
     }
-    return items;
+    return rows.filter((r) => r.length > 0);
 }
 
-/** The legend strip: one horizontal row above the plot, swatches aligned
- *  with palette order. It never overlaps data because its height is part of
- *  the top padding. */
+/** Measure one legend entry, truncating its label into the per-item budget. */
+function measureLegendItem(category: string, size: number): LegendItem {
+    const label = truncateToWidth(category, LEGEND_LABEL_BUDGET, size);
+    const labelWidth = estimateTextSize(label, size).width;
+    return { category, label, labelWidth, width: LEGEND_SWATCH + LEGEND_SWATCH_GAP + labelWidth };
+}
+
+/** Truncate an entry into an explicit pixel budget (narrow rows). */
+function squeezeLegendItem(category: string, budget: number, size: number): LegendItem {
+    const labelBudget = Math.max(0, budget - LEGEND_SWATCH - LEGEND_SWATCH_GAP);
+    const label = truncateToWidth(category, labelBudget, size);
+    const labelWidth = estimateTextSize(label, size).width;
+    return { category, label, labelWidth, width: LEGEND_SWATCH + LEGEND_SWATCH_GAP + labelWidth };
+}
+
+/** The legend strip: horizontal rows above the plot, swatches aligned with
+ *  palette order. It never overlaps data because its height is part of the
+ *  top padding; entries wrap across up to `LEGEND_MAX_ROWS` rows and dropped
+ *  categories leave an explicit `+N` marker at the end of the last row. */
 function buildLegend(
     plan: ChartCompilePlan,
     plot: PlotRect,
-    items: ReadonlyArray<LegendItem>,
+    rows: ReadonlyArray<ReadonlyArray<LegendItem>>,
     theme: ChartTheme,
 ): SemanticNode[] {
-    if (items.length === 0) return [];
+    const placed = rows.reduce((a, r) => a + r.length, 0);
+    if (placed === 0) return [];
     const categories = plan.series.categories;
     const size = theme.legendFont.sizePx;
     const rowHeight = legendRowHeight(theme);
-    const stripTop = plot.y - LEGEND_BOTTOM_GAP - rowHeight;
-    const textMid = stripTop + rowHeight / 2;
-    const swatchTop = stripTop + (rowHeight - LEGEND_SWATCH) / 2;
+    const stripTop = plot.y - LEGEND_BOTTOM_GAP - rows.length * rowHeight - (rows.length - 1) * LEGEND_ROW_GAP;
 
     const children: SemanticNode[] = [];
-    let cursor = plot.x;
-    items.forEach((item, i) => {
-        // Use the same palette index as `seriesColor` so legend swatches match
-        // mark colors one-for-one.
-        const color = seriesColor(theme, categories, item.category);
-        children.push({
-            kind: "rect",
-            id: `legend:swatch:${i}`,
-            role: "chart.legend",
-            x: cursor,
-            y: swatchTop,
-            w: LEGEND_SWATCH,
-            h: LEGEND_SWATCH,
-            rx: 2,
-            ry: 2,
-            fill: { color },
-        });
-        children.push({
-            kind: "text",
-            id: `legend:label:${i}`,
-            role: "chart.legend",
-            text: item.label,
-            font: theme.legendFont,
-            anchor: { x: cursor + LEGEND_SWATCH + LEGEND_SWATCH_GAP + item.labelWidth / 2, y: textMid },
-            color: theme.labelColor,
-        });
-        cursor += item.width + LEGEND_ITEM_GAP;
+    let index = 0;
+    rows.forEach((row, rowIndex) => {
+        const rowTop = stripTop + rowIndex * (rowHeight + LEGEND_ROW_GAP);
+        const textMid = rowTop + rowHeight / 2;
+        const swatchTop = rowTop + (rowHeight - LEGEND_SWATCH) / 2;
+        let cursor = plot.x;
+        for (const item of row) {
+            // Use the same palette index as `seriesColor` so legend swatches
+            // match mark colors one-for-one.
+            const color = seriesColor(theme, categories, item.category);
+            children.push({
+                kind: "rect",
+                id: `legend:swatch:${index}`,
+                role: "chart.legend",
+                x: cursor,
+                y: swatchTop,
+                w: LEGEND_SWATCH,
+                h: LEGEND_SWATCH,
+                rx: 2,
+                ry: 2,
+                fill: { color },
+            });
+            children.push({
+                kind: "text",
+                id: `legend:label:${index}`,
+                role: "chart.legend",
+                text: item.label,
+                font: theme.legendFont,
+                anchor: { x: cursor + LEGEND_SWATCH + LEGEND_SWATCH_GAP + item.labelWidth / 2, y: textMid },
+                color: theme.labelColor,
+            });
+            cursor += item.width + LEGEND_ITEM_GAP;
+            index += 1;
+        }
     });
 
     // Dropped categories get an explicit overflow marker — the legend never
     // silently pretends the chart has fewer series than the data does.
-    const dropped = categories.length - items.length;
+    const dropped = categories.length - placed;
     if (dropped > 0) {
         const marker = `+${dropped}`;
+        const lastRow = rows[rows.length - 1];
+        const rowTop = stripTop + (rows.length - 1) * (rowHeight + LEGEND_ROW_GAP);
+        const lastRowEnd = lastRow.reduce((acc, item) => acc + item.width, 0) + LEGEND_ITEM_GAP * Math.max(0, lastRow.length - 1);
         children.push({
             kind: "text",
             id: "legend:overflow",
             role: "chart.legend",
             text: marker,
             font: theme.legendFont,
-            anchor: { x: cursor + estimateTextSize(marker, size).width / 2, y: textMid },
+            anchor: {
+                x: plot.x + lastRowEnd + LEGEND_ITEM_GAP + estimateTextSize(marker, size).width / 2,
+                y: rowTop + rowHeight / 2,
+            },
             color: theme.labelColor,
         });
     }

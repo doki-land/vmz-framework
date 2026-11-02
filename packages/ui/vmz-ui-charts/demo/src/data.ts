@@ -213,6 +213,31 @@ const FACET_PLATFORM: GalleryExample = {
     ],
 };
 
+const LEGEND_WRAP: GalleryExample = {
+    id: "legend-wrap",
+    title: "图例 · 多行换行",
+    note: "八个长名系列在窄宽下换行成多行条带,图例行高计入上边距不遮数据。",
+    spec: {
+        mark: "bar",
+        keyField: "id",
+        encoding: [
+            { field: "quarter", channel: "x" },
+            { field: "sales", channel: "y" },
+            { field: "region", channel: "color" },
+        ],
+    },
+    rows: [
+        { id: "q1-n", quarter: "Q1", sales: 42, region: "North America" },
+        { id: "q1-s", quarter: "Q1", sales: 36, region: "South America" },
+        { id: "q1-e", quarter: "Q1", sales: 51, region: "Western Europe" },
+        { id: "q1-a", quarter: "Q1", sales: 44, region: "Southeast Asia" },
+        { id: "q1-m", quarter: "Q1", sales: 29, region: "Middle East" },
+        { id: "q1-f", quarter: "Q1", sales: 33, region: "North Africa" },
+        { id: "q1-o", quarter: "Q1", sales: 25, region: "Oceania Pacific" },
+        { id: "q1-c", quarter: "Q1", sales: 38, region: "Central Europe" },
+    ],
+};
+
 const AREA_TRAFFIC: GalleryExample = {
     id: "area-traffic",
     title: "面积 · 流量构成",
@@ -326,6 +351,7 @@ export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     DONUT_SHARE,
     RADAR_SCORE,
     FACET_PLATFORM,
+    LEGEND_WRAP,
     AREA_TRAFFIC,
     SCATTER_LATENCY,
     NEGATIVE_DELTAS,
