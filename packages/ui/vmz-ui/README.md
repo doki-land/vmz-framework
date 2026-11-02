@@ -31,6 +31,22 @@ A preset is Style Theme source files, not a runtime theme. It is never injected 
 carries no hidden semantics. `contracts/token-requirements.v0.json` remains the truth source for
 which tokens the components require; the `ui-automation` gate checks this preset against it.
 
+## Brand theming
+
+Applications rebrand by **owning their token files**, never by overriding CSS variables at runtime:
+
+1. `pnpm exec vmz init design` materializes the preset into `<app>/designs/` (existing files are
+   kept unless `--force`).
+2. Edit `designs/tokens/brand.json`: set `brand.primary` and the `scale.*` ramp to your brand hue,
+   and adjust `semantic-action.json` / `semantic-status.json` when actions or status tones should
+   follow the brand.
+3. The build compiles them into `--vmz-*` custom properties. Components consume only those semantic
+   variables, so no component source changes are ever needed.
+
+`data-theme="dark"` / `data-theme="high-contrast"` activate the overlay files under
+`designs/themes/`. The default preset ships a production-neutral palette only — product brand
+colors live exclusively in the application's own `designs/`.
+
 ## Preview `0.0.4`
 
 This is a **preview** release. It is **not** `production-ready` and **not** a mature / production UI.
