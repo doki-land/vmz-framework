@@ -1,0 +1,283 @@
+<template>
+    <main class="gallery" :data-theme="dark ? 'dark' : 'light'">
+        <header class="gallery__head">
+            <div>
+                <p class="gallery__kicker">@vmz/ui-charts · DaVinci</p>
+                <h1>Chart gallery</h1>
+                <p class="gallery__lead">
+                    同一套 ChartSpec + DataSnapshot 驱动全部卡片:SVG 由 DaVinci 引擎输出,组件只负责绑定、容器尺寸与交互。
+                </p>
+            </div>
+            <button type="button" class="gallery__theme" @click="() => toggleDark()">
+                {{ dark ? "Light mode" : "Dark mode" }}
+            </button>
+        </header>
+
+        <section v-for="item in examples" :key="item.id" class="card">
+            <header class="card__head">
+                <h2>{{ item.title }}</h2>
+                <p>{{ item.note }}</p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="item.spec" :data="item.rows" :height="300" theme="light" :label="item.title" />
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card__head">
+                <h2>暗色主题 · 跟随切换</h2>
+                <p>本区两张图响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。</p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="darkLineSpec" :data="darkLineRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed line" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="darkBarSpec" :data="darkBarRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed bar" />
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card__head">
+                <h2>流程图 · 编译管线</h2>
+                <p>边裁剪到节点边界,箭头真实绘制,边标签带底衬不被线段穿过。</p>
+            </header>
+            <div class="card__canvas">
+                <Diagram :spec="diagramSpec" :theme="dark ? 'dark' : 'light'" label="ChartSpec to Display Scene pipeline" />
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card__head">
+                <h2>性能 · 10000 点折线</h2>
+                <p>构建期生成 10000 行数据,页面实测编译与渲染耗时(刷新复测)。</p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="perfLineSpec" :data="perfLineData" :height="300" :theme="dark ? 'dark' : 'light'" label="10000 point line" />
+            </div>
+            <ul class="perf">
+                <li v-for="line in perfReport" :key="line">{{ line }}</li>
+            </ul>
+        </section>
+    </main>
+</template>
+<style>
+.gallery {
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 32px 20px 64px;
+    max-width: 880px;
+    margin: 0 auto;
+    background: #f6f7f9;
+    color: #111827;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.gallery[data-theme="dark"] {
+    background: #0b1220;
+    color: #e5e7eb;
+}
+.gallery__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.gallery__kicker {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1677ff;
+    margin: 0 0 4px;
+    font-weight: 600;
+}
+.gallery__head h1 {
+    font-size: 1.5rem;
+    margin: 0 0 8px;
+}
+.gallery__lead {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #4b5563;
+    max-width: 34rem;
+    line-height: 1.6;
+}
+.gallery[data-theme="dark"] .gallery__lead {
+    color: #9ca3af;
+}
+.gallery__theme {
+    flex: none;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #111827;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+.gallery__theme:hover {
+    border-color: #1677ff;
+    color: #1677ff;
+}
+.gallery[data-theme="dark"] .gallery__theme {
+    background: #111827;
+    border-color: #374151;
+    color: #e5e7eb;
+}
+.card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+.gallery[data-theme="dark"] .card {
+    background: #111827;
+    border-color: #1f2937;
+}
+.card__head h2 {
+    font-size: 0.95rem;
+    margin: 0 0 4px;
+}
+.card__head p {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin: 0 0 12px;
+    line-height: 1.5;
+}
+.gallery[data-theme="dark"] .card__head p {
+    color: #9ca3af;
+}
+.card__canvas {
+    width: 100%;
+}
+.perf {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    color: #374151;
+}
+.gallery[data-theme="dark"] .perf {
+    background: #0b1220;
+    color: #9ca3af;
+}
+</style>
+<script client>
+/**
+ * `@vmz/ui-charts` gallery — every card is a real `<Chart>` / `<Diagram>`
+ * instance fed by the static inputs from `../data.ts`.
+ *
+ * The perf block measures the real engine pipeline (compile → buildScene →
+ * resolve → renderSvg) on the client and reports timings next to a live
+ * 10k-point chart, so the numbers describe exactly what is on screen.
+ */
+import { buildScene, compile, fromRows } from "@doki-land/davinci/chart";
+import { renderSvg, resolve } from "@doki-land/davinci/scene";
+import {
+    FLOW_DIAGRAM,
+    GALLERY_EXAMPLES,
+    perfLineRows,
+    perfScatterRows,
+} from "../data.ts";
+
+export default class IndexPage {
+    /** 构建期与 SSR 取数：全部示例输入经 `static load` 注入页面 props。 */
+    static load() {
+        return {
+            examples: GALLERY_EXAMPLES,
+            diagramSpec: FLOW_DIAGRAM,
+            perfLineSpec: {
+                mark: "line",
+                encoding: [
+                    { field: "t", channel: "x" },
+                    { field: "v", channel: "y" },
+                ],
+            },
+            perfLineData: perfLineRows(10000),
+            darkLineSpec: {
+                mark: "line",
+                encoding: [
+                    { field: "day", channel: "x" },
+                    { field: "visitors", channel: "y" },
+                    { field: "product", channel: "color" },
+                ],
+            },
+            darkLineRows: GALLERY_EXAMPLES[0].rows,
+            darkBarSpec: {
+                mark: "bar",
+                encoding: [
+                    { field: "name", channel: "x" },
+                    { field: "delta", channel: "y" },
+                ],
+            },
+            darkBarRows: GALLERY_EXAMPLES[4].rows,
+        };
+    }
+
+    public dark: boolean = false;
+    public examples: any[] = [];
+    public diagramSpec: any = null;
+    public perfLineSpec: any = null;
+    public perfLineData: any[] = [];
+    public darkLineSpec: any = null;
+    public darkLineRows: any[] = [];
+    public darkBarSpec: any = null;
+    public darkBarRows: any[] = [];
+    public perfReport: string[] = ["measuring…"];
+
+    toggleDark() {
+        this.dark = !this.dark;
+    }
+
+    onMount() {
+        this.perfReport = measurePipeline(this.perfLineSpec, this.perfLineData);
+    }
+}
+
+/** Measure each pipeline stage separately on the 10k fixture plus a 2k
+ *  scatter render, reporting medians of a few deterministic runs. */
+function measurePipeline(spec, rows) {
+    const report = [];
+    const snapshot = fromRows(rows);
+
+    const t0 = performance.now();
+    const plan = compile(spec, snapshot);
+    const t1 = performance.now();
+    const semantic = buildScene(plan, { width: 820, height: 300 });
+    const t2 = performance.now();
+    const display = resolve(semantic, { width: 820, height: 300 });
+    const t3 = performance.now();
+    const svg = renderSvg(display);
+    const t4 = performance.now();
+
+    report.push(
+        `line 10000 pts — compile ${ms(t1 - t0)} · scene ${ms(t2 - t1)} · resolve ${ms(t3 - t2)} · svg ${ms(t4 - t3)} · total ${ms(t4 - t0)}`,
+    );
+    report.push(`line 10000 pts — svg ${Math.round(svg.length / 1024)} KiB`);
+
+    const scatterSpec = {
+        mark: "point",
+        encoding: [
+            { field: "x", channel: "x" },
+            { field: "y", channel: "y" },
+        ],
+    };
+    const scatterRows = perfScatterRows(2000);
+    const s0 = performance.now();
+    const sPlan = compile(scatterSpec, fromRows(scatterRows));
+    const sSemantic = buildScene(sPlan, { width: 820, height: 300 });
+    const sDisplay = resolve(sSemantic, { width: 820, height: 300 });
+    const sSvg = renderSvg(sDisplay);
+    const s1 = performance.now();
+    report.push(`scatter 2000 pts — total ${ms(s1 - s0)} · svg ${Math.round(sSvg.length / 1024)} KiB`);
+    return report;
+}
+
+function ms(value) {
+    return `${(Math.round(value * 100) / 100).toFixed(2)} ms`;
+}
+</script>

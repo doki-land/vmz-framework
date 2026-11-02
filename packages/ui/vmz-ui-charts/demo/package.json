@@ -1,0 +1,18 @@
+{
+    "name": "@vmz-ui-charts/demo",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "check": "vmz check .",
+        "build": "vmz build .",
+        "dev": "vmz dev ."
+    },
+    "dependencies": {
+        "@doki-land/davinci": "workspace:*",
+        "@vmz/ui-charts": "workspace:*"
+    },
+    "devDependencies": {
+        "vmz": "workspace:*"
+    }
+}
