@@ -89,6 +89,7 @@ import {
     formatTickLabel,
     fromRows,
     niceLinearTicks,
+    registerGeoMap,
 } from '../../../../../davinci/davinci-chart/src/index.ts';
 import { rgb8 } from '../../../../../davinci/davinci-types/src/index.ts';
 import {
@@ -3374,6 +3375,333 @@ console.log('charts-render: tree lays hierarchy into a deterministic tidy layout
     ]));
     if (!cyc.diagnostics.items.some((d) => d.code === 'davinci.chart.tree-cycle')) {
         fail('a hierarchy cycle must raise tree-cycle');
+    }
+}
+
+// ─── Third wave: force / parallel / hexbin / contour / chord / tree variants / geo ───
+
+console.log('charts-render: force layout is deterministic, seeded by the edge fingerprint…');
+{
+    const forceSpec = {
+        mark: 'force',
+        encoding: [
+            { field: 'src', channel: 'source' },
+            { field: 'dst', channel: 'target' },
+        ],
+    };
+    const forceRows = [
+        { src: 'a', dst: 'b' }, { src: 'a', dst: 'c' }, { src: 'b', dst: 'c' },
+        { src: 'a', dst: 'b' }, // duplicate — merged with an info diagnostic
+        { src: 'c', dst: 'c' }, // self-loop — refused
+        { src: 'd', dst: 'e' },
+    ];
+    const a = pipeline(forceSpec, forceRows);
+    const b = pipeline(forceSpec, forceRows);
+    if (!a.plan.diagnostics.items.some((d) => d.code === 'davinci.chart.force-self-loop' && d.severity === 'error')) {
+        fail('a self-loop must raise force-self-loop (error)');
+    }
+    if (!a.plan.diagnostics.items.some((d) => d.code === 'davinci.chart.force-duplicate-edge')) {
+        fail('a duplicate edge must raise force-duplicate-edge (info)');
+    }
+    if (a.plan.marks.length !== 5) fail(`want 5 force nodes, got ${a.plan.marks.length}`);
+    // Deterministic: identical input gives identical coordinates.
+    const posA = new Map(a.plan.marks.map((m) => [m.key, `${m.channels.get('x')},${m.channels.get('y')}`]));
+    const posB = new Map(b.plan.marks.map((m) => [m.key, `${m.channels.get('x')},${m.channels.get('y')}`]));
+    for (const [k, v] of posA) {
+        if (posB.get(k) !== v) fail(`force layout must be deterministic, ${k} moved`);
+    }
+    // Degrees: a touches b and c (deduped) → 2; d and e touch one each → 1.
+    const degOf = (key) => a.plan.marks.find((m) => m.key === key).channels.get('degree');
+    if (degOf('a') !== 2 || degOf('d') !== 1) fail(`force degrees must count deduped edges, got a=${degOf('a')} d=${degOf('d')}`);
+    // Positions stay inside the normalized frame.
+    for (const m of a.plan.marks) {
+        const x = Number(m.channels.get('x'));
+        const y = Number(m.channels.get('y'));
+        if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) fail('force positions must normalize into [0, 1]');
+    }
+    // Scene: links as grid lines, nodes as degree-sized marks.
+    const links = a.semantic.root.children.filter((n) => n.id.startsWith('force:edge:'));
+    if (links.length !== 4) fail(`want 4 deduped force links, got ${links.length}`);
+    const dots = a.semantic.root.children.filter((n) => n.id.startsWith('force:') && n.role === 'chart.mark');
+    if (dots.length !== 5) fail(`want 5 force node marks, got ${dots.length}`);
+    // Oversized input is degree-sampled with a warning.
+    const bigRows = Array.from({ length: 420 }, (_, i) => ({ src: `n${i}`, dst: `n${(i * 7) % 419}` }));
+    const big = compile(forceSpec, fromRows(bigRows));
+    if (!big.diagnostics.items.some((d) => d.code === 'davinci.chart.force-sampled')) {
+        fail('oversized graphs must raise force-sampled');
+    }
+}
+
+console.log('charts-render: parallel coordinates give every dimension its own axis…');
+{
+    const parSpec = {
+        mark: 'parallel',
+        dimensions: ['speed', 'weight', 'price'],
+        encoding: [{ field: 'brand', channel: 'color' }],
+    };
+    const parRows = [
+        { brand: 'Alpha', speed: 120, weight: 1400, price: 30 },
+        { brand: 'Alpha', speed: 150, weight: 1600, price: 42 },
+        { brand: 'Beta', speed: 90, weight: 1100, price: 22 },
+        { brand: 'Beta', speed: 105, weight: 1250, price: 26 },
+    ];
+    const { plan, semantic } = pipeline(parSpec, parRows);
+    if (!plan.stat) fail('parallel must materialize per-dimension domains');
+    const axes = semantic.root.children.filter((n) => n.id.startsWith('parallel:axis:'));
+    if (axes.length !== 3) fail(`want 3 parallel axes, got ${axes.length}`);
+    // Domains are independent per dimension: speed lo ≠ weight lo ≠ price lo.
+    const loCol = plan.stat.columns.find((c) => c.name === 'lo');
+    const los = loCol.values.map(Number);
+    if (new Set(los).size !== 3) fail('parallel dimensions must keep independent domains');
+    // One polyline per row with one vertex per axis and the row key per vertex.
+    const lines = semantic.root.children.filter((n) => n.id.startsWith('parallel:') && n.role === 'chart.mark');
+    if (lines.length !== 4) fail(`want 4 parallel row polylines, got ${lines.length}`);
+    for (const l of lines) {
+        const pl = l.hitRegion && l.hitRegion.polyline;
+        if (!pl || pl.points.length !== 3) fail('each parallel row must carry one vertex per axis');
+        if (!pl.keys.every((k) => k === l.id.slice('parallel:'.length))) fail('parallel vertices must key back to their row');
+    }
+    // A row missing a dimension value draws nothing.
+    const withMissing = compile(parSpec, fromRows([...parRows, { brand: 'Beta', speed: 99, weight: null, price: 21 }]));
+    if (withMissing.marks.length !== 4) fail(`a row missing a dimension must not draw, got ${withMissing.marks.length}`);
+    // Fewer than two dimensions is an authoring error.
+    const bad = compile({ mark: 'parallel', dimensions: ['speed'], encoding: [] }, fromRows(parRows));
+    if (!bad.diagnostics.items.some((d) => d.code === 'davinci.chart.parallel-needs-dimensions')) {
+        fail('one dimension must raise parallel-needs-dimensions');
+    }
+}
+
+console.log('charts-render: hexbin tiles scatter into counted hexagons…');
+{
+    const hexSpec = {
+        mark: 'hexbin',
+        encoding: [
+            { field: 'x', channel: 'x' },
+            { field: 'y', channel: 'y' },
+        ],
+    };
+    const hexRows = Array.from({ length: 60 }, (_, i) => ({ x: (i % 10) * 3 + (i % 3), y: (i % 6) * 4 + (i % 2) }));
+    const { plan, semantic } = pipeline(hexSpec, hexRows);
+    if (!plan.stat) fail('hexbin must materialize an aggregation grid');
+    const countCol = plan.stat.columns.find((c) => c.name === 'count');
+    const total = countCol.values.reduce((a, b) => a + b, 0);
+    if (total !== 60) fail(`hexbin counts must sum to the input size, got ${total}`);
+    const cells = semantic.root.children.filter((n) => n.id.startsWith('hexbin:') && n.role === 'chart.mark');
+    if (cells.length !== plan.stat.rowCount) fail('every hex cell must draw one hexagon');
+    for (const c of cells) {
+        if (!c.hitRegion || !c.hitRegion.polygon) fail('hexbin cells must carry polygon hit regions');
+        if (c.path.commands.length !== 7) fail('a hexagon must be a six-vertex closed path');
+    }
+    // The densest cell samples the ramp end.
+    const maxCell = cells.reduce((a, b) => (Number(plan.stat.columns.find((c) => c.name === 'count').values[a.rowIndex]) >= Number(plan.stat.columns.find((c) => c.name === 'count').values[b.rowIndex]) ? a : b));
+    const ramp = DEFAULT_CHART_THEME.heatmapRamp;
+    const last = ramp[ramp.length - 1];
+    if (maxCell.fill.color.b !== last.b) fail('the densest cell must sample the ramp end');
+}
+
+console.log('charts-render: contour draws closed rings from the density grid…');
+{
+    const contourSpec = {
+        mark: 'contour',
+        encoding: [
+            { field: 'x', channel: 'x' },
+            { field: 'y', channel: 'y' },
+        ],
+    };
+    // One blob at (50, 50).
+    let seed = 9;
+    const rand = () => {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+    };
+    const contourRows = Array.from({ length: 200 }, () => {
+        const u = rand();
+        const v = rand();
+        return { x: 50 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * 10, y: 50 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.sin(2 * Math.PI * v) * 10 };
+    });
+    const { plan, semantic } = pipeline(contourSpec, contourRows);
+    if (!plan.stat) fail('contour must materialize density rings');
+    const rings = semantic.root.children.filter((n) => n.id.startsWith('contour:') && n.role === 'chart.mark');
+    if (rings.length === 0) fail('contour must draw at least one ring');
+    for (const r of rings) {
+        if (!r.hitRegion || !r.hitRegion.polygon) fail('contour rings must carry polygon hit regions');
+        if (r.path.commands[r.path.commands.length - 1].kind !== 'close') fail('contour rings must be closed');
+    }
+    // Nested rings: the highest level sits inside the lowest level's bounds.
+    const levels = [...new Set(plan.marks.map((m) => Number(m.channels.get('level'))))].sort((a, b) => a - b);
+    if (levels.length < 2) fail('contour must produce multiple nice levels');
+    const ringOf = (lv) => rings.filter((n) => Number(n.hitRegion.polygon ? plan.marks.find((m) => `contour:${m.key}` === n.id).channels.get('level') : 0) === lv);
+    const outer = ringOf(levels[0])[0];
+    const inner = ringOf(levels[levels.length - 1])[0];
+    if (outer && inner) {
+        const oxs = outer.hitRegion.polygon.points.map((p) => p.x);
+        const ixs = inner.hitRegion.polygon.points.map((p) => p.x);
+        if (!(Math.min(...ixs) >= Math.min(...oxs) && Math.max(...ixs) <= Math.max(...oxs))) {
+            fail('higher-level rings must nest inside lower-level rings');
+        }
+    }
+    // Fewer than three points warns.
+    const few = compile(contourSpec, fromRows([{ x: 1, y: 1 }, { x: 2, y: 2 }]));
+    if (!few.diagnostics.items.some((d) => d.code === 'davinci.chart.contour-few-points')) {
+        fail('too few points must raise contour-few-points');
+    }
+}
+
+console.log('charts-render: chord draws group arcs and quadratic ribbons…');
+{
+    const chordSpec = {
+        mark: 'chord',
+        encoding: [
+            { field: 'src', channel: 'source' },
+            { field: 'dst', channel: 'target' },
+            { field: 'gb', channel: 'value' },
+        ],
+    };
+    const chordRows = [
+        { src: 'A', dst: 'B', gb: 30 },
+        { src: 'B', dst: 'A', gb: 10 }, // mutual flows are legal in chord
+        { src: 'A', dst: 'C', gb: 20 },
+        { src: 'C', dst: 'C', gb: 99 }, // self-link — dropped with a warning
+    ];
+    const { plan, semantic } = pipeline(chordSpec, chordRows);
+    if (!plan.diagnostics.items.some((d) => d.code === 'davinci.chart.chord-self-link')) {
+        fail('a self-link must raise chord-self-link');
+    }
+    const groups = semantic.root.children.filter((n) => n.id.startsWith('chord-group:'));
+    if (groups.length !== 3) fail(`want 3 chord groups, got ${groups.length}`);
+    // Group spans follow in+out totals: A = 60 (out 50 + in 10), C = 20.
+    const sectorOf = (name) => groups.find((n) => n.id === `chord-group:${name}`).hitRegion.sector;
+    const spanA = sectorOf('A').a1 - sectorOf('A').a0;
+    const spanC = sectorOf('C').a1 - sectorOf('C').a0;
+    if (Math.abs(spanA / spanC - 3) > 0.2) fail('chord group spans must be proportional to in+out totals');
+    const ribbons = semantic.root.children.filter((n) => n.id.startsWith('chord:') && n.role === 'chart.mark' && n.kind === 'path');
+    if (ribbons.length !== 3) fail(`want 3 chord ribbons, got ${ribbons.length}`);
+    for (const r of ribbons) {
+        if (!r.path.commands.some((c) => c.kind === 'quadratic')) fail('chord ribbons must use quadratic curves');
+        if (!r.hitRegion || !r.hitRegion.polygon) fail('chord ribbons must carry polygon hit regions');
+    }
+}
+
+console.log('charts-render: tree variants align leaves and go radial…');
+{
+    const treeSpec = {
+        mark: 'tree',
+        keyField: 'id',
+        parentField: 'parent',
+        treeLayout: 'dendrogram',
+        encoding: [{ field: 'size', channel: 'size' }],
+    };
+    const treeRows = [
+        { id: 'root', parent: null, size: 0 },
+        { id: 'a', parent: 'root', size: 0 },
+        { id: 'a1', parent: 'a', size: 0 },
+        { id: 'a2', parent: 'a', size: 0 },
+        { id: 'b', parent: 'root', size: 0 },
+    ];
+    const { semantic } = pipeline(treeSpec, treeRows);
+    const posOf = (key) => semantic.root.children.find((n) => n.id === `tree:${key}`);
+    // Dendrogram: all leaves share the deepest column's x.
+    const leafXs = ['a1', 'a2', 'b'].map((k) => posOf(k).cx);
+    if (Math.abs(leafXs[0] - leafXs[1]) > 1e-9 || Math.abs(leafXs[1] - leafXs[2]) > 1e-9) {
+        fail('dendrogram leaves must align on the deepest column');
+    }
+    // Radial: the root sits at the plot center, leaves on the outer ring.
+    const radial = pipeline({ ...treeSpec, treeLayout: 'radial' }, treeRows);
+    const rPosOf = (key) => radial.semantic.root.children.find((n) => n.id === `tree:${key}`);
+    const root = rPosOf('root');
+    const leaf = rPosOf('a1');
+    const center = { x: 640 / 2, y: 360 / 2 };
+    void center;
+    const dRoot = Math.hypot(root.cx - 320, root.cy - 180);
+    if (dRoot > 2) fail(`radial root must sit at the center, got ${dRoot}`);
+    const dLeaf = Math.hypot(leaf.cx - root.cx, leaf.cy - root.cy);
+    const dParent = Math.hypot(rPosOf('a').cx - root.cx, rPosOf('a').cy - root.cy);
+    if (!(dLeaf > dParent)) fail('radial leaves must sit further out than their parents');
+}
+
+console.log('charts-render: geo choropleth matches regions and punches holes…');
+{
+    // Tiny fixture basemap (registered by the host, never bundled).
+    const fixtureMap = {
+        type: 'FeatureCollection',
+        features: [
+            {
+                type: 'Feature',
+                properties: { name: 'Alpha', iso_a3: 'ALP' },
+                geometry: { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] },
+            },
+            {
+                type: 'Feature',
+                properties: { name: 'Beta', iso_a3: 'BET' },
+                geometry: { type: 'Polygon', coordinates: [[[20, 0], [30, 0], [30, 10], [20, 10], [20, 0]]] },
+            },
+        ],
+    };
+    registerGeoMap('fixture-map', fixtureMap);
+    const geoSpec = {
+        mark: 'geo',
+        geo: { map: 'fixture-map', projection: 'mercator' },
+        encoding: [
+            { field: 'region', channel: 'region' },
+            { field: 'gdp', channel: 'color' },
+        ],
+    };
+    const geoRows = [
+        { region: 'Alpha', gdp: 90 },
+        { region: 'BET', gdp: 40 }, // iso_a3 match
+        { region: 'Nowhere', gdp: 1 },
+    ];
+    const { plan, semantic } = pipeline(geoSpec, geoRows);
+    if (!plan.diagnostics.items.some((d) => d.code === 'davinci.chart.geo-unmatched-region')) {
+        fail('an unmatched region must raise geo-unmatched-region');
+    }
+    if (plan.marks.length !== 2) fail(`unmatched regions must not draw, got ${plan.marks.length}`);
+    const regions = semantic.root.children.filter((n) => n.id.startsWith('geo:') && n.role === 'chart.mark');
+    if (regions.length !== 2) fail(`want 2 geo regions (both map features), got ${regions.length}`);
+    for (const r of regions) {
+        if (!r.hitRegion || !r.hitRegion.polygon) fail('geo regions must carry polygon hit regions');
+    }
+    // Alpha (90) samples near the ramp end; Beta (40, matched via iso_a3) is lighter.
+    const ramp = DEFAULT_CHART_THEME.heatmapRamp;
+    const alpha = regions.find((n) => n.id === 'geo:0');
+    const beta = regions.find((n) => n.id === 'geo:Beta');
+    const rampEnd = ramp[ramp.length - 1];
+    if (alpha.fill.color.b !== rampEnd.b) fail('the max region must sample the ramp end');
+    if (!(beta.fill.color.b > alpha.fill.color.b)) fail('lower values must sample lighter ramp stops (lighter = higher channel values on the light ramp)');
+    // An iso-matched region still gets its ramp value, never the track fill.
+    if (beta.fill.color.b === DEFAULT_CHART_THEME.trackColor.b && beta.fill.color.g === DEFAULT_CHART_THEME.trackColor.g) {
+        fail('an iso_a3-matched region must take its ramp value, not the track fill');
+    }
+    // Unknown map id is an error.
+    const bad = compile({ ...geoSpec, geo: { map: 'nope', projection: 'mercator' } }, fromRows(geoRows));
+    if (!bad.diagnostics.items.some((d) => d.code === 'davinci.chart.geo-unknown-map')) {
+        fail('an unregistered basemap must raise geo-unknown-map');
+    }
+    // The real Natural Earth lite pack: register from disk and smoke a spec.
+    const lite = JSON.parse(readFileSync(new URL('../../../../../davinci/geo-assets/src/ne-110m-lite.json', import.meta.url), 'utf8'));
+    registerGeoMap('ne-110m-lite', lite);
+    const world = compile(
+        { mark: 'geo', geo: { map: 'ne-110m-lite', projection: 'mercator' }, encoding: geoSpec.encoding },
+        fromRows([
+            { region: 'China', gdp: 18000 },
+            { region: 'United States of America', gdp: 27000 },
+            { region: 'BRA', gdp: 2100 },
+        ]),
+    );
+    if (world.marks.length !== 3) fail(`Natural Earth lite must match name and iso regions, got ${world.marks.length}`);
+    const worldScene = buildScene(world, { width: WIDTH, height: HEIGHT });
+    const worldRegions = worldScene.root.children.filter((n) => n.id.startsWith('geo:') && n.role === 'chart.mark');
+    if (worldRegions.length < 150) fail(`the world basemap must draw every feature, got ${worldRegions.length}`);
+}
+
+console.log('charts-render: streamgraph without a series channel is refused…');
+{
+    const noSeries = compile(
+        { mark: 'streamgraph', encoding: [{ field: 'week', channel: 'x' }, { field: 'hours', channel: 'y' }] },
+        fromRows([{ week: 'W1', hours: 3 }, { week: 'W2', hours: 5 }]),
+    );
+    if (!noSeries.diagnostics.items.some((d) => d.code === 'davinci.chart.streamgraph-needs-series' && d.severity === 'error')) {
+        fail('streamgraph without a series channel must raise streamgraph-needs-series');
     }
 }
 

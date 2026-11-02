@@ -19,6 +19,7 @@
     },
     "dependencies": {
         "@doki-land/davinci": "workspace:*",
+        "@doki-land/davinci-geo-assets": "workspace:*",
         "@vmz/ui": "workspace:*",
         "@vmz/ui-charts": "workspace:*",
         "@vmz/ui-icons": "workspace:*",

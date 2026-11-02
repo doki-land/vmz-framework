@@ -8,7 +8,8 @@
 
 import { diag, type Diagnostic, type DiagnosticSet } from "@doki-land/davinci-types";
 import { column, fromRows, type DataColumn, type DataSnapshot } from "./data.js";
-import { apply as scaleApply, type Scale } from "./scale.js";
+import { geoMapById, type GeoFeature } from "./geo.js";
+import { apply as scaleApply, niceLinearTicks, type Scale } from "./scale.js";
 import { binValues, boxStats, kde, rankDescending, silvermanBandwidth } from "./statistic.js";
 
 /** Mark kind (geometric primitive family). Only marks with real scene
@@ -48,7 +49,13 @@ export type MarkKind =
     | "strip"
     | "beeswarm"
     | "gantt"
-    | "tree";
+    | "tree"
+    | "force"
+    | "parallel"
+    | "hexbin"
+    | "contour"
+    | "chord"
+    | "geo";
 
 /** Encoding channel — how a data field maps to a visual property. */
 export interface EncodingChannel {
@@ -90,6 +97,20 @@ export interface ChartSpec {
     readonly valueDomain?: readonly [number, number];
     /** Sparkline mode: strip axes, grid and legend for tiny inline charts. */
     readonly spark?: boolean;
+    /** Tree only: layout variant. `tidy` (default) packs parents over their
+     *  children; `dendrogram` aligns every leaf on the deepest column;
+     *  `radial` maps depth to radius and leaf order to angle. */
+    readonly treeLayout?: "tidy" | "dendrogram" | "radial";
+    /** Parallel coordinates only: ordered quantitative fields, one axis per
+     *  entry. This is the multi-axis authoring surface — encodings only carry
+     *  the optional `color` series. */
+    readonly dimensions?: ReadonlyArray<string>;
+    /** Geo choropleth only: basemap resource id (registered by the host) and
+     *  the projection to fit it with. */
+    readonly geo?: {
+        readonly map: string;
+        readonly projection: "mercator" | "equirectangular" | "albers";
+    };
 }
 
 /** Series (grouping) domain resolved once by `compile`. */
@@ -154,11 +175,13 @@ const markRequiredChannels: ReadonlyMap<string, ReadonlyArray<string>> = new Map
     ["calendar", ["color"]],
     ["dumbbell", ["yEnd"]],
     ["gantt", ["start", "end"]],
+    ["force", ["source", "target"]],
+    ["chord", ["source", "target", "value"]],
 ]);
 
 /** Mark kinds whose `color` encoding is a quantitative value channel, not a
- *  series grouping (heatmap and calendar cells read color as data). */
-const colorAsValueMarks: ReadonlySet<string> = new Set(["heatmap", "calendar"]);
+ *  series grouping (heatmap, calendar and geo cells read color as data). */
+const colorAsValueMarks: ReadonlySet<string> = new Set(["heatmap", "calendar", "geo"]);
 
 /** Mark kinds whose legend / palette comes from a positional category field
  *  instead of a series encoding: ridgeline ridges and rose / radial-bar /
@@ -172,7 +195,20 @@ const categorySeriesField: ReadonlyMap<string, string> = new Map([
 
 /** Marks whose statistics or shared offsets are computed globally — faceting
  *  them would need per-panel statistics, which is a separate contract. */
-const statDrivenMarks: ReadonlySet<string> = new Set(["histogram", "boxplot", "ridgeline", "bump", "violin", "calendar", "streamgraph", "mosaic"]);
+const statDrivenMarks: ReadonlySet<string> = new Set([
+    "histogram",
+    "boxplot",
+    "ridgeline",
+    "bump",
+    "violin",
+    "calendar",
+    "streamgraph",
+    "mosaic",
+    "force",
+    "hexbin",
+    "contour",
+    "chord",
+]);
 
 /** Encoding channels each mark needs before any row can position. */
 const markEncodingNeeds: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -201,6 +237,11 @@ const markEncodingNeeds: Readonly<Record<string, ReadonlyArray<string>>> = {
     strip: ["x", "y"],
     beeswarm: ["y"],
     gantt: ["y", "start", "end"],
+    force: ["source", "target"],
+    hexbin: ["x", "y"],
+    contour: ["x", "y"],
+    chord: ["source", "target", "value"],
+    geo: ["region", "color"],
 };
 
 /** Mark kinds with real scene geometry. Kept in sync with the scene
@@ -241,6 +282,12 @@ const implementedMarks: ReadonlySet<string> = new Set([
     "beeswarm",
     "gantt",
     "tree",
+    "force",
+    "parallel",
+    "hexbin",
+    "contour",
+    "chord",
+    "geo",
 ]);
 
 /** Resolve the effective series layout. `undefined` is the natural per-mark
@@ -952,6 +999,17 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
 
     // Streamgraph wiggle offsets: each x slot's stacked ribbons balance around
     // zero at −Σ/2, so the silhouette wiggles instead of sitting on a baseline.
+    // Without a series channel there are no ribbons to balance — refuse loudly.
+    if (spec.mark === "streamgraph" && !legendCol) {
+        diagnostics.push(
+            diag(
+                "error",
+                "davinci.chart.streamgraph-needs-series",
+                `streamgraph needs a color / series / group channel: a single stream has no wiggle to balance`,
+                undefined,
+            ),
+        );
+    }
     if (spec.mark === "streamgraph") {
         const xEnc = spec.encoding.find((e) => e.channel === "x");
         const yEnc = spec.encoding.find((e) => e.channel === "y");
@@ -1343,6 +1401,586 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
     }
 
+    // Force layout: deterministic seed from the edge fingerprint, fixed 300
+    // iterations (never a convergence claim), positions materialized into
+    // node channels. Oversized graphs are degree-sampled with a warning.
+    interface ForceNodeInfo {
+        key: string;
+        rowIndex: number;
+        degree: number;
+        x: number;
+        y: number;
+    }
+    let forceNodes: ForceNodeInfo[] = [];
+    if (spec.mark === "force") {
+        const sEnc = spec.encoding.find((e) => e.channel === "source");
+        const tEnc = spec.encoding.find((e) => e.channel === "target");
+        const sCol = sEnc ? column(data, sEnc.field) : undefined;
+        const tCol = tEnc ? column(data, tEnc.field) : undefined;
+        if (sCol && tCol) {
+            // Dedupe edges (merge weights), refuse self-loops loudly.
+            const edgeMap = new Map<string, { s: string; t: string; w: number }>();
+            let selfLoops = 0;
+            let dupes = 0;
+            const nodeRow = new Map<string, number>();
+            for (let r = 0; r < data.rowCount; r++) {
+                const s = sCol.values[r];
+                const t = tCol.values[r];
+                if (s === null || s === undefined || t === null || t === undefined) continue;
+                const source = String(s);
+                const target = String(t);
+                if (source === target) {
+                    selfLoops++;
+                    continue;
+                }
+                const id = source < target ? `${source}→${target}` : `${target}→${source}`;
+                const hit = edgeMap.get(id);
+                if (hit) {
+                    hit.w += 1;
+                    dupes++;
+                } else {
+                    edgeMap.set(id, { s: source, t: target, w: 1 });
+                }
+                if (!nodeRow.has(source)) nodeRow.set(source, r);
+                if (!nodeRow.has(target)) nodeRow.set(target, r);
+            }
+            if (selfLoops > 0) {
+                diagnostics.push(
+                    diag(
+                        "error",
+                        "davinci.chart.force-self-loop",
+                        `${selfLoops} self-loop${selfLoops === 1 ? "" : "s"} refused: a force graph edge needs two distinct nodes`,
+                        sEnc?.field,
+                    ),
+                );
+            }
+            if (dupes > 0) {
+                diagnostics.push(
+                    diag(
+                        "info",
+                        "davinci.chart.force-duplicate-edge",
+                        `${dupes} duplicate edge${dupes === 1 ? "" : "s"} merged into their twin's weight`,
+                        undefined,
+                    ),
+                );
+            }
+            // Degree sampling above the cap — deterministic order.
+            const degree = new Map<string, number>();
+            for (const e of edgeMap.values()) {
+                degree.set(e.s, (degree.get(e.s) ?? 0) + 1);
+                degree.set(e.t, (degree.get(e.t) ?? 0) + 1);
+            }
+            const FORCE_MAX_NODES = 400;
+            let kept = [...nodeRow.keys()];
+            if (kept.length > FORCE_MAX_NODES) {
+                const order = new Map(kept.map((k, i) => [k, i]));
+                kept.sort((a, b) => (degree.get(b)! - degree.get(a)!) || (order.get(a)! - order.get(b)!));
+                const dropped = kept.length - FORCE_MAX_NODES;
+                kept = kept.slice(0, FORCE_MAX_NODES);
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.force-sampled",
+                        `force layout sampled ${FORCE_MAX_NODES} of ${kept.length + dropped} nodes by degree; ${dropped} dropped`,
+                        undefined,
+                    ),
+                );
+            }
+            const keptSet = new Set(kept);
+            const links = [...edgeMap.values()].filter((e) => keptSet.has(e.s) && keptSet.has(e.t));
+            // Deterministic seed: FNV-1a over the canonical edge list.
+            const fingerprint = links
+                .map((e) => `${e.s}>${e.t}:${e.w}`)
+                .sort()
+                .join("|");
+            let rngState = 0x811c9dc5;
+            for (let i = 0; i < fingerprint.length; i++) {
+                rngState ^= fingerprint.charCodeAt(i);
+                rngState = Math.imul(rngState, 0x01000193);
+            }
+            const rand = (): number => {
+                rngState |= 0;
+                rngState = (rngState + 0x6d2b79f5) | 0;
+                let t = Math.imul(rngState ^ (rngState >>> 15), 1 | rngState);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+            const n = kept.length;
+            const xs = new Float64Array(n);
+            const ys = new Float64Array(n);
+            const idxOf = new Map(kept.map((k, i) => [k, i]));
+            // Golden-angle spiral init with a tiny seeded jitter.
+            for (let i = 0; i < n; i++) {
+                const r = Math.sqrt(i + 0.5);
+                const theta = i * 2.399963229728653 + rand() * 0.05;
+                xs[i] = r * Math.cos(theta);
+                ys[i] = r * Math.sin(theta);
+            }
+            const k = Math.sqrt(1 / Math.max(1, n));
+            const dx = new Float64Array(n);
+            const dy = new Float64Array(n);
+            for (let iter = 0; iter < 300; iter++) {
+                dx.fill(0);
+                dy.fill(0);
+                for (let i = 0; i < n; i++) {
+                    for (let j = i + 1; j < n; j++) {
+                        const ddx = xs[i] - xs[j];
+                        const ddy = ys[i] - ys[j];
+                        const dist2 = Math.max(0.01, ddx * ddx + ddy * ddy);
+                        const f = ((k * k) / dist2) * 0.5;
+                        const fx = (ddx / Math.sqrt(dist2)) * f;
+                        const fy = (ddy / Math.sqrt(dist2)) * f;
+                        dx[i] += fx;
+                        dy[i] += fy;
+                        dx[j] -= fx;
+                        dy[j] -= fy;
+                    }
+                }
+                for (const e of links) {
+                    const a = idxOf.get(e.s)!;
+                    const b = idxOf.get(e.t)!;
+                    const ddx = xs[b] - xs[a];
+                    const ddy = ys[b] - ys[a];
+                    const dist = Math.max(0.01, Math.sqrt(ddx * ddx + ddy * ddy));
+                    const f = ((dist * dist) / k) * 0.02 * Math.min(4, e.w);
+                    const fx = (ddx / dist) * f;
+                    const fy = (ddy / dist) * f;
+                    dx[a] += fx;
+                    dy[a] += fy;
+                    dx[b] -= fx;
+                    dy[b] -= fy;
+                }
+                const cool = 1 - iter / 300;
+                for (let i = 0; i < n; i++) {
+                    xs[i] += dx[i] * cool;
+                    ys[i] += dy[i] * cool;
+                    // Gentle centering keeps the cloud from drifting away.
+                    xs[i] *= 1 - 0.02 * cool;
+                    ys[i] *= 1 - 0.02 * cool;
+                }
+            }
+            // Normalize the bounding box into [0.05, 0.95]².
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            for (let i = 0; i < n; i++) {
+                if (xs[i] < minX) minX = xs[i];
+                if (xs[i] > maxX) maxX = xs[i];
+                if (ys[i] < minY) minY = ys[i];
+                if (ys[i] > maxY) maxY = ys[i];
+            }
+            const spanX = maxX - minX || 1;
+            const spanY = maxY - minY || 1;
+            forceNodes = kept.map((key, i) => ({
+                key,
+                rowIndex: nodeRow.get(key)!,
+                degree: degree.get(key) ?? 0,
+                x: 0.05 + (0.9 * (xs[i] - minX)) / spanX,
+                y: 0.05 + (0.9 * (ys[i] - minY)) / spanY,
+            }));
+            // Links materialize too — the scene never re-reads the edge list.
+            stat = fromRows(links.map((e) => ({ source: e.s, target: e.t, weight: e.w })));
+        }
+    }
+
+    // Parallel coordinates: one independent linear domain per dimension,
+    // materialized into the stat snapshot in authoring order.
+    let parallelDims: { dim: string; lo: number; hi: number }[] = [];
+    if (spec.mark === "parallel") {
+        const dims = spec.dimensions ?? [];
+        if (dims.length < 2) {
+            diagnostics.push(
+                diag(
+                    "error",
+                    "davinci.chart.parallel-needs-dimensions",
+                    `parallel coordinates need at least two entries in dimensions, got ${dims.length}`,
+                    "dimensions",
+                ),
+            );
+        }
+        parallelDims = [];
+        for (const dim of dims) {
+            const col = column(data, dim);
+            if (!col) {
+                if (data.columns.length > 0) {
+                    diagnostics.push(
+                        diag("error", "davinci.chart.unknown-field", `dimension "${dim}" is not in the data`, dim),
+                    );
+                }
+                continue;
+            }
+            const nums = col.values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+            if (nums.length === 0) {
+                diagnostics.push(
+                    diag("warning", "davinci.chart.parallel-empty-dimension", `dimension "${dim}" has no finite numeric values`, dim),
+                );
+                continue;
+            }
+            parallelDims.push({ dim, lo: Math.min(...nums), hi: Math.max(...nums) });
+        }
+        if (parallelDims.length > 0) {
+            stat = fromRows(parallelDims.map((d) => ({ dim: d.dim, lo: d.lo, hi: d.hi })));
+        }
+        // Rows missing any dimension value never reach the frame.
+    }
+
+    // Hexbin: hexagonal aggregation grid over the scatter extent.
+    interface HexCell {
+        cx: number;
+        cy: number;
+        count: number;
+    }
+    let hexCells: HexCell[] = [];
+    let hexRadius = 1;
+    if (spec.mark === "hexbin") {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol) {
+            const pts: [number, number][] = [];
+            for (let r = 0; r < data.rowCount; r++) {
+                const x = xCol.values[r];
+                const y = yCol.values[r];
+                if (typeof x !== "number" || !Number.isFinite(x)) continue;
+                if (typeof y !== "number" || !Number.isFinite(y)) continue;
+                pts.push([x, y]);
+            }
+            if (pts.length > 0) {
+                const xs = pts.map((p) => p[0]);
+                const ys = pts.map((p) => p[1]);
+                let minX = Math.min(...xs);
+                let maxX = Math.max(...xs);
+                let minY = Math.min(...ys);
+                let maxY = Math.max(...ys);
+                if (minX === maxX) {
+                    minX -= 0.5;
+                    maxX += 0.5;
+                }
+                if (minY === maxY) {
+                    minY -= 0.5;
+                    maxY += 0.5;
+                }
+                hexRadius = (maxX - minX) / 18;
+                const dx = hexRadius * 1.5;
+                const dy = hexRadius * Math.sqrt(3);
+                const cells = new Map<string, HexCell>();
+                for (const [x, y] of pts) {
+                    // Axial rounding for pointy-top hexagons.
+                    const q = (x - minX) / dx;
+                    const row = Math.round((y - minY) / dy);
+                    const col = Math.round(q - (row % 2 === 0 ? 0 : 0.5));
+                    const cx = minX + (col + (row % 2 === 0 ? 0 : 0.5)) * dx;
+                    const cy = minY + row * dy;
+                    const id = `${col}:${row}`;
+                    const cell = cells.get(id);
+                    if (cell) cell.count++;
+                    else cells.set(id, { cx, cy, count: 1 });
+                }
+                hexCells = [...cells.values()];
+                stat = fromRows(hexCells.map((c) => ({ cx: c.cx, cy: c.cy, count: c.count, radius: hexRadius })));
+            }
+        }
+    }
+
+    // Contour: 2D Gaussian KDE over a shared grid, marching squares at nice
+    // levels, rings materialized as point rows grouped by (level, ring).
+    interface ContourRing {
+        level: number;
+        firstStatRow: number;
+    }
+    let contourRings: ContourRing[] = [];
+    if (spec.mark === "contour") {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol) {
+            const pts: [number, number][] = [];
+            for (let r = 0; r < data.rowCount; r++) {
+                const x = xCol.values[r];
+                const y = yCol.values[r];
+                if (typeof x !== "number" || !Number.isFinite(x)) continue;
+                if (typeof y !== "number" || !Number.isFinite(y)) continue;
+                pts.push([x, y]);
+            }
+            if (pts.length < 3) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.contour-few-points",
+                        `contour needs at least three usable points, got ${pts.length}`,
+                        xEnc?.field,
+                    ),
+                );
+            } else {
+                const xs = pts.map((p) => p[0]);
+                const ys = pts.map((p) => p[1]);
+                let minX = Math.min(...xs);
+                let maxX = Math.max(...xs);
+                let minY = Math.min(...ys);
+                let maxY = Math.max(...ys);
+                const padX = (maxX - minX || 1) * 0.1;
+                const padY = (maxY - minY || 1) * 0.1;
+                minX -= padX;
+                maxX += padX;
+                minY -= padY;
+                maxY += padY;
+                const G = 48;
+                const gx: number[] = [];
+                const gy: number[] = [];
+                for (let i = 0; i < G; i++) {
+                    gx.push(minX + ((maxX - minX) * i) / (G - 1));
+                    gy.push(minY + ((maxY - minY) * i) / (G - 1));
+                }
+                const bwx = silvermanBandwidth(xs);
+                const bwy = silvermanBandwidth(ys);
+                const field = new Float64Array(G * G);
+                let peak = 0;
+                for (let j = 0; j < G; j++) {
+                    for (let i = 0; i < G; i++) {
+                        let sum = 0;
+                        for (const [x, y] of pts) {
+                            const ux = (gx[i] - x) / bwx;
+                            const uy = (gy[j] - y) / bwy;
+                            if (ux > 4 || ux < -4 || uy > 4 || uy < -4) continue;
+                            sum += Math.exp(-0.5 * (ux * ux + uy * uy));
+                        }
+                        field[j * G + i] = sum;
+                        if (sum > peak) peak = sum;
+                    }
+                }
+                if (peak > 0) {
+                    const levelValues = niceLinearTicks([0, peak]).values.filter((v) => v > 0).slice(0, 6);
+                    const statRows: Record<string, unknown>[] = [];
+                    contourRings = [];
+                    for (const level of levelValues) {
+                        const rings = marchingSquares(field, G, gx, gy, level);
+                        for (const ring of rings) {
+                            if (ring.length < 3) continue;
+                            contourRings.push({ level, firstStatRow: statRows.length });
+                            for (const p of ring) statRows.push({ level, px: p.x, py: p.y });
+                        }
+                    }
+                    if (statRows.length > 0) stat = fromRows(statRows);
+                }
+            }
+        }
+    }
+
+    // Chord: aggregate the edge list into a group matrix, order groups by
+    // total desc, and pre-assign every link its source / target arc spans.
+    interface ChordLinkSpan {
+        rowIndex: number;
+        key: string;
+        s: string;
+        t: string;
+        v: number;
+        sa0: number;
+        sa1: number;
+        ta0: number;
+        ta1: number;
+    }
+    let chordLinks: ChordLinkSpan[] = [];
+    let chordGroups: { name: string; a0: number; a1: number; total: number }[] = [];
+    if (spec.mark === "chord") {
+        const sEnc = spec.encoding.find((e) => e.channel === "source");
+        const tEnc = spec.encoding.find((e) => e.channel === "target");
+        const vEnc = spec.encoding.find((e) => e.channel === "value");
+        const sCol = sEnc ? column(data, sEnc.field) : undefined;
+        const tCol = tEnc ? column(data, tEnc.field) : undefined;
+        const vCol = vEnc ? column(data, vEnc.field) : undefined;
+        if (sCol && tCol && vCol) {
+            const rawLinks: ChordLinkSpan[] = [];
+            let selfLinks = 0;
+            for (let r = 0; r < data.rowCount; r++) {
+                const s = sCol.values[r];
+                const t = tCol.values[r];
+                const v = vCol.values[r];
+                if (s === null || s === undefined || t === null || t === undefined) continue;
+                if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) continue;
+                if (String(s) === String(t)) {
+                    selfLinks++;
+                    continue;
+                }
+                rawLinks.push({ rowIndex: r, key: String(r), s: String(s), t: String(t), v, sa0: 0, sa1: 0, ta0: 0, ta1: 0 });
+            }
+            if (selfLinks > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.chord-self-link",
+                        `${selfLinks} self-link${selfLinks === 1 ? "" : "s"} dropped: chord ribbons need two distinct groups`,
+                        sEnc?.field,
+                    ),
+                );
+            }
+            if (rawLinks.length > 0) {
+                const totals = new Map<string, number>();
+                const order: string[] = [];
+                for (const l of rawLinks) {
+                    if (!totals.has(l.s)) order.push(l.s);
+                    if (!totals.has(l.t)) order.push(l.t);
+                    totals.set(l.s, (totals.get(l.s) ?? 0) + l.v);
+                    totals.set(l.t, (totals.get(l.t) ?? 0) + l.v);
+                }
+                const groups = [...totals.entries()].sort((a, b) => b[1] - a[1] || order.indexOf(a[0]) - order.indexOf(b[0]));
+                const grand = groups.reduce((a, [, t]) => a + t, 0);
+                const GAP = 0.02;
+                const spanTotal = Math.PI * 2 - GAP * groups.length;
+                let acc = -Math.PI / 2;
+                const groupSpan = new Map<string, { a0: number; a1: number }>();
+                chordGroups = [];
+                for (const [name, total] of groups) {
+                    const span = (spanTotal * total) / grand;
+                    groupSpan.set(name, { a0: acc, a1: acc + span });
+                    chordGroups.push({ name, a0: acc, a1: acc + span, total });
+                    acc += span + GAP;
+                }
+                // Within each group, links take sub-spans proportional to value,
+                // descending — source side and target side independently.
+                const sideCursor = new Map<string, number>();
+                for (const [name] of groups) sideCursor.set(name + ":out", groupSpan.get(name)!.a0);
+                for (const [name] of groups) sideCursor.set(name + ":in", groupSpan.get(name)!.a0);
+                const sorted = [...rawLinks].sort((a, b) => b.v - a.v);
+                for (const l of sorted) {
+                    const sSpan = groupSpan.get(l.s)!;
+                    const tSpan = groupSpan.get(l.t)!;
+                    const sTotal = totals.get(l.s)!;
+                    const tTotal = totals.get(l.t)!;
+                    const sLen = ((sSpan.a1 - sSpan.a0) * l.v) / sTotal;
+                    const tLen = ((tSpan.a1 - tSpan.a0) * l.v) / tTotal;
+                    l.sa0 = sideCursor.get(l.s + ":out")!;
+                    l.sa1 = l.sa0 + sLen;
+                    sideCursor.set(l.s + ":out", l.sa1);
+                    l.ta0 = sideCursor.get(l.t + ":in")!;
+                    l.ta1 = l.ta0 + tLen;
+                    sideCursor.set(l.t + ":in", l.ta1);
+                }
+                chordLinks = sorted;
+                // Group arcs materialize — the scene never re-derives angles.
+                stat = fromRows(chordGroups.map((g) => ({ name: g.name, a0: g.a0, a1: g.a1, total: g.total })));
+            }
+        }
+    }
+
+    // Geo choropleth: match region values to basemap features (exact `name`,
+    // then `iso_a3`) and project every ring once. Regions with no feature and
+    // maps the host never registered are loud authoring errors.
+    let geoMatched: Set<number> | null = null;
+    let geoFeatureOf: Map<number, string> | null = null;
+    if (spec.mark === "geo") {
+        const rEnc = spec.encoding.find((e) => e.channel === "region");
+        const cEnc = spec.encoding.find((e) => e.channel === "color");
+        const rCol = rEnc ? column(data, rEnc.field) : undefined;
+        const cCol = cEnc ? column(data, cEnc.field) : undefined;
+        if (!spec.geo) {
+            diagnostics.push(
+                diag("error", "davinci.chart.geo-needs-map", `geo needs a \`geo: { map, projection }\` spec block`, "geo"),
+            );
+        } else {
+            const map = geoMapById(spec.geo.map);
+            if (!map) {
+                diagnostics.push(
+                    diag(
+                        "error",
+                        "davinci.chart.geo-unknown-map",
+                        `basemap "${spec.geo.map}" is not registered; the host must registerGeoMap it first`,
+                        spec.geo.map,
+                    ),
+                );
+            } else if (rCol && cCol) {
+                // Project every feature ring once.
+                const project = geoProjector(spec.geo.projection);
+                interface ProjectedRing {
+                    name: string;
+                    poly: number;
+                    hole: number;
+                    pts: [number, number][];
+                }
+                const rings: ProjectedRing[] = [];
+                let minX = Infinity;
+                let maxX = -Infinity;
+                let minY = Infinity;
+                let maxY = -Infinity;
+                const pushRing = (name: string, poly: number, hole: number, ring: ReadonlyArray<ReadonlyArray<number>>): void => {
+                    const pts: [number, number][] = ring.map(([lon, lat]) => project(lon, lat));
+                    for (const [x, y] of pts) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                    rings.push({ name, poly, hole, pts });
+                };
+                for (const f of map.features) {
+                    const name = f.properties.name;
+                    if (f.geometry.type === "Polygon") {
+                        f.geometry.coordinates.forEach((ring, ri) => pushRing(name, 0, ri > 0 ? 1 : 0, ring));
+                    } else if (f.geometry.type === "MultiPolygon") {
+                        f.geometry.coordinates.forEach((poly, pi) => poly.forEach((ring, ri) => pushRing(name, pi, ri > 0 ? 1 : 0, ring)));
+                    }
+                }
+                // Normalize into [0, 1]² preserving aspect.
+                const spanX = maxX - minX || 1;
+                const spanY = maxY - minY || 1;
+                const fit = Math.max(spanX, spanY);
+                const statRows: Record<string, unknown>[] = [];
+                rings.forEach((ring, ringIndex) => {
+                    // Punch holes under the nonzero fill rule: holes get the
+                    // opposite winding of their polygon's outer ring.
+                    const outer = ring.hole === 1 ? rings.find((r) => r.name === ring.name && r.poly === ring.poly && r.hole === 0) : undefined;
+                    let pts = ring.pts;
+                    if (outer && signedRingArea(pts) * signedRingArea(outer.pts) > 0) pts = [...pts].reverse();
+                    for (const [x, y] of pts) {
+                        statRows.push({
+                            name: ring.name,
+                            ring: ringIndex,
+                            hole: ring.hole,
+                            px: 0.02 + (0.96 * (x - minX)) / fit,
+                            py: 0.02 + (0.96 * (y - minY)) / fit,
+                        });
+                    }
+                });
+                if (statRows.length > 0) stat = fromRows(statRows);
+                // Match data rows to features by name, then iso_a3, and keep
+                // the matched feature name per row (iso matches must still
+                // find their fill value at scene time).
+                const nameOf = new Map<string, string>();
+                for (const f of map.features) {
+                    nameOf.set(f.properties.name, f.properties.name);
+                    nameOf.set(f.properties.iso_a3, f.properties.name);
+                }
+                geoMatched = new Set();
+                geoFeatureOf = new Map();
+                const unmatched = new Set<string>();
+                for (let r = 0; r < data.rowCount; r++) {
+                    const rv = rCol.values[r];
+                    if (rv === null || rv === undefined) continue;
+                    const key = String(rv);
+                    const feature = nameOf.get(key) ?? nameOf.get(key.toUpperCase());
+                    if (feature !== undefined) {
+                        geoMatched.add(r);
+                        geoFeatureOf.set(r, feature);
+                    } else {
+                        unmatched.add(key);
+                    }
+                }
+                if (unmatched.size > 0) {
+                    diagnostics.push(
+                        diag(
+                            "warning",
+                            "davinci.chart.geo-unmatched-region",
+                            `${unmatched.size} region value${unmatched.size === 1 ? "" : "s"} match no basemap feature: ${[...unmatched].slice(0, 5).join(", ")}${unmatched.size > 5 ? ", …" : ""}`,
+                            rEnc?.field,
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
     for (const enc of spec.encoding) {
         const col = column(data, enc.field);
         if (!col) {
@@ -1605,6 +2243,57 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 ]),
             });
         }
+    } else if (spec.mark === "force") {
+        for (const node of forceNodes) {
+            marks.push({
+                rowIndex: node.rowIndex,
+                key: node.key,
+                series: null,
+                channels: new Map<string, number | string>([
+                    ["x", node.x],
+                    ["y", node.y],
+                    ["degree", node.degree],
+                ]),
+            });
+        }
+    } else if (spec.mark === "hexbin" && stat) {
+        for (let i = 0; i < hexCells.length; i++) {
+            const c = hexCells[i];
+            marks.push({
+                rowIndex: i,
+                key: String(i),
+                series: null,
+                channels: new Map<string, number | string>([
+                    ["cx", c.cx],
+                    ["cy", c.cy],
+                    ["count", c.count],
+                    ["radius", hexRadius],
+                ]),
+            });
+        }
+    } else if (spec.mark === "contour" && stat) {
+        contourRings.forEach((ring, i) => {
+            marks.push({
+                rowIndex: ring.firstStatRow,
+                key: `${ring.level}~${i}`,
+                series: null,
+                channels: new Map<string, number | string>([["level", ring.level]]),
+            });
+        });
+    } else if (spec.mark === "chord") {
+        for (const l of chordLinks) {
+            marks.push({
+                rowIndex: l.rowIndex,
+                key: l.key,
+                series: null,
+                channels: new Map<string, number | string>([
+                    ["sa0", l.sa0],
+                    ["sa1", l.sa1],
+                    ["ta0", l.ta0],
+                    ["ta1", l.ta1],
+                ]),
+            });
+        }
     } else if (spec.mark === "calendar" && stat) {
         const dateColS = column(stat, "date");
         const weekColS = column(stat, "week");
@@ -1773,6 +2462,29 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 channels.set("endV", span[1]);
             }
         }
+        // Parallel coordinates: a row missing any dimension value draws no
+        // polyline at all.
+        if (spec.mark === "parallel") {
+            for (const d of parallelDims) {
+                const col = column(data, d.dim);
+                const v = col ? col.values[r] : null;
+                if (typeof v !== "number" || !Number.isFinite(v)) {
+                    positioned = false;
+                    break;
+                }
+            }
+        }
+        // Geo: a region row with no basemap feature draws nothing (compile
+        // already warned about it); matched rows carry their feature name so
+        // iso-matched rows still find their fill value at scene time.
+        if (spec.mark === "geo" && geoMatched) {
+            if (!geoMatched.has(r)) {
+                positioned = false;
+            } else {
+                const feature = geoFeatureOf?.get(r);
+                if (feature !== undefined) channels.set("feature", feature);
+            }
+        }
         // Rows without a usable x / y position never become marks; the rest
         // still keep their original row index and key so ids do not renumber.
         if (positioned) {
@@ -1832,6 +2544,139 @@ function weekdayOfDays(days: number): number {
 function parseGanttValue(raw: number | string | boolean | null): number | null {
     if (typeof raw === "number" && Number.isFinite(raw)) return raw;
     return parseCalendarDate(raw);
+}
+
+/** Geo projector: lon/lat degrees → planar units for the chosen projection. */
+function geoProjector(kind: "mercator" | "equirectangular" | "albers"): (lon: number, lat: number) => [number, number] {
+    const rad = Math.PI / 180;
+    switch (kind) {
+        case "mercator":
+            return (lon, lat) => {
+                const phi = Math.max(-85, Math.min(85, lat)) * rad;
+                return [lon * rad, -Math.log(Math.tan(Math.PI / 4 + phi / 2))];
+            };
+        case "equirectangular":
+            return (lon, lat) => [lon * rad, -lat * rad];
+        case "albers": {
+            // d3 default parallels (29.5° / 45.5° N) and origin (96° W, 23° N).
+            const phi0 = 29.5 * rad;
+            const phi1 = 45.5 * rad;
+            const lat0 = 23 * rad;
+            const lon0 = -96 * rad;
+            const n = (Math.sin(phi0) + Math.sin(phi1)) / 2;
+            const c = Math.cos(phi0) * Math.cos(phi0) + 2 * n * Math.sin(phi0);
+            const rho0 = Math.sqrt(c - 2 * n * Math.sin(lat0)) / n;
+            return (lon, lat) => {
+                const rho = Math.sqrt(Math.max(0, c - 2 * n * Math.sin(lat * rad))) / n;
+                const theta = n * (lon * rad - lon0);
+                return [rho * Math.sin(theta), -(rho0 - rho * Math.cos(theta))];
+            };
+        }
+    }
+}
+
+/** Signed area of a ring in projected coordinates (winding probe). */
+function signedRingArea(pts: ReadonlyArray<readonly [number, number]>): number {
+    let sum = 0;
+    for (let i = 0; i < pts.length; i++) {
+        const [x0, y0] = pts[i];
+        const [x1, y1] = pts[(i + 1) % pts.length];
+        sum += x0 * y1 - x1 * y0;
+    }
+    return sum / 2;
+}
+
+/** Marching squares over a density grid: joins threshold segments into closed
+ *  rings (case table walks each cell edge once, then stitches by shared
+ *  endpoints). Deterministic for a given grid. */
+function marchingSquares(
+    field: Float64Array,
+    size: number,
+    gx: ReadonlyArray<number>,
+    gy: ReadonlyArray<number>,
+    level: number,
+): { x: number; y: number }[][] {
+    const at = (i: number, j: number): number => field[j * size + i];
+    const lerp = (a: number, b: number, va: number, vb: number): number => (Math.abs(vb - va) < 1e-12 ? 0.5 : (level - va) / (vb - va));
+    // Edge endpoints are keyed so segments stitch into rings.
+    const segments: { a: { x: number; y: number }; b: { x: number; y: number } }[] = [];
+    for (let j = 0; j < size - 1; j++) {
+        for (let i = 0; i < size - 1; i++) {
+            const v0 = at(i, j);
+            const v1 = at(i + 1, j);
+            const v2 = at(i + 1, j + 1);
+            const v3 = at(i, j + 1);
+            let idx = 0;
+            if (v0 > level) idx |= 1;
+            if (v1 > level) idx |= 2;
+            if (v2 > level) idx |= 4;
+            if (v3 > level) idx |= 8;
+            if (idx === 0 || idx === 15) continue;
+            const top = { x: gx[i] + lerp(0, 1, v0, v1) * (gx[i + 1] - gx[i]), y: gy[j] };
+            const right = { x: gx[i + 1], y: gy[j] + lerp(0, 1, v1, v2) * (gy[j + 1] - gy[j]) };
+            const bottom = { x: gx[i] + lerp(0, 1, v3, v2) * (gx[i + 1] - gx[i]), y: gy[j + 1] };
+            const left = { x: gx[i], y: gy[j] + lerp(0, 1, v0, v3) * (gy[j + 1] - gy[j]) };
+            switch (idx) {
+                case 1:
+                case 14:
+                    segments.push({ a: left, b: top });
+                    break;
+                case 2:
+                case 13:
+                    segments.push({ a: top, b: right });
+                    break;
+                case 3:
+                case 12:
+                    segments.push({ a: left, b: right });
+                    break;
+                case 4:
+                case 11:
+                    segments.push({ a: right, b: bottom });
+                    break;
+                case 5:
+                    segments.push({ a: left, b: top });
+                    segments.push({ a: right, b: bottom });
+                    break;
+                case 6:
+                case 9:
+                    segments.push({ a: top, b: bottom });
+                    break;
+                case 7:
+                case 8:
+                    segments.push({ a: left, b: bottom });
+                    break;
+                case 10:
+                    segments.push({ a: top, b: right });
+                    segments.push({ a: left, b: bottom });
+                    break;
+            }
+        }
+    }
+    // Stitch segments into rings by consuming shared endpoints. A shared cell
+    // edge is computed identically on both sides, so endpoints match exactly.
+    const keyOf = (p: { x: number; y: number }): string => `${p.x.toFixed(6)},${p.y.toFixed(6)}`;
+    const remaining = [...segments];
+    const rings: { x: number; y: number }[][] = [];
+    while (remaining.length > 0) {
+        const first = remaining.shift()!;
+        const ring = [first.a, first.b];
+        let end = first.b;
+        let closed = false;
+        for (let guard = 0; guard < segments.length + 2; guard++) {
+            if (keyOf(end) === keyOf(first.a)) {
+                closed = true;
+                break;
+            }
+            const idx = remaining.findIndex((s) => keyOf(s.a) === keyOf(end) || keyOf(s.b) === keyOf(end));
+            if (idx < 0) break;
+            const seg = remaining.splice(idx, 1)[0];
+            const next = keyOf(seg.a) === keyOf(end) ? seg.b : seg.a;
+            ring.push(next);
+            end = next;
+        }
+        if (closed && ring.length >= 4) rings.push(ring.slice(0, -1));
+    }
+    return rings;
 }
 
 /** Whether a raw cell can be turned into a finite number (or a real category). */

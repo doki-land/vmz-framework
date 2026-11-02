@@ -861,7 +861,7 @@ export default class Chart {
         if (!this.spec) return out;
         if (this.spec.facetField) return out;
         const markKind = String(this.spec.mark);
-        if (markKind !== "line" && markKind !== "area" && markKind !== "bump" && markKind !== "slope" && markKind !== "streamgraph") return out;
+        if (markKind !== "line" && markKind !== "area" && markKind !== "bump" && markKind !== "slope" && markKind !== "streamgraph" && markKind !== "parallel") return out;
         for (const node of this._markNodes()) {
             // 折线/面积/雷达多边形都带 stroke；没有 stroke 的路径不可见也不出点标记。
             if (node.kind !== "path" || !node.hitRegion || !("polyline" in node.hitRegion)) continue;
@@ -1140,7 +1140,18 @@ export default class Chart {
         const markKind = String(this.spec.mark);
         const xEnc = this.spec.encoding.find((e) => e.channel === "x");
         const yEnc = this.spec.encoding.find((e) => e.channel === "y");
-        // sankey 节点不是 plan.marks（由链接派生），按前缀还原：名称 + 总流量。
+        // sankey / chord 的派生节点 id：名称 + 总流量（从原始行现算）。
+        if (id.startsWith("chord-group:")) {
+            const name = id.slice("chord-group:".length);
+            if (plan.stat) {
+                for (let i = 0; i < plan.stat.rowCount; i++) {
+                    if (String(readCell(plan.stat, "name", i)) === name) {
+                        return `${name} · 总量 ${formatCell(readCell(plan.stat, "total", i))}`;
+                    }
+                }
+            }
+            return name;
+        }
         if (id.startsWith("sankey-node:")) {
             const name = id.slice("sankey-node:".length);
             const sEnc = this.spec.encoding.find((e) => e.channel === "source");
@@ -1229,6 +1240,37 @@ export default class Chart {
                 }
                 if (typeof sv === "number" && typeof ev === "number") parts.push(`时长 ${formatCell(ev - sv)}`);
                 return parts.join(" · ");
+            }
+            if (markKind === "force") {
+                const degree = mark.channels.get("degree");
+                return `${mark.key} · 度 ${formatCell(typeof degree === "number" ? degree : null)}`;
+            }
+            if (markKind === "parallel") {
+                const dims = this.spec.dimensions ?? [];
+                const parts2: string[] = [];
+                if (mark.series !== null) parts2.push(mark.series);
+                for (const dim of dims) {
+                    parts2.push(`${dim}: ${formatCell(readCell(plan.resolvedData, dim, rowIndex))}`);
+                }
+                return parts2.join(" · ");
+            }
+            if (markKind === "hexbin" && plan.stat) {
+                const cx = readCell(plan.stat, "cx", rowIndex);
+                const cy = readCell(plan.stat, "cy", rowIndex);
+                const count = readCell(plan.stat, "count", rowIndex);
+                return `count: ${formatCell(count)} · 中心 (${formatCell(cx)}, ${formatCell(cy)})`;
+            }
+            if (markKind === "contour") {
+                const level = mark.channels.get("level");
+                return `密度 level: ${formatCell(typeof level === "number" ? level : null)}`;
+            }
+            if (markKind === "chord") {
+                const sEnc = this.spec.encoding.find((e) => e.channel === "source");
+                const tEnc = this.spec.encoding.find((e) => e.channel === "target");
+                const vEnc = this.spec.encoding.find((e) => e.channel === "value");
+                if (sEnc && tEnc && vEnc) {
+                    return `${formatCell(readCell(plan.resolvedData, sEnc.field, rowIndex))} → ${formatCell(readCell(plan.resolvedData, tEnc.field, rowIndex))} · ${formatCell(readCell(plan.resolvedData, vEnc.field, rowIndex))}`;
+                }
             }
             if (markKind === "boxplot" && plan.stat) {
                 const kind = String(readCell(plan.stat, "kind", rowIndex));

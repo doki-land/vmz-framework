@@ -6,3 +6,4 @@ export * from "./statistic.js";
 export * from "./compile.js";
 export * from "./scene.js";
 export * from "./theme.js";
+export * from "./geo.js";

@@ -212,6 +212,12 @@ function markOwnFrame(mark: string): boolean {
         case "gantt":
         case "tree":
         case "beeswarm":
+        case "force":
+        case "parallel":
+        case "hexbin":
+        case "contour":
+        case "chord":
+        case "geo":
             return true;
         default:
             return false;
@@ -266,6 +272,18 @@ function buildMarkPanel(
             return buildTree(plan, plot, theme, idPrefix);
         case "beeswarm":
             return buildBeeswarmFrame(plan, plot, seriesCategories, theme, idPrefix);
+        case "force":
+            return buildForce(plan, plot, theme, idPrefix);
+        case "parallel":
+            return buildParallel(plan, plot, seriesCategories, theme, idPrefix);
+        case "hexbin":
+            return buildHexbin(plan, plot, theme, idPrefix);
+        case "contour":
+            return buildContour(plan, plot, theme, idPrefix);
+        case "chord":
+            return buildChord(plan, plot, theme, idPrefix);
+        case "geo":
+            return buildGeo(plan, plot, theme, idPrefix);
         default:
             return buildCartesianPanel(plan, plot, seriesCategories, theme, idPrefix);
     }
@@ -3741,23 +3759,57 @@ function buildTree(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, id
     for (const r of roots) measure(r, 1);
     if (leafCount === 0) return [];
 
-    const depthW = maxDepth > 1 ? (plot.w - 20) / (maxDepth - 1) : 0;
-    const leafH = plot.h / Math.max(1, leafCount);
+    const layout = plan.spec.treeLayout ?? "tidy";
     const pos = new Map<string, { x: number; y: number }>();
-    let leafIdx = 0;
-    const place = (key: string, depth: number): void => {
-        const children = childrenOf.get(key) ?? [];
-        let y: number;
-        if (children.length === 0) {
-            y = plot.y + leafH * (leafIdx + 0.5);
-            leafIdx++;
-        } else {
-            for (const c of children) place(c, depth + 1);
-            y = (pos.get(children[0])!.y + pos.get(children[children.length - 1])!.y) / 2;
-        }
-        pos.set(key, { x: plot.x + depth * depthW, y });
-    };
-    for (const r of roots) place(r, 0);
+    if (layout === "radial") {
+        // Polar variant: depth → radius, leaf order → angle (twelve o'clock,
+        // clockwise), parents at the mid-angle of their children.
+        const cx = plot.x + plot.w / 2;
+        const cy = plot.y + plot.h / 2;
+        const ringW = maxDepth > 1 ? Math.min(plot.w, plot.h) / 2 / (maxDepth - 1) : Math.min(plot.w, plot.h) / 2;
+        let leafIdx = 0;
+        const place = (key: string, depth: number): number => {
+            const children = childrenOf.get(key) ?? [];
+            let angle: number;
+            if (children.length === 0) {
+                angle = PIE_START_ANGLE + (leafIdx / leafCount) * Math.PI * 2;
+                leafIdx++;
+            } else {
+                let sumCos = 0;
+                let sumSin = 0;
+                for (const c of children) {
+                    const a = place(c, depth + 1);
+                    sumCos += Math.cos(a);
+                    sumSin += Math.sin(a);
+                }
+                angle = Math.atan2(sumSin, sumCos);
+            }
+            const r = depth * ringW;
+            pos.set(key, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+            return angle;
+        };
+        for (const r of roots) place(r, 0);
+    } else {
+        const depthW = maxDepth > 1 ? (plot.w - 20) / (maxDepth - 1) : 0;
+        const leafH = plot.h / Math.max(1, leafCount);
+        let leafIdx = 0;
+        const place = (key: string, depth: number): void => {
+            const children = childrenOf.get(key) ?? [];
+            let y: number;
+            if (children.length === 0) {
+                y = plot.y + leafH * (leafIdx + 0.5);
+                leafIdx++;
+            } else {
+                for (const c of children) place(c, depth + 1);
+                y = (pos.get(children[0])!.y + pos.get(children[children.length - 1])!.y) / 2;
+            }
+            // Dendrogram aligns every leaf on the deepest column; tidy packs
+            // internal nodes at their own depth.
+            const column = layout === "dendrogram" && children.length === 0 ? maxDepth - 1 : depth;
+            pos.set(key, { x: plot.x + column * depthW, y });
+        };
+        for (const r of roots) place(r, 0);
+    }
 
     // Color groups: single root → its children are the groups.
     const colorRoots = roots.length === 1 ? (childrenOf.get(roots[0]) ?? roots) : roots;
@@ -3806,12 +3858,12 @@ function buildTree(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, id
             fill: { color },
             ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
         });
-        const label = truncateToWidth(mark.key, Math.max(24, depthW - 14), theme.labelFont.sizePx);
+        const label = truncateToWidth(mark.key, layout === "radial" ? 72 : Math.max(24, (maxDepth > 1 ? (plot.w - 20) / (maxDepth - 1) : plot.w) - 14), theme.labelFont.sizePx);
         if (label !== "") {
             const w = estimateTextSize(label, theme.labelFont.sizePx).width;
             // Deepest nodes would overflow the right edge — flip their labels
-            // to the left side of the dot.
-            const fitsRight = p.x + 8 + w <= plot.x + plot.w;
+            // to the left side of the dot. Radial labels flip by angle.
+            const fitsRight = layout === "radial" ? p.x <= plot.x + plot.w / 2 : p.x + 8 + w <= plot.x + plot.w;
             nodes.push({
                 kind: "text",
                 id: `${idPrefix}tree:label:${mark.key}`,
@@ -3822,6 +3874,465 @@ function buildTree(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, id
                 color: theme.labelColor,
             });
         }
+    }
+    return nodes;
+}
+
+// ─── Force / parallel / hexbin / contour / chord ─────────────────────────
+
+/** Force graph: nodes and links from the compile-time deterministic layout
+ *  (fixed 300 iterations, seeded from the edge fingerprint). */
+function buildForce(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    const posOf = new Map<string, { x: number; y: number; degree: number }>();
+    for (const mark of plan.marks) {
+        const x = Number(mark.channels.get("x"));
+        const y = Number(mark.channels.get("y"));
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        posOf.set(mark.key, {
+            x: plot.x + x * plot.w,
+            y: plot.y + y * plot.h,
+            degree: Number(mark.channels.get("degree") ?? 0),
+        });
+    }
+    const nodes: SemanticNode[] = [];
+    // Links first — nodes paint on top.
+    if (stat) {
+        const sCol = column(stat, "source");
+        const tCol = column(stat, "target");
+        if (sCol && tCol) {
+            for (let i = 0; i < stat.rowCount; i++) {
+                const a = posOf.get(String(sCol.values[i]));
+                const b = posOf.get(String(tCol.values[i]));
+                if (!a || !b) continue;
+                nodes.push({
+                    kind: "path",
+                    id: `${idPrefix}force:edge:${i}`,
+                    role: "chart.grid",
+                    path: {
+                        commands: [
+                            { kind: "move", to: { x: a.x, y: a.y } },
+                            { kind: "line", to: { x: b.x, y: b.y } },
+                        ],
+                    },
+                    stroke: { color: theme.gridStroke ?? theme.axisStroke, width: 1 },
+                });
+            }
+        }
+    }
+    const showLabels = plan.marks.length <= 40;
+    for (const mark of plan.marks) {
+        const p = posOf.get(mark.key);
+        if (!p) continue;
+        const r = 3 + Math.min(4, p.degree * 0.8);
+        nodes.push({
+            kind: "ellipse",
+            id: `force:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            cx: p.x,
+            cy: p.y,
+            rx: r,
+            ry: r,
+            fill: { color: theme.markFill },
+            ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
+        });
+        if (showLabels) {
+            const label = truncateToWidth(mark.key, 72, theme.labelFont.sizePx);
+            const w = estimateTextSize(label, theme.labelFont.sizePx).width;
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}force:label:${mark.key}`,
+                role: "chart.axis",
+                text: label,
+                font: theme.labelFont,
+                anchor: { x: p.x + r + 3 + w / 2, y: p.y },
+                color: theme.labelColor,
+            });
+        }
+    }
+    return nodes;
+}
+
+/** Parallel coordinates: k independent axes, one polyline per row. */
+function buildParallel(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+    idPrefix: string,
+): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const dimCol = column(stat, "dim");
+    const loCol = column(stat, "lo");
+    const hiCol = column(stat, "hi");
+    if (!dimCol || !loCol || !hiCol) return [];
+    const dims: { dim: string; lo: number; hi: number }[] = [];
+    for (let i = 0; i < stat.rowCount; i++) {
+        dims.push({ dim: String(dimCol.values[i]), lo: Number(loCol.values[i]), hi: Number(hiCol.values[i]) });
+    }
+    const k = dims.length;
+    if (k < 2) return [];
+    const axisX = (i: number): number => plot.x + (i * plot.w) / (k - 1);
+    const projectDim = (i: number, v: number): number => {
+        const span = dims[i].hi - dims[i].lo;
+        return span > 0 ? plot.y + plot.h - ((v - dims[i].lo) / span) * plot.h : plot.y + plot.h / 2;
+    };
+    const nodes: SemanticNode[] = [];
+    // Axes with real per-dimension ticks (lo / mid / hi).
+    dims.forEach((d, i) => {
+        const x = axisX(i);
+        nodes.push({
+            kind: "path",
+            id: `${idPrefix}parallel:axis:${d.dim}`,
+            role: "chart.axis",
+            path: {
+                commands: [
+                    { kind: "move", to: { x, y: plot.y } },
+                    { kind: "line", to: { x, y: plot.y + plot.h } },
+                ],
+            },
+            stroke: axisStroke(theme),
+        });
+        const ticks = [d.lo, (d.lo + d.hi) / 2, d.hi];
+        for (const t of ticks) {
+            const label = formatTickLabel(t, 2);
+            const w = estimateTextSize(label, theme.labelFont.sizePx).width;
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}parallel:tick:${d.dim}:${label}`,
+                role: "chart.axis",
+                text: label,
+                font: theme.labelFont,
+                anchor: { x: x - LABEL_GAP - w / 2, y: projectDim(i, t) },
+                color: theme.labelColor,
+            });
+        }
+        nodes.push({
+            kind: "text",
+            id: `${idPrefix}parallel:dim:${d.dim}`,
+            role: "chart.axis",
+            text: truncateToWidth(d.dim, Math.max(40, plot.w / k - 8), theme.labelFont.sizePx),
+            font: theme.labelFont,
+            anchor: { x, y: plot.y - LABEL_GAP - theme.labelFont.sizePx / 2 },
+            color: theme.labelColor,
+        });
+    });
+    // One polyline per row.
+    for (const mark of plan.marks) {
+        const pts: { x: number; y: number }[] = [];
+        for (let i = 0; i < k; i++) {
+            const col = column(plan.resolvedData, dims[i].dim);
+            const v = col ? col.values[mark.rowIndex] : null;
+            if (typeof v !== "number" || !Number.isFinite(v)) {
+                pts.length = 0;
+                break;
+            }
+            pts.push({ x: axisX(i), y: projectDim(i, v) });
+        }
+        if (pts.length === 0) continue;
+        const color = seriesColor(theme, seriesCategories, mark.series);
+        nodes.push({
+            kind: "path",
+            id: `parallel:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            path: {
+                commands: [
+                    { kind: "move", to: pts[0] },
+                    ...pts.slice(1).map((p) => ({ kind: "line" as const, to: p })),
+                ],
+            },
+            hitRegion: { polyline: { points: pts, keys: pts.map(() => mark.key) } },
+            stroke: { color: { ...color, a: 0.7 }, width: 1.5 },
+        });
+    }
+    return nodes;
+}
+
+/** Hexbin: hexagonal aggregation cells colored by count on the ramp. */
+function buildHexbin(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const cxCol = column(stat, "cx");
+    const cyCol = column(stat, "cy");
+    const countCol = column(stat, "count");
+    const radiusCol = column(stat, "radius");
+    if (!cxCol || !cyCol || !countCol || !radiusCol) return [];
+    const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    if (!xEnc || !yEnc) return [];
+    const xScale = pixelScale(plan.scales.get("x"), [plot.x, plot.x + plot.w]);
+    const yScale = pixelScale(plan.scales.get("y"), [plot.y + plot.h, plot.y]);
+    if (!xScale || xScale.kind !== "linear" || !yScale || yScale.kind !== "linear") return [];
+    const maxCount = Math.max(1, ...Array.from({ length: stat.rowCount }, (_, i) => Number(countCol.values[i])));
+    const xSpan = xScale.domain[1] - xScale.domain[0] || 1;
+    const ySpan = yScale.domain[1] - yScale.domain[0] || 1;
+
+    const nodes: SemanticNode[] = [];
+    nodes.push(buildAxis(`${idPrefix}x-axis`, plot, xScale, "horizontal", theme));
+    nodes.push(buildAxis(`${idPrefix}y-axis`, plot, yScale, "vertical", theme));
+    for (const mark of plan.marks) {
+        const i = mark.rowIndex;
+        const cx = project(xScale, Number(cxCol.values[i]));
+        const cy = project(yScale, Number(cyCol.values[i]));
+        if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+        const radius = Number(radiusCol.values[i]);
+        const rx = (radius / xSpan) * plot.w;
+        const ry = (radius / ySpan) * plot.h;
+        const pts: { x: number; y: number }[] = [];
+        for (let s = 0; s < 6; s++) {
+            const a = (Math.PI / 3) * s + Math.PI / 6;
+            pts.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+        }
+        const count = Number(countCol.values[i]);
+        nodes.push({
+            kind: "path",
+            id: `hexbin:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            path: {
+                commands: [
+                    { kind: "move", to: pts[0] },
+                    ...pts.slice(1).map((p) => ({ kind: "line" as const, to: p })),
+                    { kind: "close" },
+                ],
+            },
+            hitRegion: { polygon: { points: pts } },
+            fill: { color: sampleRamp(theme.heatmapRamp, count / maxCount) },
+        });
+    }
+    return nodes;
+}
+
+/** Contour: marching-squares rings from the compile-time density grid,
+ *  stroked by level on the ramp. */
+function buildContour(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const levelCol = column(stat, "level");
+    const pxCol = column(stat, "px");
+    const pyCol = column(stat, "py");
+    if (!levelCol || !pxCol || !pyCol) return [];
+    const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    if (!xEnc || !yEnc) return [];
+    const xScale = pixelScale(plan.scales.get("x"), [plot.x, plot.x + plot.w]);
+    const yScale = pixelScale(plan.scales.get("y"), [plot.y + plot.h, plot.y]);
+    if (!xScale || !yScale) return [];
+    const levels = plan.marks.map((m) => Number(m.channels.get("level")));
+    const maxLevel = Math.max(1e-12, ...levels);
+
+    const nodes: SemanticNode[] = [];
+    nodes.push(buildAxis(`${idPrefix}x-axis`, plot, xScale, "horizontal", theme));
+    nodes.push(buildAxis(`${idPrefix}y-axis`, plot, yScale, "vertical", theme));
+    plan.marks.forEach((mark, mi) => {
+        const level = Number(mark.channels.get("level"));
+        // Ring point rows run from this mark's firstStatRow to the next
+        // mark's (ring rows are grouped in mark order).
+        const end = mi + 1 < plan.marks.length ? plan.marks[mi + 1].rowIndex : stat.rowCount;
+        const ringPts: { x: number; y: number }[] = [];
+        for (let i = mark.rowIndex; i < end; i++) {
+            ringPts.push({ x: project(xScale, Number(pxCol.values[i])), y: project(yScale, Number(pyCol.values[i])) });
+        }
+        if (ringPts.length < 3 || !ringPts.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) return;
+        nodes.push({
+            kind: "path",
+            id: `contour:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            path: {
+                commands: [
+                    { kind: "move", to: ringPts[0] },
+                    ...ringPts.slice(1).map((p) => ({ kind: "line" as const, to: p })),
+                    { kind: "close" },
+                ],
+            },
+            hitRegion: { polygon: { points: ringPts } },
+            stroke: { color: sampleRamp(theme.heatmapRamp, level / maxLevel), width: 1.5 },
+        });
+    });
+    return nodes;
+}
+
+/** Chord: group arcs on the rim with quadratic ribbons through the center. */
+function buildChord(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const nameCol = column(stat, "name");
+    const a0Col = column(stat, "a0");
+    const a1Col = column(stat, "a1");
+    const totalCol = column(stat, "total");
+    if (!nameCol || !a0Col || !a1Col || !totalCol) return [];
+    const sEnc = plan.spec.encoding.find((e) => e.channel === "source");
+    const tEnc = plan.spec.encoding.find((e) => e.channel === "target");
+    const sCol = sEnc ? column(plan.resolvedData, sEnc.field) : undefined;
+    const tCol = tEnc ? column(plan.resolvedData, tEnc.field) : undefined;
+    const cx = plot.x + plot.w / 2;
+    const cy = plot.y + plot.h / 2;
+    const r = Math.max(0, Math.min(plot.w, plot.h) / 2 - 40);
+    if (r <= 0) return [];
+    const rRibbon = r * 0.92;
+
+    const nodes: SemanticNode[] = [];
+    const groups: { name: string; a0: number; a1: number; total: number }[] = [];
+    for (let i = 0; i < stat.rowCount; i++) {
+        groups.push({ name: String(nameCol.values[i]), a0: Number(a0Col.values[i]), a1: Number(a1Col.values[i]), total: Number(totalCol.values[i]) });
+    }
+    // Group arcs on the rim.
+    groups.forEach((g, gi) => {
+        const color = seriesColor(theme, groups.map((x) => x.name), g.name);
+        nodes.push({
+            kind: "path",
+            id: `chord-group:${g.name}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["group", g.name] },
+            path: { commands: sliceCommands(cx, cy, r, r * 0.86, g.a0, g.a1) },
+            fill: { color },
+            hitRegion: { sector: { cx, cy, rOuter: r, rInner: r * 0.86, a0: g.a0, a1: g.a1 } },
+        });
+        void gi;
+        const mid = (g.a0 + g.a1) / 2;
+        const label = truncateToWidth(g.name, 72, theme.labelFont.sizePx);
+        const w = estimateTextSize(label, theme.labelFont.sizePx).width;
+        const lx = cx + (r + 14) * Math.cos(mid);
+        const ly = cy + (r + 14) * Math.sin(mid);
+        nodes.push({
+            kind: "text",
+            id: `${idPrefix}chord:label:${g.name}`,
+            role: "chart.axis",
+            text: label,
+            font: theme.labelFont,
+            anchor: { x: lx + (Math.cos(mid) >= 0 ? w / 4 : -w / 4), y: ly },
+            color: theme.labelColor,
+        });
+    });
+    // Ribbons: arc span → center control → target span.
+    const groupColor = new Map(groups.map((g) => [g.name, seriesColor(theme, groups.map((x) => x.name), g.name)]));
+    const arcPt = (a: number): { x: number; y: number } => ({ x: cx + rRibbon * Math.cos(a), y: cy + rRibbon * Math.sin(a) });
+    for (const mark of plan.marks) {
+        const sa0 = Number(mark.channels.get("sa0"));
+        const sa1 = Number(mark.channels.get("sa1"));
+        const ta0 = Number(mark.channels.get("ta0"));
+        const ta1 = Number(mark.channels.get("ta1"));
+        if (![sa0, sa1, ta0, ta1].every(Number.isFinite)) continue;
+        const sName = sCol ? String(sCol.values[mark.rowIndex]) : "";
+        const tName = tCol ? String(tCol.values[mark.rowIndex]) : "";
+        const color = groupColor.get(sName) ?? theme.markFill;
+        const commands: PathCommand[] = [
+            { kind: "move", to: arcPt(sa0) },
+            { kind: "arc", rx: rRibbon, ry: rRibbon, xRot: 0, largeArc: sa1 - sa0 > Math.PI, sweep: true, to: arcPt(sa1) },
+            { kind: "quadratic", cp: { x: cx, y: cy }, to: arcPt(ta0) },
+            { kind: "arc", rx: rRibbon, ry: rRibbon, xRot: 0, largeArc: ta1 - ta0 > Math.PI, sweep: true, to: arcPt(ta1) },
+            { kind: "quadratic", cp: { x: cx, y: cy }, to: arcPt(sa0) },
+            { kind: "close" },
+        ];
+        // Hit polygon: sample both arcs and both quadratic curves.
+        const outline: { x: number; y: number }[] = [];
+        for (let i = 0; i <= 6; i++) outline.push(arcPt(sa0 + ((sa1 - sa0) * i) / 6));
+        for (let i = 0; i <= 6; i++) outline.push(quadraticAt(arcPt(sa1), { x: cx, y: cy }, arcPt(ta0), i / 6));
+        for (let i = 0; i <= 6; i++) outline.push(arcPt(ta0 + ((ta1 - ta0) * i) / 6));
+        for (let i = 0; i <= 6; i++) outline.push(quadraticAt(arcPt(ta1), { x: cx, y: cy }, arcPt(sa0), i / 6));
+        nodes.push({
+            kind: "path",
+            id: `chord:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            path: { commands },
+            hitRegion: { polygon: { points: outline } },
+            fill: { color: { ...color, a: theme.sankeyLinkOpacity } },
+        });
+    }
+    return nodes;
+}
+
+/** Point on a quadratic bezier at t. */
+function quadraticAt(p0: { x: number; y: number }, c: { x: number; y: number }, p1: { x: number; y: number }, t: number): { x: number; y: number } {
+    const u = 1 - t;
+    return {
+        x: u * u * p0.x + 2 * u * t * c.x + t * t * p1.x,
+        y: u * u * p0.y + 2 * u * t * c.y + t * t * p1.y,
+    };
+}
+
+/** Geo choropleth: projected basemap rings from the compile-time stat,
+ *  regions colored by value on the ramp, no-data regions on the track. */
+function buildGeo(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const nameCol = column(stat, "name");
+    const ringCol = column(stat, "ring");
+    const pxCol = column(stat, "px");
+    const pyCol = column(stat, "py");
+    if (!nameCol || !ringCol || !pxCol || !pyCol) return [];
+    const cScale = plan.scales.get("color");
+    if (!cScale || cScale.kind !== "linear") return [];
+    const [d0, d1] = cScale.domain;
+    const colorOf = (v: number): RGBA => sampleRamp(theme.heatmapRamp, d1 > d0 ? (v - d0) / (d1 - d0) : 1);
+
+    // Value per region from the data rows (region/color encodings).
+    const rEnc = plan.spec.encoding.find((e) => e.channel === "region");
+    const cEnc = plan.spec.encoding.find((e) => e.channel === "color");
+    const rCol = rEnc ? column(plan.resolvedData, rEnc.field) : undefined;
+    const cCol = cEnc ? column(plan.resolvedData, cEnc.field) : undefined;
+    const valueOf = new Map<string, number>();
+    if (rCol && cCol) {
+        for (const mark of plan.marks) {
+            const v = cCol.values[mark.rowIndex];
+            if (typeof v !== "number" || !Number.isFinite(v)) continue;
+            const feature = mark.channels.get("feature");
+            valueOf.set(typeof feature === "string" ? feature : String(rCol.values[mark.rowIndex]), v);
+        }
+    }
+    // Group stat point rows into rings: the ring column is a global sequential
+    // index per ring, so a change opens a new ring; features regroup by name.
+    interface GRing {
+        pts: { x: number; y: number }[];
+    }
+    const ringsByName = new Map<string, GRing[]>();
+    let lastRing = -1;
+    for (let i = 0; i < stat.rowCount; i++) {
+        const name = String(nameCol.values[i]);
+        const ringIndex = Number(ringCol.values[i]);
+        if (ringIndex !== lastRing) {
+            lastRing = ringIndex;
+            const list = ringsByName.get(name);
+            if (list) list.push({ pts: [] });
+            else ringsByName.set(name, [{ pts: [] }]);
+        }
+        const list = ringsByName.get(name)!;
+        const x = plot.x + Number(pxCol.values[i]) * plot.w;
+        const y = plot.y + Number(pyCol.values[i]) * plot.h;
+        list[list.length - 1].pts.push({ x, y });
+    }
+
+    const nodes: SemanticNode[] = [];
+    for (const [name, rings] of ringsByName) {
+        if (rings.some((r) => r.pts.length < 3)) continue;
+        const commands: PathCommand[] = [];
+        for (const ring of rings) {
+            commands.push({ kind: "move", to: ring.pts[0] });
+            for (const p of ring.pts.slice(1)) commands.push({ kind: "line", to: p });
+            commands.push({ kind: "close" });
+        }
+        const value = valueOf.get(name);
+        // Hit polygon: the largest ring of the feature.
+        const outer = rings.reduce((a, b) => (b.pts.length > a.pts.length ? b : a));
+        const markKey = plan.marks.find((m) => rCol && String(rCol.values[m.rowIndex]) === name)?.key;
+        nodes.push({
+            kind: "path",
+            id: `geo:${markKey ?? name}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", markKey ?? name] },
+            path: { commands },
+            hitRegion: { polygon: { points: outer.pts } },
+            fill: { color: value !== undefined ? colorOf(value) : theme.trackColor },
+            stroke: { color: theme.pointStroke ?? theme.trackColor, width: 0.5 },
+        });
+    }
+    if (!plan.spec.spark) {
+        nodes.push(...buildHeatmapRampLegend(plot, cScale.domain, theme, idPrefix, "right"));
     }
     return nodes;
 }
