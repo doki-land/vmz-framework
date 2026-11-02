@@ -3,6 +3,6 @@ import markdownIt from '@vmz/plugin-markdown-it';
 import shiki from '@vmz/plugin-shiki';
 
 export default defineConfig({
-    plugins: [markdownIt(), shiki()],
+    plugins: [markdownIt(), shiki({ textmate: 'vmz-textmate/shiki' })],
     engines: { code: 'shiki', markdown: 'markdown-it' },
 });

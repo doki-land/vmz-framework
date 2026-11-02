@@ -36,16 +36,7 @@
         "@vmz/plugin": "workspace:*"
     },
     "peerDependencies": {
-        "shiki": ">=3",
-        "vmz-textmate": "*"
-    },
-    "peerDependenciesMeta": {
-        "shiki": {
-            "optional": false
-        },
-        "vmz-textmate": {
-            "optional": true
-        }
+        "shiki": ">=3"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",

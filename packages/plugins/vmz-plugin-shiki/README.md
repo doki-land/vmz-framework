@@ -31,12 +31,13 @@ bundled dependency, so install it alongside the plugin:
 pnpm add @vmz/plugin-shiki shiki
 ```
 
-The default `vmz-textmate/shiki` path also needs `shiki/core`; installing `@shikijs/*` transitively through
-`vmz-textmate` does not replace the application-level `shiki` install.
+The runtime loads plain `shiki` by default (a literal dynamic import that client bundles can vendor). A TextMate
+adapter adds custom grammars on top; installing `@shikijs/*` transitively through an adapter does not replace the
+application-level `shiki` install.
 
 ## Third-party TextMate grammar (VMZ-2)
 
-By default the runtime loads `vmz-textmate/shiki`. For other languages (e.g. VOS), pass a peer adapter:
+Custom grammars (VMZ, VOS, …) come from an explicit adapter module id that the host must resolve:
 
 ```ts
 import shiki from '@vmz/plugin-shiki';
@@ -46,6 +47,9 @@ export default defineConfig({
   engines: { code: 'shiki' },
 });
 ```
+
+The adapter specifier is host-resolved (serve-host resolve hooks on Node, an import map or vendor copy in the
+browser) and never vendored by the packer; when it fails to load, the runtime falls back to plain `shiki`.
 
 The plugin writes `dist/_vmz/plugin-shiki.config.json`; the runtime reads it in SSR (`VMZ_DIST`) and in the browser (`fetch`).
 

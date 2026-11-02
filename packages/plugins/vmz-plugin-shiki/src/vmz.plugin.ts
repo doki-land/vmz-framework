@@ -7,20 +7,18 @@ const source = loadPluginSource(import.meta.url, '../components/Shiki.vmz');
 
 export type ShikiPluginOptions = {
     /**
-     * TextMate Shiki adapter module id.
-     * Default `vmz-textmate/shiki`; VOS uses `@game-gpt/vos-textmate/shiki`.
+     * TextMate Shiki adapter module id (e.g. `vmz-textmate/shiki`). Explicit
+     * opt-in: the host must resolve this specifier (it is not an npm
+     * dependency of the plugin). Omit it to use the plain Shiki path.
      */
     textmate?: string;
     /** Default Shiki themes for prewarm. */
     themes?: string[];
 };
 
-const DEFAULT_TEXTMATE = 'vmz-textmate/shiki';
-
 function writeRuntimeSidecar(outDir: string, opts: ShikiPluginOptions) {
-    const textmate = opts.textmate ?? DEFAULT_TEXTMATE;
     const payload = {
-        textmate,
+        ...(opts.textmate ? { textmate: opts.textmate } : {}),
         ...(opts.themes?.length ? { themes: opts.themes } : {}),
     };
     const dir = path.join(outDir, '_vmz');
@@ -42,7 +40,7 @@ function writeRuntimeSidecar(outDir: string, opts: ShikiPluginOptions) {
  */
 export function shiki(options: ShikiPluginOptions = {}) {
     configureShiki({
-        textmate: options.textmate ?? DEFAULT_TEXTMATE,
+        textmate: options.textmate,
         themes: options.themes,
     });
     // Warm the highlighter at config-load time (the same process later runs the
@@ -62,7 +60,7 @@ export function shiki(options: ShikiPluginOptions = {}) {
                 writeRuntimeSidecar(ctx.outDir, options);
                 return {
                     stage: 'workspace_resolve',
-                    cacheKey: `@vmz/plugin-shiki:Shiki.vmz:${source.contentHash.slice(0, 12)}:${options.textmate ?? DEFAULT_TEXTMATE}`,
+                    cacheKey: `@vmz/plugin-shiki:Shiki.vmz:${source.contentHash.slice(0, 12)}:${options.textmate ?? 'generic'}`,
                     items: [
                         {
                             id: 'component-shiki',

@@ -6,13 +6,17 @@
 import type { Highlighter, ShikiTransformer } from 'shiki';
 
 export type ShikiRuntimeConfig = {
-    /** Shiki + TextMate adapter module (default `vmz-textmate/shiki`). */
+    /**
+     * TextMate Shiki adapter module id (e.g. `vmz-textmate/shiki`). Explicit
+     * opt-in: the adapter package is host-visible (not an npm dependency of
+     * this plugin), so the host must guarantee resolvability — serve-host
+     * resolve hooks on Node, an import map or vendor copy in the browser.
+     */
     textmate?: string;
-    /** Default themes passed to the textmate highlighter factory. */
+    /** Default themes passed to the highlighter factory. */
     themes?: string[];
 };
 
-const DEFAULT_TEXTMATE = 'vmz-textmate/shiki';
 const DEFAULT_THEME = 'vitesse-dark';
 const DEFAULT_LANG = 'text';
 
@@ -114,17 +118,18 @@ async function resolveRuntimeConfig(): Promise<void> {
     configResolved = true;
 }
 
-function textmateSpec(): string {
-    return config.textmate || DEFAULT_TEXTMATE;
+function textmateSpec(): string | null {
+    return config.textmate || null;
 }
 
 async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighter | null> {
     const spec = textmateSpec();
+    if (!spec) return null;
     try {
-        // Default adapter stays a literal specifier so client chunks vendor it;
-        // a custom `textmate` module id is an explicit escape hatch — the host
-        // (serve-host resolve hooks, import map) must make it resolvable.
-        const mod = (spec === DEFAULT_TEXTMATE ? await import('vmz-textmate/shiki') : await import(/* webpackIgnore: true */ spec)) as {
+        // The textmate adapter is an explicit opt-in module id resolved by the
+        // host (serve-host resolve hooks, import map), never vendored by pack —
+        // the generic path below is the pack-visible default.
+        const mod = (await import(/* webpackIgnore: true */ spec)) as {
             createVmzHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
             createHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
             default?: { createVmzHighlighter?: (opts: { themes?: string[] }) => Promise<CodeHighlighter> };

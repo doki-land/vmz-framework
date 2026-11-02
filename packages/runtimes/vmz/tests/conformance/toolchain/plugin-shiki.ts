@@ -63,6 +63,25 @@ if (!fs.existsSync(sidecar)) fail('missing _vmz/plugin-shiki.config.json');
 const side = JSON.parse(fs.readFileSync(sidecar, 'utf8'));
 if (side.textmate !== pathToFileURL(customTextmate).href) fail('sidecar textmate mismatch');
 
+console.log('plugin-shiki: default sidecar omits textmate…');
+// The textmate adapter is explicit opt-in: a bare `shiki()` must not leak a
+// default adapter id into the runtime config (it is not an npm dependency of
+// the plugin and would fail hard under pack resolution).
+const outDirDefault = path.join(tmp, 'dist-default');
+fs.mkdirSync(outDirDefault, { recursive: true });
+resetShikiRuntimeForTests();
+const plainPlugin = shiki({});
+await plainPlugin.contribute?.({
+    project: tmp,
+    outDir: outDirDefault,
+    stage: 'workspace_resolve',
+    protocol: '0.1.0',
+    packages: [],
+    engines: { code: 'shiki' },
+});
+const sideDefault = JSON.parse(fs.readFileSync(path.join(outDirDefault, '_vmz', 'plugin-shiki.config.json'), 'utf8'));
+if ('textmate' in sideDefault) fail(`default sidecar must not carry textmate: ${JSON.stringify(sideDefault)}`);
+
 process.env.VMZ_DIST = outDir;
 resetShikiRuntimeForTests();
 configureShiki({});
