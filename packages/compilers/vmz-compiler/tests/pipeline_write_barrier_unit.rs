@@ -72,6 +72,104 @@ export default class Demo {
 }
 
 #[test]
+fn wraps_array_mutator_args_in_one_array() {
+    let src = r#"
+export default class Demo {
+  tags = [];
+  cells = [];
+  groups: string[][] = [];
+  add(tag: { id: string }) {
+    this.tags.push(tag);
+  }
+  insert(i: number, cell: { id: string }) {
+    this.cells.splice(i + 1, 0, cell);
+  }
+  drop() {
+    this.tags.pop();
+  }
+  nested(i: number, x: string) {
+    this.groups[i].push(x);
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["tags", "cells", "groups"]));
+    assert!(
+        out.source.contains("__vmzArrayMutate(this, \"tags\", [], \"push\", [tag])"),
+        "push arg must be an array literal:\n{}",
+        out.source
+    );
+    assert!(
+        out.source.contains("__vmzArrayMutate(this, \"cells\", [], \"splice\", [i + 1, 0, cell])"),
+        "splice args must stay one array literal:\n{}",
+        out.source
+    );
+    assert!(
+        out.source.contains("__vmzArrayMutate(this, \"tags\", [], \"pop\", [])"),
+        "zero-arg mutator passes an explicit empty array:\n{}",
+        out.source
+    );
+    assert!(
+        out.source.contains("__vmzArrayMutate(this, \"groups\", [i], \"push\", [x])"),
+        "nested array mutator keeps a live index and array args:\n{}",
+        out.source
+    );
+}
+
+#[test]
+fn renders_computed_root_index_as_live_expression() {
+    let src = r#"
+export default class Demo {
+  cells = [{ id: "a", text: "x" }];
+  patch(i: number, v: { id: string; text: string }) {
+    this.cells[i] = v;
+  }
+  bump(i: number) {
+    this.cells[i]++;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["cells"]));
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"cells\", [i], v)"),
+        "computed index must stay a live expression:\n{}",
+        out.source
+    );
+    assert!(
+        out.source.contains("__vmzWritePathCompound(this, \"cells\", [i], \"+\", 1)"),
+        "computed index update must stay a live expression:\n{}",
+        out.source
+    );
+    assert!(
+        !out.source.contains("[\"i\"]"),
+        "computed index must not freeze into a string literal:\n{}",
+        out.source
+    );
+}
+
+#[test]
+fn keeps_two_segment_object_paths_off_the_array_item_fast_path() {
+    let src = r#"
+export default class Demo {
+  user = { address: { city: "a" } };
+  move(city: string) {
+    this.user.address.city = city;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["user"]));
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"user\", [\"address\", \"city\"], city)"),
+        "two static segments are an object path:\n{}",
+        out.source
+    );
+    assert!(
+        !out.source.contains("__vmzWritePathItem"),
+        "object paths must not lower to the array item helper:\n{}",
+        out.source
+    );
+}
+
+#[test]
 fn rewrites_static_index_leaf() {
     let src = r#"
 export default class Demo {

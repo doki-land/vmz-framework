@@ -17,11 +17,34 @@ enum OakBarrierKind {
     Mutator { method: String, args: std::ops::Range<usize> },
 }
 
+/// Path segment within an owned field. Static segments come from dot access and
+/// render as string literals. Dynamic segments come from computed access and
+/// must render as live expressions — quoting them would freeze the source text
+/// (`this.cells[i]` must index by the runtime value of `i`, not the key `"i"`).
+#[derive(Debug, Clone)]
+enum Seg {
+    Static(String),
+    Dynamic(String),
+}
+
+impl Seg {
+    fn render(&self) -> String {
+        match self {
+            Seg::Static(name) => format!("{name:?}"),
+            Seg::Dynamic(expr) => expr.clone(),
+        }
+    }
+}
+
+fn render_path(segments: &[Seg]) -> String {
+    segments.iter().map(Seg::render).collect::<Vec<_>>().join(", ")
+}
+
 #[derive(Debug, Clone)]
 struct OakBarrierHit {
     span: std::ops::Range<usize>,
     root: String,
-    segments: Vec<String>,
+    segments: Vec<Seg>,
     kind: OakBarrierKind,
 }
 
@@ -55,7 +78,7 @@ fn collect_statements(
     statements: &[Statement],
     source: &str,
     owned: &HashSet<String>,
-    aliases: &mut HashMap<String, (String, Vec<String>)>,
+    aliases: &mut HashMap<String, (String, Vec<Seg>)>,
     hits: &mut Vec<OakBarrierHit>,
 ) {
     for statement in statements {
@@ -118,7 +141,7 @@ fn collect_statement(
     statement: &Statement,
     source: &str,
     owned: &HashSet<String>,
-    aliases: &mut HashMap<String, (String, Vec<String>)>,
+    aliases: &mut HashMap<String, (String, Vec<Seg>)>,
     hits: &mut Vec<OakBarrierHit>,
 ) {
     collect_statements(std::slice::from_ref(statement), source, owned, aliases, hits);
@@ -128,7 +151,7 @@ fn collect_expression(
     expression: &Expression,
     source: &str,
     owned: &HashSet<String>,
-    aliases: &mut HashMap<String, (String, Vec<String>)>,
+    aliases: &mut HashMap<String, (String, Vec<Seg>)>,
     hits: &mut Vec<OakBarrierHit>,
 ) {
     match expression.kind.as_ref() {
@@ -217,9 +240,9 @@ fn static_member(expression: &Expression) -> Option<(&Expression, String)> {
 fn owned_path(
     expression: &Expression,
     owned: &HashSet<String>,
-    aliases: &HashMap<String, (String, Vec<String>)>,
+    aliases: &HashMap<String, (String, Vec<Seg>)>,
     source: &str,
-) -> Option<(String, Vec<String>)> {
+) -> Option<(String, Vec<Seg>)> {
     match expression.kind.as_ref() {
         ExpressionKind::Identifier(name) => aliases.get(name).cloned(),
         ExpressionKind::MemberExpression { object, property, computed, .. } => {
@@ -236,9 +259,9 @@ fn owned_path(
                     return None;
                 };
             let segment = if *computed {
-                source.get(property.span.clone())?.trim().to_string()
+                Seg::Dynamic(source.get(property.span.clone())?.trim().to_string())
             } else {
-                ident(property)?.to_string()
+                Seg::Static(ident(property)?.to_string())
             };
             segments.push(segment);
             Some((root, segments))
@@ -248,14 +271,15 @@ fn owned_path(
 }
 
 fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {
-    let path =
-        hit.segments.iter().map(|segment| format!("{segment:?}")).collect::<Vec<_>>().join(", ");
+    let path = render_path(&hit.segments);
     match &hit.kind {
         OakBarrierKind::Path { operator, rhs } => {
             let rhs = source.get(rhs.clone()).unwrap_or_default().trim();
-            if hit.segments.len() == 2 && is_simple_index(&hit.segments[0]) {
-                let index = &hit.segments[0];
-                let leaf = &hit.segments[1];
+            // Array item leaf write (`rows[i].label`) — only a computed index
+            // followed by a dot leaf is an array item; `user.address.city`
+            // (two static segments) is an object path and stays on the
+            // generic write path.
+            if let [Seg::Dynamic(index), Seg::Static(leaf)] = &hit.segments[..] {
                 let item = match operator.as_str() {
                     "=" => Some(format!(
                         "this.constructor.__vmzWritePathItem(this, {:?}, {}, {:?}, {})",
@@ -304,26 +328,20 @@ fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {
             if operator == "++" { "+" } else { "-" }
         ),
         OakBarrierKind::Mutator { method, args } => {
+            // The runtime takes `args` as one array parameter — trailing bare
+            // arguments would collapse into a single non-array value and the
+            // mutator would run with an empty argument list.
             let args = if args.is_empty() {
-                String::new()
+                "[]".to_string()
             } else {
-                source.get(args.clone()).unwrap_or_default().trim().to_string()
+                format!("[{}]", source.get(args.clone()).unwrap_or_default().trim())
             };
             format!(
-                "this.constructor.__vmzArrayMutate(this, {:?}, [{}], {:?}{})",
-                hit.root,
-                path,
-                method,
-                if args.is_empty() { String::new() } else { format!(", {args}") }
+                "this.constructor.__vmzArrayMutate(this, {:?}, [{}], {:?}, {})",
+                hit.root, path, method, args
             )
         }
     }
-}
-
-fn is_simple_index(value: &str) -> bool {
-    !value.is_empty()
-        && (value.chars().all(|c| c.is_ascii_digit())
-            || value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$' || c == '.'))
 }
 
 #[derive(Debug, Clone)]
