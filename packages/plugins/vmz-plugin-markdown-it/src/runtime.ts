@@ -25,6 +25,12 @@ export type MarkdownAnalyzeHooks = {
      * Return `null`/`undefined` to keep the original href.
      */
     resolveHref?: (href: string) => string | null | undefined;
+    /**
+     * Build-time heading anchor. Return the anchor href (usually `#<id>`) to
+     * append a self-link inside the heading; `null`/`undefined` skips it.
+     * The anchor is real markup — usable without JavaScript.
+     */
+    headingAnchor?: (heading: { id: string; text: string; level: number }) => string | null | undefined;
 };
 
 const DEFAULT_OPTIONS: Required<MarkdownItRuntimeOptions> = {
@@ -134,6 +140,26 @@ export function analyzeMarkdown(source, hooks?: MarkdownAnalyzeHooks) {
             headings.push({ level, id, text });
             // Inject id into open token attrs for render.
             t.attrSet('id', id);
+            if (hooks?.headingAnchor && inline && inline.type === 'inline' && Array.isArray(inline.children)) {
+                const href = hooks.headingAnchor({ id, text, level });
+                if (typeof href === 'string' && href) {
+                    const Token = t.constructor as new (type: string, tag: string, nesting: number) => {
+                        attrs: [string, string][] | null;
+                        content: string;
+                    };
+                    const open = new Token('link_open', 'a', 1);
+                    open.attrs = [
+                        ['href', href],
+                        ['class', 'h-anchor'],
+                        ['aria-hidden', 'true'],
+                        ['tabindex', '-1'],
+                    ];
+                    const label = new Token('text', '', 0);
+                    label.content = '#';
+                    const close = new Token('link_close', 'a', -1);
+                    inline.children.push(open, label, close);
+                }
+            }
         }
         if (t.type === 'fence') {
             const info = String(t.info || '').trim();
