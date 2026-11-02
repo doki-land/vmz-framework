@@ -8,18 +8,40 @@ VMZ chart components backed by the DaVinci engine — the same `ChartSpec` + dat
 
 ```ts
 const spec = {
-    mark: "line", // bar | line | area | point | circle | pie | radar
+    mark: "line", // see the mark catalog below
     encoding: [
         { field: "day", channel: "x" },
         { field: "visitors", channel: "y" },
         { field: "product", channel: "color" }, // series + legend
     ],
-    // seriesLayout: "overlap" | "stack" | "dodge"  (bars dodge by default)
+    // seriesLayout: "overlap" | "stack" | "dodge" | "percent"
     // innerRadiusRatio: 0.6                        (pie → donut)
     // facetField: "region"                         (small multiples)
     // keyField: "id"                               (stable row identity)
+    // parentField: "parent"                        (treemap / sunburst / tree hierarchy)
+    // valueDomain: [0, 100]                        (gauge)
+    // spark: true                                  (strip all furniture)
 };
 ```
+
+## Mark catalog
+
+Every mark renders real geometry with hit-testing, keyboard navigation, tooltips, a hidden data table, theme tokens, and an identical canvas backend path.
+
+| Family | Marks | Notes |
+|--------|-------|-------|
+| Cartesian | `bar` / `rect`, `line`, `area`, `point` / `circle`, `dumbbell`, `lollipop` | `stack` / `dodge` / `percent` layouts; `yEnd` drives dumbbells |
+| Scatter variants | `strip`, `beeswarm` | strip jitters deterministically from row keys; beeswarm packs collision-free |
+| Distribution | `histogram`, `boxplot`, `violin`, `ridgeline` | binning / five-number / KDE all computed at compile time |
+| Finance | `candlestick` | `open`/`high`/`low`/`close` channels, up/down tokens |
+| Flow | `waterfall`, `funnel`, `sankey`, `streamgraph`, `gantt` | waterfall connectors, DAG-checked sankey, wiggle ribbons, date-aware gantt |
+| Hierarchy | `treemap`, `sunburst`, `tree` | one `keyField` + `parentField` (+ `size`) contract for all three |
+| Part-to-whole | `pie` (+ donut), `mosaic`, `percent` layout | rose / radial-bar live under polar |
+| Polar | `radar`, `rose`, `radial-bar`, `gauge` | 240° gauge with `valueDomain` |
+| Grid | `heatmap`, `calendar` | sequential `heatmapRamp`; calendar takes strict `YYYY-MM-DD` |
+| Aux channels | `size` (bubble), `yError` / `yErrorMinus` / `yErrorPlus`, `yLow` / `yHigh` (band) | composable with the base marks |
+
+Stat-driven marks (`histogram`, `boxplot`, `ridgeline`, `bump`, `violin`, `calendar`, `streamgraph`, `mosaic`) compute their statistics globally at compile time and therefore refuse `facetField` with an explicit diagnostic.
 
 ## Props
 
@@ -54,7 +76,7 @@ const brand = {
 };
 ```
 
-Available tokens: `seriesPalette`, `markFill`, `axisStroke`, `axisStrokeWidth`, `gridStroke` (`null` disables grid lines), `gridStrokeWidth`, `labelColor`, `labelFont`, `legendFont`, `pointStroke` (`null` disables the halo), `areaFillOpacity`.
+Available tokens: `seriesPalette`, `markFill`, `axisStroke`, `axisStrokeWidth`, `gridStroke` (`null` disables grid lines), `gridStrokeWidth`, `labelColor`, `labelFont`, `legendFont`, `pointStroke` (`null` disables the halo), `areaFillOpacity`, `heatmapRamp`, `upColor`, `downColor`, `trackColor`, `rangeTints`, `sankeyLinkOpacity`.
 
 ## Interaction
 
