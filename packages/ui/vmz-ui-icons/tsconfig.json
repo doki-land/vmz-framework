@@ -11,5 +11,5 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true
     },
-    "include": ["src/icon-types.ts", "src/icons-stroke.ts", "src/icons-text-badge.ts", "src/registry.ts"]
+    "include": ["src/**/*.ts"]
 }

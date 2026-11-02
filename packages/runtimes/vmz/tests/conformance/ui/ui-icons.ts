@@ -92,29 +92,54 @@ if (!iconSrc.includes('data-icon={name}') && !iconSrc.includes('data-icon=')) {
 if (!iconSrc.includes('registry.ts') || !iconSrc.includes('resolveIconDef')) {
     fail('Icon must import shared registry.ts via resolveIconDef');
 }
-const strokeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-stroke.ts'), 'utf8');
-const textBadgeSrc = fs.readFileSync(path.join(iconsRoot, 'src', 'icons-text-badge.ts'), 'utf8');
+const categoriesDir = path.join(iconsRoot, 'src', 'icons');
+const REQUIRED_CATEGORIES = ['action', 'feature', 'navigation', 'status', 'tool'];
+const categoryFiles = fs.existsSync(categoriesDir)
+    ? fs.readdirSync(categoriesDir).filter((name) => name.endsWith('.ts'))
+    : [];
+if (categoryFiles.length === 0) fail('src/icons/ must ship one module per category');
+const categorySources = new Map();
+for (const file of categoryFiles) {
+    categorySources.set(file.replace(/\.ts$/, ''), fs.readFileSync(path.join(categoriesDir, file), 'utf8'));
+}
+for (const category of REQUIRED_CATEGORIES) {
+    if (!categorySources.has(category)) fail(`src/icons/ missing the ${category} category module`);
+}
+for (const [category] of categorySources) {
+    if (!registrySrc.includes(`./icons/${category}.ts`)) {
+        fail(`registry.ts must import ./icons/${category}.ts — orphan category module`);
+    }
+}
+const mergedIconSrc = [...categorySources.values()].join('\n');
+const actionSrc = categorySources.get('action');
+const toolSrc = categorySources.get('tool');
 const legacyFillPath = path.join(iconsRoot, 'src', 'icons-legacy-fill.ts');
 if (fs.existsSync(legacyFillPath)) {
     fail('icons-legacy-fill.ts must be removed — registry uses stroke and text-badge only');
 }
 if (
+    fs.existsSync(path.join(iconsRoot, 'src', 'icons-stroke.ts')) ||
+    fs.existsSync(path.join(iconsRoot, 'src', 'icons-text-badge.ts'))
+) {
+    fail('flat icon modules must be removed — registry splits per category under src/icons/');
+}
+if (
     !registrySrc.includes('export const REGISTRY') ||
-    !textBadgeSrc.includes("'tool.base64'") ||
-    !strokeSrc.includes("'action.search'") ||
-    !strokeSrc.includes("'tool.url'") ||
-    !strokeSrc.includes("'tool.speed'")
+    !toolSrc.includes("'tool.base64'") ||
+    !actionSrc.includes("'action.search'") ||
+    !toolSrc.includes("'tool.url'") ||
+    !toolSrc.includes("'tool.speed'")
 ) {
     fail('registry must ship semantic registry (tool.* + action.*), not loose per-page SVG');
 }
 if (registrySrc.includes('LEGACY_FILL_ICONS') || registrySrc.includes('icons-legacy-fill')) {
     fail('registry.ts must not import legacy fill silhouettes');
 }
-if (!textBadgeSrc.includes("kind: 'text-badge'") || !iconSrc.includes('vmz-ui-icon__badge')) {
+if (!toolSrc.includes("kind: 'text-badge'") || !iconSrc.includes('vmz-ui-icon__badge')) {
     fail('proprietary tool.* names must use text-badge marks in Icon');
 }
-if (!registrySrc.includes('resolveIconDef') || !strokeSrc.includes("kind: 'stroke'")) {
-    fail('registry must use structured IconDef entries via icons-stroke.ts');
+if (!registrySrc.includes('resolveIconDef') || !mergedIconSrc.includes("kind: 'stroke'")) {
+    fail('registry must use structured IconDef entries via per-category modules');
 }
 if (registrySrc.includes('LEGACY_ICON_ALIASES') || registrySrc.includes('resolveIconPath')) {
     fail('registry.ts must not keep legacy alias tables or the deprecated resolveIconPath export');
@@ -122,11 +147,12 @@ if (registrySrc.includes('LEGACY_ICON_ALIASES') || registrySrc.includes('resolve
 if (!/throw new Error\([\s\S]*unknown icon name/.test(registrySrc)) {
     fail('registry must fail loudly on unknown icon names');
 }
-const iconKeys = [
-    ...[...strokeSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].map((match) => match[1]),
-    ...[...textBadgeSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].map((match) => match[1]),
-];
+const iconKeys = [...mergedIconSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].map((match) => match[1]);
 if (iconKeys.length === 0) fail('registry ships no icon entries');
+const duplicateKeys = [...new Set(iconKeys.filter((key, index) => iconKeys.indexOf(key) !== index))];
+if (duplicateKeys.length > 0) {
+    fail(`registry keys must be unique, duplicated: ${duplicateKeys.join(', ')}`);
+}
 for (const key of iconKeys) {
     if (!/^[a-z][a-z0-9-]*\.[a-z0-9-]+$/.test(key)) {
         fail(`registry key "${key}" must be a dotted semantic name`);
@@ -134,24 +160,32 @@ for (const key of iconKeys) {
 }
 
 console.log('ui-icons: visual geometry rules…');
-if (/strokeWidth:\s*[0-9]/.test(strokeSrc)) {
-    fail('icons-stroke.ts must not override strokeWidth per icon — one 1.75 weight for the whole set');
+if (/strokeWidth:\s*[0-9]/.test(mergedIconSrc)) {
+    fail('category modules must not override strokeWidth per icon — one 1.75 weight for the whole set');
 }
-for (const dotsBlock of strokeSrc.matchAll(/dots:\s*\[([\s\S]*?)\]/g)) {
+for (const dotsBlock of mergedIconSrc.matchAll(/dots:\s*\[([\s\S]*?)\]/g)) {
     for (const radiusMatch of dotsBlock[1].matchAll(/r:\s*([0-9.]+)/g)) {
         if (Number(radiusMatch[1]) < 1.35) {
             fail(`filled dot radius ${radiusMatch[1]} is below the 1.35 optical weight floor`);
         }
     }
 }
-const strokeEntries = strokeSrc.split(/\n {4}'/).slice(1);
-const strokeKeyCount = [...strokeSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].length;
-if (strokeEntries.length !== strokeKeyCount) {
-    fail('icons-stroke.ts entry parsing drifted — keep one 4-space indented entry per icon');
-}
-for (const entry of strokeEntries) {
-    if (!/paths:\s*\[\s*'|circles:\s*\[\s*\{|dots:\s*\[\s*\{/.test(entry)) {
-        fail(`stroke entry "${entry.slice(0, entry.indexOf(':')).trim()}" ships no visible geometry`);
+for (const [category, source] of categorySources) {
+    const strokeEntries = source.split(/\n {4}'/).slice(1);
+    const strokeKeyCount = [...source.matchAll(/^\s*'([^']+)':\s*\{/gm)].length;
+    if (strokeEntries.length !== strokeKeyCount) {
+        fail(`${category}.ts entry parsing drifted — keep one 4-space indented entry per icon`);
+    }
+    for (const entry of strokeEntries) {
+        if (/kind:\s*'text-badge'/.test(entry)) {
+            if (!/label:\s*'.+'/.test(entry)) {
+                fail(`text-badge entry "${entry.slice(0, entry.indexOf(':')).trim()}" ships an empty label`);
+            }
+            continue;
+        }
+        if (!/paths:\s*\[\s*'|circles:\s*\[\s*\{|dots:\s*\[\s*\{|d:\s*'/.test(entry)) {
+            fail(`stroke entry "${entry.slice(0, entry.indexOf(':')).trim()}" ships no visible geometry`);
+        }
     }
 }
 if (iconKeys.length < 69) {
