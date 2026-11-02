@@ -322,6 +322,463 @@ const CHART_INPUTS: ChartInput[] = [
             { 类别: '第四季度销售额', 数值: 187 },
         ],
     },
+    {
+        id: 'histogram-latency',
+        title: '直方图 · 请求时延分布',
+        note: '分箱宽度取 Freedman–Diaconis,柱间无缝,悬停读区间与计数。',
+        spec: { mark: 'histogram', encoding: [{ field: 'latency', channel: 'x' }] },
+        rows: (() => {
+            const rows: Record<string, unknown>[] = [];
+            let seed = 42;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            for (let i = 0; i < 220; i++) {
+                const u = rand();
+                const v = rand();
+                rows.push({ latency: Math.round(50 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * 18 + (i % 17 === 0 ? 60 : 0)) });
+            }
+            return rows;
+        })(),
+    },
+    {
+        id: 'boxplot-teams',
+        title: '箱线图 · 三组时延分布',
+        note: '五数概括与 1.5 IQR 须在编译期计算,离群点是真实异常值。',
+        spec: {
+            mark: 'boxplot',
+            encoding: [
+                { field: 'team', channel: 'x' },
+                { field: 'latency', channel: 'y' },
+            ],
+        },
+        rows: (() => {
+            const mk = (team: string, values: number[]) => values.map((latency) => ({ team, latency }));
+            return [
+                ...mk('api', [42, 45, 47, 48, 50, 51, 53, 55, 58, 60, 61, 63, 66, 70, 240]),
+                ...mk('web', [60, 64, 66, 70, 72, 75, 77, 80, 83, 85, 88, 92, 95]),
+                ...mk('batch', [120, 128, 131, 135, 139, 142, 148, 151, 157, 163, 170, 178, 186, 320, 345]),
+            ];
+        })(),
+    },
+    {
+        id: 'ridgeline-services',
+        title: '山脊图 · 服务时延密度',
+        note: 'KDE 在编译期计算,共享采样网格,每条脊线归一化峰高。',
+        spec: {
+            mark: 'ridgeline',
+            encoding: [
+                { field: 'latency', channel: 'x' },
+                { field: 'service', channel: 'y' },
+            ],
+        },
+        rows: (() => {
+            const rows: Record<string, unknown>[] = [];
+            let seed = 7;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            const mk = (service: string, center: number, spread: number, n: number) => {
+                for (let i = 0; i < n; i++) {
+                    const u = rand();
+                    const v = rand();
+                    rows.push({ service, latency: Math.round(center + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * spread) });
+                }
+            };
+            mk('api', 48, 12, 160);
+            mk('web', 76, 18, 160);
+            mk('batch', 132, 26, 160);
+            mk('edge', 34, 9, 160);
+            return rows;
+        })(),
+    },
+    {
+        id: 'bubble-products',
+        title: '气泡图 · 价格 × 评分 × 销量',
+        note: 'size 通道按平方根映射面积,重叠气泡仍可读。',
+        spec: {
+            mark: 'point',
+            keyField: 'id',
+            encoding: [
+                { field: 'price', channel: 'x' },
+                { field: 'rating', channel: 'y' },
+                { field: 'sales', channel: 'size' },
+            ],
+        },
+        rows: [
+            { id: 'p1', price: 39, rating: 4.6, sales: 1800 },
+            { id: 'p2', price: 59, rating: 4.2, sales: 950 },
+            { id: 'p3', price: 79, rating: 4.8, sales: 2600 },
+            { id: 'p4', price: 99, rating: 3.9, sales: 420 },
+            { id: 'p5', price: 129, rating: 4.4, sales: 1300 },
+            { id: 'p6', price: 149, rating: 4.1, sales: 680 },
+            { id: 'p7', price: 199, rating: 4.7, sales: 340 },
+            { id: 'p8', price: 249, rating: 3.8, sales: 210 },
+            { id: 'p9', price: 69, rating: 4.9, sales: 3200 },
+            { id: 'p10', price: 89, rating: 4.0, sales: 760 },
+        ],
+    },
+    {
+        id: 'error-groups',
+        title: '误差线 · 实验组均值',
+        note: 'yError 通道绘制工字梁,y 轴自动覆盖误差端点。',
+        spec: {
+            mark: 'bar',
+            keyField: 'id',
+            encoding: [
+                { field: 'group', channel: 'x' },
+                { field: 'mean', channel: 'y' },
+                { field: 'err', channel: 'yError' },
+            ],
+        },
+        rows: [
+            { id: 'e1', group: '对照组', mean: 62, err: 9 },
+            { id: 'e2', group: '实验 A', mean: 74, err: 12 },
+            { id: 'e3', group: '实验 B', mean: 81, err: 7 },
+            { id: 'e4', group: '实验 C', mean: 58, err: 14 },
+        ],
+    },
+    {
+        id: 'waterfall-profit',
+        title: '瀑布图 · 季度利润桥',
+        note: '每段增量浮在累计水平上,涨跌着色,虚线连接相邻水平。',
+        spec: {
+            mark: 'waterfall',
+            keyField: 'id',
+            encoding: [
+                { field: 'stage', channel: 'x' },
+                { field: 'delta', channel: 'y' },
+            ],
+        },
+        rows: [
+            { id: 'w0', stage: '期初现金', delta: 180 },
+            { id: 'w1', stage: '销售收入', delta: 240 },
+            { id: 'w2', stage: '退款折让', delta: -45 },
+            { id: 'w3', stage: '云服务', delta: -90 },
+            { id: 'w4', stage: '人力成本', delta: -120 },
+            { id: 'w5', stage: '其他收益', delta: 35 },
+        ],
+    },
+    {
+        id: 'funnel-signup',
+        title: '漏斗图 · 注册转化',
+        note: '阶段按人数降序成梯形,标注占首层百分比。',
+        spec: {
+            mark: 'funnel',
+            keyField: 'id',
+            encoding: [
+                { field: 'stage', channel: 'x' },
+                { field: 'users', channel: 'y' },
+            ],
+        },
+        rows: [
+            { id: 'f1', stage: '落地页访问', users: 12800 },
+            { id: 'f2', stage: '开始注册', users: 5400 },
+            { id: 'f3', stage: '验证邮箱', users: 3600 },
+            { id: 'f4', stage: '完善资料', users: 2100 },
+            { id: 'f5', stage: '首次付费', users: 860 },
+        ],
+    },
+    {
+        id: 'sankey-flow',
+        title: '桑基图 · 数据层流转',
+        note: '节点按最长路径分层,流带厚度等于真实流量。',
+        spec: {
+            mark: 'sankey',
+            encoding: [
+                { field: 'src', channel: 'source' },
+                { field: 'dst', channel: 'target' },
+                { field: 'gb', channel: 'value' },
+            ],
+        },
+        rows: [
+            { src: '采集', dst: '热层', gb: 120 },
+            { src: '采集', dst: '温层', gb: 80 },
+            { src: '热层', dst: '实时计算', gb: 90 },
+            { src: '热层', dst: '在线缓存', gb: 30 },
+            { src: '温层', dst: '离线计算', gb: 60 },
+            { src: '温层', dst: '归档', gb: 20 },
+            { src: '实时计算', dst: '告警', gb: 25 },
+            { src: '实时计算', dst: '看板', gb: 65 },
+            { src: '离线计算', dst: '报表', gb: 45 },
+            { src: '离线计算', dst: '归档', gb: 15 },
+        ],
+    },
+    {
+        id: 'treemap-disk',
+        title: '矩形树图 · 存储占用',
+        note: 'squarified 布局,父级面积是叶值求和,单根下按顶层分组着色。',
+        spec: {
+            mark: 'treemap',
+            keyField: 'id',
+            parentField: 'parent',
+            encoding: [{ field: 'gb', channel: 'size' }],
+        },
+        rows: [
+            { id: '根', parent: null, gb: 0 },
+            { id: '媒体', parent: '根', gb: 0 },
+            { id: '文档', parent: '根', gb: 0 },
+            { id: '系统', parent: '根', gb: 0 },
+            { id: '视频', parent: '媒体', gb: 420 },
+            { id: '图片', parent: '媒体', gb: 260 },
+            { id: '音频', parent: '媒体', gb: 90 },
+            { id: '设计稿', parent: '文档', gb: 140 },
+            { id: '合同', parent: '文档', gb: 60 },
+            { id: '表格', parent: '文档', gb: 45 },
+            { id: '运行时', parent: '系统', gb: 180 },
+            { id: '缓存', parent: '系统', gb: 120 },
+            { id: '日志', parent: '系统', gb: 75 },
+        ],
+    },
+    {
+        id: 'bump-apps',
+        title: '排名图 · 应用周活名次',
+        note: '秩次在编译期计算,并列取最小秩,第 1 名在顶部。',
+        spec: {
+            mark: 'bump',
+            keyField: 'id',
+            encoding: [
+                { field: 'week', channel: 'x' },
+                { field: 'active', channel: 'y' },
+                { field: 'app', channel: 'color' },
+            ],
+        },
+        rows: (() => {
+            const scores: Record<string, number[]> = {
+                Alpha: [52, 48, 61, 66, 70],
+                Beta: [60, 55, 50, 58, 62],
+                Core: [40, 58, 66, 49, 55],
+                Delta: [45, 40, 44, 60, 48],
+            };
+            const rows: Record<string, unknown>[] = [];
+            Object.entries(scores).forEach(([app, values]) => values.forEach((active, i) => rows.push({ id: `${app}-${i}`, week: `W${i + 1}`, active, app })));
+            return rows;
+        })(),
+    },
+    {
+        id: 'slope-share',
+        title: '坡度图 · 两年份额变化',
+        note: '恰两个时点连线,端点值标签在外侧。',
+        spec: {
+            mark: 'slope',
+            keyField: 'id',
+            encoding: [
+                { field: 'year', channel: 'x' },
+                { field: 'share', channel: 'y' },
+                { field: 'brand', channel: 'color' },
+            ],
+        },
+        rows: [
+            { id: 'a20', year: '2023', share: 32, brand: 'Alpha' },
+            { id: 'a24', year: '2025', share: 41, brand: 'Alpha' },
+            { id: 'b20', year: '2023', share: 44, brand: 'Beta' },
+            { id: 'b24', year: '2025', share: 36, brand: 'Beta' },
+            { id: 'c20', year: '2023', share: 24, brand: 'Core' },
+            { id: 'c24', year: '2025', share: 23, brand: 'Core' },
+        ],
+    },
+    {
+        id: 'heatmap-week',
+        title: '热力图 · 一周分时负载',
+        note: '双类目网格,色阶是真实值域,渐变图例带 min/max。',
+        spec: {
+            mark: 'heatmap',
+            keyField: 'id',
+            encoding: [
+                { field: 'day', channel: 'x' },
+                { field: 'hour', channel: 'y' },
+                { field: 'load', channel: 'color' },
+            ],
+        },
+        rows: (() => {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+            const hours = ['09', '12', '15', '18', '21'];
+            const base = [42, 68, 55, 30, 12, 38, 74, 61, 33, 9, 45, 80, 66, 40, 15, 50, 72, 58, 36, 11, 47, 77, 63, 34, 10];
+            const rows: Record<string, unknown>[] = [];
+            days.forEach((day, di) =>
+                hours.forEach((hour, hi) => rows.push({ id: `${day}-${hour}`, day, hour, load: base[di * hours.length + hi] + ((di * 7 + hi * 3) % 9) })),
+            );
+            return rows;
+        })(),
+    },
+    {
+        id: 'rose-kinds',
+        title: '玫瑰图 · 工单类型分布',
+        note: '等角花瓣半径随值,环刻度是真实数值域。',
+        spec: {
+            mark: 'rose',
+            keyField: 'id',
+            encoding: [
+                { field: 'kind', channel: 'x' },
+                { field: 'count', channel: 'y' },
+            ],
+        },
+        rows: [
+            { id: 'k1', kind: '缺陷', count: 46 },
+            { id: 'k2', kind: '需求', count: 78 },
+            { id: 'k3', kind: '咨询', count: 30 },
+            { id: 'k4', kind: '优化', count: 55 },
+            { id: 'k5', kind: '安全', count: 22 },
+            { id: 'k6', kind: '文档', count: 18 },
+        ],
+    },
+    {
+        id: 'radial-goals',
+        title: '径向条 · 目标完成度',
+        note: '同心环扫掠按 值/域最大值,首类最外环。',
+        spec: {
+            mark: 'radial-bar',
+            keyField: 'id',
+            encoding: [
+                { field: 'goal', channel: 'x' },
+                { field: 'done', channel: 'y' },
+            ],
+        },
+        rows: [
+            { id: 'g1', goal: '注册', done: 82 },
+            { id: 'g2', goal: '激活', done: 64 },
+            { id: 'g3', goal: '留存', done: 47 },
+            { id: 'g4', goal: '付费', done: 29 },
+        ],
+    },
+    {
+        id: 'gauge-load',
+        title: '仪表盘 · 集群水位',
+        note: '240° 扫掠,值域 0–100,中心读数与五档刻度。',
+        spec: { mark: 'gauge', encoding: [{ field: 'load', channel: 'theta' }], valueDomain: [0, 100] },
+        rows: [{ load: 72 }],
+    },
+    {
+        id: 'candlestick-week',
+        title: 'K 线 · 两周日线',
+        note: '实体与影线按涨跌着色,悬停读完整 OHLC。',
+        spec: {
+            mark: 'candlestick',
+            keyField: 'id',
+            encoding: [
+                { field: 'day', channel: 'x' },
+                { field: 'open', channel: 'open' },
+                { field: 'high', channel: 'high' },
+                { field: 'low', channel: 'low' },
+                { field: 'close', channel: 'close' },
+            ],
+        },
+        rows: [
+            { id: 'd01', day: '5/6', open: 102, high: 108, low: 99, close: 106 },
+            { id: 'd02', day: '5/7', open: 106, high: 109, low: 100, close: 101 },
+            { id: 'd03', day: '5/8', open: 101, high: 112, low: 100, close: 110 },
+            { id: 'd04', day: '5/9', open: 110, high: 115, low: 107, close: 113 },
+            { id: 'd05', day: '5/10', open: 113, high: 114, low: 104, close: 105 },
+            { id: 'd06', day: '5/13', open: 105, high: 111, low: 103, close: 109 },
+            { id: 'd07', day: '5/14', open: 109, high: 118, low: 108, close: 116 },
+            { id: 'd08', day: '5/15', open: 116, high: 120, low: 112, close: 113 },
+            { id: 'd09', day: '5/16', open: 113, high: 117, low: 110, close: 115 },
+            { id: 'd10', day: '5/17', open: 115, high: 122, low: 114, close: 121 },
+        ],
+    },
+    {
+        id: 'bullet-kpis',
+        title: '子弹图 · 三项 KPI',
+        note: '定性带 60/85/100%,实测条与目标刻线同轴。',
+        spec: {
+            mark: 'bullet',
+            keyField: 'id',
+            encoding: [
+                { field: 'kpi', channel: 'x' },
+                { field: 'actual', channel: 'y' },
+                { field: 'target', channel: 'target' },
+                { field: 'cap', channel: 'range' },
+            ],
+        },
+        rows: [
+            { id: 'k1', kpi: '营收(万)', actual: 220, target: 250, cap: 300 },
+            { id: 'k2', kpi: '续费率(%)', actual: 86, target: 90, cap: 100 },
+            { id: 'k3', kpi: '新客(千)', actual: 41, target: 36, cap: 60 },
+        ],
+    },
+    {
+        id: 'sparkline-traffic',
+        title: '迷你图 · 行内流量',
+        note: 'spark 模式去轴去图例,只留数据线本体,命中与 tooltip 保留。',
+        spec: {
+            mark: 'area',
+            spark: true,
+            encoding: [
+                { field: 'hour', channel: 'x' },
+                { field: 'req', channel: 'y' },
+            ],
+        },
+        rows: [
+            { hour: 0, req: 22 }, { hour: 1, req: 18 }, { hour: 2, req: 15 }, { hour: 3, req: 12 },
+            { hour: 4, req: 16 }, { hour: 5, req: 28 }, { hour: 6, req: 45 }, { hour: 7, req: 68 },
+            { hour: 8, req: 92 }, { hour: 9, req: 120 }, { hour: 10, req: 108 }, { hour: 11, req: 96 },
+        ],
+    },
+];
+
+/** 画廊分区：同一批示例按读者意图归类展示。 */
+const SECTION_DEFS: ReadonlyArray<{
+    readonly id: string;
+    readonly title: string;
+    readonly note: string;
+    readonly ids: ReadonlyArray<string>;
+}> = [
+    {
+        id: 'basics',
+        title: '基础图表',
+        note: '柱状、折线、面积与散点,覆盖分组、堆叠、负值与长标签。',
+        ids: ['bar-quarter', 'bar-dodge', 'bar-stack', 'line-weekly', 'area-traffic', 'scatter-latency', 'bar-delta', 'bar-cjk'],
+    },
+    {
+        id: 'distribution',
+        title: '分布与统计',
+        note: '分箱、五数概括、核密度、气泡面积与误差线,统计都在编译期完成。',
+        ids: ['histogram-latency', 'boxplot-teams', 'ridgeline-services', 'bubble-products', 'error-groups'],
+    },
+    {
+        id: 'flow',
+        title: '流程与转化',
+        note: '累计瀑布、转化漏斗与分层流量,每段几何都对应真实数值。',
+        ids: ['waterfall-profit', 'funnel-signup', 'sankey-flow'],
+    },
+    {
+        id: 'hierarchy',
+        title: '层级结构',
+        note: 'squarified 矩形树图,父级面积是叶值求和。',
+        ids: ['treemap-disk'],
+    },
+    {
+        id: 'ranking',
+        title: '排名与变化',
+        note: '秩次线与两时点坡度,读出相对位置而非绝对刻度。',
+        ids: ['bump-apps', 'slope-share'],
+    },
+    {
+        id: 'polar',
+        title: '极坐标',
+        note: '饼、环、雷达、玫瑰、径向条与仪表盘,角度与半径都有真实映射。',
+        ids: ['pie-share', 'donut-share', 'radar-score', 'rose-kinds', 'radial-goals', 'gauge-load'],
+    },
+    {
+        id: 'grid',
+        title: '网格热力',
+        note: '双类目网格配顺序色阶,渐变图例读值域。',
+        ids: ['heatmap-week'],
+    },
+    {
+        id: 'finance',
+        title: '金融',
+        note: 'OHLC 蜡烛,实体与影线按涨跌着色。',
+        ids: ['candlestick-week'],
+    },
+    {
+        id: 'compact',
+        title: '迷你与多面板',
+        note: 'spark 迷你线与共享刻度的小倍数网格。',
+        ids: ['sparkline-traffic', 'facet-platform'],
+    },
 ];
 
 const DIAGRAM_TITLE = '流程图 · Diagram';
@@ -343,9 +800,16 @@ const DIAGRAM_SPEC: DiagramSpec = {
     ],
 };
 
-/** 图表示例输入（渲染输入与代码文本同源）。 */
-export function chartGalleryExamples(): ChartGalleryExample[] {
-    return CHART_INPUTS.map((input) => ({
+/** 一个分区：按读者意图归类的一组图表示例。 */
+export interface ChartGallerySection {
+    id: string;
+    title: string;
+    note: string;
+    examples: ChartGalleryExample[];
+}
+
+function toExample(input: (typeof CHART_INPUTS)[number]): ChartGalleryExample {
+    return {
         id: input.id,
         title: input.title,
         note: input.note,
@@ -353,6 +817,26 @@ export function chartGalleryExamples(): ChartGalleryExample[] {
         rows: input.rows,
         specText: JSON.stringify(input.spec, null, 2),
         dataText: JSON.stringify(input.rows, null, 2),
+    };
+}
+
+/** 图表示例输入（渲染输入与代码文本同源）。 */
+export function chartGalleryExamples(): ChartGalleryExample[] {
+    return CHART_INPUTS.map(toExample);
+}
+
+/** 分区示例输入：与 `chartGalleryExamples` 同源，按 SECTION_DEFS 归类。 */
+export function chartGallerySections(): ChartGallerySection[] {
+    const byId = new Map(CHART_INPUTS.map((input) => [input.id, input]));
+    return SECTION_DEFS.map((section) => ({
+        id: section.id,
+        title: section.title,
+        note: section.note,
+        examples: section.ids.map((id) => {
+            const input = byId.get(id);
+            if (!input) throw new Error(`chart-gallery: section ${section.id} references unknown example ${id}`);
+            return toExample(input);
+        }),
     }));
 }
 

@@ -28,7 +28,16 @@
                     </li>
                 </ul>
             </section>
-            <section v-for="item in examples" :key="item.id" class="chart-card">
+            <section v-for="section in sections" :key="section.id" class="charts-section">
+                <header class="charts-section__head">
+                    <h2 :id="'charts-section-' + section.id">
+                        {{ section.title }}
+                    </h2>
+                    <p>
+                        {{ section.note }}
+                    </p>
+                </header>
+                <section v-for="item in section.examples" :key="item.id" class="chart-card">
                 <header class="chart-card__head">
                     <div class="chart-card__titles">
                         <h2>
@@ -65,6 +74,7 @@
                         </pre>
                     </div>
                 </div>
+                </section>
             </section>
             <section class="chart-card">
                 <header class="chart-card__head">
@@ -186,6 +196,24 @@
     color: var(--vmz-text-steel);
     font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
+.charts-section {
+    margin-top: 2.5rem;
+}
+.charts-section__head {
+    display: grid;
+    gap: 0.25rem;
+    max-width: 46rem;
+}
+.charts-section__head h2 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 1.35rem / 1.4 var(--vmz-font-display);
+}
+.charts-section__head p {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 0.95rem / 1.6 var(--vmz-font-sans);
+}
 .chart-card {
     margin-top: 1.5rem;
     padding: 1.5rem;
@@ -304,9 +332,9 @@
  */
 import {
     chartGalleryDiagram,
-    chartGalleryExamples,
+    chartGallerySections,
     type ChartGalleryDiagram,
-    type ChartGalleryExample,
+    type ChartGallerySection,
 } from "../demo/chart-gallery.ts";
 import { pageMeta } from "../page-meta.ts";
 
@@ -314,16 +342,16 @@ export default class ChartGalleryPage {
     static meta = pageMeta(
         "图表 · VMZ",
         "Charts · VMZ",
-        "VMZ 图表：消费公开 UI 作者面 @vmz/ui-charts 的 Chart 与 Diagram 组件，覆盖柱状、折线、面积、散点、饼、环、雷达与小倍数。",
-        "VMZ charts consuming the public @vmz/ui-charts Chart and Diagram components across bar, line, area, point, pie, donut, radar and facet examples.",
+        "VMZ 图表：消费公开 UI 作者面 @vmz/ui-charts 的 Chart 与 Diagram 组件，覆盖柱状、折线、面积、散点、直方图、箱线、山脊、瀑布、漏斗、桑基、矩形树图、排名、坡度、热力、玫瑰、径向条、仪表盘、K 线、子弹、迷你与小倍数。",
+        "VMZ charts consuming the public @vmz/ui-charts Chart and Diagram components across bar, line, area, point, histogram, boxplot, ridgeline, waterfall, funnel, sankey, treemap, bump, slope, heatmap, rose, radial bar, gauge, candlestick, bullet, sparkline and facet examples.",
     );
 
     /** 构建期与 SSR 取数：读同一份演示输入，静态预渲染不依赖 `#server` RPC。 */
     static load() {
-        const examples = chartGalleryExamples();
+        const sections = chartGallerySections();
         const diagram = chartGalleryDiagram();
         return {
-            examples,
+            sections,
             diagramTitle: diagram.title,
             diagramNote: diagram.note,
             diagramSpec: diagram.spec,
@@ -371,8 +399,8 @@ export default class ChartGalleryPage {
     activeDetail = "";
     dark = false;
 
-    /** 由 `static load` 注入的示例输入（public = 页面 props）。 */
-    public examples: ChartGalleryExample[] = [];
+    /** 由 `static load` 注入的分区示例输入（public = 页面 props）。 */
+    public sections: ChartGallerySection[] = [];
     public diagramTitle = "";
     public diagramNote = "";
     public diagramSpec: ChartGalleryDiagram["spec"] | null = null;
@@ -396,11 +424,11 @@ export default class ChartGalleryPage {
  * 图表页的服务端取数能力。spec / rows 与展示文本来自
  * `../../demo/chart-gallery.ts` 的同一份构建期输入，页面不在作者面另写常量。
  */
-import { chartGalleryDiagram, chartGalleryExamples } from "../../demo/chart-gallery.ts";
+import { chartGalleryDiagram, chartGallerySections } from "../../demo/chart-gallery.ts";
 
 export default class ChartGalleryPageServer {
-    getExamples() {
-        return chartGalleryExamples();
+    getSections() {
+        return chartGallerySections();
     }
 
     getDiagram() {
