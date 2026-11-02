@@ -10,7 +10,13 @@
  * 没有 RPC resolver 的预渲染进程发起 `#server` 调用。
  */
 import type { ChartSpec } from '@doki-land/davinci/chart';
+import { registerGeoMap } from '@doki-land/davinci/chart';
+import { NE_110M_LITE } from '@doki-land/davinci-geo-assets';
 import type { DiagramSpec } from '@doki-land/davinci/diagram';
+
+// 底图注册：资产来自独立资源包 `@doki-land/davinci-geo-assets`(Natural
+// Earth 公共域,坐标降精度),引擎主包不携带任何地理数据。
+registerGeoMap('ne-110m-lite', NE_110M_LITE);
 
 /** 一个图表示例：渲染输入与同源文本。 */
 export interface ChartGalleryExample {
@@ -1026,6 +1032,201 @@ const CHART_INPUTS: ChartInput[] = [
             { id: 't5', task: '灰度发布', begin: '2026-04-20', finish: '2026-04-30' },
         ],
     },
+    {
+        id: 'force-deps',
+        title: '力导向 · 服务依赖',
+        note: '确定性种子布局,固定迭代轮数,同输入同坐标。',
+        spec: {
+            mark: 'force',
+            encoding: [
+                { field: 'src', channel: 'source' },
+                { field: 'dst', channel: 'target' },
+            ],
+        },
+        rows: [
+            { src: '网关', dst: '认证' },
+            { src: '网关', dst: '订单' },
+            { src: '网关', dst: '商品' },
+            { src: '订单', dst: '支付' },
+            { src: '订单', dst: '库存' },
+            { src: '商品', dst: '库存' },
+            { src: '商品', dst: '评价' },
+            { src: '支付', dst: '账务' },
+            { src: '支付', dst: '风控' },
+            { src: '风控', dst: '认证' },
+            { src: '评价', dst: '搜索' },
+            { src: '商品', dst: '搜索' },
+            { src: '账务', dst: '报表' },
+            { src: '库存', dst: '报表' },
+        ],
+    },
+    {
+        id: 'parallel-cars',
+        title: '平行坐标 · 车型指标',
+        note: 'k 个独立数值轴,每行一条折线,键盘逐顶点可达。',
+        spec: {
+            mark: 'parallel',
+            dimensions: ['power', 'weight', 'price', 'range'],
+            encoding: [{ field: 'brand', channel: 'color' }],
+        },
+        rows: [
+            { brand: 'Alpha', power: 150, weight: 1420, price: 24, range: 520 },
+            { brand: 'Alpha', power: 180, weight: 1580, price: 31, range: 480 },
+            { brand: 'Beta', power: 110, weight: 1180, price: 16, range: 610 },
+            { brand: 'Beta', power: 130, weight: 1260, price: 19, range: 590 },
+            { brand: 'Core', power: 220, weight: 1710, price: 42, range: 450 },
+            { brand: 'Core', power: 260, weight: 1890, price: 55, range: 410 },
+            { brand: 'Delta', power: 95, weight: 1050, price: 13, range: 660 },
+        ],
+    },
+    {
+        id: 'hexbin-density',
+        title: '蜂巢 · 价量密度',
+        note: '六边形聚合网格,色阶是真实计数。',
+        spec: {
+            mark: 'hexbin',
+            encoding: [
+                { field: 'price', channel: 'x' },
+                { field: 'volume', channel: 'y' },
+            ],
+        },
+        rows: (() => {
+            let seed = 21;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            return Array.from({ length: 260 }, () => ({
+                price: Math.round(30 + rand() * 120 + (rand() > 0.8 ? 60 : 0)),
+                volume: Math.round(50 + rand() * 300),
+            }));
+        })(),
+    },
+    {
+        id: 'contour-density',
+        title: '等值线 · 价量密度',
+        note: '2D KDE + marching squares,等级取自动 nice levels。',
+        spec: {
+            mark: 'contour',
+            encoding: [
+                { field: 'price', channel: 'x' },
+                { field: 'volume', channel: 'y' },
+            ],
+        },
+        rows: (() => {
+            let seed = 33;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            return Array.from({ length: 320 }, () => {
+                const u = rand();
+                const v = rand();
+                return {
+                    price: 90 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * 30,
+                    volume: 200 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.sin(2 * Math.PI * v) * 90,
+                };
+            });
+        })(),
+    },
+    {
+        id: 'chord-regions',
+        title: '和弦 · 区域互访流量',
+        note: '组弧按流入加流出,二次曲线流带,自连诊断丢弃。',
+        spec: {
+            mark: 'chord',
+            encoding: [
+                { field: 'src', channel: 'source' },
+                { field: 'dst', channel: 'target' },
+                { field: 'gb', channel: 'value' },
+            ],
+        },
+        rows: [
+            { src: '华东', dst: '华南', gb: 120 },
+            { src: '华南', dst: '华东', gb: 90 },
+            { src: '华东', dst: '华北', gb: 80 },
+            { src: '华北', dst: '华东', gb: 60 },
+            { src: '华南', dst: '西部', gb: 45 },
+            { src: '西部', dst: '华南', gb: 30 },
+            { src: '华北', dst: '西部', gb: 25 },
+            { src: '西部', dst: '华东', gb: 20 },
+        ],
+    },
+    {
+        id: 'tree-dendrogram',
+        title: '树图 · 叶对齐(dendrogram)',
+        note: 'treeLayout 变体,叶节点对齐到最深列。',
+        spec: {
+            mark: 'tree',
+            keyField: 'id',
+            parentField: 'parent',
+            treeLayout: 'dendrogram',
+            encoding: [{ field: 'size', channel: 'size' }],
+        },
+        rows: [
+            { id: '总裁办', parent: null, size: 0 },
+            { id: '研发', parent: '总裁办', size: 0 },
+            { id: '产品', parent: '总裁办', size: 0 },
+            { id: '前端', parent: '研发', size: 0 },
+            { id: '后端', parent: '研发', size: 0 },
+            { id: '算法', parent: '研发', size: 0 },
+            { id: '设计', parent: '产品', size: 0 },
+        ],
+    },
+    {
+        id: 'tree-radial',
+        title: '树图 · 径向(radial)',
+        note: 'treeLayout 变体,深度映射半径,叶序映射角度。',
+        spec: {
+            mark: 'tree',
+            keyField: 'id',
+            parentField: 'parent',
+            treeLayout: 'radial',
+            encoding: [{ field: 'size', channel: 'size' }],
+        },
+        rows: [
+            { id: '总裁办', parent: null, size: 0 },
+            { id: '研发', parent: '总裁办', size: 0 },
+            { id: '产品', parent: '总裁办', size: 0 },
+            { id: '运营', parent: '总裁办', size: 0 },
+            { id: '前端', parent: '研发', size: 0 },
+            { id: '后端', parent: '研发', size: 0 },
+            { id: '算法', parent: '研发', size: 0 },
+            { id: '设计', parent: '产品', size: 0 },
+            { id: '策划', parent: '产品', size: 0 },
+            { id: '市场', parent: '运营', size: 0 },
+        ],
+    },
+    {
+        id: 'geo-world',
+        title: '世界 choropleth · GDP 总量',
+        note: 'Natural Earth 公共域底图(独立资源包),name/iso_a3 双匹配。',
+        spec: {
+            mark: 'geo',
+            geo: { map: 'ne-110m-lite', projection: 'mercator' },
+            encoding: [
+                { field: 'region', channel: 'region' },
+                { field: 'gdp', channel: 'color' },
+            ],
+        },
+        rows: [
+            { region: 'United States of America', gdp: 27360 },
+            { region: 'China', gdp: 17795 },
+            { region: 'Germany', gdp: 4526 },
+            { region: 'Japan', gdp: 3970 },
+            { region: 'India', gdp: 3890 },
+            { region: 'United Kingdom', gdp: 3495 },
+            { region: 'France', gdp: 3130 },
+            { region: 'Italy', gdp: 2300 },
+            { region: 'Brazil', gdp: 2180 },
+            { region: 'Canada', gdp: 2170 },
+            { region: 'RUS', gdp: 2020 },
+            { region: 'South Korea', gdp: 1760 },
+            { region: 'Australia', gdp: 1720 },
+            { region: 'Mexico', gdp: 1790 },
+            { region: 'Spain', gdp: 1620 },
+        ],
+    },
 ];
 
 /** 画廊分区：同一批示例按读者意图归类展示。 */
@@ -1044,8 +1245,8 @@ const SECTION_DEFS: ReadonlyArray<{
     {
         id: 'distribution',
         title: '分布与统计',
-        note: '分箱、五数概括、核密度、小提琴、抖动、蜂群、气泡、误差线与置信带,统计都在编译期完成。',
-        ids: ['histogram-latency', 'boxplot-teams', 'violin-teams', 'ridgeline-services', 'strip-groups', 'beeswarm-latency', 'bubble-products', 'error-groups', 'band-temp'],
+        note: '分箱、五数概括、核密度、小提琴、抖动、蜂群、气泡、误差线、置信带、蜂巢、等值线与平行坐标,统计都在编译期完成。',
+        ids: ['histogram-latency', 'boxplot-teams', 'violin-teams', 'ridgeline-services', 'strip-groups', 'beeswarm-latency', 'bubble-products', 'error-groups', 'band-temp', 'hexbin-density', 'contour-density', 'parallel-cars'],
     },
     {
         id: 'flow',
@@ -1056,8 +1257,20 @@ const SECTION_DEFS: ReadonlyArray<{
     {
         id: 'hierarchy',
         title: '层级结构',
-        note: '矩形树图、旭日与正交树,共享同一套 keyField / parentField 层级输入。',
-        ids: ['treemap-disk', 'sunburst-disk', 'tree-org'],
+        note: '矩形树图、旭日与三种树排布,共享同一套 keyField / parentField 层级输入。',
+        ids: ['treemap-disk', 'sunburst-disk', 'tree-org', 'tree-dendrogram', 'tree-radial'],
+    },
+    {
+        id: 'network',
+        title: '关系与和弦',
+        note: '确定性力导向与和弦流带,同一套 source / target 边表。',
+        ids: ['force-deps', 'chord-regions'],
+    },
+    {
+        id: 'geo',
+        title: '地理',
+        note: 'Natural Earth 公共域底图,投影与资产独立成包。',
+        ids: ['geo-world'],
     },
     {
         id: 'ranking',
