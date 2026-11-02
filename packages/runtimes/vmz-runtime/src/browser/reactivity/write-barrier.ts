@@ -90,6 +90,7 @@ export function __vmzReadPath(inst, root, segs) {
 }
 
 export function __vmzWritePathLogical(inst, root, segs, kind, rhs) {
+    assertWritePathSegs('__vmzWritePathLogical', root, segs);
     const cur = __vmzReadPath(inst, root, segs);
     if (kind === '||') {
         if (cur) return cur;
@@ -153,9 +154,19 @@ function notifyArrayItemLeaf(inst, root, idx, leaf) {
     scheduleRefresh(inst, { type: 'path', root, segs: [String(idx), leaf] });
 }
 
+function assertWritePathSegs(fn, root, segs) {
+    if (!root) return;
+    if (!Array.isArray(segs) || segs.length === 0) {
+        throw new Error(
+            `vmz:dom ${fn} requires a non-empty path under root ${JSON.stringify(root)}; root field writes must stay plain assignments so the field setter reports them`,
+        );
+    }
+}
+
 export function __vmzWritePath(inst, root, segs, value) {
     if (!inst || inst.__vmzDestroyed) return value;
-    if (!root || !Array.isArray(segs) || segs.length === 0) return value;
+    assertWritePathSegs('__vmzWritePath', root, segs);
+    if (!root) return value;
 
     // Hot path: array item field write (`rows[i].label`) ??no map/slice, no shared-owner walk.
     if (segs.length === 2) {
@@ -227,7 +238,8 @@ export function __vmzListTranspose(inst, root, ia, ib) {
 
 export function __vmzWritePathCompound(inst, root, segs, op, rhs) {
     if (!inst || inst.__vmzDestroyed) return undefined;
-    if (!root || !Array.isArray(segs) || segs.length === 0) return undefined;
+    assertWritePathSegs('__vmzWritePathCompound', root, segs);
+    if (!root) return undefined;
 
     if (segs.length === 2) {
         return __vmzWritePathCompoundItem(inst, root, segs[0], segs[1], op, rhs);
