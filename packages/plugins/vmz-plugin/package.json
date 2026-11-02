@@ -7,7 +7,7 @@
     },
     "version": "0.3.12",
     "type": "module",
-    "description": "VMZ plugin protocol types and definePlugin / defineConfig helpers (no N-API)",
+    "description": "VMZ plugin protocol types and definePlugin helper (no N-API)",
     "license": "MIT",
     "main": "./index.js",
     "types": "./index.d.ts",

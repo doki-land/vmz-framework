@@ -11,7 +11,7 @@ link, and fence analysis for build-time document work.
 The package depends on `markdown-it` directly, so no separate peer install is required.
 
 ```ts
-import { defineConfig } from '@vmz/plugin';
+import { defineConfig } from '@vmz/vmz';
 import markdownIt from '@vmz/plugin-markdown-it';
 
 export default defineConfig({

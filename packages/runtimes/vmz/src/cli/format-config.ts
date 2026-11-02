@@ -4,7 +4,7 @@
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { VmzFormatConfig } from '@vmz/plugin';
+import type { VmzFormatConfig } from '../workspace/user-config.js';
 
 export type ResolvedFormatOptions = {
     includes?: string[];

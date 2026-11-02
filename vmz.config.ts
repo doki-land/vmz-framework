@@ -1,5 +1,5 @@
 // VMZ project configuration for the vmz-framework hybrid monorepo.
-import { defineConfig } from '@vmz/plugin';
+import { defineConfig } from 'vmz';
 
 export default defineConfig({
     format: {

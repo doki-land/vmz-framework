@@ -17,6 +17,7 @@ const files = [
     'dev-watch-roots.test.ts',
     'invocation.test.ts',
     'plugin.test.ts',
+    'plugin-surface.test.ts',
     'config-host.test.ts',
     'init-design.test.ts',
     'wechat-packaging.test.ts',

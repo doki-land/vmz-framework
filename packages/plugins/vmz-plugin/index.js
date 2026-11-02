@@ -59,11 +59,3 @@ export function definePlugin(def) {
         contribute: def.contribute,
     };
 }
-
-/**
- * @param {import('./index.js').VmzUserConfig} config
- * @returns {import('./index.js').VmzUserConfig}
- */
-export function defineConfig(config) {
-    return config ?? {};
-}

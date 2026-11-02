@@ -5,11 +5,11 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { PLUGIN_PROTOCOL as PLUGIN_PROTOCOL_PKG, contentHash, defineConfig, definePlugin } from '@vmz/plugin';
+import { PLUGIN_PROTOCOL as PLUGIN_PROTOCOL_PKG, contentHash, definePlugin } from '@vmz/plugin';
 import { log } from './log.js';
 import { resolveWorkspacePackages } from './packages.js';
 
-export { contentHash, defineConfig, definePlugin };
+export { contentHash, definePlugin };
 export const PLUGIN_PROTOCOL = PLUGIN_PROTOCOL_PKG;
 
 export const CONFIG_NAMES = ['vmz.config.ts', 'vmz.config.mts', 'vmz.config.mjs', 'vmz.config.js'];
@@ -67,9 +67,9 @@ function configDiagnosticError(code, sourcePath, err) {
  * @returns {Promise<{
  *   plugins: import('@vmz/plugin').VmzPlugin[],
  *   engines: import('@vmz/plugin').VmzEngines,
- *   delivery: import('@vmz/plugin').DeliveryAuthoring | null,
+ *   delivery: import('./user-config.js').DeliveryAuthoring | null,
  *   application: { id?: string } | null,
- *   format: import('@vmz/plugin').VmzFormatConfig | null,
+ *   format: import('./user-config.js').VmzFormatConfig | null,
  *   path: string | null,
  *   pluginPath: string | null,
  * }>}
@@ -79,11 +79,11 @@ export async function loadVmzConfig(project) {
     const plugins = [];
     /** @type {import('@vmz/plugin').VmzEngines} */
     let engines = {};
-    /** @type {import('@vmz/plugin').DeliveryAuthoring | null} */
+    /** @type {import('./user-config.js').DeliveryAuthoring | null} */
     let delivery = null;
     /** @type {{ id?: string } | null} */
     let application = null;
-    /** @type {import('@vmz/plugin').VmzFormatConfig | null} */
+    /** @type {import('./user-config.js').VmzFormatConfig | null} */
     let format = null;
     /** @type {string | null} */
     let configPath = null;

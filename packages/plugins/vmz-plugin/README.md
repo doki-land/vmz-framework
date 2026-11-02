@@ -40,7 +40,7 @@ Official plugins export a factory: `pluginName(optional config)`, with the same 
 `pluginName()` must behave exactly like the plugin's default configuration.
 
 ```ts
-import { defineConfig } from '@vmz/plugin';
+import { defineConfig } from '@vmz/vmz';
 import katex from '@vmz/plugin-katex';
 
 export default defineConfig({

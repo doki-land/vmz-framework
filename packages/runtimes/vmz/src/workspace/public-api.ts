@@ -1041,7 +1041,19 @@ export {
     extractHardcodedText,
     pseudoLocalizeCatalog,
 } from '../locale/locale-tooling.js';
-export { applyPlugins, contentHash, defineConfig, definePlugin, loadVmzConfig } from './plugin-host.js';
+export { applyPlugins, contentHash, definePlugin, loadVmzConfig } from './plugin-host.js';
+export { defineConfig } from './user-config.js';
+export type {
+    DeliveryAssembly,
+    DeliveryAuthoring,
+    DeliveryPackagingAuthoring,
+    DeliveryProfileAuthoring,
+    DeliveryServerRuntime,
+    SiteDeliveryAuthoring,
+    VmzFormatConfig,
+    VmzUserConfig,
+    WechatPackagingAuthoring,
+} from './user-config.js';
 export {
     createRolldownPluginVmzAdapter,
     createVitePluginVmzAdapter,
