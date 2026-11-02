@@ -32,6 +32,19 @@ export interface ChartTheme {
     readonly pointStroke: RGBA | null;
     /** Opacity of the area-mark fill (the stroke keeps full strength). */
     readonly areaFillOpacity: number;
+    /** Sequential ramp for value→color marks (heatmap): ≥2 stops, sampled at
+     *  t ∈ [0, 1] from the data minimum to the maximum. */
+    readonly heatmapRamp: ReadonlyArray<RGBA>;
+    /** Rising fill for candlestick bodies and waterfall positive deltas. */
+    readonly upColor: RGBA;
+    /** Falling fill for candlestick bodies and waterfall negative deltas. */
+    readonly downColor: RGBA;
+    /** Unfilled track ring / sweep color for gauge and radial-bar marks. */
+    readonly trackColor: RGBA;
+    /** Qualitative band tints for bullet charts, poor → good. */
+    readonly rangeTints: readonly [RGBA, RGBA, RGBA];
+    /** Opacity of sankey link ribbons (nodes stay at full strength). */
+    readonly sankeyLinkOpacity: number;
 }
 
 const LABEL_FAMILY = "system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif";
@@ -59,6 +72,12 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
     legendFont: { family: LABEL_FAMILY, sizePx: 12 },
     pointStroke: rgb8(255, 255, 255),
     areaFillOpacity: 0.25,
+    heatmapRamp: [rgb8(239, 246, 255), rgb8(191, 219, 254), rgb8(96, 165, 250), rgb8(37, 99, 235), rgb8(30, 58, 138)],
+    upColor: rgb8(16, 185, 129),
+    downColor: rgb8(239, 68, 68),
+    trackColor: rgb8(229, 231, 235),
+    rangeTints: [rgb8(229, 231, 235), rgb8(209, 213, 219), rgb8(156, 163, 175)],
+    sankeyLinkOpacity: 0.35,
 };
 
 /** Dark theme — same palette roles with lifted brightness and quiet chrome. */
@@ -83,4 +102,10 @@ export const DARK_CHART_THEME: ChartTheme = {
     legendFont: { family: LABEL_FAMILY, sizePx: 12 },
     pointStroke: rgb8(17, 24, 39),
     areaFillOpacity: 0.3,
+    heatmapRamp: [rgb8(12, 30, 62), rgb8(30, 58, 138), rgb8(37, 99, 235), rgb8(96, 165, 250), rgb8(191, 219, 254)],
+    upColor: rgb8(52, 211, 153),
+    downColor: rgb8(248, 113, 113),
+    trackColor: rgb8(55, 65, 81),
+    rangeTints: [rgb8(31, 41, 55), rgb8(55, 65, 81), rgb8(75, 85, 99)],
+    sankeyLinkOpacity: 0.4,
 };

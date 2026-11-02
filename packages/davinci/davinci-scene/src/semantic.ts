@@ -58,6 +58,15 @@ export type HitRegion =
               readonly points: ReadonlyArray<Point2D>;
               readonly keys: ReadonlyArray<string>;
           };
+      }
+    | {
+          /** Closed filled polygon (funnel segments, sankey link ribbons,
+           *  ridgeline ribbons): the host hit-tests with ray casting inside
+           *  and falls back to edge distance outside, and anchors tooltips at
+           *  the polygon centroid. */
+          readonly polygon: {
+              readonly points: ReadonlyArray<Point2D>;
+          };
       };
 
 // ─── Shape kinds ──────────────────────────────────────────────────────────
