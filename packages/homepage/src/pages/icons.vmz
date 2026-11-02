@@ -13,38 +13,87 @@
                     {{ leadLabel }}
                 </p>
             </header>
-            <section aria-label="Icon gallery controls" class="icons-gallery__toolbar">
+            <section :aria-label="toolbarAriaLabel" class="icons-gallery__toolbar">
                 <label class="icons-gallery__search">
                     <span class="sr-only">
                         搜索图标
                     </span>
-                    <input type="search" placeholder="{{ searchPlaceholderLabel }}" :value="searchQuery" @input="(e) => (searchQuery = (e.target as HTMLInputElement).value)" />
+                    <input type="search" :placeholder="searchPlaceholderLabel" :value="searchQuery" @input="(e) => (searchQuery = (e.target as HTMLInputElement).value)" />
                 </label>
-                <div role="group" :aria-label="sizeAriaLabel" class="icons-gallery__size-switch">
-                    <button v-for="sz in sizeOptions" :key="sz.value" type="button" :data-active="sizePx === sz.value ? 'true' : 'false'" :aria-pressed="sizePx === sz.value ? 'true' : 'false'" @click="() => (sizePx = sz.value)" class="icons-gallery__size-btn">
-                        {{ sz.label }}
+                <div role="group" :aria-label="categoryAriaLabel" class="icons-gallery__categories">
+                    <button type="button" :data-active="activeCategory === '' ? 'true' : 'false'" :aria-pressed="activeCategory === '' ? 'true' : 'false'" @click="() => (activeCategory = '')" class="icons-gallery__category">
+                        {{ allCategoriesLabel }}
+                        <span class="icons-gallery__category-count">
+                            {{ totalCount }}
+                        </span>
+                    </button>
+                    <button v-for="cat in categoryFilters" :key="cat.prefix" type="button" :data-active="activeCategory === cat.prefix ? 'true' : 'false'" :aria-pressed="activeCategory === cat.prefix ? 'true' : 'false'" @click="() => (activeCategory = cat.prefix)" class="icons-gallery__category">
+                        {{ cat.label }}
+                        <span class="icons-gallery__category-count">
+                            {{ cat.count }}
+                        </span>
                     </button>
                 </div>
-                <div role="group" :aria-label="themeAriaLabel" class="icons-gallery__theme-switch">
-                    <button type="button" :data-active="themeMode === 'light' ? 'true' : 'false'" :aria-pressed="themeMode === 'light' ? 'true' : 'false'" @click="() => (themeMode = 'light')" class="icons-gallery__theme-btn">
-                        {{ themeLightLabel }}
+                <div role="group" :aria-label="substrateAriaLabel" class="icons-gallery__substrate-switch">
+                    <button type="button" :data-active="substrate === 'light' ? 'true' : 'false'" :aria-pressed="substrate === 'light' ? 'true' : 'false'" @click="() => (substrate = 'light')" class="icons-gallery__substrate">
+                        {{ substrateLightLabel }}
                     </button>
-                    <button type="button" :data-active="themeMode === 'night' ? 'true' : 'false'" :aria-pressed="themeMode === 'night' ? 'true' : 'false'" @click="() => (themeMode = 'night')" class="icons-gallery__theme-btn">
-                        {{ themeNightLabel }}
+                    <button type="button" :data-active="substrate === 'night' ? 'true' : 'false'" :aria-pressed="substrate === 'night' ? 'true' : 'false'" @click="() => (substrate = 'night')" class="icons-gallery__substrate">
+                        {{ substrateNightLabel }}
                     </button>
                 </div>
+            </section>
+            <section :aria-labelledby="'icons-currentcolor'" class="icons-gallery__usage">
+                <h2 :id="'icons-currentcolor'">
+                    {{ currentColorTitle }}
+                </h2>
+                <p class="icons-gallery__usage-lead">
+                    {{ currentColorLead }}
+                </p>
+                <div class="icons-gallery__usage-row">
+                    <span class="icons-gallery__usage-sample">
+                        <Icon name="action.search" size="md" />
+                        {{ currentColorSampleText }}
+                    </span>
+                    <span class="icons-gallery__usage-sample icons-gallery__usage-sample--brand">
+                        <Icon name="action.search" size="md" />
+                        {{ currentColorSampleText }}
+                    </span>
+                    <span class="icons-gallery__usage-sample icons-gallery__usage-sample--success">
+                        <Icon name="status.success" size="md" />
+                        {{ currentColorSampleText }}
+                    </span>
+                    <span class="icons-gallery__usage-sample icons-gallery__usage-sample--danger">
+                        <Icon name="status.error" size="md" />
+                        {{ currentColorSampleText }}
+                    </span>
+                </div>
+                <pre class="icons-gallery__code">
+                    <code>
+                        {{ currentColorSnippet }}
+                    </code>
+                </pre>
             </section>
             <section v-for="group in filteredGroups" :key="group.prefix" :aria-labelledby="'icons-group-' + group.prefix" class="icons-group">
                 <h2 :id="'icons-group-' + group.prefix">
                     {{ group.label }}
+                    <code class="icons-group__prefix">
+                        {{ group.prefix }}
+                        .*
+                    </code>
                     <span class="icons-group__count">
                         {{ group.items.length }}
                     </span>
                 </h2>
-                <div class="icons-group__grid">
+                <div :data-substrate="substrate" class="icons-group__grid">
                     <button v-for="entry in group.items" :key="entry.name" type="button" :data-active="selectedName === entry.name ? 'true' : 'false'" @click="() => (selectedName = entry.name)" class="icon-card">
-                        <span class="icon-card__glyph" :style="{ fontSize: sizePx + 'px' }">
-                            <Icon :name="entry.name" :size="sizeToken" />
+                        <span class="icon-card__glyphs">
+                            <span v-for="col in sizeColumns" :key="col.px" :data-glyph-size="col.px" class="icon-card__glyph">
+                                <Icon :name="entry.name" size="md" />
+                                <span class="icon-card__glyph-size">
+                                    {{ col.px }}
+                                </span>
+                            </span>
                         </span>
                         <span class="icon-card__name">
                             {{ entry.name }}
@@ -52,13 +101,21 @@
                     </button>
                 </div>
             </section>
+            <p v-if="filteredGroups.length === 0" class="icons-gallery__empty">
+                {{ emptyLabel }}
+            </p>
             <section v-if="selectedEntry" aria-live="polite" class="icons-gallery__detail">
                 <h2>
                     {{ detailTitleLabel }}
                 </h2>
-                <div class="icons-gallery__detail-body">
-                    <div class="icons-gallery__detail-preview" :style="{ fontSize: (sizePx * 2) + 'px' }">
-                        <Icon :name="selectedEntry.name" :size="sizeToken" />
+                <div :data-substrate="substrate" class="icons-gallery__detail-body">
+                    <div class="icons-gallery__detail-preview">
+                        <span v-for="col in sizeColumns" :key="col.px" :data-glyph-size="col.px" class="icon-card__glyph">
+                            <Icon :name="selectedEntry.name" size="md" />
+                            <span class="icon-card__glyph-size">
+                                {{ col.px }}
+                            </span>
+                        </span>
                     </div>
                     <dl class="icons-gallery__detail-meta">
                         <dt>
@@ -78,16 +135,20 @@
                             </code>
                         </dd>
                     </dl>
-                    <pre class="icons-gallery__code">
-                        <code>
-                            {{ usageCode }}
-                        </code>
-                    </pre>
+                    <div class="icons-gallery__detail-snippets">
+                        <pre class="icons-gallery__code">
+                            <code>
+                                {{ usageSnippet }}
+                            </code>
+                        </pre>
+                        <pre class="icons-gallery__code">
+                            <code>
+                                {{ registrySnippet }}
+                            </code>
+                        </pre>
+                    </div>
                 </div>
             </section>
-            <p v-if="filteredGroups.length === 0" class="icons-gallery__empty">
-                {{ emptyLabel }}
-            </p>
         </main>
     </SiteShell>
 </template>
@@ -114,10 +175,8 @@
     font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
 .icons-gallery__toolbar {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
+    display: grid;
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
     padding: 1rem;
     border: 1px solid var(--vmz-line-default);
@@ -125,7 +184,8 @@
     background: var(--vmz-surface-paper);
 }
 .icons-gallery__search input {
-    width: min(18rem, 60vw);
+    width: min(20rem, 100%);
+    box-sizing: border-box;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
@@ -133,17 +193,47 @@
     color: var(--vmz-text-ink);
     background: var(--vmz-surface-paper);
 }
-.icons-gallery__size-switch,
-.icons-gallery__theme-switch {
+.icons-gallery__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+.icons-gallery__category {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: 999px;
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
+    font: 500 0.8rem / 1 var(--vmz-font-sans);
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+.icons-gallery__category:hover {
+    border-color: var(--vmz-text-steel);
+    color: var(--vmz-text-ink);
+}
+.icons-gallery__category[data-active="true"] {
+    border-color: var(--vmz-text-ink);
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-fill);
+}
+.icons-gallery__category-count {
+    font: 500 0.7rem / 1 var(--vmz-font-mono);
+    color: var(--vmz-text-steel);
+}
+.icons-gallery__substrate-switch {
     display: inline-flex;
     gap: 0.25rem;
+    width: fit-content;
     padding: 0.2rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
     background: var(--vmz-surface-paper);
 }
-.icons-gallery__size-btn,
-.icons-gallery__theme-btn {
+.icons-gallery__substrate {
     padding: 0.3rem 0.7rem;
     border: none;
     border-radius: var(--vmz-radius-sm);
@@ -153,13 +243,51 @@
     cursor: pointer;
     transition: background-color 120ms ease, color 120ms ease;
 }
-.icons-gallery__size-btn[data-active="true"],
-.icons-gallery__theme-btn[data-active="true"] {
+.icons-gallery__substrate[data-active="true"] {
     color: var(--vmz-text-ink);
     background: var(--vmz-surface-fill);
 }
-.icons-group {
+.icons-gallery__usage {
     margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+}
+.icons-gallery__usage h2 {
+    margin: 0 0 0.5rem;
+    color: var(--vmz-text-ink);
+    font: 600 1.15rem / 1.6 var(--vmz-font-display);
+}
+.icons-gallery__usage-lead {
+    margin: 0 0 1rem;
+    color: var(--vmz-text-steel);
+    font: 400 0.9rem / 1.7 var(--vmz-font-sans);
+}
+.icons-gallery__usage-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+    margin-bottom: 1rem;
+}
+.icons-gallery__usage-sample {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font: 400 0.95rem / 1.5 var(--vmz-font-sans);
+    color: var(--vmz-text-ink);
+}
+.icons-gallery__usage-sample--brand {
+    color: #1677ff;
+}
+.icons-gallery__usage-sample--success {
+    color: #16a34a;
+}
+.icons-gallery__usage-sample--danger {
+    color: #dc2626;
+}
+.icons-group {
+    margin-top: 1.75rem;
 }
 .icons-group h2 {
     display: flex;
@@ -168,6 +296,10 @@
     margin: 0 0 1rem;
     color: var(--vmz-text-ink);
     font: 600 1.25rem / 1.6 var(--vmz-font-display);
+}
+.icons-group__prefix {
+    font: 400 0.78rem / 1.4 var(--vmz-font-mono);
+    color: var(--vmz-text-steel);
 }
 .icons-group__count {
     font: 500 0.875rem / 1 var(--vmz-font-sans);
@@ -178,20 +310,20 @@
 }
 .icons-group__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
     gap: 0.75rem;
 }
 .icon-card {
     display: grid;
-    gap: 0.4rem;
-    padding: 0.9rem 0.6rem;
+    gap: 0.5rem;
+    padding: 0.75rem 0.6rem 0.6rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-ink);
     cursor: pointer;
     text-align: center;
-    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .icon-card:hover {
     border-color: var(--vmz-text-steel);
@@ -200,16 +332,53 @@
     border-color: var(--vmz-action-primary-background);
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--vmz-action-primary-background) 18%, transparent);
 }
+.icon-card__glyphs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    align-items: end;
+    gap: 0.25rem;
+}
 .icon-card__glyph {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.5rem;
+    display: grid;
+    justify-items: center;
+    gap: 0.2rem;
+    min-width: 0;
+}
+.icon-card__glyph-size {
+    font: 400 0.62rem / 1 var(--vmz-font-mono);
+    color: var(--vmz-text-steel);
+}
+/* Exact preview sizes: the package glyph box is `1em`, so the page only sets
+   font-size on the component host. Stroke width comes from the registry def
+   and stays untouched. */
+.icons-gallery [data-glyph-size="16"] .vmz-ui-icon {
+    font-size: 16px;
+}
+.icons-gallery [data-glyph-size="20"] .vmz-ui-icon {
+    font-size: 20px;
+}
+.icons-gallery [data-glyph-size="24"] .vmz-ui-icon {
+    font-size: 24px;
+}
+.icons-gallery [data-glyph-size="32"] .vmz-ui-icon {
+    font-size: 32px;
 }
 .icon-card__name {
     font: 400 0.68rem / 1.3 var(--vmz-font-mono);
     color: var(--vmz-text-steel);
     word-break: break-all;
+}
+/* Preview substrate toggle — strokes are checked against light and night
+   surfaces without touching the site theme. */
+.icons-group__grid[data-substrate="night"] .icon-card,
+.icons-gallery__detail-body[data-substrate="night"] .icons-gallery__detail-preview {
+    background: #0b1220;
+    border-color: #1f2937;
+    color: #e5e7eb;
+}
+.icons-group__grid[data-substrate="night"] .icon-card__name,
+.icons-group__grid[data-substrate="night"] .icon-card__glyph-size {
+    color: #9ca3af;
 }
 .icons-gallery__detail {
     margin-top: 2rem;
@@ -235,14 +404,12 @@
     }
 }
 .icons-gallery__detail-preview {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: flex;
+    align-items: end;
+    gap: 1rem;
     padding: 1rem;
     border: 1px dashed var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
-    min-width: 6rem;
-    min-height: 6rem;
 }
 .icons-gallery__detail-meta {
     margin: 0;
@@ -260,14 +427,20 @@
     font: 400 0.875rem / 1.4 var(--vmz-font-mono);
     color: var(--vmz-text-ink);
 }
+.icons-gallery__detail-snippets {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+}
 .icons-gallery__code {
     margin: 0;
-    padding: 1rem;
+    padding: 0.8rem 1rem;
     border-radius: var(--vmz-radius-md);
     background: var(--vmz-surface-fill);
     overflow-x: auto;
-    font: 400 0.8rem / 1.5 var(--vmz-font-mono);
+    font: 400 0.78rem / 1.55 var(--vmz-font-mono);
     color: var(--vmz-text-ink);
+    white-space: pre;
 }
 .icons-gallery__empty {
     margin-top: 2rem;
@@ -291,6 +464,12 @@
 import { REGISTRY, type IconDef } from "@vmz/ui-icons/registry";
 import { pageMeta } from "../page-meta.ts";
 
+/**
+ * 图标浏览页 — 分组、搜索、筛选与尺寸预览全部由 `@vmz/ui-icons` 的
+ * `REGISTRY` 驱动；页面不持有任何图标数据、路径或映射表副本（由
+ * `tests/icon-duplication.gate.mjs` 强制）。渲染经公开 `Icon` 组件完成。
+ */
+
 interface IconEntry {
     name: string;
     def: IconDef;
@@ -302,88 +481,116 @@ interface IconGroup {
     items: IconEntry[];
 }
 
-const PREFIX_LABELS: Record<string, string> = {
+interface CategoryFilter {
+    prefix: string;
+    label: string;
+    count: number;
+}
+
+/** 分类中文名是页面文案，不是图标数据；前缀集合始终从 registry 键派生。 */
+const CATEGORY_LABELS: Record<string, string> = {
     action: "操作",
+    brand: "品牌",
+    commerce: "商业",
+    data: "数据",
+    develop: "开发",
+    device: "设备",
+    editor: "编辑器",
+    feature: "特性",
+    file: "文件",
+    git: "Git",
+    media: "媒体",
     nav: "导航",
+    social: "社交",
     status: "状态",
     tool: "工具",
-    feature: "特性",
 };
 
-const SIZE_TO_TOKEN: Record<number, string> = {
-    16: "sm",
-    20: "md",
-    24: "lg",
-};
+function prefixOf(name: string): string {
+    const dot = name.indexOf(".");
+    return dot > 0 ? name.slice(0, dot) : "other";
+}
 
-function buildGroups(query: string): IconGroup[] {
-    const q = query.trim().toLowerCase();
-    const filtered: Record<string, IconEntry[]> = {};
+function labelOf(prefix: string): string {
+    return CATEGORY_LABELS[prefix] ?? prefix;
+}
+
+/** Registry 键的首次出现顺序即分类顺序（与包内模块顺序一致）。 */
+function collectGroups(): IconGroup[] {
+    const byPrefix = new Map<string, IconEntry[]>();
     for (const name of Object.keys(REGISTRY)) {
-        if (q && !name.toLowerCase().includes(q)) continue;
-        const dot = name.indexOf(".");
-        const prefix = dot > 0 ? name.slice(0, dot) : "other";
-        if (!filtered[prefix]) filtered[prefix] = [];
-        filtered[prefix].push({ name, def: REGISTRY[name] });
+        const prefix = prefixOf(name);
+        if (!byPrefix.has(prefix)) byPrefix.set(prefix, []);
+        byPrefix.get(prefix)!.push({ name, def: REGISTRY[name] });
     }
     const groups: IconGroup[] = [];
-    const order = ["action", "nav", "status", "tool", "feature"];
-    for (const p of order) {
-        if (filtered[p]) {
-            filtered[p].sort((a, b) => a.name.localeCompare(b.name));
-            groups.push({
-                prefix: p,
-                label: PREFIX_LABELS[p] ?? p,
-                items: filtered[p],
-            });
-        }
-    }
-    for (const p of Object.keys(filtered).sort()) {
-        if (order.includes(p)) continue;
-        filtered[p].sort((a, b) => a.name.localeCompare(b.name));
-        groups.push({ prefix: p, label: PREFIX_LABELS[p] ?? p, items: filtered[p] });
+    for (const [prefix, items] of byPrefix) {
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        groups.push({ prefix, label: labelOf(prefix), items });
     }
     return groups;
 }
 
+const ALL_GROUPS = collectGroups();
+
 export default class IconGalleryPage {
     static meta = pageMeta(
-        "图标预览 · VMZ",
-        "Icon gallery · VMZ",
-        "浏览 VMZ 官方图标库的语义名、尺寸与主题切换。",
-        "Browse the VMZ icon registry with semantic names, sizes, and theme toggle.",
+        "图标库 · VMZ",
+        "Icon library · VMZ",
+        "浏览 @vmz/ui-icons registry 的全部语义图标：15 个分类、四种尺寸、深浅底核对与 currentColor 用法。",
+        "Browse the full @vmz/ui-icons registry: 15 categories, four sizes, light/night substrates and currentColor usage.",
     );
 
     kickerLabel = "VMZ · UI Icons";
-    titleLabel = "图标预览";
-    leadLabel = "消费 @vmz/ui-icons registry 的语义图标。按前缀分组，支持搜索、尺寸切换与主题切换。";
-    searchPlaceholderLabel = "输入语义名，如 action.search";
-    sizeAriaLabel = "图标尺寸";
-    themeAriaLabel = "主题模式";
-    themeLightLabel = "浅色";
-    themeNightLabel = "深色";
+    titleLabel = "图标库";
+    toolbarAriaLabel = "图标浏览控制";
+    searchPlaceholderLabel = "搜索语义名，如 action.search";
+    categoryAriaLabel = "按分类筛选";
+    allCategoriesLabel = "全部";
+    substrateAriaLabel = "预览底色";
+    substrateLightLabel = "浅色底";
+    substrateNightLabel = "深色底";
+    currentColorTitle = "currentColor 用法";
+    currentColorLead = "图标描边与填充都继承 CSS color，放进任何文字颜色环境即自动跟随，无需额外变量。";
+    currentColorSampleText = "文字内嵌";
     detailTitleLabel = "图标详情";
     detailNameLabel = "语义名";
     detailKindLabel = "类型";
-    emptyLabel = "没有匹配的图标，换个关键词试试。";
+    emptyLabel = "没有匹配的图标，换个关键词或分类试试。";
 
     searchQuery = "";
-    sizePx = 24;
-    themeMode: "light" | "night" = "light";
+    activeCategory = "";
+    substrate: "light" | "night" = "light";
     selectedName = "";
 
-    sizeOptions = [
-        { value: 16, label: "16px" },
-        { value: 20, label: "20px" },
-        { value: 24, label: "24px" },
-    ];
+    sizeColumns = [{ px: 16 }, { px: 20 }, { px: 24 }, { px: 32 }];
 
-    get sizeToken(): string {
-        return SIZE_TO_TOKEN[this.sizePx] ?? "md";
+    currentColorSnippet = `<span style="color: #1677ff">\n    <Icon name="action.search" size="md" />\n    搜索\n</span>`;
+
+    get totalCount(): number {
+        return Object.keys(REGISTRY).length;
+    }
+
+    get leadLabel(): string {
+        return `全部 ${this.totalCount} 个语义图标直接来自 @vmz/ui-icons registry，按 ${ALL_GROUPS.length} 个分类分组。每个图标以 16 / 20 / 24 / 32 px 实渲染，描边重量由 registry 定义决定；切换深浅底可核对描边表现。`;
+    }
+
+    get categoryFilters(): CategoryFilter[] {
+        return ALL_GROUPS.map((group) => ({
+            prefix: group.prefix,
+            label: group.label,
+            count: group.items.length,
+        }));
     }
 
     get filteredGroups(): IconGroup[] {
-        return buildGroups(this.searchQuery);
+        const q = this.searchQuery.trim().toLowerCase();
+        return ALL_GROUPS.filter((group) => this.activeCategory === "" || group.prefix === this.activeCategory)
+            .map((group) => ({
+                ...group,
+                items: group.items.filter((entry) => !q || entry.name.toLowerCase().includes(q)),
+            }))
+            .filter((group) => group.items.length > 0);
     }
 
     get selectedEntry(): IconEntry | null {
@@ -392,10 +599,14 @@ export default class IconGalleryPage {
         return def ? { name: this.selectedName, def } : null;
     }
 
-    get usageCode(): string {
+    get usageSnippet(): string {
         if (!this.selectedEntry) return "";
-        const size = SIZE_TO_TOKEN[this.sizePx] ?? "md";
-        return `<Icon name="${this.selectedEntry.name}" size="${size}" />`;
+        return `<Icon name="${this.selectedEntry.name}" size="md" />`;
+    }
+
+    get registrySnippet(): string {
+        if (!this.selectedEntry) return "";
+        return `import { REGISTRY } from "@vmz/ui-icons/registry";\n\nREGISTRY["${this.selectedEntry.name}"].kind // "${this.selectedEntry.def.kind}"`;
     }
 }
 </script>
