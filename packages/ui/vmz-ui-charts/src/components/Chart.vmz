@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="chart" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @mousedown="_onMouseDown" @mouseup="_onMouseUp" @click="_onClick" @keydown="_onKeydown" class="vmz-ui-charts__chart" :style="hostStyle" :data-theme="_themeName()" tabindex="0" role="img" :aria-label="_ariaLabel()" :aria-describedby="_srId()">
+    <div data-vmz-ui-charts="chart" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @mousedown="_onMouseDown" @mouseup="_onMouseUp" @click="_onClick" @keydown="_onKeydown" class="vmz-ui-charts__chart" :style="hostStyle" :data-theme="_themeName()" tabindex="0" :role="tableView ? 'group' : 'img'" :aria-label="_ariaLabel()" :aria-describedby="_describedBy()">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">
             No chart spec or data.
         </div>
@@ -7,7 +7,8 @@
             <div v-if="_hasError()" class="vmz-ui-charts__error-banner">
                 Chart compile failed — see diagnostics below.
             </div>
-            <div v-html="markup()" class="vmz-ui-charts__svg" />
+            <div v-if="tableView" class="vmz-ui-charts__table-view" v-html="_tableHtml()" />
+            <div v-if="!tableView" v-html="markup()" class="vmz-ui-charts__svg" />
         </div>
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
             <div v-for="(d, i) in diagnostics" :key="i" :data-sev="d.severity" class="vmz-ui-charts__diag-item">
@@ -23,6 +24,7 @@
             {{ _tooltip.text }}
         </div>
         <div class="vmz-ui-charts__sr" :id="_srId()">{{ _summary() }}</div>
+        <div v-if="!tableView && !_isEmpty()" class="vmz-ui-charts__sr" :id="_srTableId()" v-html="_tableHtml()" />
     </div>
 </template>
 <style>
@@ -181,6 +183,49 @@
     background: rgba(249, 250, 251, 0.95);
     color: #111827;
 }
+/* 数据表降级视图：同一组件的原生表格渲染。 */
+.vmz-ui-charts__table-view {
+    overflow: auto;
+    max-height: 100%;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+.vmz-ui-charts__table-view table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.vmz-ui-charts__table-view caption {
+    text-align: left;
+    padding: 6px 8px;
+    font-weight: 600;
+    color: var(--vmz-text-strong, #111827);
+}
+.vmz-ui-charts__table-view th,
+.vmz-ui-charts__table-view td {
+    text-align: left;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--vmz-line-default, #e5e7eb);
+    white-space: nowrap;
+}
+.vmz-ui-charts__table-view th {
+    color: var(--vmz-text-muted, #6b7280);
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    background: var(--vmz-surface-paper, #ffffff);
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__table-view caption {
+    color: var(--vmz-text-strong-dark, #f3f4f6);
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__table-view th,
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__table-view td {
+    border-bottom-color: var(--vmz-line-default-dark, #1f2937);
+    color: #e5e7eb;
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__table-view th {
+    background: var(--vmz-surface-paper-dark, #0b1220);
+    color: var(--vmz-text-muted-dark, #9ca3af);
+}
 .vmz-ui-charts__sr {
     position: absolute;
     width: 1px;
@@ -254,6 +299,8 @@ interface NavTarget {
 const FALLBACK_WIDTH = 640;
 const FALLBACK_HEIGHT = 360;
 const HIT_TOLERANCE_PX = 8;
+/** 数据表视图的最大渲染行数（超出截断并标注）。 */
+const TABLE_MAX_ROWS = 1000;
 
 export default class Chart {
     /** DaVinci ChartSpec（mark + encoding）。 */
@@ -273,6 +320,9 @@ export default class Chart {
     /** 宿主显式提供的 SVG 资源 id 前缀。null 时从声明式输入确定性派生，
      *  同页多实例不撞 id；需要绝对唯一（例如同 spec 重复内联）时由宿主传入。 */
     public resourceIdPrefix: string | null = null;
+    /** true 时用原生数据表代替 SVG 渲染（降级视图）；false 时表格仍以视觉
+     *  隐藏形式挂在 `aria-describedby` 上供读屏器取数。 */
+    public tableView: boolean = false;
 
     /** 交互 runtime state。 */
     public state: RuntimeState | null = null;
@@ -447,6 +497,58 @@ export default class Chart {
 
     public _srId(): string {
         return `${this._resourcePrefix()}summary`;
+    }
+
+    /** 隐藏数据表的 id（aria-describedby 的第二段）。 */
+    public _srTableId(): string {
+        return `${this._resourcePrefix()}table`;
+    }
+
+    /** aria-describedby：摘要 + 隐藏数据表（表格视图下表格本身可读，不再重复引用）。 */
+    public _describedBy(): string {
+        if (this.tableView) return this._srId();
+        return `${this._srId()} ${this._srTableId()}`;
+    }
+
+    // ---- 数据表降级视图 ----
+
+    /** 表格列：按 spec 编码顺序取字段，facet / key 字段收尾，去重。 */
+    public _tableFields(): string[] {
+        if (!this.spec) return [];
+        const fields: string[] = [];
+        for (const enc of this.spec.encoding) {
+            if (!fields.includes(enc.field)) fields.push(enc.field);
+        }
+        if (this.spec.facetField && !fields.includes(this.spec.facetField)) fields.push(this.spec.facetField);
+        if (this.spec.keyField && !fields.includes(this.spec.keyField)) fields.push(this.spec.keyField);
+        return fields;
+    }
+
+    /** 真实数据的 HTML 表（表格视图与屏幕阅读器隐藏表共用）。超过 1000 行
+     *  截断并显式标注余量，避免万行 DOM 拖垮页面。 */
+    public _tableHtml(): string {
+        const snap = this.snapshot ?? (this.data ? fromRows(this.data) : null);
+        if (!snap) return "";
+        const fields = this._tableFields();
+        if (fields.length === 0) return "";
+        const total = snap.rowCount;
+        const shown = Math.min(total, TABLE_MAX_ROWS);
+        let html = `<table><caption>${escapeHtml(this._ariaLabel())}</caption><thead><tr>`;
+        for (const f of fields) {
+            html += `<th scope="col">${escapeHtml(f)}</th>`;
+        }
+        html += "</tr></thead><tbody>";
+        for (let r = 0; r < shown; r++) {
+            html += "<tr>";
+            for (const f of fields) {
+                html += `<td>${escapeHtml(formatCell(readCell(snap, f, r)))}</td>`;
+            }
+            html += "</tr>";
+        }
+        if (shown < total) {
+            html += `<tr><td colspan="${fields.length}">… ${total - shown} more rows not listed</td></tr>`;
+        }
+        return html + "</tbody></table>";
     }
 
     public _markCount(): number {
@@ -1314,6 +1416,15 @@ function fromZoomSpace(kind: string | null, z: number): number {
 /** RGBA → CSS 颜色串（crosshair 点标记用）。 */
 function rgbaCss(c: RGBA): string {
     return `rgba(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)}, ${c.a})`;
+}
+
+/** HTML 转义（数据表单元格 / caption）。 */
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }
 
 /** 数值格式化成短标签（最多两位小数，去尾零）。 */

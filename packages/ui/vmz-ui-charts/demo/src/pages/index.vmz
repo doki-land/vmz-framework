@@ -44,6 +44,17 @@
 
         <section class="card">
             <header class="card__head">
+                <h2>数据表视图 · 可切换降级</h2>
+                <p>同一 Chart 组件切到原生表格渲染,图表形态下读屏器也能经 aria-describedby 拿到隐藏表格。</p>
+            </header>
+            <button type="button" class="gallery__theme" @click="() => toggleTable()">{{ tableView ? "Chart view" : "Table view" }}</button>
+            <div class="card__canvas">
+                <Chart :spec="tableSpec" :data="tableRows" :height="300" :theme="dark ? 'dark' : 'light'" :tableView="tableView" label="weekly visitors by product" />
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card__head">
                 <h2>流程图 · 编译管线</h2>
                 <p>边裁剪到节点边界,箭头真实绘制,边标签带底衬不被线段穿过。</p>
             </header>
@@ -226,6 +237,8 @@ export default class IndexPage {
             darkPieRows: galleryExample("donut-share").rows,
             darkRadarSpec: galleryExample("radar-score").spec,
             darkRadarRows: galleryExample("radar-score").rows,
+            tableSpec: galleryExample("line-weekly").spec,
+            tableRows: galleryExample("line-weekly").rows,
         };
     }
 
@@ -242,10 +255,17 @@ export default class IndexPage {
     public darkPieRows: any[] = [];
     public darkRadarSpec: any = null;
     public darkRadarRows: any[] = [];
+    public tableSpec: any = null;
+    public tableRows: any[] = [];
+    public tableView: boolean = false;
     public perfReport: string[] = ["measuring…"];
 
     toggleDark() {
         this.dark = !this.dark;
+    }
+
+    toggleTable() {
+        this.tableView = !this.tableView;
     }
 
     onMount() {
