@@ -26,7 +26,7 @@
         <section class="card">
             <header class="card__head">
                 <h2>暗色主题 · 跟随切换</h2>
-                <p>本区三张图响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。</p>
+                <p>本区图表响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。</p>
             </header>
             <div class="card__canvas">
                 <Chart :spec="darkLineSpec" :data="darkLineRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed line" />
@@ -36,6 +36,9 @@
             </div>
             <div class="card__canvas">
                 <Chart :spec="darkPieSpec" :data="darkPieRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed donut" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="darkRadarSpec" :data="darkRadarRows" :height="300" :theme="dark ? 'dark' : 'light'" label="dark themed radar" />
             </div>
         </section>
 
@@ -221,6 +224,8 @@ export default class IndexPage {
             darkBarRows: galleryExample("bar-delta").rows,
             darkPieSpec: galleryExample("donut-share").spec,
             darkPieRows: galleryExample("donut-share").rows,
+            darkRadarSpec: galleryExample("radar-score").spec,
+            darkRadarRows: galleryExample("radar-score").rows,
         };
     }
 
@@ -235,6 +240,8 @@ export default class IndexPage {
     public darkBarRows: any[] = [];
     public darkPieSpec: any = null;
     public darkPieRows: any[] = [];
+    public darkRadarSpec: any = null;
+    public darkRadarRows: any[] = [];
     public perfReport: string[] = ["measuring…"];
 
     toggleDark() {

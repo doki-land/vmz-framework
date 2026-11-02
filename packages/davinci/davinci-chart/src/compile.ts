@@ -13,7 +13,7 @@ import { apply as scaleApply, type Scale } from "./scale.js";
 /** Mark kind (geometric primitive family). Only marks with real scene
  *  geometry are listed — an authoring surface can never name a mark the
  *  engine would silently drop. */
-export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area" | "pie";
+export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area" | "pie" | "radar";
 
 /** Encoding channel — how a data field maps to a visual property. */
 export interface EncodingChannel {
@@ -87,7 +87,7 @@ export interface ChartCompilePlan {
 const seriesChannels: ReadonlySet<string> = new Set(["series", "color", "group"]);
 
 /** Mark kinds measured from a zero baseline. */
-const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area"]);
+const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area", "radar"]);
 
 /** Channels whose value decides whether a row can be positioned at all. */
 const positionChannels: ReadonlySet<string> = new Set(["x", "y", "theta"]);
@@ -95,7 +95,7 @@ const positionChannels: ReadonlySet<string> = new Set(["x", "y", "theta"]);
 /** Mark kinds with real scene geometry. Kept in sync with the scene
  *  builder; `compile` refuses anything else instead of rendering an empty
  *  chart with no explanation. */
-const implementedMarks: ReadonlySet<string> = new Set(["bar", "rect", "line", "point", "circle", "area", "pie"]);
+const implementedMarks: ReadonlySet<string> = new Set(["bar", "rect", "line", "point", "circle", "area", "pie", "radar"]);
 
 /** Resolve the effective series layout. `undefined` is the natural per-mark
  *  default: grouped bars dodge, everything else overlaps. */
@@ -118,7 +118,7 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             diag(
                 "error",
                 "davinci.chart.unsupported-mark",
-                `mark "${String(spec.mark)}" has no scene geometry; implemented marks are bar, rect, line, point, circle, area, pie`,
+                `mark "${String(spec.mark)}" has no scene geometry; implemented marks are bar, rect, line, point, circle, area, pie, radar`,
                 String(spec.mark),
             ),
         );
@@ -197,6 +197,31 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 spec.seriesLayout,
             ),
         );
+    }
+    if (spec.mark === "radar") {
+        // A radar web needs at least three spokes to read as a shape — one or
+        // two dimensions draw a degenerate fan, so say so instead of
+        // rendering a confusing chart.
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        if (xCol) {
+            const dims = new Set<string>();
+            for (const v of xCol.values) {
+                if (v === null || v === undefined) continue;
+                if (typeof v === "number" && !Number.isFinite(v)) continue;
+                dims.add(String(v));
+            }
+            if (dims.size > 0 && dims.size < 3) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.radar-few-dimensions",
+                        `radar reads as a shape with at least 3 dimensions, got ${dims.size}`,
+                        xEnc?.field,
+                    ),
+                );
+            }
+        }
     }
     if (layout === "stack" && spec.mark !== "bar" && spec.mark !== "rect" && spec.mark !== "area") {
         diagnostics.push(

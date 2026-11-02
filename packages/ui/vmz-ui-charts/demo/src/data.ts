@@ -157,6 +157,33 @@ const DONUT_SHARE: GalleryExample = {
     ],
 };
 
+const RADAR_SCORE: GalleryExample = {
+    id: "radar-score",
+    title: "雷达 · 两款产品五维评分",
+    note: "极坐标网按维度展开,环刻度是真实数值域;悬停顶点读单元格原值。",
+    spec: {
+        mark: "radar",
+        keyField: "id",
+        encoding: [
+            { field: "dim", channel: "x" },
+            { field: "score", channel: "y" },
+            { field: "product", channel: "color" },
+        ],
+    },
+    rows: [
+        { id: "a-0", dim: "性能", score: 82, product: "Console" },
+        { id: "a-1", dim: "稳定", score: 68, product: "Console" },
+        { id: "a-2", dim: "功能", score: 91, product: "Console" },
+        { id: "a-3", dim: "生态", score: 47, product: "Console" },
+        { id: "a-4", dim: "文档", score: 73, product: "Console" },
+        { id: "b-0", dim: "性能", score: 58, product: "Insight" },
+        { id: "b-1", dim: "稳定", score: 86, product: "Insight" },
+        { id: "b-2", dim: "功能", score: 62, product: "Insight" },
+        { id: "b-3", dim: "生态", score: 77, product: "Insight" },
+        { id: "b-4", dim: "文档", score: 52, product: "Insight" },
+    ],
+};
+
 const AREA_TRAFFIC: GalleryExample = {
     id: "area-traffic",
     title: "面积 · 流量构成",
@@ -268,6 +295,7 @@ export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     STACK_SALES,
     PIE_SHARE,
     DONUT_SHARE,
+    RADAR_SCORE,
     AREA_TRAFFIC,
     SCATTER_LATENCY,
     NEGATIVE_DELTAS,

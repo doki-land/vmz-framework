@@ -542,6 +542,9 @@ export default class Chart {
         if (id.startsWith("line:") || id.startsWith("area:")) {
             return id.slice(id.indexOf(":") + 1);
         }
+        if (id.startsWith("radar-series:")) {
+            return id.slice("radar-series:".length);
+        }
         return id;
     }
 

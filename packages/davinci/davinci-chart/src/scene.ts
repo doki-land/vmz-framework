@@ -24,7 +24,7 @@ import {
     type SemanticNode,
     type SemanticScene,
 } from "@doki-land/davinci-scene";
-import { resolveSeriesLayout, type ChartCompilePlan } from "./compile.js";
+import { resolveSeriesLayout, type ChartCompilePlan, type PlanMark } from "./compile.js";
 import { column, type DataColumn } from "./data.js";
 import { apply, bandwidth, formatTickLabel, niceLinearTicks, type Scale } from "./scale.js";
 import { DEFAULT_CHART_THEME, type ChartTheme } from "./theme.js";
@@ -130,6 +130,26 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
         const children: SemanticNode[] = [];
         if (plot.w > 0 && plot.h > 0) {
             children.push(...buildPie(plan, plot, seriesCategories, theme));
+            children.push(...buildLegend(plan, plot, legendItems, theme));
+        }
+        return {
+            version: SCENE_VERSION,
+            root: {
+                kind: "group",
+                id: "chart-root",
+                role: "group",
+                children,
+            },
+        };
+    }
+
+    // Radar marks replace the cartesian frame with a polar web: spoke lines,
+    // tick rings and dimension labels around the plot. Series polygons and
+    // vertices stay ordinary marks with stable ids.
+    if (plan.spec.mark === "radar") {
+        const children: SemanticNode[] = [];
+        if (plot.w > 0 && plot.h > 0) {
+            children.push(...buildRadar(plan, plot, seriesCategories, theme));
             children.push(...buildLegend(plan, plot, legendItems, theme));
         }
         return {
@@ -593,6 +613,206 @@ function sliceCommands(
         { kind: "arc", rx: rInner, ry: rInner, xRot: 0, largeArc, sweep: false, to: inner(a0) },
         { kind: "close" },
     ];
+}
+
+// ─── Radar (polar web) ───────────────────────────────────────────────────
+
+/** Dimension labels truncate into this budget so long names never collide. */
+const RADAR_LABEL_BUDGET = 96;
+/** Vertex glyph radius — smaller than scatter points, vertices sit on lines. */
+const RADAR_VERTEX_RADIUS = 3;
+
+/** Build a radar web: tick rings + spokes as the quiet grid, dimension and
+ *  value labels as axis furniture, and one closed polygon per series with a
+ *  vertex mark per row (vertex ids carry the row key, so tooltips read real
+ *  cell values through the shared mark path). */
+function buildRadar(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    if (!xEnc || !yEnc) return [];
+    const xCol = column(plan.resolvedData, xEnc.field);
+    const yCol = column(plan.resolvedData, yEnc.field);
+    if (!xCol || !yCol) return [];
+
+    // Dimension order: the band domain when x is categorical, otherwise the
+    // first-appearance order of usable values (radar never positions by a
+    // quantitative x — spokes are nominal slots either way).
+    const xScale = plan.scales.get(xEnc.channel);
+    let dims: string[];
+    if (xScale && xScale.kind === "band") {
+        dims = xScale.domain.map((d) => String(d));
+    } else {
+        const seen = new Set<string>();
+        for (const v of xCol.values) {
+            if (v === null || v === undefined) continue;
+            if (typeof v === "number" && !Number.isFinite(v)) continue;
+            const key = String(v);
+            if (!seen.has(key)) {
+                seen.add(key);
+            }
+        }
+        dims = [...seen];
+    }
+    const n = dims.length;
+    if (n === 0) return [];
+
+    const yScale = plan.scales.get(yEnc.channel);
+    if (!yScale || yScale.kind !== "linear") return [];
+    const [lo, hi] = yScale.domain;
+    const span = hi - lo;
+
+    const cx = plot.x + plot.w / 2;
+    const cy = plot.y + plot.h / 2;
+    const angleOf = (i: number): number => PIE_START_ANGLE + (i / n) * Math.PI * 2;
+
+    // Dimension labels sit outside the web. The outer radius reserves each
+    // label's radial half-extent (width near the side spokes, height near top
+    // and bottom) so labels stay inside the plot without clipping.
+    const dimLabels = dims.map((d) => truncateToWidth(d, RADAR_LABEL_BUDGET, theme.labelFont.sizePx));
+    let reserve = 0;
+    for (let i = 0; i < n; i++) {
+        const a = angleOf(i);
+        const size = estimateTextSize(dimLabels[i], theme.labelFont.sizePx);
+        const radialHalf = (Math.abs(Math.cos(a)) * size.width) / 2 + (Math.abs(Math.sin(a)) * size.height) / 2;
+        reserve = Math.max(reserve, LABEL_GAP + radialHalf);
+    }
+    const rOuter = Math.max(0, Math.min(plot.w, plot.h) / 2 - reserve);
+    if (rOuter <= 0) return [];
+
+    /** Radius in pixels for a data value — the web maps the domain linearly,
+     *  so ring ticks keep their data meaning. A degenerate domain (all values
+     *  equal) places every vertex on the outer ring. */
+    const radiusOf = (v: number): number => (span > 0 ? ((v - lo) / span) * rOuter : rOuter);
+    const vertex = (i: number, r: number): { x: number; y: number } => {
+        const a = angleOf(i);
+        return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+    };
+
+    const nodes: SemanticNode[] = [];
+    const ticks = niceLinearTicks([lo, hi]);
+
+    // Tick rings — regular n-gons at each tick radius, quietest layer. The
+    // minimum tick collapses to the center point and is skipped.
+    if (theme.gridStroke) {
+        for (const t of ticks.values) {
+            const r = radiusOf(t);
+            if (r <= 0) continue;
+            const ring: PathCommand[] = [{ kind: "move", to: vertex(0, r) }];
+            for (let i = 1; i < n; i++) ring.push({ kind: "line", to: vertex(i, r) });
+            ring.push({ kind: "close" });
+            nodes.push({
+                kind: "path",
+                id: `radar:ring:${formatTickLabel(t, ticks.decimals)}`,
+                role: "chart.grid",
+                path: { commands: ring },
+                stroke: { color: theme.gridStroke, width: theme.gridStrokeWidth },
+            });
+        }
+        // Spokes from the center to each dimension's outer vertex.
+        for (let i = 0; i < n; i++) {
+            nodes.push({
+                kind: "path",
+                id: `radar:spoke:${dims[i]}`,
+                role: "chart.grid",
+                path: { commands: [{ kind: "move", to: { x: cx, y: cy } }, { kind: "line", to: vertex(i, rOuter) }] },
+                stroke: { color: theme.gridStroke, width: theme.gridStrokeWidth },
+            });
+        }
+    }
+
+    // Axis furniture: ring value labels along the top spoke, dimension labels
+    // outside the web.
+    const axisChildren: SemanticNode[] = [];
+    for (const t of ticks.values) {
+        const r = radiusOf(t);
+        if (r <= 0) continue;
+        axisChildren.push({
+            kind: "text",
+            id: `radar:tick:${formatTickLabel(t, ticks.decimals)}`,
+            role: "chart.axis",
+            text: formatTickLabel(t, ticks.decimals),
+            font: theme.labelFont,
+            anchor: { x: cx + LABEL_GAP / 2 + estimateTextSize(formatTickLabel(t, ticks.decimals), theme.labelFont.sizePx).width / 2, y: cy - r },
+            color: theme.labelColor,
+        });
+    }
+    for (let i = 0; i < n; i++) {
+        const a = angleOf(i);
+        const size = estimateTextSize(dimLabels[i], theme.labelFont.sizePx);
+        const radialHalf = (Math.abs(Math.cos(a)) * size.width) / 2 + (Math.abs(Math.sin(a)) * size.height) / 2;
+        const anchorR = rOuter + LABEL_GAP + radialHalf;
+        axisChildren.push({
+            kind: "text",
+            id: `radar:dim:${dims[i]}`,
+            role: "chart.axis",
+            text: dimLabels[i],
+            font: theme.labelFont,
+            anchor: { x: cx + anchorR * Math.cos(a), y: cy + anchorR * Math.sin(a) },
+            color: theme.labelColor,
+        });
+    }
+    if (axisChildren.length > 0) {
+        nodes.push({ kind: "group", id: "radar-axis", role: "chart.axis", children: axisChildren });
+    }
+
+    // One closed polygon per series, plus a vertex mark per data row. Rows
+    // are matched to their dimension slot by value; a series missing a
+    // dimension simply skips that vertex (never fabricates a zero).
+    const bySeries = new Map<string | null, PlanMark[]>();
+    for (const mark of plan.marks) {
+        const bucket = bySeries.get(mark.series);
+        if (bucket) bucket.push(mark);
+        else bySeries.set(mark.series, [mark]);
+    }
+    for (const [name, marks] of bySeries) {
+        const points: { mark: PlanMark; x: number; y: number; dimIndex: number }[] = [];
+        for (const mark of marks) {
+            const rawX = xCol.values[mark.rowIndex];
+            const rawY = yCol.values[mark.rowIndex];
+            if (rawX === null || rawX === undefined) continue;
+            if (typeof rawY !== "number" || !Number.isFinite(rawY)) continue;
+            const dimIndex = dims.indexOf(String(rawX));
+            if (dimIndex < 0) continue;
+            const p = vertex(dimIndex, radiusOf(rawY));
+            points.push({ mark, x: p.x, y: p.y, dimIndex });
+        }
+        if (points.length === 0) continue;
+        points.sort((a, b) => a.dimIndex - b.dimIndex);
+        const color = seriesColor(theme, seriesCategories, name);
+        const commands: PathCommand[] = [{ kind: "move", to: { x: points[0].x, y: points[0].y } }];
+        for (const p of points.slice(1)) commands.push({ kind: "line", to: { x: p.x, y: p.y } });
+        commands.push({ kind: "close" });
+        const seriesId = name ?? "series";
+        nodes.push({
+            kind: "path",
+            id: `radar-series:${seriesId}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["series", seriesId] },
+            path: { commands },
+            fill: { color: { ...color, a: theme.areaFillOpacity } },
+            stroke: { color, width: LINE_STROKE_WIDTH },
+        });
+        for (const p of points) {
+            nodes.push({
+                kind: "ellipse",
+                id: `radar:${p.mark.key}`,
+                role: "chart.mark",
+                source: { domain: "chart", path: ["mark", p.mark.key] },
+                cx: p.x,
+                cy: p.y,
+                rx: RADAR_VERTEX_RADIUS,
+                ry: RADAR_VERTEX_RADIUS,
+                fill: { color },
+                ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
+            });
+        }
+    }
+    return nodes;
 }
 
 // ─── Guides: grid, baselines, ticks, labels, legend ──────────────────────

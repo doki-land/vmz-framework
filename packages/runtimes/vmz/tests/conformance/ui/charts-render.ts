@@ -1715,6 +1715,141 @@ console.log('charts-render: pie refuses bad authoring loudly…');
     if (Math.abs(sec.a1 - sec.a0 - Math.PI * 2) > 1e-6) fail('single surviving slice must cover the circle');
 }
 
+// ─── Radar (polar web) ───────────────────────────────────────────────────
+
+console.log('charts-render: radar draws a polar web with real geometry…');
+{
+    const radarSpec = {
+        mark: 'radar',
+        keyField: 'id',
+        encoding: [
+            { field: 'dim', channel: 'x' },
+            { field: 'score', channel: 'y' },
+            { field: 'product', channel: 'color' },
+        ],
+    };
+    const dims = ['速度', '稳定性', '功能', '生态', '文档'];
+    const radarRows = [
+        { id: 'a-0', dim: '速度', score: 80, product: 'alpha' },
+        { id: 'a-1', dim: '稳定性', score: 65, product: 'alpha' },
+        { id: 'a-2', dim: '功能', score: 90, product: 'alpha' },
+        { id: 'a-3', dim: '生态', score: 45, product: 'alpha' },
+        { id: 'a-4', dim: '文档', score: 70, product: 'alpha' },
+        { id: 'b-0', dim: '速度', score: 55, product: 'beta' },
+        { id: 'b-1', dim: '稳定性', score: 85, product: 'beta' },
+        { id: 'b-2', dim: '功能', score: 60, product: 'beta' },
+        { id: 'b-3', dim: '生态', score: 75, product: 'beta' },
+        { id: 'b-4', dim: '文档', score: 50, product: 'beta' },
+    ];
+    const { plan, semantic, svg } = pipeline(radarSpec, radarRows);
+
+    // Web structure: spokes per dimension, tick rings, one axis-furniture
+    // group, one closed polygon per series, one vertex per row.
+    const grid = gridLines(semantic);
+    const spokes = grid.filter((n) => n.id.startsWith('radar:spoke:'));
+    const rings = grid.filter((n) => n.id.startsWith('radar:ring:'));
+    if (spokes.length !== dims.length) fail(`want ${dims.length} spokes, got ${spokes.length}`);
+    if (rings.length < 2) fail(`want at least 2 tick rings, got ${rings.length}`);
+    const polygons = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (polygons.length !== 2) fail(`want 2 series polygons, got ${polygons.length}`);
+    const vertices = semantic.root.children.filter((n) => n.kind === 'ellipse' && n.role === 'chart.mark');
+    if (vertices.length !== radarRows.length) fail(`want ${radarRows.length} vertices, got ${vertices.length}`);
+
+    // Geometry: spokes radiate from the shared center, the first dimension
+    // sits at twelve o'clock, and polygons close over one vertex per dim.
+    const spoke0 = spokes[0].path.commands;
+    const cx = spoke0[0].to.x;
+    const cy = spoke0[0].to.y;
+    const spokeEnd = spokes[0].path.commands[1].to;
+    const rOuter = Math.hypot(spokeEnd.x - cx, spokeEnd.y - cy);
+    if (!(rOuter > 0)) fail('spokes must have a positive length');
+    if (Math.abs(spokeEnd.x - cx) > 1e-9 || !(spokeEnd.y < cy)) fail('the first spoke must point to twelve o’clock');
+    for (let i = 0; i < spokes.length; i++) {
+        const end = spokes[i].path.commands[1].to;
+        if (Math.abs(Math.hypot(end.x - cx, end.y - cy) - rOuter) > 1e-9) {
+            fail(`spoke ${i} must reach the outer ring`);
+        }
+        const wantAngle = -Math.PI / 2 + (i / dims.length) * Math.PI * 2;
+        const gotAngle = Math.atan2(end.y - cy, end.x - cx);
+        if (Math.abs(Math.cos(gotAngle) - Math.cos(wantAngle)) > 1e-9 || Math.abs(Math.sin(gotAngle) - Math.sin(wantAngle)) > 1e-9) {
+            fail(`spoke ${i} angle mismatch`);
+        }
+    }
+    for (const p of polygons) {
+        const cmds = p.path.commands;
+        if (cmds[cmds.length - 1].kind !== 'close') fail('radar polygon must be closed');
+        if (cmds.filter((c) => c.kind === 'line').length !== dims.length - 1) {
+            fail('polygon must visit one vertex per dimension');
+        }
+        const first = cmds[0].to;
+        if (Math.abs(first.x - cx) > 1e-9) fail('the first polygon vertex must sit on the top spoke');
+        // Translucent fill over a full-strength stroke, palette-ordered.
+        if (Math.abs(p.fill.color.a - DEFAULT_CHART_THEME.areaFillOpacity) > 1e-9) {
+            fail('radar polygon fill must use the area fill opacity token');
+        }
+    }
+    const alphaColor = DEFAULT_CHART_THEME.seriesPalette[0];
+    if (polygons[0].stroke.color.r !== alphaColor.r || polygons[0].stroke.color.g !== alphaColor.g) {
+        fail('the first series polygon must take the first palette color');
+    }
+
+    // Radius mapping is real: a vertex distance from the center is the value
+    // projected through the shared y domain, so alpha[功能]=90 sits farther
+    // out than beta[功能]=60 on the same spoke.
+    const yDomain = plan.scales.get('y').domain;
+    if (yDomain[0] > 0) fail('radar domain must include the zero baseline');
+    const vertexById = new Map(vertices.map((v) => [v.id, v]));
+    const aFun = vertexById.get('radar:a-2');
+    const bFun = vertexById.get('radar:b-2');
+    const rA = Math.hypot(aFun.cx - cx, aFun.cy - cy);
+    const rB = Math.hypot(bFun.cx - cx, bFun.cy - cy);
+    if (!(rA > rB)) fail('a higher score must sit farther from the center');
+    const wantRA = ((90 - yDomain[0]) / (yDomain[1] - yDomain[0])) * rOuter;
+    if (Math.abs(rA - wantRA) > 1e-9) fail(`vertex radius must project the value, want ${wantRA}, got ${rA}`);
+
+    // Labels: dimension labels outside the web, ring value labels on the top
+    // spoke, legend above the plot, and no cartesian axes.
+    const axisGroup = semantic.root.children.find((n) => n.kind === 'group' && n.role === 'chart.axis');
+    if (!axisGroup) fail('radar must emit an axis-furniture group');
+    const dimLabels = axisGroup.children.filter((t) => t.id.startsWith('radar:dim:'));
+    if (dimLabels.length !== dims.length) fail(`want ${dims.length} dimension labels, got ${dimLabels.length}`);
+    for (const t of dimLabels) {
+        if (!(Math.hypot(t.anchor.x - cx, t.anchor.y - cy) > rOuter)) {
+            fail(`dimension label ${t.text} must sit outside the web`);
+        }
+    }
+    const tickLabels = axisGroup.children.filter((t) => t.id.startsWith('radar:tick:'));
+    if (tickLabels.length !== rings.length) fail('every ring must carry a value label');
+    for (const t of tickLabels) {
+        if (Math.abs(t.anchor.y - cy) > rOuter + 1e-9) fail('tick labels must stay inside the web');
+        if (!(t.anchor.x > cx)) fail('tick labels must sit right of the top spoke');
+    }
+    const legendTexts = collectTexts(semantic.root).filter((t) => t.id.startsWith('legend:label:'));
+    if (legendTexts.length !== 2) fail('radar legend must list both series');
+    if (svg.includes('NaN')) fail('radar svg must not carry NaN');
+
+    // Dark theme re-tokens the web: palette and chrome both change.
+    const darkScene = buildScene(plan, { width: WIDTH, height: HEIGHT }, { theme: DARK_CHART_THEME });
+    const darkPoly = darkScene.root.children.find((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (darkPoly.stroke.color.r === polygons[0].stroke.color.r && darkPoly.stroke.color.g === polygons[0].stroke.color.g) {
+        fail('dark radar must use the dark palette');
+    }
+    const darkRing = darkScene.root.children.find((n) => n.id.startsWith('radar:ring:'));
+    if (darkRing.stroke.color.r !== DARK_CHART_THEME.gridStroke.r) fail('dark rings must use the dark grid token');
+
+    // Degenerate authoring: two dimensions raise a warning, values that never
+    // vary still render a finite web.
+    const few = compile(radarSpec, fromRows(radarRows.filter((r) => r.dim === '速度' || r.dim === '稳定性')));
+    if (!few.diagnostics.items.some((d) => d.code === 'davinci.chart.radar-few-dimensions')) {
+        fail('two-dimension radar must raise radar-few-dimensions');
+    }
+    const flat = pipeline(
+        radarSpec,
+        dims.map((dim, i) => ({ id: `f-${i}`, dim, score: 50, product: 'alpha' })),
+    );
+    if (flat.svg.includes('NaN')) fail('flat radar must not carry NaN');
+}
+
 console.log('charts-render: the published facade dist is byte-identical to the internals…');
 {
     // Two independent code paths — internal workspace sources (all sections
