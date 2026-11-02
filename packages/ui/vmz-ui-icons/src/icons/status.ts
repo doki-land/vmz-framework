@@ -35,4 +35,13 @@ export const STATUS_ICONS: Record<string, IconDef> = {
         paths: ['M3 9A13 13 0 0 1 21 9', 'M6.5 12.5A8.5 8.5 0 0 1 17.5 12.5', 'M4 20L20 4'],
         dots: [{ cx: 12, cy: 16, r: 1.5 }],
     },
+    'status.spinner': {
+        kind: 'stroke',
+        paths: ['M20.5 12A8.5 8.5 0 1 1 12 3.5'],
+    },
+    'status.error': {
+        kind: 'stroke',
+        circles: [{ cx: 12, cy: 12, r: 9 }],
+        paths: ['M9 9L15 15', 'M15 9L9 15'],
+    },
 };

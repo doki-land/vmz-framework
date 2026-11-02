@@ -181,4 +181,25 @@ export const ACTION_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M3 6H21V18H3Z', 'M3 7L12 13L21 7'],
     },
+    'action.sync': {
+        kind: 'stroke',
+        paths: ['M8 4L4 8L8 12', 'M4 8H20', 'M16 12L20 16L16 20', 'M20 16H4'],
+    },
+    'action.archive': {
+        kind: 'stroke',
+        paths: ['M4 4H20V8H4Z', 'M5 8H19V20H5Z', 'M10 12H14'],
+    },
+    'action.share': {
+        kind: 'stroke',
+        circles: [
+            { cx: 18, cy: 5.5, r: 2.5 },
+            { cx: 6, cy: 12, r: 2.5 },
+            { cx: 18, cy: 18.5, r: 2.5 },
+        ],
+        paths: ['M8.2 10.9L15.8 6.6', 'M8.2 13.1L15.8 17.4'],
+    },
+    'action.move': {
+        kind: 'stroke',
+        paths: ['M12 4L15 7H13V11H17V9L20 12L17 15V13H13V17H15L12 20L9 17H11V13H7V15L4 12L7 9V11H11V7H9L12 4Z'],
+    },
 };

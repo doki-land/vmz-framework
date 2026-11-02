@@ -27,4 +27,12 @@ export const FILE_ICONS: Record<string, IconDef> = {
     'file.archive': { kind: 'text-badge', label: 'ZIP' },
     'file.markdown': { kind: 'text-badge', label: 'MD' },
     'file.spreadsheet': { kind: 'text-badge', label: 'CSV' },
+    'file.cloud': {
+        kind: 'stroke',
+        paths: ['M6.5 19A4.5 4.5 0 0 1 6.2 10.1A5.8 5.8 0 0 1 17.4 10.6A4.3 4.3 0 0 1 17.5 19H6.5Z'],
+    },
+    'file.cloud-off': {
+        kind: 'stroke',
+        paths: ['M6.5 19A4.5 4.5 0 0 1 6.2 10.1A5.8 5.8 0 0 1 17.4 10.6A4.3 4.3 0 0 1 17.5 19H6.5Z', 'M4 20L20 4'],
+    },
 };

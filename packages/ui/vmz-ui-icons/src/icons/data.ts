@@ -10,4 +10,16 @@ export const DATA_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M4 5H20V19H4Z', 'M4 9.5H20', 'M4 14H20', 'M9.5 5V19'],
     },
+    'data.column': {
+        kind: 'stroke',
+        paths: ['M4 5H20V19H4Z', 'M9.5 5V19', 'M14.5 5V19'],
+    },
+    'data.row': {
+        kind: 'stroke',
+        paths: ['M4 5H20V19H4Z', 'M4 10H20', 'M4 15H20'],
+    },
+    'data.aggregate': {
+        kind: 'stroke',
+        paths: ['M17 6H7L13 12L7 18H17'],
+    },
 };
