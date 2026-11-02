@@ -215,6 +215,40 @@ if (iconKeys.length < EXPECTED_MIN_ICONS) {
     fail(`registry must not shrink below ${EXPECTED_MIN_ICONS} semantic marks, got ${iconKeys.length}`);
 }
 
+console.log('ui-icons: slash direction + corner softening…');
+// Negation and decorative slashes run lower-left to upper-right only. A symmetric X
+// (both diagonal directions in one icon) is a cross, not a slash, and stays allowed.
+for (const [category, source] of categorySources) {
+    for (const entryMatch of source.matchAll(/^\s*'([^']+)':\s*\{([\s\S]*?)\n    \},?$/gm)) {
+        const key = entryMatch[1];
+        const body = entryMatch[2];
+        if (!body.includes("kind: 'stroke'")) continue;
+        let backslashCount = 0;
+        let slashCount = 0;
+        for (const segmentMatch of body.matchAll(/'M(\d+\.?\d*) (\d+\.?\d*)L(\d+\.?\d*) (\d+\.?\d*)'/g)) {
+            const dx = Number(segmentMatch[3]) - Number(segmentMatch[1]);
+            const dy = Number(segmentMatch[4]) - Number(segmentMatch[2]);
+            if (Math.abs(dx) > 10 && Math.abs(dy) > 10) {
+                if (dx * dy > 0) backslashCount += 1;
+                else slashCount += 1;
+            }
+        }
+        if (backslashCount > 0 && slashCount === 0) {
+            fail(`${key} (${category}.ts) draws a lone upper-left to lower-right diagonal — negation and decorative slashes must run lower-left to upper-right`);
+        }
+    }
+}
+// Acute corners (triangles, play marks, compass needles) must be geometrically softened
+// with a quadratic round instead of relying on the stroke join alone.
+const SOFT_CORNER_ICONS = ['status.warning', 'media.play', 'media.next', 'media.previous', 'nav.compass'];
+for (const key of SOFT_CORNER_ICONS) {
+    const entryMatch = mergedIconSrc.match(new RegExp(`'${key.replace('.', '\\.')}':\\s*\\{([\\s\\S]*?)\\n    \\}`));
+    if (!entryMatch) fail(`expected soft-corner icon ${key} is missing from the registry`);
+    else if (!entryMatch[1].includes('Q')) {
+        fail(`${key} must soften its acute corners with a quadratic round (Q segment)`);
+    }
+}
+
 for (const px of ['16px', '20px', '24px']) {
     if (!iconSrc.includes(px)) fail(`Icon must ship the ${px} size step`);
 }

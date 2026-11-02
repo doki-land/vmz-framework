@@ -25,6 +25,9 @@ Visual rules (enforced by the conformance gate):
 - Round caps and joins; multi-part marks must physically connect (arrowheads join their arc, stems join outlines).
 - Fixed spans: crosses 6–18, chevrons 6–18 × 9–15, plus/minus 5–19, checks 5–19 × 7–17, mean mark overbar 6–18 over a cross 7.5–16.5 × 10–19.
 - Filled dots use `r=1.5` so they survive the 16px step.
+- Negation and decorative slashes run lower-left to upper-right (`status.offline`, `action.eye-off`); a symmetric X is a cross, not a slash. The gate rejects lone upper-left to lower-right diagonals.
+- Acute corners below 60° (triangles, play marks, compass needles) are softened with a quadratic round in the path itself; corners at 90° or wider rely on the round stroke join.
+- Parallel strokes keep at least ≈2.25 units of clear space at 16px; three-layer wound shapes (paperclip) shed a layer first, then widen the gaps. Intrinsically dense shapes (QR dot matrix, brand letterforms) are documented exceptions.
 - Optically centered at (12,12); ground-biased metaphors keep the baseline on `y=20`. One silhouette per concept, checked across categories before a new mark lands.
 - 16px is the primary review size, with 20 / 24 / 32 checked on the same contact sheet: a mark that only reads at 64px is not finished.
 
