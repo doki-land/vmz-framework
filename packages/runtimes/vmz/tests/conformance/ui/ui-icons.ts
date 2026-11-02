@@ -98,8 +98,12 @@ const CATEGORY_PREFIX = {
     brand: 'brand',
     commerce: 'commerce',
     data: 'data',
+    develop: 'develop',
+    device: 'device',
+    editor: 'editor',
     feature: 'feature',
     file: 'file',
+    git: 'git',
     media: 'media',
     navigation: 'nav',
     social: 'social',
@@ -107,7 +111,7 @@ const CATEGORY_PREFIX = {
     tool: 'tool',
 };
 const REQUIRED_CATEGORIES = Object.keys(CATEGORY_PREFIX);
-const EXPECTED_MIN_ICONS = 117;
+const EXPECTED_MIN_ICONS = 169;
 const categoryFiles = fs.existsSync(categoriesDir)
     ? fs.readdirSync(categoriesDir).filter((name) => name.endsWith('.ts'))
     : [];

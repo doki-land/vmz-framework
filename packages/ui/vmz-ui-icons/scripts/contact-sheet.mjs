@@ -36,8 +36,12 @@ const CATEGORY_GROUPS = [
     ['tool', 'Tool'],
     ['file', 'File'],
     ['media', 'Media'],
+    ['editor', 'Editor'],
     ['data', 'Data'],
     ['commerce', 'Commerce'],
+    ['device', 'Device'],
+    ['develop', 'Develop'],
+    ['git', 'Git'],
     ['social', 'Social'],
     ['brand', 'Brand'],
 ];
