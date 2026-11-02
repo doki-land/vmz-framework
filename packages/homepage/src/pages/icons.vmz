@@ -153,6 +153,10 @@
     </SiteShell>
 </template>
 <style>
+/* 本页底色纯白：整页底板是页面级口径，灰白大底不允许出现在 gallery 页。 */
+.site.icons-gallery-page {
+    background: var(--vmz-surface-paper);
+}
 .icons-gallery {
     width: min(calc(100% - var(--site-gutter) * 2), var(--vmz-layout-max-width));
     margin: 0 auto;
@@ -221,7 +225,7 @@
     background: var(--vmz-surface-fill);
 }
 .icons-gallery__category-count {
-    font: 500 0.7rem / 1 var(--vmz-font-mono);
+    font: 500 0.75rem / 1 var(--vmz-font-mono);
     color: var(--vmz-text-steel);
 }
 .icons-gallery__substrate-switch {
@@ -262,7 +266,7 @@
 .icons-gallery__usage-lead {
     margin: 0 0 1rem;
     color: var(--vmz-text-steel);
-    font: 400 0.9rem / 1.7 var(--vmz-font-sans);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
 .icons-gallery__usage-row {
     display: flex;
@@ -274,7 +278,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    font: 400 0.95rem / 1.5 var(--vmz-font-sans);
+    font: 400 1rem / 1.5 var(--vmz-font-sans);
     color: var(--vmz-text-ink);
 }
 .icons-gallery__usage-sample--brand {
@@ -345,7 +349,7 @@
     min-width: 0;
 }
 .icon-card__glyph-size {
-    font: 400 0.62rem / 1 var(--vmz-font-mono);
+    font: 400 0.75rem / 1 var(--vmz-font-mono);
     color: var(--vmz-text-steel);
 }
 /* Exact preview sizes: the package glyph box is `1em`, so the page only sets
@@ -364,7 +368,7 @@
     font-size: 32px;
 }
 .icon-card__name {
-    font: 400 0.68rem / 1.3 var(--vmz-font-mono);
+    font: 400 0.75rem / 1.35 var(--vmz-font-mono);
     color: var(--vmz-text-steel);
     word-break: break-all;
 }
@@ -445,7 +449,7 @@
 .icons-gallery__empty {
     margin-top: 2rem;
     color: var(--vmz-text-steel);
-    font: 400 0.95rem / 1.6 var(--vmz-font-sans);
+    font: 400 1rem / 1.6 var(--vmz-font-sans);
     text-align: center;
 }
 .sr-only {

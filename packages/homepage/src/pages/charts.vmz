@@ -44,7 +44,7 @@
                 </header>
                 <div class="chart-card__body">
                     <div class="chart-card__canvas">
-                        <Chart :spec="item.spec" :data="item.rows" :height="280" :theme="chartTheme" :label="item.title" />
+                        <Chart :spec="item.spec" :data="item.rows" :height="280" :theme="dark ? 'dark' : 'light'" :label="item.title" />
                     </div>
                     <div v-if="activeDetail === item.id" class="chart-card__detail">
                         <h3>
@@ -79,7 +79,7 @@
                 </header>
                 <div class="chart-card__body">
                     <div class="chart-card__canvas">
-                        <Diagram :spec="diagramSpec" :theme="chartTheme" :label="diagramTitle" />
+                        <Diagram :spec="diagramSpec" :theme="dark ? 'dark' : 'light'" :label="diagramTitle" />
                     </div>
                     <div class="chart-card__detail chart-card__detail--open">
                         <h3>
@@ -118,6 +118,10 @@
     </SiteShell>
 </template>
 <style>
+/* 本页底色纯白：整页底板是页面级口径，灰白大底不允许出现在 gallery 页。 */
+.site.charts-gallery-page {
+    background: var(--vmz-surface-paper);
+}
 .charts-gallery {
     width: min(calc(100% - var(--site-gutter) * 2), var(--vmz-layout-max-width));
     margin: 0 auto;
@@ -180,7 +184,7 @@
     display: grid;
     gap: 0.3rem;
     color: var(--vmz-text-steel);
-    font: 400 0.9rem / 1.7 var(--vmz-font-sans);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
 .chart-card {
     margin-top: 1.5rem;
@@ -281,7 +285,7 @@
 .charts-gallery__theming p {
     margin: 0;
     color: var(--vmz-text-steel);
-    font: 400 0.9rem / 1.7 var(--vmz-font-sans);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
 @media (max-width: 40rem) {
     .chart-card {
@@ -373,10 +377,6 @@ export default class ChartGalleryPage {
     public diagramNote = "";
     public diagramSpec: ChartGalleryDiagram["spec"] | null = null;
     public diagramSpecText = "";
-
-    get chartTheme(): string {
-        return this.dark ? "dark" : "light";
-    }
 
     toggleDark() {
         this.dark = !this.dark;
