@@ -115,6 +115,48 @@ const STACK_SALES: GalleryExample = {
     ],
 };
 
+const PIE_SHARE: GalleryExample = {
+    id: "pie-share",
+    title: "饼图 · 流量来源占比",
+    note: "切片从十二点顺时针排列,宽切片带对比色百分比标签,悬停读真实值与占比。",
+    spec: {
+        mark: "pie",
+        keyField: "source",
+        encoding: [
+            { field: "visits", channel: "theta" },
+            { field: "source", channel: "color" },
+        ],
+    },
+    rows: [
+        { source: "直接访问", visits: 335 },
+        { source: "搜索引擎", visits: 310 },
+        { source: "外链引荐", visits: 234 },
+        { source: "社交媒体", visits: 135 },
+        { source: "邮件订阅", visits: 86 },
+    ],
+};
+
+const DONUT_SHARE: GalleryExample = {
+    id: "donut-share",
+    title: "环形 · 存储占用",
+    note: "innerRadiusRatio 0.62 的环段,命中区与几何都是真实扇环。",
+    spec: {
+        mark: "pie",
+        innerRadiusRatio: 0.62,
+        keyField: "tier",
+        encoding: [
+            { field: "gb", channel: "theta" },
+            { field: "tier", channel: "color" },
+        ],
+    },
+    rows: [
+        { tier: "热数据", gb: 420 },
+        { tier: "温数据", gb: 260 },
+        { tier: "冷数据", gb: 180 },
+        { tier: "归档", gb: 90 },
+    ],
+};
+
 const AREA_TRAFFIC: GalleryExample = {
     id: "area-traffic",
     title: "面积 · 流量构成",
@@ -224,12 +266,22 @@ export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     QUARTER_SALES,
     DODGE_SALES,
     STACK_SALES,
+    PIE_SHARE,
+    DONUT_SHARE,
     AREA_TRAFFIC,
     SCATTER_LATENCY,
     NEGATIVE_DELTAS,
     CJK_LABELS,
     BAD_SPEC,
 ];
+
+/** Look up a gallery example by id — pages must never index the array
+ *  positionally, inserting a new card must not rewire existing references. */
+export function galleryExample(id: string): GalleryExample {
+    const hit = GALLERY_EXAMPLES.find((e) => e.id === id);
+    if (!hit) throw new Error(`unknown gallery example: ${id}`);
+    return hit;
+}
 
 export const FLOW_DIAGRAM: DiagramSpec = {
     kind: "flowchart",

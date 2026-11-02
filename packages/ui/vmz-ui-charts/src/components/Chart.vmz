@@ -467,6 +467,10 @@ export default class Chart {
 
     /** 点到单个 mark 的距离（rect/ellipse 内部为 0，path 为到折线段距离）。 */
     public _distanceTo(node: SemanticNode, px: number, py: number): number | null {
+        // 显式扇形命中区（pie / donut 切片）优先于几何近似。
+        if (node.hitRegion && "sector" in node.hitRegion) {
+            return sectorDistance(node.hitRegion.sector, px, py);
+        }
         if (node.kind === "rect") {
             const inside = px >= node.x && px <= node.x + node.w && py >= node.y && py <= node.y + node.h;
             if (inside) {
@@ -514,6 +518,23 @@ export default class Chart {
             const rowIndex = mark.rowIndex;
             const parts: string[] = [];
             if (mark.series !== null) parts.push(mark.series);
+            if (markKind === "pie") {
+                // pie 切片报 theta 原值与真实占比（对正切片求和）。
+                const thetaEnc = this.spec.encoding.find((e) => e.channel === "theta");
+                if (thetaEnc) {
+                    const value = readCell(plan.resolvedData, thetaEnc.field, rowIndex);
+                    parts.push(`${thetaEnc.field}: ${formatCell(value)}`);
+                    let total = 0;
+                    for (const m of plan.marks) {
+                        const v = readCell(plan.resolvedData, thetaEnc.field, m.rowIndex);
+                        if (typeof v === "number" && Number.isFinite(v) && v > 0) total += v;
+                    }
+                    if (typeof value === "number" && total > 0) {
+                        parts.push(`${Math.round((value / total) * 1000) / 10}%`);
+                    }
+                }
+                return parts.length > 0 ? parts.join(" · ") : id;
+            }
             if (xEnc) parts.push(`${xEnc.field}: ${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
             if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, rowIndex))}`);
             return parts.length > 0 ? parts.join(" · ") : id;
@@ -528,6 +549,13 @@ export default class Chart {
     public _nodeAnchor(id: string): Point2D | null {
         const node = this._markNodes().find((n) => n.id === id);
         if (!node) return null;
+        // 扇形切片的锚点在中角中半径处。
+        if (node.hitRegion && "sector" in node.hitRegion) {
+            const s = node.hitRegion.sector;
+            const mid = (s.a0 + s.a1) / 2;
+            const r = (s.rInner + s.rOuter) / 2;
+            return { x: s.cx + r * Math.cos(mid), y: s.cy + r * Math.sin(mid) };
+        }
         if (node.kind === "rect") return { x: node.x + node.w / 2, y: node.y };
         if (node.kind === "ellipse") return { x: node.cx, y: node.cy - node.ry };
         if (node.kind === "path") {
@@ -695,6 +723,40 @@ function segmentDistance(
     let t = ((px - a.x) * dx + (py - a.y) * dy) / lengthSq;
     t = Math.max(0, Math.min(1, t));
     return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+}
+
+/** 点到环形扇区的距离：内部为 0，外部为到最近边界的距离。 */
+function sectorDistance(
+    s: { cx: number; cy: number; rOuter: number; rInner: number; a0: number; a1: number },
+    px: number,
+    py: number,
+): number {
+    const dx = px - s.cx;
+    const dy = py - s.cy;
+    const r = Math.hypot(dx, dy);
+    const twoPi = Math.PI * 2;
+    // 把指针角度规范化进 [a0, a0+2π)，与扇区扫掠窗口直接可比。
+    let ang = Math.atan2(dy, dx);
+    while (ang < s.a0) ang += twoPi;
+    while (ang >= s.a0 + twoPi) ang -= twoPi;
+    const withinAngle = ang >= s.a0 && ang <= s.a1;
+    if (withinAngle && r >= s.rInner && r <= s.rOuter) return 0;
+    if (withinAngle) {
+        // 角度在扫掠内：最近边界是外弧、内弧或（纯饼的）圆心。
+        const candidates = [Math.abs(r - s.rOuter)];
+        if (s.rInner > 0) candidates.push(Math.abs(r - s.rInner));
+        else candidates.push(r);
+        return Math.min(...candidates);
+    }
+    // 角度在扫掠外：最近边界是两条径向边之一。
+    const edge = (a: number): number =>
+        segmentDistance(
+            px,
+            py,
+            { x: s.cx + s.rInner * Math.cos(a), y: s.cy + s.rInner * Math.sin(a) },
+            { x: s.cx + s.rOuter * Math.cos(a), y: s.cy + s.rOuter * Math.sin(a) },
+        );
+    return Math.min(edge(s.a0), edge(s.a1));
 }
 
 /** 读取快照单元格。 */

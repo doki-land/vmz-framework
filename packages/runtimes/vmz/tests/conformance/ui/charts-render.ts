@@ -41,6 +41,15 @@
  *   duplicate keys are reported (`davinci.chart.duplicate-key`) and stay
  *   unique, an unknown `keyField` is an error, and the plan — not the scene —
  *   owns the series grouping domain
+ * - grouped bars dodge side by side inside the x slot, `stack` accumulates
+ *   same-sign values from the zero baseline (bars flush, areas as ribbons,
+ *   plan marks carry `stackBase`, the y domain covers the totals), and layout
+ *   misuse is diagnosed (`unsupported-layout` / `layout-without-series` /
+ *   `layout-ignored`)
+ * - pie / donut slices run clockwise from twelve o'clock as annular-sector
+ *   paths with matching hit regions and contrast-aware percentage labels,
+ *   need a `theta` channel, drop negative shares with a warning, refuse an
+ *   out-of-range `innerRadiusRatio`, and skip the cartesian frame entirely
  * - `ChartTheme` tokens resolve every presentation color and font — the default
  *   palette and neutrals serialize as hex, a custom theme replaces them
  *   everywhere with no leftover hardcoded color, legend swatches share the
@@ -1557,6 +1566,153 @@ console.log('charts-render: layout misuse is diagnosed, never silent…');
     if (!dodgeLine.diagnostics.items.some((d) => d.code === 'davinci.chart.layout-ignored')) {
         fail('dodge on line must raise layout-ignored');
     }
+}
+
+// ─── Pie / donut ─────────────────────────────────────────────────────────
+
+console.log("charts-render: pie slices share the circle from twelve o'clock…");
+{
+    const pieSpec = {
+        mark: 'pie',
+        keyField: 'kind',
+        encoding: [
+            { field: 'value', channel: 'theta' },
+            { field: 'kind', channel: 'color' },
+        ],
+    };
+    const pieRows = [
+        { kind: 'alpha', value: 40 },
+        { kind: 'beta', value: 30 },
+        { kind: 'gamma', value: 20 },
+        { kind: 'delta', value: 10 },
+    ];
+    const { semantic, svg } = pipeline(pieSpec, pieRows);
+    const slices = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (slices.length !== 4) fail(`want 4 pie slices, got ${slices.length}`);
+    // Angles run clockwise from twelve o'clock and cover the full circle.
+    let acc = -Math.PI / 2;
+    for (let i = 0; i < slices.length; i++) {
+        const sector = slices[i].hitRegion?.sector;
+        if (!sector) fail(`slice ${i} must carry a sector hit region`);
+        const sweep = (pieRows[i].value / 100) * Math.PI * 2;
+        if (Math.abs(sector.a0 - acc) > 1e-9) fail(`slice ${i} must start where the previous ended`);
+        if (Math.abs(sector.a1 - sector.a0 - sweep) > 1e-9) {
+            fail(`slice ${i} sweep want ${sweep}, got ${sector.a1 - sector.a0}`);
+        }
+        if (sector.rInner !== 0) fail('a pie (not donut) must have zero inner radius');
+        acc = sector.a1;
+    }
+    if (Math.abs(acc - Math.PI * 1.5) > 1e-9) fail('slices must cover the full circle');
+    // Stable identity: ids carry the keyField value, palette order is first appearance.
+    if (slices[0].id !== 'pie:alpha') fail(`slice id want pie:alpha, got ${slices[0].id}`);
+    const expect = DEFAULT_CHART_THEME.seriesPalette[0];
+    const got = slices[0].fill.color;
+    if (got.r !== expect.r || got.g !== expect.g || got.b !== expect.b) {
+        fail('alpha slice must take the first palette color');
+    }
+    // Wide slices carry a real percentage label, anchored inside the slice.
+    const labels = collectTexts(semantic.root).filter((t) => t.id.startsWith('pie:label:'));
+    if (!labels.some((t) => t.text === '40%')) fail('alpha slice must be labelled 40%');
+    for (const label of labels) {
+        const sector = slices.find((s) => s.id === `pie:${label.id.slice('pie:label:'.length)}`).hitRegion.sector;
+        const mid = (sector.a0 + sector.a1) / 2;
+        const dx = label.anchor.x - sector.cx;
+        const dy = label.anchor.y - sector.cy;
+        const labelR = Math.hypot(dx, dy);
+        // Unit-vector comparison avoids the atan2 2π wrap for mid-angles past π.
+        if (Math.abs(dx / labelR - Math.cos(mid)) > 1e-9 || Math.abs(dy / labelR - Math.sin(mid)) > 1e-9) {
+            fail(`label ${label.id} must sit at the slice mid-angle`);
+        }
+        if (!(labelR > sector.rInner && labelR < sector.rOuter)) fail(`label ${label.id} must sit inside the slice`);
+    }
+    // No cartesian furniture: no axes, no grid — but the legend still lists slices.
+    if (axisStats(semantic).groups.length !== 0) fail('pie must not draw axes');
+    if (gridLines(semantic).length !== 0) fail('pie must not draw grid lines');
+    const legendTexts = collectTexts(semantic.root).filter((t) => t.id.startsWith('legend:label:'));
+    if (legendTexts.length !== 4) fail(`want 4 legend entries, got ${legendTexts.length}`);
+    if (svg.includes('NaN')) fail('pie svg must not carry NaN');
+    // A single-slice pie is a full circle — SVG arcs split it into two halves.
+    const single = pipeline(pieSpec, [{ kind: 'only', value: 5 }]);
+    const singleSlice = single.semantic.root.children.find((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (!singleSlice) fail('single-slice pie must still render');
+    if (singleSlice.path.commands.filter((c) => c.kind === 'arc').length !== 2) {
+        fail('a full-circle slice must split into two arcs');
+    }
+    if (single.svg.includes('NaN')) fail('single-slice svg must not carry NaN');
+}
+
+console.log('charts-render: donut slices are ring sectors with an inner radius…');
+{
+    const donutSpec = {
+        mark: 'pie',
+        innerRadiusRatio: 0.6,
+        keyField: 'kind',
+        encoding: [
+            { field: 'value', channel: 'theta' },
+            { field: 'kind', channel: 'color' },
+        ],
+    };
+    const { semantic, svg } = pipeline(donutSpec, [
+        { kind: 'alpha', value: 3 },
+        { kind: 'beta', value: 1 },
+    ]);
+    const slices = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (slices.length !== 2) fail(`want 2 donut slices, got ${slices.length}`);
+    const sector = slices[0].hitRegion.sector;
+    if (!(sector.rInner > 0)) fail('donut slice must carry a positive inner radius');
+    if (Math.abs(sector.rInner / sector.rOuter - 0.6) > 1e-9) fail('hit region must keep the inner radius ratio');
+    // Ring sector = outer arc + inner arc sweeping the opposite way.
+    const arcs = slices[0].path.commands.filter((c) => c.kind === 'arc');
+    if (arcs.length !== 2) fail(`donut slice must have 2 arcs, got ${arcs.length}`);
+    if (arcs[0].sweep === arcs[1].sweep) fail('inner arc must sweep opposite the outer arc');
+    if (svg.includes('NaN')) fail('donut svg must not carry NaN');
+}
+
+console.log('charts-render: pie refuses bad authoring loudly…');
+{
+    // Missing theta channel → error, no slices.
+    const noTheta = compile({ mark: 'pie', encoding: [{ field: 'kind', channel: 'color' }] }, fromRows([{ kind: 'a' }]));
+    if (!noTheta.diagnostics.items.some((d) => d.code === 'davinci.chart.pie-needs-theta' && d.severity === 'error')) {
+        fail('pie without theta must raise pie-needs-theta');
+    }
+    const noThetaScene = buildScene(noTheta, { width: WIDTH, height: HEIGHT });
+    if (noThetaScene.root.children.some((n) => n.role === 'chart.mark' && n.kind === 'path')) {
+        fail('theta-less pie must not draw slices');
+    }
+    // innerRadiusRatio outside [0, 1) → error.
+    const badRatio = compile(
+        { mark: 'pie', innerRadiusRatio: 1.2, encoding: [{ field: 'v', channel: 'theta' }] },
+        fromRows([{ v: 1 }]),
+    );
+    if (
+        !badRatio.diagnostics.items.some((d) => d.code === 'davinci.chart.invalid-inner-radius' && d.severity === 'error')
+    ) {
+        fail('innerRadiusRatio >= 1 must raise invalid-inner-radius');
+    }
+    // Negative slice → warning + dropped, the survivor renormalizes to the circle.
+    const neg = compile(
+        {
+            mark: 'pie',
+            keyField: 'kind',
+            encoding: [
+                { field: 'value', channel: 'theta' },
+                { field: 'kind', channel: 'color' },
+            ],
+        },
+        fromRows([
+            { kind: 'ok', value: 3 },
+            { kind: 'bad', value: -1 },
+        ]),
+    );
+    if (!neg.diagnostics.items.some((d) => d.code === 'davinci.chart.negative-slice')) {
+        fail('negative theta must raise negative-slice');
+    }
+    if (neg.marks.length !== 1) fail(`negative slice must be dropped, got ${neg.marks.length} marks`);
+    const negScene = buildScene(neg, { width: WIDTH, height: HEIGHT });
+    const negSlices = negScene.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (negSlices.length !== 1) fail('only the non-negative slice renders');
+    const sec = negSlices[0].hitRegion.sector;
+    if (Math.abs(sec.a1 - sec.a0 - Math.PI * 2) > 1e-6) fail('single surviving slice must cover the circle');
 }
 
 console.log('charts-render: the published facade dist is byte-identical to the internals…');

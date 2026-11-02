@@ -35,10 +35,21 @@ export interface SourceRef {
     readonly path?: ReadonlyArray<string | number>;
 }
 
-/** Hit region — optional explicit rect for hit-testing (overrides geometry bounds). */
-export interface HitRegion {
-    readonly rect: BoundsRect;
-}
+/** Hit region — optional explicit target for hit-testing (overrides geometry bounds). */
+export type HitRegion =
+    | { readonly rect: BoundsRect }
+    | {
+          /** Annular sector for pie / donut slices: angle in radians, 0 =
+           *  +x axis, positive clockwise (screen coordinates, y down). */
+          readonly sector: {
+              readonly cx: number;
+              readonly cy: number;
+              readonly rOuter: number;
+              readonly rInner: number;
+              readonly a0: number;
+              readonly a1: number;
+          };
+      };
 
 // ─── Shape kinds ──────────────────────────────────────────────────────────
 

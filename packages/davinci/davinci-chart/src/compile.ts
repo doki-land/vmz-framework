@@ -13,7 +13,7 @@ import { apply as scaleApply, type Scale } from "./scale.js";
 /** Mark kind (geometric primitive family). Only marks with real scene
  *  geometry are listed — an authoring surface can never name a mark the
  *  engine would silently drop. */
-export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area";
+export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area" | "pie";
 
 /** Encoding channel — how a data field maps to a visual property. */
 export interface EncodingChannel {
@@ -36,6 +36,9 @@ export interface ChartSpec {
      *  else overlaps. `stack` accumulates positive and negative values
      *  separately from the zero baseline (bars and areas only). */
     readonly seriesLayout?: "overlap" | "stack" | "dodge";
+    /** Pie only: inner radius as a fraction of the outer radius (0 = pie,
+     *  0.55–0.75 reads as a donut). */
+    readonly innerRadiusRatio?: number;
     /** Field whose value names each row. Marks carry this key as identity, so
      *  re-sorting or filtering rows never renumbers them. Without `keyField`
      *  keys are positional (`"0"`, `"1"`, …) and only stable while the row
@@ -87,12 +90,12 @@ const seriesChannels: ReadonlySet<string> = new Set(["series", "color", "group"]
 const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area"]);
 
 /** Channels whose value decides whether a row can be positioned at all. */
-const positionChannels: ReadonlySet<string> = new Set(["x", "y"]);
+const positionChannels: ReadonlySet<string> = new Set(["x", "y", "theta"]);
 
 /** Mark kinds with real scene geometry. Kept in sync with the scene
  *  builder; `compile` refuses anything else instead of rendering an empty
  *  chart with no explanation. */
-const implementedMarks: ReadonlySet<string> = new Set(["bar", "rect", "line", "point", "circle", "area"]);
+const implementedMarks: ReadonlySet<string> = new Set(["bar", "rect", "line", "point", "circle", "area", "pie"]);
 
 /** Resolve the effective series layout. `undefined` is the natural per-mark
  *  default: grouped bars dodge, everything else overlaps. */
@@ -115,7 +118,7 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             diag(
                 "error",
                 "davinci.chart.unsupported-mark",
-                `mark "${String(spec.mark)}" has no scene geometry; implemented marks are bar, rect, line, point, circle, area`,
+                `mark "${String(spec.mark)}" has no scene geometry; implemented marks are bar, rect, line, point, circle, area, pie`,
                 String(spec.mark),
             ),
         );
@@ -161,6 +164,30 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     // ── Series layout pre-pass (stack offsets live in the plan, geometry in
     // the scene builder) ─────────────────────────────────────────────────
     const layout = resolveSeriesLayout(spec, seriesCol !== undefined);
+    if (spec.mark === "pie") {
+        const thetaEnc = spec.encoding.find((e) => e.channel === "theta");
+        if (!thetaEnc) {
+            diagnostics.push(
+                diag(
+                    "error",
+                    "davinci.chart.pie-needs-theta",
+                    `pie marks need a "theta" encoding channel naming the value field`,
+                    "theta",
+                ),
+            );
+        }
+        const ratio = spec.innerRadiusRatio ?? 0;
+        if (!Number.isFinite(ratio) || ratio < 0 || ratio >= 1) {
+            diagnostics.push(
+                diag(
+                    "error",
+                    "davinci.chart.invalid-inner-radius",
+                    `innerRadiusRatio must be a finite number in [0, 1), got ${String(spec.innerRadiusRatio)}`,
+                    "innerRadiusRatio",
+                ),
+            );
+        }
+    }
     if (spec.seriesLayout && !seriesCol) {
         diagnostics.push(
             diag(
@@ -393,6 +420,20 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                     ),
                 );
                 if (positionChannels.has(enc.channel)) positioned = false;
+                continue;
+            }
+            // Pie slices are shares of a whole — a negative value has no
+            // angle and is dropped with a warning, never drawn backwards.
+            if (spec.mark === "pie" && enc.channel === "theta" && typeof raw === "number" && raw < 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.negative-slice",
+                        `field "${enc.field}" is negative for row ${r} (${raw}); pie slices need non-negative shares`,
+                        `${enc.field}#${r}`,
+                    ),
+                );
+                positioned = false;
                 continue;
             }
 

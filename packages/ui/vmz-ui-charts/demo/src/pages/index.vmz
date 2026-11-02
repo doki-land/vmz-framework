@@ -26,13 +26,16 @@
         <section class="card">
             <header class="card__head">
                 <h2>暗色主题 · 跟随切换</h2>
-                <p>本区两张图响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。</p>
+                <p>本区三张图响应顶部 Dark mode 按钮,暗色令牌经 theme prop 注入。</p>
             </header>
             <div class="card__canvas">
                 <Chart :spec="darkLineSpec" :data="darkLineRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed line" />
             </div>
             <div class="card__canvas">
                 <Chart :spec="darkBarSpec" :data="darkBarRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed bar" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="darkPieSpec" :data="darkPieRows" :height="280" :theme="dark ? 'dark' : 'light'" label="dark themed donut" />
             </div>
         </section>
 
@@ -180,6 +183,7 @@ import { renderSvg, resolve } from "@doki-land/davinci/scene";
 import {
     FLOW_DIAGRAM,
     GALLERY_EXAMPLES,
+    galleryExample,
     perfLineRows,
     perfScatterRows,
 } from "../data.ts";
@@ -206,7 +210,7 @@ export default class IndexPage {
                     { field: "product", channel: "color" },
                 ],
             },
-            darkLineRows: GALLERY_EXAMPLES[0].rows,
+            darkLineRows: galleryExample("line-weekly").rows,
             darkBarSpec: {
                 mark: "bar",
                 encoding: [
@@ -214,7 +218,9 @@ export default class IndexPage {
                     { field: "delta", channel: "y" },
                 ],
             },
-            darkBarRows: GALLERY_EXAMPLES[4].rows,
+            darkBarRows: galleryExample("bar-delta").rows,
+            darkPieSpec: galleryExample("donut-share").spec,
+            darkPieRows: galleryExample("donut-share").rows,
         };
     }
 
@@ -227,6 +233,8 @@ export default class IndexPage {
     public darkLineRows: any[] = [];
     public darkBarSpec: any = null;
     public darkBarRows: any[] = [];
+    public darkPieSpec: any = null;
+    public darkPieRows: any[] = [];
     public perfReport: string[] = ["measuring…"];
 
     toggleDark() {

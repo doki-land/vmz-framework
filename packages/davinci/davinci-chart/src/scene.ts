@@ -123,6 +123,26 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
     const legendHeight = legendItems.length > 0 ? legendRowHeight(theme) + LEGEND_BOTTOM_GAP : 0;
     const padding: ScenePadding = { ...basePadding, top: basePadding.top + legendHeight };
     const plot = plotRect(viewport, padding);
+
+    // Pie marks live outside the cartesian frame: no axes, no grid, slices
+    // fill the plot. Everything else (legend, theme, identity) is shared.
+    if (plan.spec.mark === "pie") {
+        const children: SemanticNode[] = [];
+        if (plot.w > 0 && plot.h > 0) {
+            children.push(...buildPie(plan, plot, seriesCategories, theme));
+            children.push(...buildLegend(plan, plot, legendItems, theme));
+        }
+        return {
+            version: SCENE_VERSION,
+            root: {
+                kind: "group",
+                id: "chart-root",
+                role: "group",
+                children,
+            },
+        };
+    }
+
     const children: SemanticNode[] = [];
 
     if (xEnc && yEnc && plot.w > 0 && plot.h > 0) {
@@ -429,6 +449,150 @@ function buildPoints(
             ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } }
             : {}),
     }));
+}
+
+// ─── Pie / donut ─────────────────────────────────────────────────────────
+
+/** Slices start at twelve o'clock and run clockwise. */
+const PIE_START_ANGLE = -Math.PI / 2;
+
+/** Build pie / donut slices from the plan. Angles come from raw theta values
+ *  (never scale-applied channels), each slice carries an annular-sector hit
+ *  region, and a slice large enough gets a contrast-aware percentage label. */
+function buildPie(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const thetaEnc = plan.spec.encoding.find((e) => e.channel === "theta");
+    if (!thetaEnc) return [];
+    const thetaCol = column(plan.resolvedData, thetaEnc.field);
+    if (!thetaCol) return [];
+
+    const cx = plot.x + plot.w / 2;
+    const cy = plot.y + plot.h / 2;
+    const rOuter = Math.max(0, Math.min(plot.w, plot.h) / 2);
+    const ratio = plan.spec.innerRadiusRatio ?? 0;
+    const rInner = rOuter * Math.min(Math.max(ratio, 0), 0.95);
+    if (rOuter <= 0) return [];
+
+    const total = plan.marks.reduce((sum, m) => {
+        const v = thetaCol.values[m.rowIndex];
+        return sum + (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+    }, 0);
+    if (!(total > 0)) return [];
+
+    const nodes: SemanticNode[] = [];
+    let acc = PIE_START_ANGLE;
+    for (const mark of plan.marks) {
+        const raw = thetaCol.values[mark.rowIndex];
+        const value = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 0;
+        const share = value / total;
+        const a0 = acc;
+        const a1 = acc + share * Math.PI * 2;
+        acc = a1;
+        if (share <= 0) continue;
+
+        const color = seriesColor(theme, seriesCategories, mark.series);
+        nodes.push({
+            kind: "path",
+            id: `pie:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            path: { commands: sliceCommands(cx, cy, rOuter, rInner, a0, a1) },
+            fill: { color },
+            hitRegion: { sector: { cx, cy, rOuter, rInner, a0, a1 } },
+        });
+
+        // Percentage label at the mid-angle when the slice is wide enough —
+        // contrast picks dark text on light slices and white on saturated ones.
+        const mid = (a0 + a1) / 2;
+        const labelR = rInner + (rOuter - rInner) * 0.62;
+        const lx = cx + labelR * Math.cos(mid);
+        const ly = cy + labelR * Math.sin(mid);
+        const pct = `${Math.round(share * 1000) / 10}%`;
+        if (arcLengthFits((a1 - a0) * labelR, pct, theme.labelFont.sizePx)) {
+            nodes.push({
+                kind: "text",
+                id: `pie:label:${mark.key}`,
+                role: "text",
+                source: { domain: "chart", path: ["mark", mark.key, "label"] },
+                text: pct,
+                font: theme.labelFont,
+                anchor: { x: lx, y: ly },
+                color: contrastText(color),
+            });
+        }
+    }
+    return nodes;
+}
+
+/** Arc-length budget: the label must fit inside the slice sweep. */
+function arcLengthFits(arcLength: number, label: string, sizePx: number): boolean {
+    return estimateTextSize(label, sizePx).width + 6 <= arcLength;
+}
+
+/** Pick a readable label color for a slice fill (WCAG-ish luminance split). */
+function contrastText(fill: RGBA): RGBA {
+    const lum = 0.2126 * fill.r + 0.7152 * fill.g + 0.0722 * fill.b;
+    return lum > 0.62 ? { r: 0.07, g: 0.09, b: 0.15, a: 1 } : { r: 1, g: 1, b: 1, a: 1 };
+}
+
+/** One slice as SVG path commands — a ring sector for donuts, a wedge from
+ *  the center for pies. Full-circle slices split into two arcs because SVG
+ *  arcs cannot turn 360° in one command. */
+function sliceCommands(
+    cx: number,
+    cy: number,
+    rOuter: number,
+    rInner: number,
+    a0: number,
+    a1: number,
+): PathCommand[] {
+    const sweep = a1 - a0;
+    const outer = (a: number) => ({ x: cx + rOuter * Math.cos(a), y: cy + rOuter * Math.sin(a) });
+    const inner = (a: number) => ({ x: cx + rInner * Math.cos(a), y: cy + rInner * Math.sin(a) });
+    const largeArc = sweep > Math.PI;
+    const full = sweep >= Math.PI * 2 - 1e-9;
+
+    if (rInner <= 0) {
+        if (full) {
+            // Two half-circle arcs around the center.
+            const mid = a0 + sweep / 2;
+            return [
+                { kind: "move", to: outer(a0) },
+                { kind: "arc", rx: rOuter, ry: rOuter, xRot: 0, largeArc: false, sweep: true, to: outer(mid) },
+                { kind: "arc", rx: rOuter, ry: rOuter, xRot: 0, largeArc: false, sweep: true, to: outer(a0) },
+                { kind: "close" },
+            ];
+        }
+        return [
+            { kind: "move", to: { x: cx, y: cy } },
+            { kind: "line", to: outer(a0) },
+            { kind: "arc", rx: rOuter, ry: rOuter, xRot: 0, largeArc, sweep: true, to: outer(a1) },
+            { kind: "close" },
+        ];
+    }
+    if (full) {
+        const mid = a0 + sweep / 2;
+        return [
+            { kind: "move", to: outer(a0) },
+            { kind: "arc", rx: rOuter, ry: rOuter, xRot: 0, largeArc: false, sweep: true, to: outer(mid) },
+            { kind: "arc", rx: rOuter, ry: rOuter, xRot: 0, largeArc: false, sweep: true, to: outer(a0) },
+            { kind: "line", to: inner(a0) },
+            { kind: "arc", rx: rInner, ry: rInner, xRot: 0, largeArc: false, sweep: false, to: inner(mid) },
+            { kind: "arc", rx: rInner, ry: rInner, xRot: 0, largeArc: false, sweep: false, to: inner(a0) },
+            { kind: "close" },
+        ];
+    }
+    return [
+        { kind: "move", to: outer(a0) },
+        { kind: "arc", rx: rOuter, ry: rOuter, xRot: 0, largeArc, sweep: true, to: outer(a1) },
+        { kind: "line", to: inner(a1) },
+        { kind: "arc", rx: rInner, ry: rInner, xRot: 0, largeArc, sweep: false, to: inner(a0) },
+        { kind: "close" },
+    ];
 }
 
 // ─── Guides: grid, baselines, ticks, labels, legend ──────────────────────
