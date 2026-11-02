@@ -132,6 +132,32 @@ for (const key of iconKeys) {
         fail(`registry key "${key}" must be a dotted semantic name`);
     }
 }
+
+console.log('ui-icons: visual geometry rules…');
+if (/strokeWidth:\s*[0-9]/.test(strokeSrc)) {
+    fail('icons-stroke.ts must not override strokeWidth per icon — one 1.75 weight for the whole set');
+}
+for (const dotsBlock of strokeSrc.matchAll(/dots:\s*\[([\s\S]*?)\]/g)) {
+    for (const radiusMatch of dotsBlock[1].matchAll(/r:\s*([0-9.]+)/g)) {
+        if (Number(radiusMatch[1]) < 1.35) {
+            fail(`filled dot radius ${radiusMatch[1]} is below the 1.35 optical weight floor`);
+        }
+    }
+}
+const strokeEntries = strokeSrc.split(/\n {4}'/).slice(1);
+const strokeKeyCount = [...strokeSrc.matchAll(/^\s*'([^']+)':\s*\{/gm)].length;
+if (strokeEntries.length !== strokeKeyCount) {
+    fail('icons-stroke.ts entry parsing drifted — keep one 4-space indented entry per icon');
+}
+for (const entry of strokeEntries) {
+    if (!/paths:\s*\[\s*'|circles:\s*\[\s*\{|dots:\s*\[\s*\{/.test(entry)) {
+        fail(`stroke entry "${entry.slice(0, entry.indexOf(':')).trim()}" ships no visible geometry`);
+    }
+}
+if (iconKeys.length < 69) {
+    fail(`registry must keep at least 69 semantic marks, got ${iconKeys.length}`);
+}
+
 for (const px of ['16px', '20px', '24px']) {
     if (!iconSrc.includes(px)) fail(`Icon must ship the ${px} size step`);
 }
