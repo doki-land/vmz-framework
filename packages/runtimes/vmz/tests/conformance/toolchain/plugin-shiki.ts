@@ -135,6 +135,45 @@ if (!syncDegraded.includes('shiki-fallback') || !syncDegraded.includes('c &lt; d
 }
 
 
+console.log('plugin-shiki: no computed dynamic import in shipped runtime (G4)…');
+// Browser chunks can only vendor what the packer can see: a computed
+// `import(specVar)` ships as a bare specifier and fails in the browser with
+// "Failed to resolve module specifier 'shiki'". The only non-literal dynamic
+// import allowed is the documented custom-textmate escape hatch.
+const runtimeSrc = fs.readFileSync(distRuntime, 'utf8');
+if (!/await import\('shiki'\)/.test(runtimeSrc)) {
+    fail('generic shiki load must use a literal specifier so vmz-pack can vendor it');
+}
+const computedImports = runtimeSrc.match(/import\(([^'"`][^)]*)\)/g) || [];
+const leaked = computedImports.filter((m) => !/webpackIgnore/.test(m));
+if (leaked.length) fail(`computed dynamic imports leak to the client bundle: ${leaked.join(', ')}`);
+
+console.log('plugin-shiki: factory prewarm keeps SSR on the sync path…');
+// The plugin factory kicks prewarm at config-load time so SSR renders the same
+// tokenized markup the client computes — no unhighlighted fallback flash.
+const warmTextmate = path.join(tmp, 'warm-textmate.mjs');
+fs.writeFileSync(
+    warmTextmate,
+    `export async function createVmzHighlighter() {
+  return { codeToHtml(code) { return '<pre class="shiki warm"><code>' + code + '</code></pre>'; } };
+}
+`,
+    'utf8',
+);
+resetShikiRuntimeForTests();
+shiki({ textmate: pathToFileURL(warmTextmate).href });
+let warm = '';
+for (let i = 0; i < 200; i++) {
+    const out = highlightSync('const z = 3', 'ts', 'vitesse-dark');
+    if (out.includes('shiki warm')) {
+        warm = out;
+        break;
+    }
+    await new Promise((r) => setTimeout(r, 10));
+}
+if (!warm) fail('factory prewarm never warmed the sync path — SSR would flash the fallback');
+
+
 console.log('plugin-shiki: package exports…');
 const pkg = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'package.json'), 'utf8'));
 if (!String(pkg.exports['.'].default).includes('dist/')) fail('main export must target dist/');

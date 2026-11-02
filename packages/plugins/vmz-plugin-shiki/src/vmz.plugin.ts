@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { definePlugin, loadPluginSource } from '@vmz/plugin';
-import { configureShiki } from './runtime.js';
+import { configureShiki, prewarmShiki } from './runtime.js';
 
 const source = loadPluginSource(import.meta.url, '../components/Shiki.vmz');
 
@@ -45,6 +45,11 @@ export function shiki(options: ShikiPluginOptions = {}) {
         textmate: options.textmate ?? DEFAULT_TEXTMATE,
         themes: options.themes,
     });
+    // Warm the highlighter at config-load time (the same process later runs the
+    // document pipeline and page SSR), so `highlightSync` hits the cache during
+    // SSR and the first paint already carries the final tokenized markup — no
+    // unhighlighted fallback flash. Bootstrap failure degrades to plain fences.
+    void prewarmShiki({ themes: options.themes }).catch(() => {});
 
     return definePlugin({
         name: '@vmz/plugin-shiki',

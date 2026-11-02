@@ -121,6 +121,9 @@ function textmateSpec(): string {
 async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighter | null> {
     const spec = textmateSpec();
     try {
+        // Default adapter stays a literal specifier so client chunks vendor it;
+        // a custom `textmate` module id is an explicit escape hatch — the host
+        // (serve-host resolve hooks, import map) must make it resolvable.
         const mod = (spec === DEFAULT_TEXTMATE ? await import('vmz-textmate/shiki') : await import(/* webpackIgnore: true */ spec)) as {
             createVmzHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
             createHighlighter?: (opts: { themes?: string[]; langs?: unknown[] }) => Promise<CodeHighlighter>;
@@ -139,8 +142,11 @@ async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighte
 }
 
 async function loadGenericHighlighter(themes: string[]): Promise<Highlighter> {
-    const genericPackage = 'shiki';
-    const { createHighlighter } = await import(genericPackage);
+    // Literal specifier only: a computed dynamic import (variable argument) is
+    // invisible to the packer, so the browser chunk would keep a bare specifier
+    // and fail with "Failed to resolve module specifier 'shiki'". Literal
+    // imports let vmz-pack vendor the highlighter into an async client chunk.
+    const { createHighlighter } = await import('shiki');
     return createHighlighter({
         themes,
         langs: ['javascript', 'typescript', 'tsx', 'jsx', 'json', 'html', 'css', 'markdown', 'bash', 'text'],
