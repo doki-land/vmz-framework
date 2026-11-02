@@ -17,7 +17,7 @@ export const TOOL_ICONS: Record<string, IconDef> = {
     },
     'tool.length': {
         kind: 'stroke',
-        paths: ['M4 9H20V15H4Z', 'M8 9V12', 'M12 9V13.5', 'M16 9V12'],
+        paths: ['M4 8.5H20V15.5H4Z', 'M8 8.5V12', 'M12 8.5V13.5', 'M16 8.5V12'],
     },
     'tool.weight': {
         kind: 'stroke',
@@ -82,12 +82,12 @@ export const TOOL_ICONS: Record<string, IconDef> = {
     },
     'tool.ohm': {
         kind: 'stroke',
-        paths: ['M7 14C7 10.5 9.3 8 12 8C14.7 8 17 10.5 17 14', 'M7 14V17', 'M17 14V17', 'M4.5 17H9.5', 'M14.5 17H19.5'],
+        paths: ['M7 14.5C7 10.8 9.2 7.5 12 7.5C14.8 7.5 17 10.8 17 14.5', 'M7 14.5V17', 'M17 14.5V17', 'M4.5 17H9.5', 'M14.5 17H19.5'],
     },
     'tool.speed': {
         kind: 'stroke',
         paths: ['M5 14A7 7 0 0 1 19 14', 'M12 14L16 10'],
-        dots: [{ cx: 12, cy: 14, r: 1.35 }],
+        dots: [{ cx: 12, cy: 14, r: 1.5 }],
     },
     'tool.base64': { kind: 'text-badge', label: 'B64' },
     'tool.base36': { kind: 'text-badge', label: 'B36' },

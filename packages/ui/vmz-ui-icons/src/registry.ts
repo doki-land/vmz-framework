@@ -1,8 +1,14 @@
 /** Shared icon registry for `@vmz/ui-icons` and optional app-level Icon shims. */
 import type { IconDef } from './icon-types.ts';
 import { ACTION_ICONS } from './icons/action.ts';
+import { BRAND_ICONS } from './icons/brand.ts';
+import { COMMERCE_ICONS } from './icons/commerce.ts';
+import { DATA_ICONS } from './icons/data.ts';
 import { FEATURE_ICONS } from './icons/feature.ts';
+import { FILE_ICONS } from './icons/file.ts';
+import { MEDIA_ICONS } from './icons/media.ts';
 import { NAVIGATION_ICONS } from './icons/navigation.ts';
+import { SOCIAL_ICONS } from './icons/social.ts';
 import { STATUS_ICONS } from './icons/status.ts';
 import { TOOL_ICONS } from './icons/tool.ts';
 
@@ -10,13 +16,19 @@ export type { IconDef, IconFillDef, IconMixedDef, IconMixedNode, IconStrokeDef, 
 export { DEFAULT_STROKE_WIDTH } from './icon-types.ts';
 
 /**
- * One registry, one row per concept. Category modules under `./icons/` are the only
- * sources; keys stay stable, and unknown names throw instead of falling back.
+ * One registry, one silhouette per concept. Category modules under `./icons/` are the
+ * only sources; keys stay stable, and unknown names throw instead of falling back.
  */
 export const REGISTRY: Record<string, IconDef> = {
     ...ACTION_ICONS,
+    ...BRAND_ICONS,
+    ...COMMERCE_ICONS,
+    ...DATA_ICONS,
     ...FEATURE_ICONS,
+    ...FILE_ICONS,
+    ...MEDIA_ICONS,
     ...NAVIGATION_ICONS,
+    ...SOCIAL_ICONS,
     ...STATUS_ICONS,
     ...TOOL_ICONS,
 };
@@ -27,7 +39,7 @@ export function resolveIconDef(name: string): IconDef | null {
     const def = REGISTRY[key];
     if (!def) {
         throw new Error(
-            `@vmz/ui-icons: unknown icon name "${key}" — expected a dotted semantic name from the registry (action.*, feature.*, nav.*, status.*, tool.*)`,
+            `@vmz/ui-icons: unknown icon name "${key}" — expected a dotted semantic name from the registry (action.*, brand.*, commerce.*, data.*, feature.*, file.*, media.*, nav.*, social.*, status.*, tool.*)`,
         );
     }
     return def;

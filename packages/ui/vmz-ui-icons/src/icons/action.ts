@@ -55,9 +55,9 @@ export const ACTION_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: [],
         dots: [
-            { cx: 5, cy: 12, r: 1.35 },
-            { cx: 12, cy: 12, r: 1.35 },
-            { cx: 19, cy: 12, r: 1.35 },
+            { cx: 5, cy: 12, r: 1.5 },
+            { cx: 12, cy: 12, r: 1.5 },
+            { cx: 19, cy: 12, r: 1.5 },
         ],
     },
     'action.filter': {
@@ -140,7 +140,45 @@ export const ACTION_ICONS: Record<string, IconDef> = {
     },
     'action.search-document': {
         kind: 'stroke',
-        paths: ['M4 4H13L17 8V20H4Z', 'M13 4V8H17', 'M16.1 16.1L20 20'],
-        circles: [{ cx: 14, cy: 14, r: 3 }],
+        paths: ['M4 3.5H12L16.5 8V20.5H4Z', 'M12 3.5V8H16.5', 'M16.5 16.5L20.5 20.5'],
+        circles: [{ cx: 14.2, cy: 14.2, r: 3.2 }],
+    },
+    'action.save': {
+        kind: 'stroke',
+        paths: ['M4 4H16L20 8V20H4Z', 'M8 20V13H16V20', 'M8 4V8.5H14V4'],
+    },
+    'action.undo': {
+        kind: 'stroke',
+        paths: ['M9 14L4 9L9 4', 'M4 9H14A6.5 6.5 0 0 1 20.5 15.5V18'],
+    },
+    'action.redo': {
+        kind: 'stroke',
+        paths: ['M15 14L20 9L15 4', 'M20 9H10A6.5 6.5 0 0 0 3.5 15.5V18'],
+    },
+    'action.cut': {
+        kind: 'stroke',
+        paths: ['M7.9 7.5L20 19', 'M7.9 16.5L20 5'],
+        circles: [
+            { cx: 6, cy: 6, r: 2.2 },
+            { cx: 6, cy: 18, r: 2.2 },
+        ],
+    },
+    'action.paste': {
+        kind: 'stroke',
+        paths: ['M16 5H19V20H5V5H8', 'M8 3.5H16V7H8Z'],
+    },
+    'action.eye': {
+        kind: 'stroke',
+        paths: ['M2.5 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 21.5 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2.5 12Z'],
+        circles: [{ cx: 12, cy: 12, r: 3 }],
+    },
+    'action.eye-off': {
+        kind: 'stroke',
+        paths: ['M2.5 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 21.5 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2.5 12Z', 'M4 5L20 19'],
+        circles: [{ cx: 12, cy: 12, r: 3 }],
+    },
+    'action.mail': {
+        kind: 'stroke',
+        paths: ['M3 6H21V18H3Z', 'M3 7L12 13L21 7'],
     },
 };

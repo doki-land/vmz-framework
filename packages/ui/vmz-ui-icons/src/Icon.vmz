@@ -42,14 +42,14 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    min-width: 1.65em;
-    padding: 0.12em 0.22em;
+    min-width: 1.7em;
+    padding: 0.1em 0.2em;
     border: 1.5px solid currentColor;
     border-radius: 0.2em;
     font-family: var(--vmz-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
-    font-size: 0.52em;
+    font-size: 0.56em;
     font-weight: 600;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
     line-height: 1.1;
     text-align: center;
     text-transform: uppercase;
