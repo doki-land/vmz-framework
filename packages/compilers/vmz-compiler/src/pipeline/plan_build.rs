@@ -48,7 +48,17 @@ fn append_dispose_nodes(view: &ViewView, out: &mut Vec<PlanNode>, next_id: &mut 
                     collect(c, seen);
                 }
             }
-            ViewNode::Component { children, .. } | ViewNode::Slot { children, .. } => {
+            ViewNode::Component { children, each, .. } => {
+                if let Some(e) = each {
+                    if let Some(r) = e.region {
+                        seen.insert(r.0, DisposeRegionSource::Each);
+                    }
+                }
+                for c in children {
+                    collect(c, seen);
+                }
+            }
+            ViewNode::Slot { children, .. } => {
                 for c in children {
                     collect(c, seen);
                 }
@@ -106,29 +116,43 @@ fn push_node(node: &ViewNode, out: &mut Vec<PlanNode>, next_id: &mut u32) -> u32
                 branches: branch_ids,
             }
         }
-        ViewNode::Component { tag, children, attrs, .. } => {
+        ViewNode::Component { tag, children, attrs, each } => {
             let kid_ids: Vec<u32> = children.iter().map(|c| push_node(c, out, next_id)).collect();
-            let resume_marker = attrs.iter().find_map(|a| {
-                a.name
-                    .strip_prefix("client:")
-                    .map(|s| if s.is_empty() { "load".into() } else { s.to_string() })
-            });
-            // Component `@event` → ComponentEventPlan (never onXxx prop).
-            let events: Vec<ComponentEventPlan> = attrs
-                .iter()
-                .filter(|a| a.name.starts_with('@') && a.name.len() > 1)
-                .map(|a| {
-                    let raw = a.name.strip_prefix('@').unwrap_or(&a.name);
-                    let name = raw.split('.').next().unwrap_or(raw).to_string();
-                    ComponentEventPlan { name, host_id: Some(id) }
-                })
-                .collect();
-            PlanNode::Component {
-                id,
-                tag: Some(tag.clone()),
-                resume_marker,
-                events,
-                children: kid_ids,
+            if let Some(e) = each {
+                // `v-for` on a component iterates rows like an element: the plan
+                // carries the each region and key binding, never leaked props.
+                PlanNode::Each {
+                    id,
+                    tag: Some(tag.clone()),
+                    binding: e.list_binding.map(|b| b.0),
+                    key_binding: e.key_binding.map(|b| b.0),
+                    region: e.region.map(|r| r.0),
+                    resume_marker: None,
+                    children: kid_ids,
+                }
+            } else {
+                let resume_marker = attrs.iter().find_map(|a| {
+                    a.name
+                        .strip_prefix("client:")
+                        .map(|s| if s.is_empty() { "load".into() } else { s.to_string() })
+                });
+                // Component `@event` → ComponentEventPlan (never onXxx prop).
+                let events: Vec<ComponentEventPlan> = attrs
+                    .iter()
+                    .filter(|a| a.name.starts_with('@') && a.name.len() > 1)
+                    .map(|a| {
+                        let raw = a.name.strip_prefix('@').unwrap_or(&a.name);
+                        let name = raw.split('.').next().unwrap_or(raw).to_string();
+                        ComponentEventPlan { name, host_id: Some(id) }
+                    })
+                    .collect();
+                PlanNode::Component {
+                    id,
+                    tag: Some(tag.clone()),
+                    resume_marker,
+                    events,
+                    children: kid_ids,
+                }
             }
         }
         ViewNode::Slot { name, children, .. } => {

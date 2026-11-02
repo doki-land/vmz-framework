@@ -252,9 +252,12 @@ fn build_component_stripped(
     let TemplateNode::Element { tag, attrs, children } = node else {
         return ViewNode::Text { value: String::new() };
     };
-    let view_attrs = build_attrs(tag, attrs, strip, false, ir);
+    // `v-for` on a component iterates exactly like on an element: the each
+    // metadata lives on the node, never as leaked props.
+    let each = take_each(attrs, ir);
+    let view_attrs = build_attrs(tag, attrs, strip, true, ir);
     let kids = build_nodes(children, ir, routes);
-    ViewNode::Component { tag: tag.clone(), attrs: view_attrs, children: kids }
+    ViewNode::Component { tag: tag.clone(), attrs: view_attrs, children: kids, each }
 }
 
 fn build_link_stripped(
@@ -292,11 +295,22 @@ fn build_element(
         return ViewNode::Text { value: String::new() };
     };
 
-    let each_expr = if allow_each { attr_interp(attrs, "each") } else { None };
-    let each_as = if allow_each { attr_static(attrs, "as") } else { None };
-    let each_key = if allow_each { attr_interp(attrs, "key") } else { None };
+    let each = if allow_each { take_each(attrs, ir) } else { None };
 
-    let each = if let (Some(list_expr), Some(as_name)) = (each_expr, each_as) {
+    let view_attrs = build_attrs(tag, attrs, strip, allow_each, ir);
+    let kids = build_nodes(children, ir, routes);
+    ViewNode::Element { tag: tag.clone(), attrs: view_attrs, children: kids, each }
+}
+
+/// Shared `v-for` extraction for elements and components: `each` / `as` /
+/// `key` become [`ViewEach`] metadata (with correlated bindings) and are
+/// stripped from the attribute list by the caller.
+fn take_each(attrs: &[TemplateAttr], ir: &mut IrDepCursor<'_>) -> Option<ViewEach> {
+    let each_expr = attr_interp(attrs, "each");
+    let each_as = attr_static(attrs, "as");
+    let each_key = attr_interp(attrs, "key");
+
+    if let (Some(list_expr), Some(as_name)) = (each_expr, each_as) {
         let list = sanitize(&list_expr);
         let list_binding =
             ir.take_binding(&[BindingKind::EachList], &list).map(|t| BindingId(t.id));
@@ -314,11 +328,7 @@ fn build_element(
         })
     } else {
         None
-    };
-
-    let view_attrs = build_attrs(tag, attrs, strip, allow_each, ir);
-    let kids = build_nodes(children, ir, routes);
-    ViewNode::Element { tag: tag.clone(), attrs: view_attrs, children: kids, each }
+    }
 }
 
 fn build_attrs(

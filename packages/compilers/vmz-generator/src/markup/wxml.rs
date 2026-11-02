@@ -243,7 +243,7 @@ fn emit_node(
             }
             Ok(out)
         }
-        ViewNode::Component { tag, attrs, children } => {
+        ViewNode::Component { tag, attrs, children, each } => {
             if ctx.profile != MiniTemplateProfile::Structure {
                 push_err(
                     ctx,
@@ -253,6 +253,27 @@ fn emit_node(
                 return Err(());
             }
             let mut attr_s = format!(" name=\"{}\"", escape_xml_attr(tag));
+            // `v-for` on a component carries the same row metadata as elements.
+            if let Some(e) = each {
+                if let Some(list_b) = e.list_binding {
+                    patch_bindings.insert(list_b.0, ());
+                    attr_s.push_str(&format!(" data-vmz-each=\"b.B_{}\"", list_b.0));
+                } else {
+                    attr_s
+                        .push_str(&format!(" data-vmz-each=\"{}\"", escape_xml_attr(&e.list_expr)));
+                }
+                attr_s.push_str(&format!(" data-vmz-as=\"{}\"", escape_xml_attr(&e.as_name)));
+                if let Some(key_b) = e.key_binding {
+                    patch_bindings.insert(key_b.0, ());
+                    attr_s.push_str(&format!(" data-vmz-key=\"b.B_{}\"", key_b.0));
+                } else if let Some(key_expr) = &e.key_expr {
+                    attr_s
+                        .push_str(&format!(" data-vmz-key-expr=\"{}\"", escape_xml_attr(key_expr)));
+                }
+                if let Some(r) = e.region {
+                    attr_s.push_str(&format!(" data-vmz-region=\"{}\"", r.0));
+                }
+            }
             for a in attrs {
                 if is_once_marker(&a.name) || is_memo_marker(&a.name) {
                     continue;

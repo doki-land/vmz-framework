@@ -100,9 +100,29 @@ fn emit_node(
             }
             Ok(out)
         }
-        ViewNode::Component { tag, attrs, children } => {
+        ViewNode::Component { tag, attrs, children, each } => {
             let wtag = kebab(tag);
             let mut attr_s = String::new();
+            // `v-for` on a component lowers onto the component tag itself,
+            // mirroring element rows (wx:for is legal on custom components).
+            let mut prev_item = None;
+            if let Some(e) = each {
+                prev_item = ctx.each_item.clone();
+                ctx.each_item = Some(e.as_name.clone());
+                if let Some(list_b) = e.list_binding {
+                    patch_bindings.insert(list_b.0, ());
+                    attr_s.push_str(&format!(" wx:for=\"{{{{b.B_{}}}}}\"", list_b.0));
+                } else {
+                    attr_s.push_str(&format!(" wx:for=\"{{{{{}}}}}\"", e.list_expr));
+                }
+                if !e.as_name.is_empty() && e.as_name != "item" {
+                    attr_s.push_str(&format!(" wx:for-item=\"{}\"", escape_xml_attr(&e.as_name)));
+                }
+                attr_s.push_str(&format!(
+                    " wx:key=\"{}\"",
+                    wx_key(&e.as_name, e.key_expr.as_deref())
+                ));
+            }
             for a in attrs {
                 if is_event_attr(&a.name) {
                     emit_event(a, &mut attr_s, ctx)?;
@@ -121,6 +141,9 @@ fn emit_node(
                     continue;
                 }
                 inner.push_str(&emit_node(c, patch_bindings, ctx)?);
+            }
+            if each.is_some() {
+                ctx.each_item = prev_item;
             }
             if inner.is_empty() {
                 Ok(format!("<{wtag}{attr_s} />"))

@@ -660,22 +660,46 @@ fn emit_node(
             once,
             memo,
         ),
-        ViewNode::Component { tag, attrs, children } => emit_component(
-            tag,
-            attrs,
-            children,
-            fields,
-            scope,
-            aliases,
-            each_depth,
-            handler_ctx,
-            ir,
-            stmts,
-            next_id,
-            child_ctors,
-            once,
-            memo,
-        ),
+        ViewNode::Component { tag, attrs, children, each } => {
+            if let Some(each) = each {
+                // `v-for` on a component iterates rows exactly like on an
+                // element: the item scope lives inside the row closure.
+                return emit_each_block(
+                    tag,
+                    attrs,
+                    children,
+                    each,
+                    fields,
+                    scope,
+                    aliases,
+                    each_depth,
+                    handler_ctx,
+                    ir,
+                    stmts,
+                    next_id,
+                    child_ctors,
+                    once,
+                    memo,
+                    RowEmit::Component,
+                );
+            }
+            emit_component(
+                tag,
+                attrs,
+                children,
+                fields,
+                scope,
+                aliases,
+                each_depth,
+                handler_ctx,
+                ir,
+                stmts,
+                next_id,
+                child_ctors,
+                once,
+                memo,
+            )
+        }
         ViewNode::Slot { name, attrs, children } => {
             let mut attrs = attrs.clone();
             if let Some(n) = name
@@ -987,6 +1011,7 @@ fn emit_element(
             child_ctors,
             once,
             memo,
+            RowEmit::Element,
         );
     }
     emit_plain_element(
@@ -1810,6 +1835,20 @@ fn emit_bind_text_content(
     ));
 }
 
+/// Row body flavor inside an `each` schedule: DOM element rows can use the
+/// clone kernel, component rows always create instances through `api.component`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RowEmit {
+    Element,
+    Component,
+}
+
+impl RowEmit {
+    fn is_component(self) -> bool {
+        matches!(self, RowEmit::Component)
+    }
+}
+
 fn emit_each_block(
     tag: &str,
     attrs: &[ViewAttr],
@@ -1826,6 +1865,7 @@ fn emit_each_block(
     child_ctors: &HashMap<String, String>,
     once: bool,
     memo: Option<&MemoCtx>,
+    row: RowEmit,
 ) -> Result<String, String> {
     // `v-once` on the list element (or an ancestor) freezes the rendered rows.
     let once = once || has_once_marker(attrs);
@@ -1890,7 +1930,9 @@ fn emit_each_block(
     // `v-once` rows never re-render, so the fast clone kernel (and its host-field
     // subscriptions) is disabled — the fat createItem evaluates each row once.
     // `v-memo` rows need the snapshot gate, which the clone kernel cannot express.
-    let row_kernel = if once
+    // Component rows are instance creates, not cloneable DOM: always fat createItem.
+    let row_kernel = if row.is_component()
+        || once
         || has_memo_marker(attrs)
         || children.iter().any(subtree_has_once_marker)
         || children.iter().any(subtree_has_memo_marker)
@@ -1915,22 +1957,40 @@ fn emit_each_block(
     // today's fat createItem). Do not treat rowKernel.html as SSR truth source.
     let item_fn = |ir: &mut IrDepCursor<'_>, next_id: &mut u32| -> Result<String, String> {
         let mut item_stmts = Vec::new();
-        let item_root = emit_plain_element(
-            tag,
-            attrs,
-            children,
-            fields,
-            &child_scope,
-            &child_aliases,
-            depth,
-            handler_ctx,
-            ir,
-            &mut item_stmts,
-            next_id,
-            child_ctors,
-            once,
-            memo,
-        )?;
+        let item_root = match row {
+            RowEmit::Element => emit_plain_element(
+                tag,
+                attrs,
+                children,
+                fields,
+                &child_scope,
+                &child_aliases,
+                depth,
+                handler_ctx,
+                ir,
+                &mut item_stmts,
+                next_id,
+                child_ctors,
+                once,
+                memo,
+            )?,
+            RowEmit::Component => emit_component(
+                tag,
+                attrs,
+                children,
+                fields,
+                &child_scope,
+                &child_aliases,
+                depth,
+                handler_ctx,
+                ir,
+                &mut item_stmts,
+                next_id,
+                child_ctors,
+                once,
+                memo,
+            )?,
+        };
         Ok(format!(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
             indent_block(&item_stmts.join("\n"))

@@ -40,6 +40,7 @@ fn sample_unit() -> ProgramUnit {
                     modifiers: Vec::new(),
                 }],
                 children: vec![],
+                each: None,
             },
             ViewNode::If {
                 region: Some(vmz_types::RegionId(1)),

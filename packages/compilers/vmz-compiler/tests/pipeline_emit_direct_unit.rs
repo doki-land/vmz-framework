@@ -100,6 +100,49 @@ export default class DealsPage {
 }
 
 #[test]
+fn each_on_component_evaluates_item_scope_inside_item_closure() {
+    // `v-for` on a component must iterate like on an element: the item alias
+    // (`panel`) is only bound inside the item closure, so the component create
+    // may never evaluate `panel` / `panel.id` eagerly in the outer scope.
+    let src = r#"
+export default class PanelGrid {
+  panels: { id: string; title: string }[] = [];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div><PanelCard v-for="panel in panels" :key="panel.id" :panel="panel" /></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // Iteration happens through the each schedule, never through leaked props.
+    assert!(js.contains("createItem:"), "component v-for must lower to an each schedule: {js}");
+    assert!(!js.contains("\"each\":"), "`each` must never leak into component props: {js}");
+    assert!(!js.contains("\"as\":"), "`as` must never leak into component props: {js}");
+    // The item closure is the only place the alias is in scope.
+    let item_fn = js.find("function(api, box").map(|at| &js[at..]).unwrap_or("");
+    assert!(!item_fn.is_empty(), "each item closure must exist: {js}");
+    assert!(
+        item_fn.contains("api.component(this,"),
+        "component must be created inside the item closure: {js}"
+    );
+    assert!(
+        item_fn.contains("\"panel\":box1.item"),
+        "prop must evaluate the item alias inside the closure: {js}"
+    );
+    assert!(
+        js.contains("key: function(box1) { return (box1.item.id); }"),
+        "key must evaluate the item alias per row inside the schedule: {js}"
+    );
+    // Outer scope never touches the alias eagerly.
+    let outer = &js[..js.find("function(api, box").unwrap_or(0)];
+    assert!(!outer.contains("panel.id"), "eager `panel.id` outside the item closure: {js}");
+    assert!(!outer.contains(":panel"), "eager `panel` prop outside the item closure: {js}");
+}
+
+#[test]
 fn v_once_region_emits_create_time_writes_without_any_subscription() {
     let src = r#"
 export default class OnceDemo {

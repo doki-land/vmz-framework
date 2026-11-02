@@ -198,6 +198,10 @@ pub enum ViewNode {
         attrs: Vec<ViewAttr>,
         /// Slot / default children.
         children: Vec<ViewNode>,
+        /// Optional `each` metadata when this component iterates a list.
+        /// Item scope lives inside the row closure, identical to elements.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        each: Option<ViewEach>,
     },
     /// Named or default slot.
     Slot {
@@ -253,7 +257,7 @@ pub enum ViewAttrValue {
     Bare,
 }
 
-/// `each` metadata on an element.
+/// `each` metadata on an element or component.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ViewEach {
     /// List expression source text.
@@ -1314,7 +1318,7 @@ impl ProgramUnit {
         let mut out = Vec::new();
         fn walk(node: &ViewNode, out: &mut Vec<ResumeEntryDecl>) {
             match node {
-                ViewNode::Component { tag, attrs, children } => {
+                ViewNode::Component { tag, attrs, children, .. } => {
                     let mut strategy = None;
                     for a in attrs {
                         if let Some(s) = a.name.strip_prefix("client:") {
