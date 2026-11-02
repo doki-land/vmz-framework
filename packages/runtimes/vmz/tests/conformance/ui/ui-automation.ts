@@ -6,6 +6,7 @@
  * - package name @vmz/ui (not vmz-design); not a plugin
  * - token-requirements.v0 contract present and wired to Button source
  * - Button references required CSS vars; no forbidden brand hex in @vmz/ui
+ * - default preset chromatic discipline (neutral ramp, no decorative/neon hues, semantic grid)
  * - fixture with semantic action tokens builds
  * - fixture missing required tokens fails unknown_design_token
  * - homepage designs emit action.primary.* / focus.ring vars
@@ -200,6 +201,137 @@ if (!fs.existsSync(path.join(uiRoot, 'src', 'components', 'Button.vmz'))) {
 if (pkg.vmz?.componentsRoot) {
     fail('forbid package.json vmz.componentsRoot — convention is src/components');
 }
+
+console.log('ui-automation: default preset chromatic discipline…');
+/** Collect `{ key, value }` leaves from both preset shapes (`{entries:[…]}` and nested objects). */
+function collectColorLeaves(node, trail, out) {
+    if (Array.isArray(node)) {
+        for (const item of node) collectColorLeaves(item, trail, out);
+        return out;
+    }
+    if (!node || typeof node !== 'object') return out;
+    if (Array.isArray(node.key?.path)) {
+        out.push({ key: node.key.path.join('.'), value: node.value });
+        return out;
+    }
+    const pairs = Object.entries(node).filter(([k]) => k !== 'key' && k !== 'value');
+    if (!pairs.length) return out;
+    if (pairs.every(([, v]) => v === null || typeof v !== 'object')) {
+        for (const [k, v] of pairs) out.push({ key: [...trail, k].join('.'), value: v });
+        return out;
+    }
+    for (const [k, v] of pairs) collectColorLeaves(v, [...trail, k], out);
+    return out;
+}
+function hexToHsl(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = ((n >> 16) & 255) / 255;
+    const g = ((n >> 8) & 255) / 255;
+    const b = (n & 255) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    let h = 0;
+    if (d !== 0) {
+        if (max === r) h = 60 * (((g - b) / d) % 6);
+        else if (max === g) h = 60 * ((b - r) / d + 2);
+        else h = 60 * ((r - g) / d + 4);
+    }
+    return { h: (h + 360) % 360, s, l };
+}
+/** Semantic slots allowed to carry chroma in the default theme. Everything else must stay neutral. */
+const CHROMA_ALLOW = [
+    /^brand\.primary$/,
+    /^scale\.\d+$/,
+    /^action\.primary\./,
+    /^action\.link\./,
+    /^focus\.ring$/,
+    /^status\.(info|success|warning|danger)\./,
+];
+/**
+ * R1 neutral ramp stays ≤0.30 saturation · R2 no decorative saturated color outside the
+ * allowlist · R3 neon green band rejected even on semantic slots · R4 forbiddenBrandHex.
+ */
+function chromaticViolations(leaves, forbiddenHex) {
+    const violations = [];
+    for (const leaf of leaves) {
+        if (typeof leaf.value !== 'string') continue;
+        for (const hex of leaf.value.match(/#[0-9a-fA-F]{6}\b/g) || []) {
+            const { h, s, l } = hexToHsl(hex);
+            if (/^(surface|text|line)\./.test(leaf.key) && s > 0.3) {
+                violations.push(`R1 neutral ${leaf.key} ${hex} saturation ${s.toFixed(2)}`);
+            }
+            if (!CHROMA_ALLOW.some((re) => re.test(leaf.key)) && s >= 0.5 && l >= 0.35) {
+                violations.push(`R2 decorative ${leaf.key} ${hex} saturation ${s.toFixed(2)} lightness ${l.toFixed(2)}`);
+            }
+            if (h >= 135 && h <= 175 && s >= 0.75 && l >= 0.35 && l <= 0.75) {
+                violations.push(`R3 neon ${leaf.key} ${hex} hue ${h.toFixed(0)}`);
+            }
+            if (forbiddenHex.includes(hex.toLowerCase())) {
+                violations.push(`R4 forbidden ${leaf.key} ${hex}`);
+            }
+        }
+    }
+    return violations;
+}
+const defaultThemeLeaves = [];
+for (const rel of presetManifest.files.tokens || []) {
+    collectColorLeaves(JSON.parse(fs.readFileSync(path.join(presetDir, rel), 'utf8')), [], defaultThemeLeaves);
+}
+const presetViolations = chromaticViolations(defaultThemeLeaves, forbidden);
+if (presetViolations.length) fail(`default preset chromatic discipline:\n${presetViolations.join('\n')}`);
+
+/** R5: the four semantic statuses must ship all four slots. */
+function missingStatusSlots(keys) {
+    const missing = [];
+    for (const tone of ['info', 'success', 'warning', 'danger']) {
+        for (const slot of ['accent', 'foreground', 'background', 'border']) {
+            if (!keys.has(`status.${tone}.${slot}`)) missing.push(`status.${tone}.${slot}`);
+        }
+    }
+    return missing;
+}
+const statusKeys = new Set(
+    collectColorLeaves(
+        JSON.parse(fs.readFileSync(path.join(presetDir, 'tokens', 'semantic-status.json'), 'utf8')),
+        [],
+        [],
+    ).map((l) => l.key),
+);
+const missingSlots = missingStatusSlots(statusKeys);
+if (missingSlots.length) fail(`R5 semantic status gaps: ${missingSlots.join(', ')}`);
+
+// Negative fixtures must trip the matching rule; the positive set must stay silent.
+const chromaFixtures = [
+    { leaves: [{ key: 'decorative.mint', value: '#34D399' }], want: 'R2' },
+    { leaves: [{ key: 'action.primary.background', value: '#00CD79' }], want: 'R3' },
+    { leaves: [{ key: 'surface.page', value: '#E6F4FF' }], want: 'R1' },
+    { leaves: [{ key: 'status.success.accent', value: '#00C878' }], want: 'R4' },
+    {
+        leaves: [
+            { key: 'status.success.accent', value: '#52C41A' },
+            { key: 'action.primary.background', value: '#1677FF' },
+            { key: 'surface.page', value: '#F5F6F8' },
+        ],
+        want: null,
+    },
+];
+for (const fx of chromaFixtures) {
+    const got = chromaticViolations(fx.leaves, forbidden);
+    if (fx.want === null) {
+        if (got.length) fail(`chromatic fixture false positive: ${got.join(' | ')}`);
+    } else if (!got.some((v) => v.startsWith(fx.want))) {
+        fail(`chromatic fixture missed ${fx.want}: ${JSON.stringify(fx.leaves)}`);
+    }
+}
+const fullSlots = new Set();
+for (const tone of ['info', 'success', 'warning', 'danger']) {
+    for (const slot of ['accent', 'foreground', 'background', 'border']) fullSlots.add(`status.${tone}.${slot}`);
+}
+if (missingStatusSlots(fullSlots).length) fail('chromatic fixture false positive: R5 full grid');
+if (!missingStatusSlots(new Set(['status.info.accent'])).length) fail('chromatic fixture missed R5');
 
 console.log('ui-automation: homepage semantic action tokens…');
 ensureDavinciFacade(root);
