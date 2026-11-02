@@ -431,6 +431,14 @@ function buildLines(
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
+            // Hosts snap to real data points: vertices in path order, each
+            // with its stable row key.
+            hitRegion: {
+                polyline: {
+                    points: sorted.map((row) => ({ x: row.x, y: row.y })),
+                    keys: sorted.map((row) => row.key),
+                },
+            },
             stroke: { color: seriesColor(theme, seriesCategories, name), width: LINE_STROKE_WIDTH },
         });
     }
@@ -479,6 +487,18 @@ function buildAreas(
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
+            // Vertices along the top edge carry row keys, so hosts resolve
+            // nearest-point tooltips even for stacked ribbons.
+            hitRegion: {
+                polyline: {
+                    points: sorted.map((row) =>
+                        layout === "stack"
+                            ? { x: row.x, y: project(yScale, (row.stackBase ?? 0) + (row.yRaw ?? 0)) }
+                            : { x: row.x, y: row.y },
+                    ),
+                    keys: sorted.map((row) => row.key),
+                },
+            },
             fill: { color: { ...color, a: theme.areaFillOpacity } },
             stroke: { color, width: LINE_STROKE_WIDTH },
         });

@@ -1973,6 +1973,67 @@ console.log('charts-render: facets lay out small multiples with shared scales…
     if (darkGrid.stroke.color.r !== DARK_CHART_THEME.gridStroke.r) fail('dark facet grids must use the dark grid token');
 }
 
+// ─── Polyline hit regions (nearest-point interaction contract) ───────────
+
+console.log('charts-render: line and area marks carry polyline hit regions with row keys…');
+{
+    const keyedLineSpec = {
+        mark: 'line',
+        keyField: 'id',
+        encoding: [
+            { field: 'day', channel: 'x' },
+            { field: 'visitors', channel: 'y' },
+            { field: 'product', channel: 'color' },
+        ],
+    };
+    const keyedRows = [
+        { id: 'c-mon', day: 'Mon', visitors: 120, product: 'Console' },
+        { id: 'c-tue', day: 'Tue', visitors: 145, product: 'Console' },
+        { id: 'c-wed', day: 'Wed', visitors: 98, product: 'Console' },
+        { id: 'i-mon', day: 'Mon', visitors: 80, product: 'Insight' },
+        { id: 'i-tue', day: 'Tue', visitors: 110, product: 'Insight' },
+        { id: 'i-wed', day: 'Wed', visitors: 132, product: 'Insight' },
+    ];
+    const { semantic } = pipeline(keyedLineSpec, keyedRows);
+    const lines = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (lines.length !== 2) fail(`want 2 series lines, got ${lines.length}`);
+    for (const p of lines) {
+        if (!p.hitRegion || !p.hitRegion.polyline) fail(`${p.id} must carry a polyline hit region`);
+        const pl = p.hitRegion.polyline;
+        if (pl.points.length !== 3 || pl.keys.length !== 3) fail('polyline must carry one vertex + key per row');
+        // Vertices follow x order and keys keep row identity, so a host can
+        // snap to the nearest real data point without re-projecting.
+        if (!(pl.points[0].x < pl.points[1].x && pl.points[1].x < pl.points[2].x)) {
+            fail('polyline vertices must be x-ordered');
+        }
+        const series = p.id === 'line:Console' ? 'c' : 'i';
+        if (pl.keys.join(',') !== `${series}-mon,${series}-tue,${series}-wed`) {
+            fail(`polyline keys must be the row keys in vertex order, got ${pl.keys.join(',')}`);
+        }
+    }
+
+    // Area marks (incl. stacked ribbons) carry top-edge vertices with keys.
+    const area = pipeline(
+        { mark: 'area', keyField: 'id', seriesLayout: 'stack', encoding: keyedLineSpec.encoding },
+        keyedRows,
+    );
+    const areas = area.semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (areas.length !== 2) fail(`want 2 stacked areas, got ${areas.length}`);
+    for (const p of areas) {
+        const pl = p.hitRegion && p.hitRegion.polyline;
+        if (!pl || pl.points.length !== 3 || pl.keys.length !== 3) {
+            fail('stacked area must carry top-edge polyline vertices with row keys');
+        }
+    }
+    const consoleArea = areas.find((p) => p.id === 'area:Console');
+    const insightArea = areas.find((p) => p.id === 'area:Insight');
+    if (consoleArea && insightArea) {
+        const cTop = consoleArea.hitRegion.polyline.points[0].y;
+        const iTop = insightArea.hitRegion.polyline.points[0].y;
+        if (!(iTop < cTop)) fail('the stacked area vertex must sit above the base series vertex');
+    }
+}
+
 console.log('charts-render: the published facade dist is byte-identical to the internals…');
 {
     // Two independent code paths — internal workspace sources (all sections

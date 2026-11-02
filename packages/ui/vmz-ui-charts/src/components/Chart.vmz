@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="chart" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @click="_onClick" @keydown="_onKeydown" class="vmz-ui-charts__chart" :style="hostStyle" :data-theme="_themeName()" tabindex="0" role="img" :aria-label="_ariaLabel()" :aria-describedby="_srId()">
+    <div data-vmz-ui-charts="chart" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @mousedown="_onMouseDown" @mouseup="_onMouseUp" @click="_onClick" @keydown="_onKeydown" class="vmz-ui-charts__chart" :style="hostStyle" :data-theme="_themeName()" tabindex="0" role="img" :aria-label="_ariaLabel()" :aria-describedby="_srId()">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">
             No chart spec or data.
         </div>
@@ -16,6 +16,9 @@
                 {{ d.message }}
             </div>
         </div>
+        <div v-if="_crosshair.visible" class="vmz-ui-charts__crosshair" :style="_crosshairStyle()" />
+        <div v-for="(dot, i) in _crosshairDots" :key="i" class="vmz-ui-charts__crosshair-dot" :style="_dotStyle(dot)" />
+        <div v-if="_brush.active" class="vmz-ui-charts__brush" :style="_brushStyle()" />
         <div v-if="_tooltip.visible" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()" aria-live="polite">
             {{ _tooltip.text }}
         </div>
@@ -30,6 +33,9 @@
     border-radius: 4px;
     overflow: hidden;
     box-sizing: border-box;
+    /* 拖拽（brush/pan）期间禁止浏览器文本选择，否则选区高亮会盖在刻度标签上。 */
+    user-select: none;
+    -webkit-user-select: none;
 }
 .vmz-ui-charts__chart[data-theme="dark"] {
     background: var(--vmz-surface-paper-dark, #0b1220);
@@ -63,6 +69,46 @@
 @media (prefers-reduced-motion: reduce) {
     .vmz-ui-charts__svg svg { animation: none; }
     .vmz-ui-charts__svg svg [data-dvz-id] { transition: none; }
+}
+/* 交互覆盖层（crosshair / brush）——即时定位，无动画，天然满足 reduced-motion。 */
+.vmz-ui-charts__crosshair {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--vmz-line-default, #9ca3af);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 3;
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__crosshair {
+    background: var(--vmz-line-default-dark, #6b7280);
+}
+.vmz-ui-charts__crosshair-dot {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--vmz-surface-paper, #ffffff);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 4;
+    box-sizing: border-box;
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__crosshair-dot {
+    border-color: var(--vmz-surface-paper-dark, #0b1220);
+}
+.vmz-ui-charts__brush {
+    position: absolute;
+    border: 1px dashed #1677ff;
+    background: rgba(22, 119, 255, 0.12);
+    pointer-events: none;
+    z-index: 3;
+    box-sizing: border-box;
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__brush {
+    border-color: #60a5fa;
+    background: rgba(96, 165, 250, 0.14);
 }
 .vmz-ui-charts__empty {
     width: 100%;
@@ -170,6 +216,7 @@ import {
     type ChartSpec,
     type ChartTheme,
     type DataSnapshot,
+    type Scale,
 } from "@doki-land/davinci/chart";
 import {
     renderSvg,
@@ -180,7 +227,29 @@ import {
     type SemanticScene,
 } from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
-import type { Point2D } from "@doki-land/davinci/types";
+import type { Point2D, RGBA } from "@doki-land/davinci/types";
+
+/** Crosshair 顶点标记（CSS px）。 */
+interface CrosshairDot {
+    x: number;
+    y: number;
+    color: string;
+}
+
+/** line/area 系列的折线命中区（scene 坐标）。 */
+interface PolylineHit {
+    id: string;
+    points: ReadonlyArray<Point2D>;
+    keys: ReadonlyArray<string>;
+    color: string;
+}
+
+/** 键盘导航目标：mark 节点或折线顶点（key 非空时 tooltip 读行值）。 */
+interface NavTarget {
+    id: string;
+    key: string | null;
+    point: Point2D | null;
+}
 
 const FALLBACK_WIDTH = 640;
 const FALLBACK_HEIGHT = 360;
@@ -235,6 +304,29 @@ export default class Chart {
         y: 0,
         text: "",
     };
+    /** Crosshair 竖线状态（CSS px）。 */
+    public _crosshair: { visible: boolean; x: number } = { visible: false, x: 0 };
+    /** Crosshair 顶点标记（CSS px + 系列色）。 */
+    public _crosshairDots: CrosshairDot[] = [];
+    /** Brush 选区（scene 坐标）。 */
+    public _brush: { active: boolean; x0: number; y0: number; x1: number; y1: number } = {
+        active: false,
+        x0: 0,
+        y0: 0,
+        x1: 0,
+        y1: 0,
+    };
+    /** Shift+拖拽 pan 的起点（clientX + 起始域）。 */
+    public _panStart: { clientX: number; lo: number; hi: number } | null = null;
+    /** 当前 x 视域（数据单位），null = 全域。 */
+    public _viewDomain: number[] | null = null;
+    /** 未缩放 x 比例尺缓存（zoom/pan 的基准域与 kind）。 */
+    public _baseXDomain: number[] | null = null;
+    public _baseXKind: string | null = null;
+    /** wheel 非被动监听器的稳定引用（onMount 挂、onUnmount 摘）。 */
+    public _wheelBound: ((ev: WheelEvent) => void) | null = null;
+    /** brush / pan 结束后的那次 click 是拖拽余波，必须抑制（否则空命中立即清空选择）。 */
+    public _suppressClick: boolean = false;
 
     // ---- 尺寸与主题 ----
 
@@ -289,18 +381,30 @@ export default class Chart {
             return null;
         }
         const snapshot = this.snapshot ?? (this.data ? fromRows(this.data) : null);
-        if (!this.spec || !snapshot) {
+        const effSpec = this._effectiveSpec();
+        if (!effSpec || !snapshot) {
             this.diagnostics = [];
             this._semanticScene = null;
             this._plan = null;
             return null;
         }
-        const plan = compile(this.spec, snapshot);
+        const plan = compile(effSpec, snapshot);
         this.diagnostics = plan.diagnostics.items.map((d) => ({
             severity: d.severity,
             code: d.code,
             message: d.message,
         }));
+        // zoom/pan 基准：未缩放时的 x 域与 kind，从首次编译的比例尺捕获。
+        const xScale = plan.scales.get("x");
+        if (xScale && (xScale.kind === "linear" || xScale.kind === "log")) {
+            if (this._baseXDomain === null) {
+                this._baseXDomain = [xScale.domain[0], xScale.domain[1]];
+                this._baseXKind = xScale.kind;
+            }
+        } else {
+            this._baseXDomain = null;
+            this._baseXKind = null;
+        }
         const w = this._effWidth();
         const h = this._effHeight();
         const semantic = buildScene(plan, { width: w, height: h }, { theme: this._chartTheme() });
@@ -368,11 +472,13 @@ export default class Chart {
         this.state = initialState(this._effWidth(), this._effHeight());
         this._attachResizeObserver();
         this._attachThemeMedia();
+        this._attachWheel();
     }
 
     onUnmount() {
         this._detachResizeObserver();
         this._detachThemeMedia();
+        this._detachWheel();
     }
 
     public _attachThemeMedia(): void {
@@ -420,6 +526,303 @@ export default class Chart {
         if (!this.state) return null;
         this.state = reduce(this.state, action);
         return this.state;
+    }
+
+    // ---- 视域（zoom / pan，仅定量 x、非分面） ----
+
+    /** 视域生效的 spec：x 比例尺域被 `_viewDomain` 覆盖，kind/range 沿用编译基线。 */
+    public _effectiveSpec(): ChartSpec | null {
+        const spec = this.spec;
+        if (!spec) return null;
+        if (!this._viewDomain || !this._baseXKind) return spec;
+        const scales = new Map<string, Scale>();
+        if (spec.scales) {
+            for (const entry of Array.from(spec.scales.entries())) {
+                scales.set(entry[0], entry[1]);
+            }
+        }
+        const domain: [number, number] = [this._viewDomain[0], this._viewDomain[1]];
+        if (this._baseXKind === "log") {
+            scales.set("x", { kind: "log", domain, range: [0, 1] });
+        } else {
+            scales.set("x", { kind: "linear", domain, range: [0, 1] });
+        }
+        return { ...spec, scales };
+    }
+
+    /** 当前是否可缩放/平移：笛卡尔 + 定量 x + 非分面。 */
+    public _zoomable(): boolean {
+        if (!this.spec) return false;
+        if (this.spec.facetField) return false;
+        if (this._baseXDomain === null) return false;
+        return true;
+    }
+
+    /** 从语义场景的轴基线还原 plot 矩形（x 轴底线 + y 轴底线）。 */
+    public _plotBounds() {
+        if (!this._semanticScene) return null;
+        let xFrom: number | null = null;
+        let xTo = 0;
+        let yTop = 0;
+        let yBottom = 0;
+        for (const g of this._semanticScene.root.children) {
+            if (g.kind !== "group") continue;
+            if (g.id !== "x-axis" && g.id !== "y-axis") continue;
+            for (const n of g.children) {
+                if (n.kind !== "path" || !n.id.endsWith(":baseline")) continue;
+                const cmds = n.path.commands;
+                const a = cmds[0];
+                const b = cmds[1];
+                if (a.kind !== "move" || !b || b.kind !== "line") continue;
+                if (g.id === "x-axis") {
+                    xFrom = a.to.x;
+                    xTo = b.to.x;
+                    yBottom = a.to.y;
+                } else {
+                    yTop = a.to.y;
+                    yBottom = b.to.y;
+                    if (xFrom === null) xFrom = a.to.x;
+                }
+            }
+        }
+        if (xFrom === null || !(xTo > xFrom) || !(yBottom > yTop)) return null;
+        return { x: xFrom, y: yTop, w: xTo - xFrom, h: yBottom - yTop };
+    }
+
+    /** wheel 缩放：以指针下的数据值为焦点，限定在基线域内。 */
+    public _onWheel(ev: WheelEvent): void {
+        if (!this._zoomable()) return;
+        if (typeof ev.preventDefault === "function") ev.preventDefault();
+        const point = this._toScenePoint(ev);
+        const bounds = this._plotBounds();
+        const base = this._baseXDomain;
+        if (!point || !bounds || !base) return;
+        const cur = this._viewDomain ?? [base[0], base[1]];
+        const kind = this._baseXKind;
+        const t = Math.max(0, Math.min(1, (point.x - bounds.x) / bounds.w));
+        const zFocus = zoomSpace(kind, cur[0]) + t * (zoomSpace(kind, cur[1]) - zoomSpace(kind, cur[0]));
+        const factor = ev.deltaY > 0 ? 1.25 : 0.8;
+        let newLo = fromZoomSpace(kind, zFocus - (zFocus - zoomSpace(kind, cur[0])) * factor);
+        let newHi = fromZoomSpace(kind, zFocus + (zoomSpace(kind, cur[1]) - zFocus) * factor);
+        newLo = Math.max(newLo, base[0]);
+        newHi = Math.min(newHi, base[1]);
+        if (!(newHi > newLo)) return;
+        if (newLo <= base[0] && newHi >= base[1]) {
+            this._viewDomain = null;
+        } else {
+            this._viewDomain = [newLo, newHi];
+        }
+        this._hideCrosshair();
+    }
+
+    public _attachWheel(): void {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof root.addEventListener !== "function") return;
+        this._wheelBound = (ev: WheelEvent) => this._onWheel(ev);
+        root.addEventListener("wheel", this._wheelBound, { passive: false });
+    }
+
+    public _detachWheel(): void {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (root && this._wheelBound && typeof root.removeEventListener === "function") {
+            root.removeEventListener("wheel", this._wheelBound);
+        }
+        this._wheelBound = null;
+    }
+
+    /** 键盘缩放：+ 放大、- 缩小、0 复位（键盘等价路径）。 */
+    public _zoomBy(factor: number): void {
+        if (!this._zoomable()) return;
+        const base = this._baseXDomain;
+        if (!base) return;
+        const cur = this._viewDomain ?? [base[0], base[1]];
+        const kind = this._baseXKind;
+        const zMid = (zoomSpace(kind, cur[0]) + zoomSpace(kind, cur[1])) / 2;
+        let newLo = fromZoomSpace(kind, zMid - (zMid - zoomSpace(kind, cur[0])) * factor);
+        let newHi = fromZoomSpace(kind, zMid + (zoomSpace(kind, cur[1]) - zMid) * factor);
+        newLo = Math.max(newLo, base[0]);
+        newHi = Math.min(newHi, base[1]);
+        if (!(newHi > newLo)) return;
+        if (newLo <= base[0] && newHi >= base[1]) {
+            this._viewDomain = null;
+        } else {
+            this._viewDomain = [newLo, newHi];
+        }
+    }
+
+    /** 重置视域到全域。 */
+    public _resetView(): void {
+        this._viewDomain = null;
+    }
+
+    // ---- Crosshair（line/area 最近点取值） ----
+
+    /** line/area 卡片的全部系列折线命中区。 */
+    public _polylines(): PolylineHit[] {
+        const out: PolylineHit[] = [];
+        if (!this._semanticScene) return out;
+        if (!this.spec) return out;
+        if (this.spec.facetField) return out;
+        const markKind = String(this.spec.mark);
+        if (markKind !== "line" && markKind !== "area") return out;
+        for (const node of this._markNodes()) {
+            if (node.kind !== "path" || !node.hitRegion || !("polyline" in node.hitRegion)) continue;
+            const color = node.stroke ? rgbaCss(node.stroke.color) : "#1677ff";
+            out.push({ id: node.id, points: node.hitRegion.polyline.points, keys: node.hitRegion.polyline.keys, color });
+        }
+        return out;
+    }
+
+    /** 指针在 plot 内时显示 crosshair：吸附到最近数据 x，tooltip 列出各系列真实值。 */
+    public _updateCrosshair(point: Point2D): void {
+        const polylines = this._polylines();
+        const bounds = this._plotBounds();
+        if (polylines.length === 0 || !bounds) return;
+        if (point.x < bounds.x || point.x > bounds.x + bounds.w || point.y < bounds.y || point.y > bounds.y + bounds.h) {
+            this._hideCrosshair();
+            return;
+        }
+        // 最近的数据 x（scene 坐标），跨全部系列。
+        let bestX: number | null = null;
+        for (const pl of polylines) {
+            for (const p of pl.points) {
+                if (bestX === null || Math.abs(p.x - point.x) < Math.abs(bestX - point.x)) bestX = p.x;
+            }
+        }
+        if (bestX === null) return;
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        const rect = root && typeof root.getBoundingClientRect === "function" ? root.getBoundingClientRect() : null;
+        const scaleX = rect && rect.width > 0 ? rect.width / this._effWidth() : 1;
+        const scaleY = rect && rect.height > 0 ? rect.height / this._effHeight() : 1;
+        this._crosshair.x = bestX * scaleX;
+        this._crosshair.visible = true;
+
+        // 每个系列在该 x 处的顶点 → 点标记 + tooltip 行。
+        const dots: CrosshairDot[] = [];
+        const parts: string[] = [];
+        const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
+        const yEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "y") : undefined;
+        let xLabel = "";
+        for (const pl of polylines) {
+            for (let i = 0; i < pl.points.length; i++) {
+                if (Math.abs(pl.points[i].x - bestX) > 0.5) continue;
+                dots.push({ x: pl.points[i].x * scaleX, y: pl.points[i].y * scaleY, color: pl.color });
+                const mark = this._plan ? this._plan.marks.find((m) => m.key === pl.keys[i]) : undefined;
+                if (mark && this._plan) {
+                    const seriesName = mark.series !== null ? mark.series : pl.id;
+                    if (yEnc) {
+                        parts.push(`${seriesName}: ${formatCell(readCell(this._plan.resolvedData, yEnc.field, mark.rowIndex))}`);
+                    }
+                    if (xLabel === "" && xEnc) {
+                        xLabel = `${xEnc.field}: ${formatCell(readCell(this._plan.resolvedData, xEnc.field, mark.rowIndex))}`;
+                    }
+                }
+                break;
+            }
+        }
+        this._crosshairDots = dots;
+        const head = xLabel !== "" ? xLabel : "";
+        this._tooltip.text = head !== "" && parts.length > 0 ? `${head} · ${parts.join(" · ")}` : parts.join(" · ");
+        this._tooltip.x = this._crosshair.x;
+        this._tooltip.y = point.y * scaleY;
+        this._tooltip.visible = parts.length > 0;
+    }
+
+    public _hideCrosshair(): void {
+        this._crosshair.visible = false;
+        this._crosshairDots = [];
+    }
+
+    public _crosshairStyle(): string {
+        return `left:${this._crosshair.x}px`;
+    }
+
+    public _dotStyle(dot: CrosshairDot): string {
+        return `left:${dot.x}px;top:${dot.y}px;background:${dot.color}`;
+    }
+
+    // ---- Brush 选区 / Shift+拖拽 pan ----
+
+    /** 宿主可 override 的 brush 回调（事件名 `chart-brush`）。 */
+    public onchartBrush(payload: { keys: Array<string | number> }): void {
+        // 默认空实现，宿主在组件实例上 override 即可接收事件。
+    }
+
+    public _onMouseDown(ev: MouseEvent): void {
+        const point = this._toScenePoint(ev);
+        if (!point) return;
+        if (ev.shiftKey && this._zoomable()) {
+            const base = this._baseXDomain;
+            const cur = this._viewDomain ?? (base ? [base[0], base[1]] : null);
+            if (base && cur) {
+                this._panStart = { clientX: ev.clientX, lo: cur[0], hi: cur[1] };
+            }
+            return;
+        }
+        // 空白处按下开始 brush；命中 mark 时保持点击选择语义。
+        if (this._hitTest(point.x, point.y) !== null) return;
+        this._brush.active = true;
+        this._brush.x0 = point.x;
+        this._brush.y0 = point.y;
+        this._brush.x1 = point.x;
+        this._brush.y1 = point.y;
+    }
+
+    public _onMouseUp(ev: MouseEvent): void {
+        if (this._panStart) {
+            // 只有真的拖动了视域才吞掉随后的 click。
+            const cur = this._viewDomain;
+            if (cur && (cur[0] !== this._panStart.lo || cur[1] !== this._panStart.hi)) {
+                this._suppressClick = true;
+            }
+            this._panStart = null;
+            return;
+        }
+        if (!this._brush.active) return;
+        const point = this._toScenePoint(ev);
+        if (point) {
+            this._brush.x1 = point.x;
+            this._brush.y1 = point.y;
+        }
+        this._brush.active = false;
+        const x0 = Math.min(this._brush.x0, this._brush.x1);
+        const x1 = Math.max(this._brush.x0, this._brush.x1);
+        const y0 = Math.min(this._brush.y0, this._brush.y1);
+        const y1 = Math.max(this._brush.y0, this._brush.y1);
+        // 小于 3px 的拖拽视为误触，不改变选择。
+        if (x1 - x0 < 3 && y1 - y0 < 3) return;
+        // brush 的 mouseup 之后浏览器还会补发一次 click——不清掉它，空命中会立刻清选择。
+        this._suppressClick = true;
+        const keys: Array<string | number> = [];
+        this.dispatch({ kind: "clear-selection" });
+        for (const node of this._markNodes()) {
+            const anchor = this._nodeAnchor(node.id);
+            if (!anchor) continue;
+            if (anchor.x >= x0 && anchor.x <= x1 && anchor.y >= y0 && anchor.y <= y1) {
+                this.dispatch({ kind: "select-toggle", nodeId: node.id });
+                keys.push(node.id);
+            }
+        }
+        this.onchartBrush({ keys });
+        this._applyDomState();
+    }
+
+    public _brushStyle(): string {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        const rect = root && typeof root.getBoundingClientRect === "function" ? root.getBoundingClientRect() : null;
+        const scaleX = rect && rect.width > 0 ? rect.width / this._effWidth() : 1;
+        const scaleY = rect && rect.height > 0 ? rect.height / this._effHeight() : 1;
+        const x = Math.min(this._brush.x0, this._brush.x1) * scaleX;
+        const y = Math.min(this._brush.y0, this._brush.y1) * scaleY;
+        const w = Math.abs(this._brush.x1 - this._brush.x0) * scaleX;
+        const h = Math.abs(this._brush.y1 - this._brush.y0) * scaleY;
+        return `left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+    }
+
+    /** 取消进行中的 brush / pan（Escape 路径）。 */
+    public _cancelDrag(): void {
+        this._brush.active = false;
+        this._panStart = null;
     }
 
     // ---- 命中测试（读渲染期缓存的 SemanticScene，不重编译） ----
@@ -470,6 +873,15 @@ export default class Chart {
         // 显式扇形命中区（pie / donut 切片）优先于几何近似。
         if (node.hitRegion && "sector" in node.hitRegion) {
             return sectorDistance(node.hitRegion.sector, px, py);
+        }
+        // 折线命中区：到最近顶点的距离（顶点吸附优先于线段近似）。
+        if (node.hitRegion && "polyline" in node.hitRegion) {
+            let best: number | null = null;
+            for (const p of node.hitRegion.polyline.points) {
+                const d = Math.hypot(px - p.x, py - p.y);
+                if (best === null || d < best) best = d;
+            }
+            return best;
         }
         if (node.kind === "rect") {
             const inside = px >= node.x && px <= node.x + node.w && py >= node.y && py <= node.y + node.h;
@@ -561,6 +973,21 @@ export default class Chart {
         return id;
     }
 
+    /** 按行 key 直接还原 tooltip 文本（crosshair / 键盘顶点路径）。 */
+    public _tooltipForRowKey(key: string): string {
+        const plan = this._plan;
+        if (!plan || !this.spec) return key;
+        const mark = plan.marks.find((m) => m.key === key);
+        if (!mark) return key;
+        const xEnc = this.spec.encoding.find((e) => e.channel === "x");
+        const yEnc = this.spec.encoding.find((e) => e.channel === "y");
+        const parts: string[] = [];
+        if (mark.series !== null) parts.push(mark.series);
+        if (xEnc) parts.push(`${xEnc.field}: ${formatCell(readCell(plan.resolvedData, xEnc.field, mark.rowIndex))}`);
+        if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, mark.rowIndex))}`);
+        return parts.length > 0 ? parts.join(" · ") : key;
+    }
+
     /** mark 节点在 scene 坐标里的锚点（tooltip / 键盘定位用）。 */
     public _nodeAnchor(id: string): Point2D | null {
         const node = this._markNodes().find((n) => n.id === id);
@@ -599,14 +1026,62 @@ export default class Chart {
         this._tooltip.x = ev.clientX - rect.left;
         this._tooltip.y = ev.clientY - rect.top;
         const point = this._toScenePoint(ev);
+
+        // pan 中：按指针位移平移 x 视域，视域不越过基线域。
+        if (this._panStart && point) {
+            const bounds = this._plotBounds();
+            const base = this._baseXDomain;
+            if (bounds && base && rect.width > 0) {
+                const sceneDx = ((ev.clientX - this._panStart.clientX) / rect.width) * this._effWidth();
+                const span = this._panStart.hi - this._panStart.lo;
+                const dataDx = (sceneDx / bounds.w) * span;
+                let lo = this._panStart.lo - dataDx;
+                let hi = this._panStart.hi - dataDx;
+                if (lo < base[0]) {
+                    lo = base[0];
+                    hi = lo + span;
+                }
+                if (hi > base[1]) {
+                    hi = base[1];
+                    lo = hi - span;
+                }
+                this._viewDomain = lo <= base[0] && hi >= base[1] ? null : [lo, hi];
+            }
+            this._hideCrosshair();
+            this._tooltip.visible = false;
+            return;
+        }
+
+        // brush 中：只更新选框，不动 hover。
+        if (this._brush.active && point) {
+            this._brush.x1 = point.x;
+            this._brush.y1 = point.y;
+            return;
+        }
+
+        // line/area：plot 内任意位置给 crosshair 最近点取值（吸附数据 x）。
+        const markKind = this.spec ? String(this.spec.mark) : "";
+        const crosshairMark = (markKind === "line" || markKind === "area") && !(this.spec && this.spec.facetField);
+        if (crosshairMark && point) {
+            this._hoverId = null;
+            this._updateCrosshair(point);
+            if (!this._crosshair.visible) this._tooltip.visible = false;
+            this.dispatch({ kind: "hover", nodeId: null });
+            this._focusIndex = -1;
+            this._applyDomState();
+            return;
+        }
+
         const hit = point ? this._hitTest(point.x, point.y) : null;
         this._hoverId = hit;
         if (hit) {
+            this._hideCrosshair();
             this._tooltip.text = this._tooltipTextFor(hit);
             this._tooltip.visible = true;
             this.dispatch({ kind: "hover", nodeId: hit });
             this.onchartHover({ rowKey: hit, x: this._tooltip.x, y: this._tooltip.y });
         } else {
+            this._hideCrosshair();
             this._tooltip.visible = false;
             this.dispatch({ kind: "hover", nodeId: null });
         }
@@ -616,6 +1091,8 @@ export default class Chart {
     public _onMouseLeave(): void {
         this._tooltip.visible = false;
         this._hoverId = null;
+        this._hideCrosshair();
+        this._cancelDrag();
         this.dispatch({ kind: "hover", nodeId: null });
         this._applyDomState();
     }
@@ -633,6 +1110,11 @@ export default class Chart {
 
     public _onClick(ev: MouseEvent): void {
         if (!this.state) return;
+        // brush / pan 拖拽收尾的那次 click 不是选择意图。
+        if (this._suppressClick) {
+            this._suppressClick = false;
+            return;
+        }
         const point = this._toScenePoint(ev);
         const hit = point ? this._hitTest(point.x, point.y) : null;
         if (!hit) {
@@ -647,17 +1129,54 @@ export default class Chart {
 
     // ---- 键盘等价入口 ----
 
+    /** 键盘导航目标：line/area 展开为逐顶点（最近点取值），其它 mark 逐节点。 */
+    public _navTargets(): NavTarget[] {
+        const polylines = this._polylines();
+        if (polylines.length > 0) {
+            const out: NavTarget[] = [];
+            for (const pl of polylines) {
+                for (let i = 0; i < pl.points.length; i++) {
+                    out.push({ id: pl.id, key: pl.keys[i], point: pl.points[i] });
+                }
+            }
+            return out;
+        }
+        return this._markNodes().map((n) => ({ id: n.id, key: null, point: null }));
+    }
+
     public _onKeydown(ev: KeyboardEvent): void {
-        const marks = this._markNodes();
-        if (marks.length === 0) return;
+        // 视域键盘路径：+ / - 缩放，0 复位。
+        if (ev.key === "+" || ev.key === "=") {
+            if (this._zoomable()) {
+                ev.preventDefault();
+                this._zoomBy(0.8);
+            }
+            return;
+        }
+        if (ev.key === "-" || ev.key === "_") {
+            if (this._zoomable()) {
+                ev.preventDefault();
+                this._zoomBy(1.25);
+            }
+            return;
+        }
+        if (ev.key === "0") {
+            if (this._zoomable()) {
+                ev.preventDefault();
+                this._resetView();
+            }
+            return;
+        }
+        const targets = this._navTargets();
+        if (targets.length === 0) return;
         if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
             ev.preventDefault();
-            this._focusIndex = (this._focusIndex + 1) % marks.length;
-            this._focusMark(marks[this._focusIndex].id);
+            this._focusIndex = (this._focusIndex + 1) % targets.length;
+            this._focusTarget(targets[this._focusIndex]);
         } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
             ev.preventDefault();
-            this._focusIndex = (this._focusIndex - 1 + marks.length) % marks.length;
-            this._focusMark(marks[this._focusIndex].id);
+            this._focusIndex = (this._focusIndex - 1 + targets.length) % targets.length;
+            this._focusTarget(targets[this._focusIndex]);
         } else if (ev.key === "Enter" || ev.key === " ") {
             if (this._hoverId) {
                 ev.preventDefault();
@@ -669,15 +1188,17 @@ export default class Chart {
             this._hoverId = null;
             this._focusIndex = -1;
             this._tooltip.visible = false;
+            this._hideCrosshair();
+            this._cancelDrag();
             this.dispatch({ kind: "clear-selection" });
             this._applyDomState();
         }
     }
 
-    /** 键盘聚焦某个 mark：tooltip 锚到节点位置，状态与 pointer 路径一致。 */
-    public _focusMark(id: string): void {
-        this._hoverId = id;
-        const anchor = this._nodeAnchor(id);
+    /** 键盘聚焦某个导航目标：tooltip 锚到顶点或节点，文本读真实行值。 */
+    public _focusTarget(target: NavTarget): void {
+        this._hoverId = target.id;
+        const anchor = target.point ? target.point : this._nodeAnchor(target.id);
         if (anchor) {
             const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
             const rect = root ? root.getBoundingClientRect() : null;
@@ -685,10 +1206,10 @@ export default class Chart {
             const scaleY = rect && rect.height > 0 ? rect.height / this._effHeight() : 1;
             this._tooltip.x = anchor.x * scaleX;
             this._tooltip.y = anchor.y * scaleY;
-            this._tooltip.text = this._tooltipTextFor(id);
+            this._tooltip.text = target.key !== null ? this._tooltipForRowKey(target.key) : this._tooltipTextFor(target.id);
             this._tooltip.visible = true;
         }
-        this.dispatch({ kind: "hover", nodeId: id });
+        this.dispatch({ kind: "hover", nodeId: target.id });
         this._applyDomState();
     }
 
@@ -779,6 +1300,20 @@ function sectorDistance(
 function readCell(data: DataSnapshot, field: string, rowIndex: number): unknown {
     const col = data.columns.find((c) => c.name === field);
     return col ? col.values[rowIndex] : null;
+}
+
+/** zoom/pan 的缩放空间：log 域在对数轴上平移缩放，线性域原样。 */
+function zoomSpace(kind: string | null, v: number): number {
+    return kind === "log" ? Math.log(v) : v;
+}
+
+function fromZoomSpace(kind: string | null, z: number): number {
+    return kind === "log" ? Math.exp(z) : z;
+}
+
+/** RGBA → CSS 颜色串（crosshair 点标记用）。 */
+function rgbaCss(c: RGBA): string {
+    return `rgba(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)}, ${c.a})`;
 }
 
 /** 数值格式化成短标签（最多两位小数，去尾零）。 */

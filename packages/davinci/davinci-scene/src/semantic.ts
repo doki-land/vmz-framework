@@ -49,6 +49,15 @@ export type HitRegion =
               readonly a0: number;
               readonly a1: number;
           };
+      }
+    | {
+          /** Polyline vertices in scene order, each with its stable row key —
+           *  lets a host snap to the nearest real data point on a line or
+           *  area path instead of interpolating between pixels. */
+          readonly polyline: {
+              readonly points: ReadonlyArray<Point2D>;
+              readonly keys: ReadonlyArray<string>;
+          };
       };
 
 // ─── Shape kinds ──────────────────────────────────────────────────────────
