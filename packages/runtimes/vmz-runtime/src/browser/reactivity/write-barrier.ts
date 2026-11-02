@@ -168,12 +168,14 @@ export function __vmzWritePath(inst, root, segs, value) {
     assertWritePathSegs('__vmzWritePath', root, segs);
     if (!root) return value;
 
+    const normSegs = segs.map((s) => String(s));
     // Hot path: array item field write (`rows[i].label`) ??no map/slice, no shared-owner walk.
-    if (segs.length === 2) {
-        return __vmzWritePathItem(inst, root, segs[0], segs[1], value);
+    // Only a real array root takes the item fast path; a two-segment object path
+    // (`user.address.city`) must stay on the generic walk or the write is dropped.
+    if (normSegs.length === 2 && Array.isArray(inst[root])) {
+        return __vmzWritePathItem(inst, root, normSegs[0], normSegs[1], value);
     }
 
-    const normSegs = segs.map((s) => String(s));
     let obj = inst[root];
     if (obj == null || typeof obj !== 'object') return value;
     for (let i = 0; i < normSegs.length - 1; i++) {
@@ -211,7 +213,11 @@ export function __vmzWritePathItem(inst, root, idx, leaf, value) {
     if (!inst || inst.__vmzDestroyed) return value;
     if (!root || leaf == null) return value;
     const arr = inst[root];
-    if (!Array.isArray(arr)) return value;
+    if (!Array.isArray(arr)) {
+        // Computed member on a plain object root: same write, generic path.
+        if (arr == null || typeof arr !== 'object') return value;
+        return __vmzWritePath(inst, root, [idx, leaf], value);
+    }
     const item = arr[idx];
     if (item == null || typeof item !== 'object') return value;
     if (Object.is(item[leaf], value)) return value;
@@ -241,7 +247,7 @@ export function __vmzWritePathCompound(inst, root, segs, op, rhs) {
     assertWritePathSegs('__vmzWritePathCompound', root, segs);
     if (!root) return undefined;
 
-    if (segs.length === 2) {
+    if (segs.length === 2 && Array.isArray(inst[root])) {
         return __vmzWritePathCompoundItem(inst, root, segs[0], segs[1], op, rhs);
     }
 
@@ -254,7 +260,11 @@ export function __vmzWritePathCompoundItem(inst, root, idx, leaf, op, rhs) {
     if (!inst || inst.__vmzDestroyed) return undefined;
     if (!root || leaf == null) return undefined;
     const arr = inst[root];
-    if (!Array.isArray(arr)) return undefined;
+    if (!Array.isArray(arr)) {
+        // Computed member on a plain object root: same write, generic path.
+        if (arr == null || typeof arr !== 'object') return undefined;
+        return __vmzWritePathCompound(inst, root, [idx, leaf], op, rhs);
+    }
     const item = arr[idx];
     if (item == null || typeof item !== 'object') return undefined;
     const cur = item[leaf];
@@ -334,6 +344,11 @@ export function __vmzArrayMutate(inst, root, baseSegs, method, args) {
         if (arr == null || typeof arr !== 'object') return undefined;
     }
     if (!Array.isArray(arr) || typeof arr[method] !== 'function') return undefined;
+    if (args !== undefined && !Array.isArray(args)) {
+        throw new Error(
+            `vmz:dom __vmzArrayMutate expects the argument list as one array (root ${JSON.stringify(root)}, method ${JSON.stringify(method)}); stale artifacts must be rebuilt`,
+        );
+    }
     const list = Array.isArray(args) ? args : [];
     const ret = arr[method](...list);
     const rootObj = inst[root];

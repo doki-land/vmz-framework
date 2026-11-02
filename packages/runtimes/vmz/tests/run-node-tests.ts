@@ -14,6 +14,7 @@ const files = [
     'html-binding.test.ts',
     'each-shared-binding-flush.test.ts',
     'write-barrier-root-guard.test.ts',
+    'write-barrier-path-args.test.ts',
     'cli-host.test.ts',
     'dev-watch-roots.test.ts',
     'invocation.test.ts',
