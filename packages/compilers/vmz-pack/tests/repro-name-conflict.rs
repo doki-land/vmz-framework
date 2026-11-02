@@ -109,6 +109,23 @@ fn planner_copy_same_chunk_collision_with_isolated_pin_resolves() {
     assert!(entry.code.contains("function plannerCopy__vmz"), "{}", entry.code);
     assert_eq!(entry.code.matches("as plannerCopy }").count(), 1, "{}", entry.code);
     assert!(!entry.code.contains("export { plannerCopy }"), "{}", entry.code);
+    // 隔离模块跨 chunk 消费必须落到自己认领者的发射面名（copy.js 的 fresh 面），
+    // 不得绑到 canonical 面（locales 的同名 getter）——0.3.x 曾在 static assemble
+    // 把 `buildDeployPlan` 的 `plannerCopy()` 绑成 locales 版（返回字符串）而崩。
+    let isolated = plan
+        .artifacts
+        .iter()
+        .find(|a| a.chunk_id.starts_with("isolated/") && a.modules.iter().any(|m| m.ends_with("src/deploy/planner.js")))
+        .expect("isolated planner chunk");
+    let import_line = isolated
+        .code
+        .lines()
+        .find(|line| line.contains("plannerCopy") && line.contains("import"))
+        .unwrap_or("");
+    assert!(
+        import_line.contains("plannerCopy__vmz"),
+        "isolated consumer must import the copy claimant's split face, got: {import_line}"
+    );
 }
 
 /// homepage Markdown/MarkdownIt 共享 chunk 形态：entities 的 decode.js 具名
