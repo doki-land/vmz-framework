@@ -410,6 +410,267 @@ fn dynamic_import_rewrites_specifier() {
     assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
 }
 
+/// 动态 `import("node:…")` 是 Node 宿主运行时解析的外部模块：说明符原文
+/// 保留、不重写为 chunk 文件，给非致命诊断 `dynamic_external_kept`。
+#[test]
+fn node_builtin_dynamic_import_is_kept_verbatim() {
+    let root = temp_tree(
+        "nodebuiltin",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/app.js",
+                "export const load = () => import('node:fs/promises');\nexport const keep = 1;\n",
+            ),
+        ],
+    );
+    let graph = build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Node, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["load".into(), "keep".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/app").unwrap();
+    assert!(entry.code.contains("import('node:fs/promises')"), "{}", entry.code);
+    assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
+    assert!(plan.dynamic_files.is_empty(), "{:?}", plan.dynamic_files);
+    assert!(
+        codes(&plan.diagnostics).contains(&"vmz::pack::emit::dynamic_external_kept".to_string()),
+        "{:?}",
+        plan.diagnostics
+    );
+}
+
+/// 静态 `import … from "node:…"` 在拼接模型下未实现：显式拒绝并给出
+/// 专用诊断码，不产出语义可疑的产物。
+#[test]
+fn node_builtin_static_import_is_explicitly_rejected() {
+    let root = temp_tree(
+        "nodebuiltinstatic",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/app.js",
+                "import { readFile } from 'node:fs/promises';\nexport const run = readFile;\n",
+            ),
+        ],
+    );
+    let graph = build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Node, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let Err(errors) = plan_emit(&graph, &link_plan, &chunks, &options()) else {
+        panic!("static node: import must be rejected")
+    };
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::node_builtin_static_unsupported".to_string()),
+        "{:?}",
+        errors
+    );
+}
+
+/// 面名歧义分裂：共享 chunk 内两个模块各自导出同名面 `value`，两个入口
+/// chunk 分别经事实链钉住不同认领者。canonical（最小被钉节点）保留原名
+/// 导出，另一认领者以 fresh 名自身为面发射，消费方合成 import 落到各自
+/// 认领者的发射面名。
+#[test]
+fn face_split_keeps_distinct_pinned_claimants() {
+    let root = temp_tree(
+        "facesplit",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entryA.js",
+                "import { value } from './a.js';\nimport { auxB } from './b.js';\nexport const runA = value + auxB;\n",
+            ),
+            (
+                "src/entryB.js",
+                "import { value } from './b.js';\nimport { auxA } from './a.js';\nexport const runB = value + auxA;\n",
+            ),
+            ("src/a.js", "export const value = 'a';\nexport const auxA = 'x';\n"),
+            ("src/b.js", "export const value = 'b';\nexport const auxB = 'y';\n"),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("entryA".to_string(), root.join("src/entryA.js")),
+            ("entryB".to_string(), root.join("src/entryB.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "entryA".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["runA".into()]),
+            },
+            EntryUse {
+                entry_logical: "entryB".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["runB".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    // 共享 chunk：两侧声明都改名，canonical 以原名发射，另一认领者以
+    // fresh 名自身为面发射。
+    let shared = plan
+        .artifacts
+        .iter()
+        .find(|a| a.modules.iter().any(|m| m.ends_with("src/a.js")) && a.modules.iter().any(|m| m.ends_with("src/b.js")))
+        .unwrap_or_else(|| panic!("expected a shared chunk containing a.js and b.js: {:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()));
+    assert!(shared.code.contains("const value__vmz2 = 'a'"), "{}", shared.code);
+    assert!(shared.code.contains("const value__vmz3 = 'b'"), "{}", shared.code);
+    assert!(shared.code.contains("export { value__vmz2 as value }"), "{}", shared.code);
+    assert!(shared.code.contains("export { value__vmz3 }"), "{}", shared.code);
+    assert!(!shared.code.contains("export { value__vmz3 as value }"), "{}", shared.code);
+    assert_eq!(shared.code.matches(" as value }").count(), 1, "{}", shared.code);
+
+    // 消费方：entryA 钉 canonical（原名导入、无别名子句），entryB 钉另一
+    // 认领者（fresh 名导入、本地名不变）。
+    let entry_a = plan.artifacts.iter().find(|a| a.chunk_id == "entry/entryA").unwrap();
+    let entry_b = plan.artifacts.iter().find(|a| a.chunk_id == "entry/entryB").unwrap();
+    assert!(entry_a.code.contains("value } from \""), "{}", entry_a.code);
+    assert!(!entry_a.code.contains("as value"), "{}", entry_a.code);
+    assert!(entry_a.code.contains("const runA = value + auxB"), "{}", entry_a.code);
+    assert!(entry_b.code.contains("value__vmz3 as value"), "{}", entry_b.code);
+    assert!(entry_b.code.contains("const runB = value + auxA"), "{}", entry_b.code);
+}
+
+/// 面名分裂的保守边界：任一被钉声明认领者不可改名（解构声明 token 兼任
+/// 属性键，`rename_unsafe`）时不分裂，冲突维持 `name_conflict` 显式拒绝。
+#[test]
+fn face_split_unrenamable_claimant_stays_rejected() {
+    let root = temp_tree(
+        "facesplitreject",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entryA.js",
+                "import { value } from './a.js';\nimport { auxB } from './b.js';\nexport const runA = value + auxB;\n",
+            ),
+            (
+                "src/entryB.js",
+                "import { value } from './b.js';\nimport { auxA } from './a.js';\nexport const runB = value + auxA;\n",
+            ),
+            ("src/a.js", "export const value = 'a';\nexport const auxA = 'x';\n"),
+            (
+                "src/b.js",
+                "const pair = { v: 'b', a: 'y' };\nexport const { value } = pair;\nexport const auxB = pair.a;\n",
+            ),
+        ],
+    );
+    let graph = build_graph(
+        &[
+            ("entryA".to_string(), root.join("src/entryA.js")),
+            ("entryB".to_string(), root.join("src/entryB.js")),
+        ],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[
+            EntryUse {
+                entry_logical: "entryA".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["runA".into()]),
+            },
+            EntryUse {
+                entry_logical: "entryB".to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec!["runB".into()]),
+            },
+        ],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let Err(errors) = plan_emit(&graph, &link_plan, &chunks, &options()) else {
+        panic!("unrenamable pinned claimant must keep the explicit name_conflict rejection")
+    };
+    assert!(
+        codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()),
+        "{:?}",
+        errors
+    );
+}
+/// 隔离模块（scope 事实不完整）整文件独立发射、剪枝只到模块级：文件内
+/// 语句文本全部存活，包括未被消费的函数体内的引用。链接层必须把这类模块
+/// 升级为 Execute 全量需求——否则目标 chunk 剪除「未被消费」的导出后，
+/// 本模块保留的 import 文本断链。
+#[test]
+fn isolated_module_keeps_referenced_exports_alive() {
+    let root = temp_tree(
+        "isolatedrefs",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/main.js", "import { used } from './opaque.js';\nexport const run = used;\n"),
+            (
+                "src/opaque.js",
+                // 模板插值使 scope 事实不完整 → 隔离独立发射；`helper` 只在未被
+                // 消费的 `dead` 函数体内被引用，文本仍随整文件进入产物。
+                "import { helper } from './lib.js';\nexport const used = 1;\nfunction dead() { return helper(`x${1}`); }\n",
+            ),
+            ("src/lib.js", "export function helper(f) { return f }\n"),
+        ],
+    );
+    let graph = build_graph(&[("main".to_string(), root.join("src/main.js"))], Target::Node, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    // `helper` 的声明与导出必须存活于某个 chunk。
+    let provider = plan
+        .artifacts
+        .iter()
+        .find(|a| a.code.contains("function helper"))
+        .unwrap_or_else(|| panic!("helper declaration pruned: {:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()));
+    assert!(provider.code.contains("export { helper }"), "{}", provider.code);
+    // 隔离 chunk 的 import 说明符必须指向该 chunk 的产物文件。
+    let isolated = plan
+        .artifacts
+        .iter()
+        .find(|a| a.chunk_id.starts_with("isolated/"))
+        .expect("opaque module must be an isolated chunk");
+    assert!(
+        isolated.code.contains(&format!("from \"./{}\"", provider.file_name)),
+        "{}",
+        isolated.code
+    );
+}
+
 /// CSS 正式支持端到端：副作用导入不进 JS 文本（不留空壳），级联按
 /// chunk 成员执行序聚合为独立 `style-<hash8>.css`，同身份去重先到先得，
 /// `modules` 按执行序记录贡献宿主。

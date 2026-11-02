@@ -147,20 +147,20 @@ pub(crate) fn assemble_chunk(
     let mut json_locals: BTreeSet<(usize, String)> = BTreeSet::new();
     let mut json_texts: HashMap<usize, Option<String>> = HashMap::new();
 
-    // 同 chunk 声明改名预决议 + 面名碰撞兜底 + 落点改名兜底：必须先于逐
-    // 模块处理——fresh 名的碰撞扫描覆盖 chunk 全部活跃语句文本，改名 span
-    // 与消费者 scope 重写共用同一替换表注入切片。同一 (节点, 名字) 被面
-    // 兜底与落点兜底命中时两表值相同（改名确定性生成），合并幂等。守卫
-    // 不成立的冲突维持由 `check_names` 显式拒绝。
-    let scans = chunk_scans(context, chunk_index);
-    let mut rename_plans = plan_declaration_renames(context, chunk_index, &scans);
-    let (face_plans, face_canonicals) = plan_face_renames(context, chunk_index, &scans);
-    for (node_index, map) in face_plans {
-        rename_plans.entry(node_index).or_default().extend(map);
-    }
-    for (node_index, map) in plan_landing_renames(context, chunk_index, &scans) {
-        rename_plans.entry(node_index).or_default().extend(map);
-    }
+    // 改名预决议在装配前由 `plan_chunk_renames` 全局算好（消费方合成跨
+    // chunk import/export 需要目标 chunk 的面名分裂结果，与装配顺序无关）；
+    // 本 chunk 是隔离 chunk 时上面已整文件返回，此处必然有预决议。
+    let preplan = match context.preplans.get(chunk_index).and_then(|item| item.as_ref()) {
+        Some(preplan) => preplan,
+        None => {
+            errors.push(
+                inconsistent(format!("chunk `{}` 缺少改名预决议", chunk.id)),
+            );
+            return None;
+        }
+    };
+    let rename_plans = &preplan.renames;
+    let face_emission = &preplan.face_emission;
 
     // 表达式 default 物化与 default 面快照：本 chunk 活跃 default 导出事实
     // → 发射绑定名。唯一 default 模块时面名 `default`，多个时无统一
@@ -216,7 +216,7 @@ pub(crate) fn assemble_chunk(
             &export_spans,
             &referenced_in_active,
             &module_path,
-            &rename_plans,
+            rename_plans,
             &mut merged,
             &mut same_chunk_locals,
             &mut import_locals,
@@ -275,6 +275,25 @@ pub(crate) fn assemble_chunk(
                         diagnostic = diagnostic.with_span(import.span);
                     }
                     warnings.push(diagnostic);
+                }
+                Err(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN => {
+                    // `node:` 内建动态 import：无文件身份可重写，说明符原文保留，
+                    // 由 Node 宿主在运行时解析（`vmz-runtime` 的 Node-only 延迟加载
+                    // 即此形态）。
+                    let mut kept = PackDiagnostic::new(
+                        "vmz::pack::emit::dynamic_external_kept",
+                        format!(
+                            "动态 import `{}` 是 Node.js 内建模块，说明符原样保留，由运行时宿主解析",
+                            edge.specifier
+                        ),
+                    )
+                    .with_path(module_path.clone());
+                    if let Some(import) = record.imports.iter().find(|import| {
+                        import.kind == ImportKind::Dynamic && import.specifier == edge.specifier
+                    }) {
+                        kept = kept.with_span(import.span);
+                    }
+                    warnings.push(kept);
                 }
                 Err(_) => errors.push(
                     PackDiagnostic::new(
@@ -632,8 +651,11 @@ pub(crate) fn assemble_chunk(
                                     });
                                 }
                             }
-                            Some(ReexportBinding::External { chunk, name }) => {
+                            Some(ReexportBinding::External { chunk, node, name }) => {
                                 referenced_chunks.insert(chunk);
+                                // 面名歧义分裂：把目标 chunk 的面名解析到本模块
+                                // 事实链认领者的实际发射面名。
+                                let name = resolve_emitted_face(context, chunk, node, &name);
                                 if emitted_reexports.insert((chunk, name.clone(), exported.clone()))
                                 {
                                     let clause = if name == *exported {
@@ -652,7 +674,9 @@ pub(crate) fn assemble_chunk(
                         }
                         continue;
                     }
-                    let clause = if local == exported {
+                    // 跨 chunk 具名重导出：目标 chunk 的面名经分裂发射表解析。
+                    let local = resolve_emitted_face(context, target_chunk, target, local);
+                    let clause = if local == *exported {
                         local.clone()
                     } else {
                         format!("{local} as {exported}")
@@ -732,7 +756,10 @@ pub(crate) fn assemble_chunk(
                                         });
                                     }
                                 }
-                                Some(ReexportBinding::External { chunk, name }) => {
+                                Some(ReexportBinding::External { chunk, node, name }) => {
+                                    // 面名歧义分裂：把目标 chunk 的面名解析到
+                                    // 事实链认领者的实际发射面名。
+                                    let name = resolve_emitted_face(context, chunk, node, &name);
                                     if emitted_reexports.insert((
                                         chunk,
                                         name.clone(),
@@ -843,6 +870,27 @@ pub(crate) fn assemble_chunk(
                 continue;
             };
             let Ok(id) = edge.target.as_ref() else {
+                let builtin = matches!(
+                    edge.target.as_ref().err(),
+                    Some(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN
+                );
+                if builtin {
+                    // 静态 `node:` 导入在拼接模型下需要 chunk 级外部 import 合成
+                    // （合并、去重、与面名决议交互），当前合同不支持：显式拒绝并
+                    // 指向可行写法，不产生语义可疑的产物。
+                    errors.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::node_builtin_static_unsupported",
+                            format!(
+                                "静态导入 `{}` 是 Node.js 内建模块：打包层仅支持动态 `import(\"node:…\")` 延迟加载（仅在 Node 宿主求值的分支内使用），静态外链导入未实现",
+                                import.specifier
+                            ),
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(import.span),
+                    );
+                    continue;
+                }
                 errors.push(
                     PackDiagnostic::new(
                         "vmz::pack::emit::edge_unresolved",
@@ -1016,10 +1064,20 @@ pub(crate) fn assemble_chunk(
                                 );
                             }
                             ImportedName::Name(name) => {
-                                bindings.named.insert((
-                                    external_name.unwrap_or_else(|| name.clone()),
-                                    binding.local.clone(),
-                                ));
+                                // 跨 chunk 面名经目标 chunk 的分裂发射表解析：
+                                // 面名歧义分裂后，本消费者事实链落到的认领者
+                                // 可能以 fresh 名发射（`external_name` 来自同
+                                // chunk 预决议时已解析到发射名，不重复解析）。
+                                let emitted = match external_name {
+                                    Some(name) => name,
+                                    None => resolve_emitted_face(
+                                        context,
+                                        synth_chunk,
+                                        target,
+                                        name,
+                                    ),
+                                };
+                                bindings.named.insert((emitted, binding.local.clone()));
                             }
                         }
                         import_locals.push((
@@ -1138,15 +1196,19 @@ pub(crate) fn assemble_chunk(
         {
             continue;
         }
-        // 面名 canonical 丢弃：被面兜底改名的面名，chunk 面只发 canonical
-        // 认领者一条（`export { fresh as 原名 }`），其余认领者的同名导出
-        // 丢弃；落点同一绑定的重导出形态由 `emitted_bindings` 去重兜住。
-        if face_canonicals.get(&item.exported).is_some_and(|canonical| *canonical != item.module) {
-            continue;
-        }
+        // 面名歧义分裂：被分裂的面名只发 canonical 认领者的原名导出
+        // （`export { fresh as 原名 }`）；被跨 chunk 消费者钉住的非 canonical
+        // 认领者以 fresh 名自身为发射面名；未被钉住的认领者不发该面导出。
+        let emitted_name = match face_emission.get(&item.exported) {
+            Some(by_module) => match by_module.get(&item.module) {
+                Some(name) => name.clone(),
+                None => continue,
+            },
+            None => item.exported.clone(),
+        };
         let key = (
             item.local.clone(),
-            if item.is_default { "default".to_string() } else { item.exported.clone() },
+            if item.is_default { "default".to_string() } else { emitted_name.clone() },
         );
         if !emitted_bindings.insert(key) {
             continue;
@@ -1155,13 +1217,13 @@ pub(crate) fn assemble_chunk(
             exports_text.push_str(&format!("export {{ {} as default }};\n", item.local));
             export_names.push(("default".to_string(), item.module.clone()));
         } else {
-            if item.local == item.exported {
+            if item.local == emitted_name {
                 exports_text.push_str(&format!("export {{ {} }};\n", item.local));
             } else {
                 exports_text
-                    .push_str(&format!("export {{ {} as {} }};\n", item.local, item.exported));
+                    .push_str(&format!("export {{ {} as {} }};\n", item.local, emitted_name));
             }
-            export_names.push((item.exported.clone(), item.module.clone()));
+            export_names.push((emitted_name, item.module.clone()));
         }
     }
 
@@ -1181,14 +1243,94 @@ pub(crate) fn assemble_chunk(
 /// scope 重写计划：消费者绑定旧名在其值引用 span 上改写为 chunk 落点名，
 /// 或同 chunk 声明改名时声明 token 与其值引用 span 改写为 fresh 名。
 #[derive(Clone)]
-struct BindingRewrite {
-    new_name: String,
+pub(crate) struct BindingRewrite {
+    pub new_name: String,
     /// 落在活跃语句内的值引用 span（import/export 子句内的不发射，不入表；
     /// 声明改名时另含声明 token 自身）。
-    spans: Vec<(usize, usize)>,
+    pub spans: Vec<(usize, usize)>,
     /// `spans` 中属于对象字面量简写属性 token 的 span：token 同时充当
     /// 属性键，重写必须发 `<旧名>: <新名>` 而非裸新名。
-    shorthand_spans: Vec<(usize, usize)>,
+    pub shorthand_spans: Vec<(usize, usize)>,
+}
+
+/// 单个 chunk 的改名预决议产物（全部 chunk 在装配前一次性算好：
+/// 消费方合成跨 chunk import/export 时必须能查到目标 chunk 的面名分裂结果，
+/// 与 chunk 装配顺序无关）。
+pub(crate) struct ChunkPreplan {
+    /// 声明/绑定改名表：节点 → 旧名 → 重写。
+    pub renames: BTreeMap<usize, BTreeMap<String, BindingRewrite>>,
+    /// 面名歧义分裂的发射表：原始面名 →（认领者模块规范化路径 → 实际发射面名）。
+    /// 面名未分裂时整键缺席；表内缺席的认领者即被丢弃的非 canonical 认领者。
+    pub face_emission: BTreeMap<String, BTreeMap<String, String>>,
+}
+
+/// 单个 chunk 的改名预决议：同 chunk 声明改名 + 面名歧义分裂 + 落点改名兜底，
+/// 三路计划合并为一张节点改名表与一张面名发射表。隔离 chunk 不参与拼接，
+/// 返回 `None`。
+pub(crate) fn plan_chunk_renames(context: &EmitContext<'_>, chunk_index: usize) -> Option<ChunkPreplan> {
+    if super::isolated::is_isolated_chunk(context, chunk_index) {
+        return None;
+    }
+    // 同 chunk 声明改名预决议 + 面名歧义分裂 + 落点改名兜底：fresh 名的碰撞
+    // 扫描覆盖 chunk 全部活跃语句文本，改名 span 与消费者 scope 重写共用同一
+    // 替换表注入切片。同一 (节点, 名字) 被面兜底与落点兜底命中时两表值相同
+    // （改名确定性生成），合并幂等。守卫不成立的冲突维持由 `check_names`
+    // 显式拒绝。
+    let scans = chunk_scans(context, chunk_index);
+    let mut renames = plan_declaration_renames(context, chunk_index, &scans);
+    let (face_plans, face_emission) = plan_face_renames(context, chunk_index, &scans);
+    for (node_index, map) in face_plans {
+        renames.entry(node_index).or_default().extend(map);
+    }
+    for (node_index, map) in plan_landing_renames(context, chunk_index, &scans) {
+        renames.entry(node_index).or_default().extend(map);
+    }
+    Some(ChunkPreplan { renames, face_emission })
+}
+
+/// 沿目标 chunk 的导出事实链把面名解析到最终声明认领者，返回面名歧义分裂后
+/// 该认领者的实际发射面名；未分裂或解析不到落点时返回原名（与解析前行为一致，
+/// 既有诊断路径不受影响）。
+pub(crate) fn resolve_emitted_face(
+    context: &EmitContext<'_>,
+    chunk_index: usize,
+    entry_node: usize,
+    name: &str,
+) -> String {
+    let mut visited: BTreeSet<(usize, String)> = BTreeSet::new();
+    let mut current_chunk = chunk_index;
+    let mut current_node = entry_node;
+    let mut face = name.to_string();
+    loop {
+        if !visited.insert((current_node, face.clone())) {
+            return face;
+        }
+        let mut scratch: Vec<PackDiagnostic> = Vec::new();
+        match resolve_same_chunk_reexport(
+            context,
+            current_chunk,
+            current_node,
+            &face,
+            "",
+            "vmz::pack::emit::name_conflict",
+            &mut scratch,
+        ) {
+            Some(ReexportBinding::Declared { node: landing, .. }) => {
+                let path = normalize_path(&context.graph.nodes[landing].resolved.path);
+                return context
+                    .face_aliases
+                    .get(&(path, face.clone()))
+                    .cloned()
+                    .unwrap_or(face);
+            }
+            Some(ReexportBinding::External { chunk, node, name }) => {
+                current_chunk = chunk;
+                current_node = node;
+                face = name;
+            }
+            None => return face,
+        }
+    }
 }
 
 /// 同 chunk 静态 import 绑定的预决议结果。
@@ -1635,7 +1777,10 @@ fn plan_same_chunk_bindings(
                     }
                     decisions.insert((import_index, binding_index), BindingDecision::Handled);
                 }
-                Some(ReexportBinding::External { chunk, name }) => {
+                Some(ReexportBinding::External { chunk, node, name }) => {
+                    // 面名歧义分裂在装配前已全局定稿：此处即解析到目标 chunk
+                    // 认领者的实际发射面名，合成 import 直接用发射名。
+                    let name = resolve_emitted_face(context, chunk, node, &name);
                     decisions.insert(
                         (import_index, binding_index),
                         BindingDecision::External { chunk, name },
@@ -1938,23 +2083,29 @@ fn pin_claimant(
     }
 }
 
-/// 面名碰撞兜底预决议：chunk 内同一面名的认领者（声明认领者：活跃声明名
+/// 面名歧义分裂预决议：chunk 内同一面名的认领者（声明认领者：活跃声明名
 /// 被非类型导出事实以该面名导出；导入绑定认领者：静态导入绑定 local 名
 /// 被同形态重导出）合计 ≥2 且至少有一个声明认领者时，把全部声明认领者
-/// 改名 `{name}__vmz{node}`（deferred 发 `export { fresh as 原名 }` 保面名，
-/// 导入绑定认领者的 local 名不变），chunk 面对该面名只发 canonical 一条
-/// 别名导出。canonical 由面消费者钉住：跨 chunk 具名/default 静态导入、
-/// 具名重导出、命名空间、动态与星号边按事实链落到哪个认领者就钉哪个
-/// （同 chunk 具名导入直接落声明、不读面，由消费者复检覆盖）；钉住多个
-/// 认领者、任一声明不可改名、或任一同 chunk 消费者重写守卫不过 → 放弃
-/// 该面名，冲突维持 `check_names` 的 `name_conflict` 显式拒绝。
-/// 返回改名计划与面名 → canonical 模块路径（deferred 定稿据此丢弃非
-/// canonical 认领者的同名导出）。
+/// 改名 `{name}__vmz{node}`（canonical 发 `export { fresh as 原名 }` 保面名，
+/// 导入绑定认领者的 local 名不变）。canonical 由面消费者钉住：跨 chunk 具名/
+/// default 静态导入、具名重导出、命名空间、动态与星号边按事实链落到哪个
+/// 认领者就钉哪个（同 chunk 具名导入直接落声明、不读面，由消费者复检覆盖）。
+///
+/// 多个认领者被不同消费者同时钉住（pins > 1）时面名**分裂**而非拒绝：
+/// canonical（最小被钉节点）保留原面名，每个被钉的非 canonical 声明认领者
+/// 以 fresh 名自身为发射面名发 `export { fresh as fresh }`，跨 chunk 消费者
+/// 合成 import 时经 [`resolve_emitted_face`] 落到自己事实链认领者的发射名。
+/// 未被任何跨 chunk 消费者钉住的非 canonical 认领者不发面导出（与单钉/零钉
+/// 口径一致）。被钉认领者含导入绑定认领者（面名归属模糊到两步重导出形态）
+/// 时仍放弃该面名，冲突维持 `check_names` 的 `name_conflict` 显式拒绝。
+/// 任一声明不可改名、或任一同 chunk 消费者重写守卫不过同样放弃。
+///
+/// 返回改名计划与面名发射表（面名 → 认领者模块路径 → 实际发射面名）。
 fn plan_face_renames(
     context: &EmitContext<'_>,
     chunk_index: usize,
     scans: &BTreeMap<usize, ChunkModuleScan<'_>>,
-) -> (BTreeMap<usize, BTreeMap<String, BindingRewrite>>, BTreeMap<String, String>) {
+) -> (BTreeMap<usize, BTreeMap<String, BindingRewrite>>, BTreeMap<String, BTreeMap<String, String>>) {
     let chunk = &context.chunks.chunks[chunk_index];
     let face_exported = |record: &ModuleRecord, name: &str| -> bool {
         record.exports.iter().any(|export| match export {
@@ -1990,7 +2141,7 @@ fn plan_face_renames(
         }
     }
     let mut plans: BTreeMap<usize, BTreeMap<String, BindingRewrite>> = BTreeMap::new();
-    let mut canonicals: BTreeMap<String, String> = BTreeMap::new();
+    let mut face_emission: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
     // 多 default 模块时 chunk 无统一 `default` 面，`export default <X>` 的
     // 面名是绑定名本身——此时 default-local 认领者也持有该面名的导出。
     let multi_default = chunk_default_bindings(context, chunk_index).len() > 1;
@@ -2219,20 +2370,39 @@ fn plan_face_renames(
                 }
             }
         }
-        if pins.len() > 1 {
+        // pins > 1 时被钉认领者含导入绑定认领者（不在声明认领者集合内）：
+        // 两步重导出形态下面名的最终声明与发射模块分离，分裂别名无法同时
+        // 覆盖两侧，放弃该面名，冲突维持 `check_names` 显式拒绝。
+        if pins.len() > 1 && pins.iter().any(|pin| !nodes.contains(pin)) {
             continue;
         }
         let canonical = match pins.iter().next() {
             Some(&pin) => pin,
             None => *owners.iter().next().expect("owners 非空"),
         };
+        let mut emission: BTreeMap<String, String> = BTreeMap::new();
+        emission.insert(
+            normalize_path(&context.graph.nodes[canonical].resolved.path),
+            name.clone(),
+        );
+        // 面名分裂：被钉住的非 canonical 声明认领者以 fresh 名自身为发射面名，
+        // 跨 chunk 消费者经 `resolve_emitted_face` 落到各自认领者的发射名；
+        // 未被钉住的非 canonical 认领者不进表，面导出随 deferred 定稿丢弃。
+        if pins.len() > 1 {
+            for &pin in pins.iter().filter(|&&pin| pin != canonical) {
+                let Some(rewrite) = rewrites.get(&pin) else { continue };
+                emission.insert(
+                    normalize_path(&context.graph.nodes[pin].resolved.path),
+                    rewrite.new_name.clone(),
+                );
+            }
+        }
         for (node, rewrite) in rewrites {
             plans.entry(node).or_default().insert(name.clone(), rewrite);
         }
-        canonicals
-            .insert(name.clone(), normalize_path(&context.graph.nodes[canonical].resolved.path));
+        face_emission.insert(name.clone(), emission);
     }
-    (plans, canonicals)
+    (plans, face_emission)
 }
 
 /// 单条冲突声明的改名守卫与重写计划；任一守卫不成立返回 `None`
@@ -2496,7 +2666,9 @@ enum ReexportBinding {
     Declared { node: usize, name: String },
     /// 来源链离开本 chunk：与跨 chunk 分支同形态发
     /// `export { <目标导出名> [as <导出名>] } from <占位符>;`。
-    External { chunk: usize, name: String },
+    /// `node` 是链在该 chunk 内的落点模块（面名歧义分裂后，消费方据此
+    /// 把面名解析到认领者的实际发射名）。
+    External { chunk: usize, node: usize, name: String },
 }
 
 /// 同 chunk 具名重导出 → 绑定事实：从目标模块的导出事实逐跳解析
@@ -2588,7 +2760,7 @@ fn resolve_same_chunk_reexport(
                     } else {
                         local.clone()
                     };
-                    return Some(ReexportBinding::External { chunk: step_chunk, name });
+                    return Some(ReexportBinding::External { chunk: step_chunk, node: step, name });
                 }
                 _ => {}
             }

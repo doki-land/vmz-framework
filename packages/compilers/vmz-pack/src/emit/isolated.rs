@@ -141,6 +141,25 @@ pub(crate) fn assemble_isolated(
                     continue;
                 };
                 let Ok(id) = edge.target.as_ref() else {
+                    if matches!(
+                        edge.target.as_ref().err(),
+                        Some(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN
+                    ) {
+                        // 静态 `node:` 导入：与平铺路径同一合同，显式拒绝并指向
+                        // 动态 `import("node:…")` 写法，不产出语义可疑的产物。
+                        errors.push(
+                            PackDiagnostic::new(
+                                "vmz::pack::emit::node_builtin_static_unsupported",
+                                format!(
+                                    "静态导入 `{}` 是 Node.js 内建模块：打包层仅支持动态 `import(\"node:…\")` 延迟加载（仅在 Node 宿主求值的分支内使用），静态外链导入未实现",
+                                    import.specifier
+                                ),
+                            )
+                            .with_path(module_path.clone())
+                            .with_span(import.span),
+                        );
+                        continue;
+                    }
                     errors.push(
                         PackDiagnostic::new(
                             "vmz::pack::emit::edge_unresolved",
@@ -442,6 +461,22 @@ fn plan_dynamic_import(
                 "vmz::pack::emit::dynamic_url_kept",
                 format!(
                     "根绝对 URL 动态 import `{}` 原样保留，由站点 origin 运行时解析",
+                    import.specifier
+                ),
+            )
+            .with_path(module_path.to_string())
+            .with_span(import.span),
+        );
+        return;
+    }
+    if crate::resolve::is_node_builtin_specifier(&import.specifier) {
+        // `node:` 内建动态 import：无文件身份可重写，说明符原文保留，
+        // 由 Node 宿主在运行时解析。
+        warnings.push(
+            PackDiagnostic::new(
+                "vmz::pack::emit::dynamic_external_kept",
+                format!(
+                    "动态 import `{}` 是 Node.js 内建模块，说明符原样保留，由运行时宿主解析",
                     import.specifier
                 ),
             )

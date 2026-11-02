@@ -374,6 +374,11 @@ fn edge_target(
         target,
         root: root.to_path_buf(),
     };
+    // `node:` 内建说明符不进入文件解析：身份是运行时外部模块，统一诊断码
+    // 供 emit 层按「原样保留」处置（动态 import 合法，静态见 emit 合同）。
+    if crate::resolve::is_node_builtin_specifier(specifier) {
+        return Err(crate::resolve::node_builtin_diagnostic(specifier, importer));
+    }
     match resolve(&request) {
         Ok(resolved) => Ok(resolved.path),
         Err(mut diagnostic) => {

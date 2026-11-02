@@ -72,6 +72,24 @@ const CODE_FORBIDDEN: &str = "vmz::pack::resolve::forbidden";
 const CODE_UNSUPPORTED_CONDITION: &str = "vmz::pack::resolve::unsupported_condition";
 const CODE_BAD_EXPORTS: &str = "vmz::pack::resolve::bad_exports";
 const CODE_BAD_MANIFEST: &str = "vmz::pack::resolve::bad_manifest";
+/// Node.js 内建模块说明符（`node:` 前缀）：运行时提供的外部模块，无物理文件身份。
+pub const CODE_NODE_BUILTIN: &str = "vmz::pack::resolve::node_builtin_external";
+
+/// `node:` 前缀说明符是 Node.js 内建模块：打包层不解析为文件、不改写，
+/// 发射时说明符文本原样保留，由运行时解析（`import('node:fs/promises')` 等
+/// 仅在 Node 宿主求值的位置使用是本链支持的书写形态）。
+pub fn is_node_builtin_specifier(specifier: &str) -> bool {
+    specifier.strip_prefix("node:").is_some_and(|name| !name.is_empty())
+}
+
+/// 为 `node:` 内建说明符构造统一诊断：身份为「运行时外部模块」，不参与文件解析。
+pub fn node_builtin_diagnostic(specifier: &str, importer: &Path) -> PackDiagnostic {
+    diag(
+        CODE_NODE_BUILTIN,
+        format!("`{specifier}` 是 Node.js 内建模块，由运行时提供，打包层保留原文"),
+        importer,
+    )
+}
 
 /// `#imports` 递归深度上限（防止 imports 自引用循环）。
 const MAX_IMPORTS_DEPTH: u32 = 16;

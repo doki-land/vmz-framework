@@ -190,6 +190,13 @@ pub(crate) struct EmitContext<'a> {
     pub sources: HashMap<usize, String>,
     /// `(引用模块规范化路径, specifier)` → 资源产物。
     pub asset_index: BTreeMap<(String, String), AssetArtifact>,
+    /// 面名歧义分裂后的实际发射面名表（全部 chunk 装配前一次性预决议）：
+    /// `(认领者模块规范化路径, 原始面名)` → 实际发射面名；未命中即未分裂，
+    /// 面名原样。消费方合成跨 chunk import/export 经
+    /// [`assemble::resolve_emitted_face`] 查本表，与 chunk 装配顺序无关。
+    pub face_aliases: BTreeMap<(String, String), String>,
+    /// 每 chunk 的改名预决议（`None` = 隔离 chunk 整文件独立发射，无拼接改名）。
+    pub preplans: Vec<Option<assemble::ChunkPreplan>>,
 }
 
 /// 由模块图、链接计划与分包计划产出产物计划。
@@ -319,7 +326,7 @@ pub fn plan_emit(
         return Err(errors);
     }
 
-    let context = EmitContext {
+    let mut context = EmitContext {
         graph,
         chunks,
         node_chunk,
@@ -328,7 +335,23 @@ pub fn plan_emit(
         linked,
         sources,
         asset_index,
+        face_aliases: BTreeMap::new(),
+        preplans: Vec::new(),
     };
+
+    // 改名全局预决议：消费方合成跨 chunk import/export 需要目标 chunk 的
+    // 面名分裂结果，必须在任何 chunk 装配之前算完全部 chunk 的预决议。
+    for chunk_index in 0..chunks.chunks.len() {
+        let preplan = assemble::plan_chunk_renames(&context, chunk_index);
+        if let Some(preplan) = &preplan {
+            for (face, by_module) in &preplan.face_emission {
+                for (module, emitted) in by_module {
+                    context.face_aliases.insert((module.clone(), face.clone()), emitted.clone());
+                }
+            }
+        }
+        context.preplans.push(preplan);
+    }
 
     // 第一遍装配（含占位符）与行级映射段。
     let mut codes: Vec<String> = Vec::with_capacity(chunks.chunks.len());

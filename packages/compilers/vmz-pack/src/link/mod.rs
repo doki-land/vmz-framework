@@ -272,6 +272,14 @@ impl<'g> Linker<'g> {
                 self.demand(Demand::Retain(target));
             }
         }
+        // opaque 模块（scope 事实不完整）在 emit 层整文件独立发射，剪枝只到
+        // 模块级：文件内全部语句、import 绑定、重导出与动态边文本都会进入产物。
+        // 若仍按符号需求剪枝，目标 chunk 会把「未被消费」的导出剪除，而本模块
+        // 保留的引用文本随之断链（死代码里的名字也必须解析成立）。升级为
+        // Execute 全量需求语义，与整文件存活口径一致。
+        if self.graph.nodes[node].record.is_scope_incomplete() {
+            self.demand(Demand::Execute(node));
+        }
     }
 
     fn activate_all(&mut self, node: usize) {
