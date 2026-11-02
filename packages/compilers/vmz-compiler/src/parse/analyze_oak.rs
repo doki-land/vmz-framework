@@ -184,7 +184,8 @@ fn walk_expr_forbidden(expr: &Expression, out: &mut Vec<ForbiddenFactory>) {
         ExpressionKind::ObjectLiteral { properties } => {
             for p in properties {
                 match p {
-                    oak_typescript::ast::ObjectProperty::Property { value, .. } | oak_typescript::ast::ObjectProperty::Spread(value) => {
+                    oak_typescript::ast::ObjectProperty::Property { value, .. }
+                    | oak_typescript::ast::ObjectProperty::Spread(value) => {
                         walk_expr_forbidden(value, out);
                     }
                     oak_typescript::ast::ObjectProperty::Method { body, .. } => {
