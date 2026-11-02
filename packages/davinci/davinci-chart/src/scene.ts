@@ -163,22 +163,29 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
         };
     }
 
+    // Facets split the plot into a small-multiple grid: one panel per facet
+    // value with shared scales, and the legend stays global.
+    if (plan.spec.facetField) {
+        const children: SemanticNode[] = [
+            ...buildFacets(plan, plot, seriesCategories, theme),
+            ...buildLegend(plan, plot, legendItems, theme),
+        ];
+        return {
+            version: SCENE_VERSION,
+            root: {
+                kind: "group",
+                id: "chart-root",
+                role: "group",
+                children,
+            },
+        };
+    }
+
     const children: SemanticNode[] = [];
 
     if (xEnc && yEnc && plot.w > 0 && plot.h > 0) {
-        const xScale = pixelScale(plan.scales.get(xEnc.channel), [plot.x, plot.x + plot.w]);
-        const yScale = pixelScale(plan.scales.get(yEnc.channel), [plot.y + plot.h, plot.y]);
-        const xCol = column(plan.resolvedData, xEnc.field);
-        const yCol = column(plan.resolvedData, yEnc.field);
-
-        if (xScale && yScale && xCol && yCol) {
-            const rows = positionedRows(plan, xScale, yScale, xCol, yCol);
-            children.push(...buildGrid(plot, yScale, theme));
-            children.push(buildAxis("x-axis", plot, xScale, "horizontal", theme));
-            children.push(buildAxis("y-axis", plot, yScale, "vertical", theme));
-            children.push(...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories, theme));
-            children.push(...buildLegend(plan, plot, legendItems, theme));
-        }
+        children.push(...buildCartesianPanel(plan, plot, seriesCategories, theme, ""));
+        children.push(...buildLegend(plan, plot, legendItems, theme));
     }
 
     return {
@@ -190,6 +197,33 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
             children,
         },
     };
+}
+
+/** One cartesian panel: grid + axes + marks inside an already-computed plot
+ *  rect. `idPrefix` qualifies furniture and series-level ids so faceted
+ *  panels never collide; row-level mark ids stay key-stable. */
+function buildCartesianPanel(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+    idPrefix: string,
+): SemanticNode[] {
+    const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    if (!xEnc || !yEnc || plot.w <= 0 || plot.h <= 0) return [];
+    const xScale = pixelScale(plan.scales.get(xEnc.channel), [plot.x, plot.x + plot.w]);
+    const yScale = pixelScale(plan.scales.get(yEnc.channel), [plot.y + plot.h, plot.y]);
+    const xCol = column(plan.resolvedData, xEnc.field);
+    const yCol = column(plan.resolvedData, yEnc.field);
+    if (!xScale || !yScale || !xCol || !yCol) return [];
+    const rows = positionedRows(plan, xScale, yScale, xCol, yCol);
+    return [
+        ...buildGrid(plot, yScale, theme, idPrefix),
+        buildAxis(`${idPrefix}x-axis`, plot, xScale, "horizontal", theme),
+        buildAxis(`${idPrefix}y-axis`, plot, yScale, "vertical", theme),
+        ...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories, theme, idPrefix),
+    ];
 }
 
 /** Compute per-side padding that fits tick labels for both axes. */
@@ -275,6 +309,7 @@ function buildMarks(
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
+    idPrefix: string = "",
 ): SemanticNode[] {
     const layout = resolveSeriesLayout(plan.spec, seriesCategories !== undefined);
     switch (plan.spec.mark) {
@@ -282,9 +317,9 @@ function buildMarks(
         case "rect":
             return buildBars(plan, rows, plot, xScale, yScale, seriesCategories, theme, layout);
         case "line":
-            return buildLines(rows, seriesCategories, theme);
+            return buildLines(rows, seriesCategories, theme, idPrefix);
         case "area":
-            return buildAreas(rows, plot, yScale, seriesCategories, theme, layout);
+            return buildAreas(rows, plot, yScale, seriesCategories, theme, layout, idPrefix);
         case "point":
         case "circle":
             return buildPoints(plan, rows, seriesCategories, theme);
@@ -381,6 +416,7 @@ function buildLines(
     rows: ReadonlyArray<PositionedMark>,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
+    idPrefix: string = "",
 ): SemanticNode[] {
     const nodes: SemanticNode[] = [];
     for (const [name, rowsInSeries] of groupBySeries(rows)) {
@@ -391,7 +427,7 @@ function buildLines(
         ];
         nodes.push({
             kind: "path",
-            id: `line:${name}`,
+            id: `${idPrefix}line:${name}`,
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
@@ -408,6 +444,7 @@ function buildAreas(
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
     layout: "overlap" | "stack" | "dodge",
+    idPrefix: string = "",
 ): SemanticNode[] {
     const baseline = zeroBaseline(yScale, plot);
     const nodes: SemanticNode[] = [];
@@ -438,7 +475,7 @@ function buildAreas(
         }
         nodes.push({
             kind: "path",
-            id: `area:${name}`,
+            id: `${idPrefix}area:${name}`,
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
@@ -631,6 +668,7 @@ function buildRadar(
     plot: PlotRect,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
+    idPrefix: string = "",
 ): SemanticNode[] {
     const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
     const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
@@ -707,7 +745,7 @@ function buildRadar(
             ring.push({ kind: "close" });
             nodes.push({
                 kind: "path",
-                id: `radar:ring:${formatTickLabel(t, ticks.decimals)}`,
+                id: `${idPrefix}radar:ring:${formatTickLabel(t, ticks.decimals)}`,
                 role: "chart.grid",
                 path: { commands: ring },
                 stroke: { color: theme.gridStroke, width: theme.gridStrokeWidth },
@@ -717,7 +755,7 @@ function buildRadar(
         for (let i = 0; i < n; i++) {
             nodes.push({
                 kind: "path",
-                id: `radar:spoke:${dims[i]}`,
+                id: `${idPrefix}radar:spoke:${dims[i]}`,
                 role: "chart.grid",
                 path: { commands: [{ kind: "move", to: { x: cx, y: cy } }, { kind: "line", to: vertex(i, rOuter) }] },
                 stroke: { color: theme.gridStroke, width: theme.gridStrokeWidth },
@@ -733,7 +771,7 @@ function buildRadar(
         if (r <= 0) continue;
         axisChildren.push({
             kind: "text",
-            id: `radar:tick:${formatTickLabel(t, ticks.decimals)}`,
+            id: `${idPrefix}radar:tick:${formatTickLabel(t, ticks.decimals)}`,
             role: "chart.axis",
             text: formatTickLabel(t, ticks.decimals),
             font: theme.labelFont,
@@ -748,7 +786,7 @@ function buildRadar(
         const anchorR = rOuter + LABEL_GAP + radialHalf;
         axisChildren.push({
             kind: "text",
-            id: `radar:dim:${dims[i]}`,
+            id: `${idPrefix}radar:dim:${dims[i]}`,
             role: "chart.axis",
             text: dimLabels[i],
             font: theme.labelFont,
@@ -757,7 +795,7 @@ function buildRadar(
         });
     }
     if (axisChildren.length > 0) {
-        nodes.push({ kind: "group", id: "radar-axis", role: "chart.axis", children: axisChildren });
+        nodes.push({ kind: "group", id: `${idPrefix}radar-axis`, role: "chart.axis", children: axisChildren });
     }
 
     // One closed polygon per series, plus a vertex mark per data row. Rows
@@ -790,7 +828,7 @@ function buildRadar(
         const seriesId = name ?? "series";
         nodes.push({
             kind: "path",
-            id: `radar-series:${seriesId}`,
+            id: `${idPrefix}radar-series:${seriesId}`,
             role: "chart.mark",
             source: { domain: "chart", path: ["series", seriesId] },
             path: { commands },
@@ -815,6 +853,103 @@ function buildRadar(
     return nodes;
 }
 
+// ─── Facets (small multiples) ────────────────────────────────────────────
+
+/** Inter-panel gaps in a facet grid. */
+const FACET_GAP_X = 20;
+const FACET_GAP_Y = 16;
+
+/** Lay the plot out as a small-multiple grid: one panel per facet value in
+ *  first-appearance order, `ceil(sqrt(n))` columns, shared scales, and a
+ *  per-panel title. Rows with a missing facet cell never reach a panel —
+ *  compile already warned about them. */
+function buildFacets(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const facetField = plan.spec.facetField;
+    if (!facetField) return [];
+    const facetCol = column(plan.resolvedData, facetField);
+    if (!facetCol) return [];
+
+    // Facet values in first-appearance order over usable cells.
+    const values: string[] = [];
+    const seen = new Set<string>();
+    const facetOfRow = new Map<number, string>();
+    for (const mark of plan.marks) {
+        const raw = facetCol.values[mark.rowIndex];
+        if (raw === null || raw === undefined) continue;
+        if (typeof raw === "number" && !Number.isFinite(raw)) continue;
+        const value = String(raw);
+        facetOfRow.set(mark.rowIndex, value);
+        if (!seen.has(value)) {
+            seen.add(value);
+            values.push(value);
+        }
+    }
+    const n = values.length;
+    if (n === 0) return [];
+
+    const cols = Math.ceil(Math.sqrt(n));
+    const rowCount = Math.ceil(n / cols);
+    const titleH = theme.labelFont.sizePx + 8;
+    const cellW = (plot.w - FACET_GAP_X * (cols - 1)) / cols;
+    const cellH = (plot.h - FACET_GAP_Y * (rowCount - 1)) / rowCount;
+
+    const nodes: SemanticNode[] = [];
+    for (let i = 0; i < n; i++) {
+        const value = values[i];
+        const colIndex = i % cols;
+        const rowIndex = Math.floor(i / cols);
+        const cellX = plot.x + colIndex * (cellW + FACET_GAP_X);
+        const cellY = plot.y + rowIndex * (cellH + FACET_GAP_Y);
+        if (cellW <= 0 || cellH - titleH <= 0) continue;
+        const idPrefix = `f${i}:`;
+
+        nodes.push({
+            kind: "text",
+            id: `${idPrefix}facet:title`,
+            role: "chart.axis",
+            text: truncateToWidth(value, Math.max(0, cellW - 8), theme.labelFont.sizePx),
+            font: theme.labelFont,
+            anchor: { x: cellX + cellW / 2, y: cellY + titleH / 2 },
+            color: theme.labelColor,
+        });
+
+        // The sub-plan filters marks to this facet; scales and the series
+        // domain stay shared, so panels are directly comparable.
+        const subPlan: ChartCompilePlan = {
+            ...plan,
+            marks: plan.marks.filter((m) => facetOfRow.get(m.rowIndex) === value),
+        };
+
+        if (plan.spec.mark === "pie" || plan.spec.mark === "radar") {
+            const panelPlot = { x: cellX, y: cellY + titleH, w: cellW, h: cellH - titleH };
+            if (plan.spec.mark === "pie") {
+                nodes.push(...buildPie(subPlan, panelPlot, seriesCategories, theme));
+            } else {
+                nodes.push(...buildRadar(subPlan, panelPlot, seriesCategories, theme, idPrefix));
+            }
+        } else {
+            // Cartesian panels re-estimate tick-label padding per cell, from
+            // the shared scales, so labels stay inside their own panel.
+            const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+            const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+            const pad = adaptivePadding({ width: cellW, height: cellH - titleH }, plan, xEnc, yEnc, theme);
+            const panelPlot: PlotRect = {
+                x: cellX + pad.left,
+                y: cellY + titleH + pad.top,
+                w: Math.max(0, cellW - pad.left - pad.right),
+                h: Math.max(0, cellH - titleH - pad.top - pad.bottom),
+            };
+            nodes.push(...buildCartesianPanel(subPlan, panelPlot, seriesCategories, theme, idPrefix));
+        }
+    }
+    return nodes;
+}
+
 // ─── Guides: grid, baselines, ticks, labels, legend ──────────────────────
 
 interface AxisTick {
@@ -825,7 +960,7 @@ interface AxisTick {
 /** Horizontal grid lines at y-axis tick positions — the quietest layer,
  *  emitted before axes and marks so data always sits on top. The baseline
  *  position is skipped: the axis owns that pixel. */
-function buildGrid(plot: PlotRect, yScale: Scale, theme: ChartTheme): SemanticNode[] {
+function buildGrid(plot: PlotRect, yScale: Scale, theme: ChartTheme, idPrefix: string = ""): SemanticNode[] {
     if (!theme.gridStroke) return [];
     if (yScale.kind !== "linear" && yScale.kind !== "log") return [];
     const baseline = plot.y + plot.h;
@@ -834,7 +969,7 @@ function buildGrid(plot: PlotRect, yScale: Scale, theme: ChartTheme): SemanticNo
         if (Math.abs(tick.position - baseline) < 0.5) return;
         nodes.push({
             kind: "path",
-            id: `y-grid:${i}`,
+            id: `${idPrefix}y-grid:${i}`,
             role: "chart.grid",
             path: {
                 commands: [

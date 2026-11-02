@@ -50,6 +50,14 @@
  *   paths with matching hit regions and contrast-aware percentage labels,
  *   need a `theta` channel, drop negative shares with a warning, refuse an
  *   out-of-range `innerRadiusRatio`, and skip the cartesian frame entirely
+ * - radar draws a polar web: spokes per dimension from twelve o'clock, tick
+ *   rings carrying the real value domain, one closed translucent polygon per
+ *   series, vertex marks with row-stable ids, and a degenerate-dimension
+ *   warning (`davinci.chart.radar-few-dimensions`)
+ * - `facetField` lays out small multiples in a `ceil(sqrt(n))` grid with
+ *   shared scales, per-panel axes and titles, facet-qualified furniture ids
+ *   (row-level mark ids stay key-stable and globally unique), a warning for
+ *   missing facet cells, and an error for an unknown facet field
  * - `ChartTheme` tokens resolve every presentation color and font — the default
  *   palette and neutrals serialize as hex, a custom theme replaces them
  *   everywhere with no leftover hardcoded color, legend swatches share the
@@ -1848,6 +1856,121 @@ console.log('charts-render: radar draws a polar web with real geometry…');
         dims.map((dim, i) => ({ id: `f-${i}`, dim, score: 50, product: 'alpha' })),
     );
     if (flat.svg.includes('NaN')) fail('flat radar must not carry NaN');
+}
+
+// ─── Facets (small multiples) ────────────────────────────────────────────
+
+console.log('charts-render: facets lay out small multiples with shared scales…');
+{
+    const facetSpec = {
+        mark: 'bar',
+        keyField: 'id',
+        facetField: 'region',
+        encoding: [
+            { field: 'quarter', channel: 'x' },
+            { field: 'sales', channel: 'y' },
+        ],
+    };
+    const facetRows = [
+        { id: 'e-q1', region: 'East', quarter: 'Q1', sales: 10 },
+        { id: 'e-q2', region: 'East', quarter: 'Q2', sales: 24 },
+        { id: 'w-q1', region: 'West', quarter: 'Q1', sales: 10 },
+        { id: 'w-q2', region: 'West', quarter: 'Q2', sales: 14 },
+        { id: 'n-q1', region: 'North', quarter: 'Q1', sales: 31 },
+        { id: 'n-q2', region: 'North', quarter: 'Q2', sales: 18 },
+        { id: 's-q1', region: 'South', quarter: 'Q1', sales: 22 },
+        { id: 's-q2', region: 'South', quarter: 'Q2', sales: 27 },
+    ];
+    const { plan, semantic, svg } = pipeline(facetSpec, facetRows);
+
+    // Four panels in first-appearance order, 2×2: one title and one axis
+    // pair per panel, furniture ids facet-qualified, mark ids row-stable.
+    const titles = semantic.root.children.filter((n) => n.id.endsWith('facet:title'));
+    if (titles.length !== 4) fail(`want 4 facet titles, got ${titles.length}`);
+    const order = titles.map((t) => t.text).join(',');
+    if (order !== 'East,West,North,South') fail(`facet order must be first appearance, got ${order}`);
+    const axisGroups = semantic.root.children.filter((n) => n.kind === 'group' && n.role === 'chart.axis');
+    if (axisGroups.length !== 8) fail(`want 8 panel axis groups, got ${axisGroups.length}`);
+    for (let i = 0; i < 4; i++) {
+        if (!axisGroups.some((g) => g.id === `f${i}:x-axis`)) fail(`panel ${i} must own an x axis`);
+        if (!axisGroups.some((g) => g.id === `f${i}:y-axis`)) fail(`panel ${i} must own a y axis`);
+    }
+    const bars = semantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    if (bars.length !== 8) fail(`want 8 facet bars, got ${bars.length}`);
+    if (!bars.some((b) => b.id === 'bar:n-q1')) fail('mark ids must stay row-stable inside panels');
+
+    // The scene contract holds: no duplicate ids anywhere in the facet grid.
+    const problems = validateScene(semantic);
+    if (problems.some((d) => d.code === 'davinci.scene.duplicate-id')) {
+        fail('facet panels must not duplicate node ids');
+    }
+
+    // Shared scales: the same value in two panels has the same bar height,
+    // and a panel in the second grid row sits strictly below the first row.
+    const byId = new Map(bars.map((b) => [b.id, b]));
+    const eastQ1 = byId.get('bar:e-q1');
+    const westQ1 = byId.get('bar:w-q1');
+    const northQ1 = byId.get('bar:n-q1');
+    if (Math.abs(eastQ1.h - westQ1.h) > 1e-9) fail('shared scales must give equal values equal heights');
+    if (!(westQ1.x > eastQ1.x)) fail('West must panel right of East');
+    if (!(northQ1.y > eastQ1.y)) fail('North must panel below East');
+    if (Math.abs(northQ1.h - eastQ1.h) < 1e-9) fail('different values must project to different heights');
+
+    // One global legend only when a series channel exists — none here.
+    if (semantic.root.children.some((n) => n.id === 'chart-legend')) fail('ungrouped facets must not draw a legend');
+    if (svg.includes('NaN')) fail('facet svg must not carry NaN');
+
+    // Faceting works for series marks too: line ids are facet-qualified.
+    const facetLine = pipeline(
+        {
+            mark: 'line',
+            facetField: 'region',
+            encoding: [
+                { field: 'quarter', channel: 'x' },
+                { field: 'sales', channel: 'y' },
+                { field: 'channel', channel: 'color' },
+            ],
+        },
+        [
+            { region: 'East', quarter: 'Q1', sales: 10, channel: 'online' },
+            { region: 'East', quarter: 'Q2', sales: 24, channel: 'online' },
+            { region: 'West', quarter: 'Q1', sales: 10, channel: 'online' },
+            { region: 'West', quarter: 'Q2', sales: 14, channel: 'online' },
+        ],
+    );
+    const linePaths = facetLine.semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (linePaths.length !== 2) fail(`want 2 faceted lines, got ${linePaths.length}`);
+    if (!linePaths.some((p) => p.id === 'f0:line:online') || !linePaths.some((p) => p.id === 'f1:line:online')) {
+        fail('faceted series marks must carry facet-qualified ids');
+    }
+    if (validateScene(facetLine.semantic).some((d) => d.code === 'davinci.scene.duplicate-id')) {
+        fail('faceted lines must not duplicate ids');
+    }
+
+    // Missing facet cells warn and never reach a panel.
+    const withMissing = compile(facetSpec, fromRows([...facetRows, { id: 'x-q1', region: null, quarter: 'Q1', sales: 99 }]));
+    if (!withMissing.diagnostics.items.some((d) => d.code === 'davinci.chart.missing-facet-value')) {
+        fail('a null facet cell must raise missing-facet-value');
+    }
+    const missingScene = buildScene(withMissing, { width: WIDTH, height: HEIGHT });
+    if (missingScene.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark').length !== 8) {
+        fail('a row with a missing facet value must appear in no panel');
+    }
+
+    // Unknown facet field is an authoring error.
+    const unknown = compile({ ...facetSpec, facetField: 'nope' }, fromRows(facetRows));
+    if (!unknown.diagnostics.items.some((d) => d.code === 'davinci.chart.unknown-field' && d.severity === 'error')) {
+        fail('an unknown facetField must raise unknown-field');
+    }
+
+    // Dark tokens flow into every panel: titles, grid and marks all re-token.
+    const darkFacet = buildScene(plan, { width: WIDTH, height: HEIGHT }, { theme: DARK_CHART_THEME });
+    const darkTitle = darkFacet.root.children.find((n) => n.id === 'f0:facet:title');
+    if (darkTitle.color.r !== DARK_CHART_THEME.labelColor.r) fail('dark facet titles must use the dark label token');
+    const darkBar = darkFacet.root.children.find((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    if (darkBar.fill.color.r !== DARK_CHART_THEME.markFill.r) fail('dark facet bars must use the dark mark token');
+    const darkGrid = darkFacet.root.children.find((n) => n.role === 'chart.grid');
+    if (darkGrid.stroke.color.r !== DARK_CHART_THEME.gridStroke.r) fail('dark facet grids must use the dark grid token');
 }
 
 console.log('charts-render: the published facade dist is byte-identical to the internals…');

@@ -539,11 +539,24 @@ export default class Chart {
             if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, rowIndex))}`);
             return parts.length > 0 ? parts.join(" · ") : id;
         }
-        if (id.startsWith("line:") || id.startsWith("area:")) {
-            return id.slice(id.indexOf(":") + 1);
+        // facet 面板的系列级 id 带 `f<i>:` 前缀（如 `f1:line:North`），剥掉再匹配。
+        let bare = id;
+        if (id.startsWith("f")) {
+            const colon = id.indexOf(":");
+            const head = id.slice(1, colon);
+            const rest = id.slice(colon + 1);
+            const facetPrefixed =
+                colon > 1 &&
+                head.length > 0 &&
+                !Number.isNaN(Number(head)) &&
+                (rest.startsWith("line:") || rest.startsWith("area:") || rest.startsWith("radar-series:"));
+            if (facetPrefixed) bare = rest;
         }
-        if (id.startsWith("radar-series:")) {
-            return id.slice("radar-series:".length);
+        if (bare.startsWith("line:") || bare.startsWith("area:")) {
+            return bare.slice(bare.indexOf(":") + 1);
+        }
+        if (bare.startsWith("radar-series:")) {
+            return bare.slice("radar-series:".length);
         }
         return id;
     }

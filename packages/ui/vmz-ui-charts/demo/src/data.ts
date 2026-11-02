@@ -184,6 +184,35 @@ const RADAR_SCORE: GalleryExample = {
     ],
 };
 
+const FACET_PLATFORM: GalleryExample = {
+    id: "facet-platform",
+    title: "分面 · 四平台月度活跃",
+    note: "facetField 把同一份数据拆成 2×2 小倍数面板,共享刻度可直接比较。",
+    spec: {
+        mark: "bar",
+        keyField: "id",
+        facetField: "platform",
+        encoding: [
+            { field: "month", channel: "x" },
+            { field: "active", channel: "y" },
+        ],
+    },
+    rows: [
+        { id: "ios-1", platform: "iOS", month: "7月", active: 42 },
+        { id: "i-2", platform: "iOS", month: "8月", active: 55 },
+        { id: "i-3", platform: "iOS", month: "9月", active: 61 },
+        { id: "a-1", platform: "Android", month: "7月", active: 68 },
+        { id: "a-2", platform: "Android", month: "8月", active: 72 },
+        { id: "a-3", platform: "Android", month: "9月", active: 66 },
+        { id: "w-1", platform: "Web", month: "7月", active: 30 },
+        { id: "w-2", platform: "Web", month: "8月", active: 28 },
+        { id: "w-3", platform: "Web", month: "9月", active: 35 },
+        { id: "d-1", platform: "Desktop", month: "7月", active: 18 },
+        { id: "d-2", platform: "Desktop", month: "8月", active: 24 },
+        { id: "d-3", platform: "Desktop", month: "9月", active: 29 },
+    ],
+};
+
 const AREA_TRAFFIC: GalleryExample = {
     id: "area-traffic",
     title: "面积 · 流量构成",
@@ -296,6 +325,7 @@ export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     PIE_SHARE,
     DONUT_SHARE,
     RADAR_SCORE,
+    FACET_PLATFORM,
     AREA_TRAFFIC,
     SCATTER_LATENCY,
     NEGATIVE_DELTAS,

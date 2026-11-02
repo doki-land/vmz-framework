@@ -29,7 +29,8 @@ export interface ChartSpec {
     readonly encoding: ReadonlyArray<EncodingChannel>;
     /** Optional explicit scale overrides. */
     readonly scales?: ReadonlyMap<string, Scale>;
-    /** Facet field (optional — produces one plan row per facet). */
+    /** Facet field (optional — the scene builder lays out one small-multiple
+     *  panel per facet value, sharing scales across panels). */
     readonly facetField?: string;
     /** How grouped (series) marks share the x slot. `undefined` is the
      *  natural per-mark default: `bar`/`rect` dodge side by side, everything
@@ -160,6 +161,40 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
     }
     const usedKeys = new Set<string>();
+
+    // The facet field is read by the scene builder when panels are laid out;
+    // an unknown facet field is the same class of authoring mistake as an
+    // unknown encoding or key field. Missing cells warn — those rows never
+    // reach a panel.
+    if (spec.facetField) {
+        const facetCol = column(data, spec.facetField);
+        if (!facetCol && data.columns.length > 0) {
+            diagnostics.push(
+                diag(
+                    "error",
+                    "davinci.chart.unknown-field",
+                    `facetField "${spec.facetField}" is not in the data`,
+                    spec.facetField,
+                ),
+            );
+        }
+        if (facetCol) {
+            let missing = 0;
+            for (const v of facetCol.values) {
+                if (v === null || v === undefined || (typeof v === "number" && !Number.isFinite(v))) missing += 1;
+            }
+            if (missing > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.missing-facet-value",
+                        `facetField "${spec.facetField}" has no usable value for ${missing} row${missing === 1 ? "" : "s"}; they appear in no panel`,
+                        spec.facetField,
+                    ),
+                );
+            }
+        }
+    }
 
     // ── Series layout pre-pass (stack offsets live in the plan, geometry in
     // the scene builder) ─────────────────────────────────────────────────
