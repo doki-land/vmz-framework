@@ -12,27 +12,39 @@
                 <p class="charts-gallery__lead">
                     {{ leadLabel }}
                 </p>
-                <div role="group" :aria-label="sizeLabel" class="charts-gallery__sizes">
-                    <button type="button" :data-active="chartWidth === 480 ? 'true' : 'false'" @click="() => setChartWidth(480)" class="charts-gallery__size">
-                        480 px
-                    </button>
-                    <button type="button" :data-active="chartWidth === 720 ? 'true' : 'false'" @click="() => setChartWidth(720)" class="charts-gallery__size">
-                        720 px
+                <div class="charts-gallery__actions">
+                    <button type="button" @click="() => toggleDark()" :aria-pressed="dark ? 'true' : 'false'" class="charts-gallery__theme-toggle">
+                        {{ dark ? themeToLightLabel : themeToDarkLabel }}
                     </button>
                 </div>
             </header>
+            <section :aria-labelledby="'charts-interactions'" class="charts-gallery__howto">
+                <h2 :id="'charts-interactions'">
+                    {{ howtoTitle }}
+                </h2>
+                <ul>
+                    <li v-for="line in howtoItems" :key="line.id">
+                        {{ line.text }}
+                    </li>
+                </ul>
+            </section>
             <section v-for="item in examples" :key="item.id" class="chart-card">
                 <header class="chart-card__head">
-                    <h2>
-                        {{ item.title }}
-                    </h2>
+                    <div class="chart-card__titles">
+                        <h2>
+                            {{ item.title }}
+                        </h2>
+                        <p>
+                            {{ item.note }}
+                        </p>
+                    </div>
                     <button type="button" :aria-expanded="activeDetail === item.id ? 'true' : 'false'" @click="() => toggleDetail(item.id)" class="chart-card__toggle">
                         {{ getToggleLabel(item.id) }}
                     </button>
                 </header>
                 <div class="chart-card__body">
                     <div class="chart-card__canvas">
-                        <Chart :spec="item.spec" :data="item.rows" :width="chartWidth" :height="chartHeight" />
+                        <Chart :spec="item.spec" :data="item.rows" :height="280" :theme="chartTheme" :label="item.title" />
                     </div>
                     <div v-if="activeDetail === item.id" class="chart-card__detail">
                         <h3>
@@ -56,15 +68,20 @@
             </section>
             <section class="chart-card">
                 <header class="chart-card__head">
-                    <h2>
-                        {{ diagramTitle }}
-                    </h2>
+                    <div class="chart-card__titles">
+                        <h2>
+                            {{ diagramTitle }}
+                        </h2>
+                        <p>
+                            {{ diagramNote }}
+                        </p>
+                    </div>
                 </header>
                 <div class="chart-card__body">
                     <div class="chart-card__canvas">
-                        <Diagram :spec="diagramSpec" />
+                        <Diagram :spec="diagramSpec" :theme="chartTheme" :label="diagramTitle" />
                     </div>
-                    <div class="chart-card__detail">
+                    <div class="chart-card__detail chart-card__detail--open">
                         <h3>
                             {{ diagramSpecTitleLabel }}
                         </h3>
@@ -75,6 +92,27 @@
                         </pre>
                     </div>
                 </div>
+            </section>
+            <section :aria-labelledby="'charts-theming'" class="charts-gallery__theming">
+                <h2 :id="'charts-theming'">
+                    {{ themingTitle }}
+                </h2>
+                <p>
+                    {{ themingPropLead }}
+                </p>
+                <pre class="chart-card__code">
+                    <code>
+                        {{ themePropSnippet }}
+                    </code>
+                </pre>
+                <p>
+                    {{ themingTokenLead }}
+                </p>
+                <pre class="chart-card__code">
+                    <code>
+                        {{ themeTokenSnippet }}
+                    </code>
+                </pre>
             </section>
         </main>
     </SiteShell>
@@ -101,27 +139,48 @@
     color: var(--vmz-text-steel);
     font: 400 1rem / 1.7 var(--vmz-font-sans);
 }
-.charts-gallery__sizes {
+.charts-gallery__actions {
     display: flex;
     gap: 0.5rem;
 }
-.charts-gallery__size {
-    padding: 0.3rem 0.7rem;
+.charts-gallery__theme-toggle {
+    padding: 0.4rem 0.85rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-steel);
-    font: 500 0.8rem / 1 var(--vmz-font-sans);
+    font: 500 0.85rem / 1 var(--vmz-font-sans);
     cursor: pointer;
     transition: border-color 120ms ease, color 120ms ease;
 }
-.charts-gallery__size[data-active="true"] {
-    border-color: var(--vmz-text-ink);
-    color: var(--vmz-text-ink);
-}
-.charts-gallery__size:hover {
+.charts-gallery__theme-toggle:hover {
     border-color: var(--vmz-text-steel);
     color: var(--vmz-text-ink);
+}
+.charts-gallery__theme-toggle[aria-pressed="true"] {
+    border-color: var(--vmz-text-ink);
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-fill);
+}
+.charts-gallery__howto {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+}
+.charts-gallery__howto h2 {
+    margin: 0 0 0.5rem;
+    color: var(--vmz-text-ink);
+    font: 600 1.05rem / 1.6 var(--vmz-font-display);
+}
+.charts-gallery__howto ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.3rem;
+    color: var(--vmz-text-steel);
+    font: 400 0.9rem / 1.7 var(--vmz-font-sans);
 }
 .chart-card {
     margin-top: 1.5rem;
@@ -133,16 +192,27 @@
 .chart-card__head {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 1rem;
     margin-bottom: 1rem;
+}
+.chart-card__titles {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
 }
 .chart-card__head h2 {
     margin: 0;
     color: var(--vmz-text-ink);
     font: 600 1.15rem / 1.6 var(--vmz-font-display);
 }
+.chart-card__head p {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 0.85rem / 1.6 var(--vmz-font-sans);
+}
 .chart-card__toggle {
+    flex: none;
     padding: 0.3rem 0.7rem;
     border: 1px solid var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
@@ -159,15 +229,14 @@
 .chart-card__body {
     display: grid;
     gap: 1rem;
+    min-width: 0;
 }
+/* 图表宽度跟随容器测量（组件内 ResizeObserver），小屏不出现横向滚动。 */
 .chart-card__canvas {
-    padding: 1rem;
+    padding: 0.5rem;
     border: 1px dashed var(--vmz-line-default);
     border-radius: var(--vmz-radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow-x: auto;
+    min-width: 0;
     background: var(--vmz-surface-paper);
 }
 .chart-card__detail {
@@ -181,6 +250,10 @@
     color: var(--vmz-text-ink);
     font: 600 0.9rem / 1.4 var(--vmz-font-display);
 }
+.chart-card__detail--open {
+    border-top: none;
+    padding-top: 0;
+}
 .chart-card__code {
     margin: 0;
     padding: 0.8rem 1rem;
@@ -191,10 +264,34 @@
     color: var(--vmz-text-ink);
     white-space: pre;
 }
+.charts-gallery__theming {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    display: grid;
+    gap: 0.75rem;
+}
+.charts-gallery__theming h2 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 1.15rem / 1.6 var(--vmz-font-display);
+}
+.charts-gallery__theming p {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 0.9rem / 1.7 var(--vmz-font-sans);
+}
+@media (max-width: 40rem) {
+    .chart-card {
+        padding: 1rem;
+    }
+}
 </style>
 <script client>
 /**
- * 图表预览页。
+ * 图表页。
  *
  * 作者面只消费 `@vmz/ui-charts` 的 `<Chart />` 与 `<Diagram />`，不导入
  * `@doki-land/davinci/*`，也不自行拼接 SVG。演示输入只存在于同页
@@ -211,10 +308,10 @@ import { pageMeta } from "../page-meta.ts";
 
 export default class ChartGalleryPage {
     static meta = pageMeta(
-        "图表预览 · VMZ",
-        "Chart gallery · VMZ",
-        "VMZ 图表预览，消费公开 UI 作者面 @vmz/ui-charts 的 Chart 与 Diagram 组件。",
-        "VMZ chart gallery consuming the public @vmz/ui-charts Chart and Diagram components.",
+        "图表 · VMZ",
+        "Charts · VMZ",
+        "VMZ 图表：消费公开 UI 作者面 @vmz/ui-charts 的 Chart 与 Diagram 组件，覆盖柱状、折线、面积、散点、饼、环、雷达与小倍数。",
+        "VMZ charts consuming the public @vmz/ui-charts Chart and Diagram components across bar, line, area, point, pie, donut, radar and facet examples.",
     );
 
     /** 构建期与 SSR 取数：读同一份演示输入，静态预渲染不依赖 `#server` RPC。 */
@@ -224,33 +321,65 @@ export default class ChartGalleryPage {
         return {
             examples,
             diagramTitle: diagram.title,
+            diagramNote: diagram.note,
             diagramSpec: diagram.spec,
             diagramSpecText: diagram.specText,
         };
     }
 
     kickerLabel = "VMZ · DaVinci Charts";
-    titleLabel = "图表预览";
-    leadLabel = "预览消费公开 UI 作者面 @vmz/ui-charts，由它绑定 @doki-land/davinci 引擎完成编译、场景解析与 SVG 呈现。";
+    titleLabel = "图表";
+    leadLabel = "消费公开 UI 作者面 @vmz/ui-charts，由它绑定 @doki-land/davinci 引擎完成编译、场景解析与 SVG 呈现。每张卡片都是可交互的真实几何。";
+    themeToDarkLabel = "切换到暗色";
+    themeToLightLabel = "切换到浅色";
+    howtoTitle = "交互";
+    howtoItems = [
+        { id: "hover", text: "悬停：十字线定位，tooltip 读真实行值；扇形读数值与占比。" },
+        { id: "select", text: "点击标记：选择高亮，其余标记降低不透明度；Esc 清除选择。" },
+        { id: "keyboard", text: "键盘：Tab 聚焦图表，←/→ 在标记间移动并读出取值，Enter 选择。" },
+        { id: "zoom", text: "数值 x 轴图表：滚轮缩放，拖拽框选区域放大，Shift+拖拽平移，按 0 复位。" },
+    ];
     specTitleLabel = "ChartSpec";
     dataTitleLabel = "示例数据";
     diagramSpecTitleLabel = "DiagramSpec";
-    sizeLabel = "图表尺寸";
     showSpecLabel = "查看规格";
     hideSpecLabel = "收起规格";
+    themingTitle = "主题定制";
+    themingPropLead = "组件级公开入口是 theme prop，取值为 light / dark / auto（auto 跟随系统）。本页顶部开关即经它切换全部图表。";
+    themePropSnippet = `<Chart :spec="spec" :data="rows" :height="280" theme="dark" label="周访问" />`;
+    themingTokenLead = "按 token 定制（系列色板、坐标轴、网格、标签字体等）在引擎层公开：buildScene 接受完整 ChartTheme，令牌在进入场景构建前解析。";
+    themeTokenSnippet = [
+        `import { compile, fromRows, buildScene, DEFAULT_CHART_THEME, type ChartTheme } from "@doki-land/davinci/chart";`,
+        `import { resolve, renderSvg } from "@doki-land/davinci/scene";`,
+        `import { rgb8 } from "@doki-land/davinci/types";`,
+        ``,
+        `const theme: ChartTheme = {`,
+        `    ...DEFAULT_CHART_THEME,`,
+        `    seriesPalette: [rgb8(13, 148, 136), rgb8(245, 158, 11)],`,
+        `    markFill: rgb8(13, 148, 136),`,
+        `};`,
+        ``,
+        `const plan = compile(spec, fromRows(rows));`,
+        `const scene = resolve(buildScene(plan, { width: 640, height: 280 }, { theme }), { width: 640, height: 280 });`,
+        `const svg = renderSvg(scene);`,
+    ].join("\n");
 
     activeDetail = "";
-    chartWidth = 480;
-    chartHeight = 260;
+    dark = false;
 
     /** 由 `static load` 注入的示例输入（public = 页面 props）。 */
     public examples: ChartGalleryExample[] = [];
     public diagramTitle = "";
+    public diagramNote = "";
     public diagramSpec: ChartGalleryDiagram["spec"] | null = null;
     public diagramSpecText = "";
 
-    setChartWidth(width: number) {
-        this.chartWidth = width;
+    get chartTheme(): string {
+        return this.dark ? "dark" : "light";
+    }
+
+    toggleDark() {
+        this.dark = !this.dark;
     }
 
     toggleDetail(id: string) {
@@ -264,7 +393,7 @@ export default class ChartGalleryPage {
 </script>
 <script server>
 /**
- * 图表预览的服务端取数能力。spec / rows 与展示文本来自
+ * 图表页的服务端取数能力。spec / rows 与展示文本来自
  * `../../demo/chart-gallery.ts` 的同一份构建期输入，页面不在作者面另写常量。
  */
 import { chartGalleryDiagram, chartGalleryExamples } from "../../demo/chart-gallery.ts";
