@@ -18,7 +18,11 @@
 //! with the plan. Nothing here panics and nothing throws through N-API.
 //! Graph-level diagnostics (entry canonicalization / read failures) mean a
 //! requested entry is absent from the plan, so they are surfaced as
-//! `ok: false` instead of silently producing a partial plan.
+//! `ok: false` instead of silently producing a partial plan. Link-level
+//! diagnostics split the same way: `vmz::pack::link::unknown_export` and
+//! failed-resolution edges (`vmz::pack::resolve::*`, except the supported
+//! `node_builtin_external` form) are `ok: false` — silently shipping them
+//! would defer the failure to a browser SyntaxError or a runtime 404.
 
 use std::path::{Path, PathBuf};
 
@@ -384,6 +388,23 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
         return Ok(Chain::Failed(graph.diagnostics.clone()));
     }
     let link_plan = vmz_pack::link::link(&graph, &entry_uses);
+    // 链接诊断里的两类必须升级构建失败，不静默放行：未知导出（否则浏览器
+    // 实例化时 SyntaxError）与解析失败边（否则产物留下悬空 import，运行时
+    // 404 / ReferenceError）。`node:` 内建外部模块维持原文保留的支持形态；
+    // 事实不完整模块维持保守隔离路径，两者都不是本层拦截对象。
+    let fatal: Vec<PackDiagnostic> = link_plan
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.code == "vmz::pack::link::unknown_export"
+                || (diagnostic.code.starts_with("vmz::pack::resolve::")
+                    && diagnostic.code != vmz_pack::resolve::CODE_NODE_BUILTIN)
+        })
+        .cloned()
+        .collect();
+    if !fatal.is_empty() {
+        return Ok(Chain::Failed(fatal));
+    }
     let chunk_plan = vmz_pack::chunk::plan_chunks(&graph, &link_plan);
     let options = EmitOptions { public_base: request.public_base.clone() };
     match vmz_pack::emit::plan_emit(&graph, &link_plan, &chunk_plan, &options) {
@@ -640,6 +661,65 @@ mod tests {
         assert_eq!(response["ok"], Value::Bool(false));
         assert!(response.get("plan").is_none());
         assert_eq!(response["diagnostics"][0]["code"], INVALID_REQUEST);
+    }
+
+    /// 未知具名导出必须 `ok: false` 并携带 `unknown_export`：静默成功会把
+    /// 失败推迟到浏览器实例化时的 SyntaxError。
+    #[test]
+    fn pack_plan_unknown_named_export_fails_loudly() {
+        let root =
+            std::env::temp_dir().join(format!("vmz-napi-pack-unknown-export-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/real.js"), "export const known = 1;\n").unwrap();
+        fs::write(
+            root.join("src/entry.js"),
+            "import { ghost } from \"./real.js\";\nexport function main() { return ghost; }\n",
+        )
+        .unwrap();
+        let uses = json!([{ "logical": "main", "execution": "side-effects", "exports": { "kind": "named", "names": ["main"] } }]);
+        let response = parse(&pack_plan_core(&request(&root, "browser", uses)));
+        assert_eq!(response["ok"], Value::Bool(false), "{response}");
+        assert!(response.get("plan").is_none(), "{response}");
+        let codes: Vec<&str> = response["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d["code"].as_str().unwrap())
+            .collect();
+        assert!(codes.contains(&"vmz::pack::link::unknown_export"), "{codes:?}");
+        let message = response["diagnostics"][0]["message"].as_str().unwrap();
+        assert!(message.contains("ghost"), "{message}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 静态导入指向不存在的模块必须 `ok: false` 并携带解析诊断：静默成功
+    /// 会在产物里留下悬空 import（运行时 404 / ReferenceError）。
+    #[test]
+    fn pack_plan_missing_import_target_fails_loudly() {
+        let root =
+            std::env::temp_dir().join(format!("vmz-napi-pack-missing-import-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(
+            root.join("src/entry.js"),
+            "import { ghost } from \"./ghost.js\";\nexport function main() { return ghost; }\n",
+        )
+        .unwrap();
+        let uses = json!([{ "logical": "main", "execution": "side-effects", "exports": { "kind": "named", "names": ["main"] } }]);
+        let response = parse(&pack_plan_core(&request(&root, "browser", uses)));
+        assert_eq!(response["ok"], Value::Bool(false), "{response}");
+        assert!(response.get("plan").is_none(), "{response}");
+        let codes: Vec<&str> = response["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d["code"].as_str().unwrap())
+            .collect();
+        assert!(codes.iter().any(|code| code.starts_with("vmz::pack::resolve::")), "{codes:?}");
+        let message = response["diagnostics"][0]["message"].as_str().unwrap();
+        assert!(message.contains("ghost"), "{message}");
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
