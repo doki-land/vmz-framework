@@ -10,8 +10,10 @@ import { diag, type Diagnostic, type DiagnosticSet } from "@doki-land/davinci-ty
 import { column, type DataSnapshot } from "./data.js";
 import { apply as scaleApply, type Scale } from "./scale.js";
 
-/** Mark kind (geometric primitive family). */
-export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area" | "text" | "tick";
+/** Mark kind (geometric primitive family). Only marks with real scene
+ *  geometry are listed — an authoring surface can never name a mark the
+ *  engine would silently drop. */
+export type MarkKind = "point" | "line" | "rect" | "bar" | "circle" | "area";
 
 /** Encoding channel — how a data field maps to a visual property. */
 export interface EncodingChannel {
@@ -79,11 +81,29 @@ const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area"]);
 /** Channels whose value decides whether a row can be positioned at all. */
 const positionChannels: ReadonlySet<string> = new Set(["x", "y"]);
 
+/** Mark kinds with real scene geometry. Kept in sync with the scene
+ *  builder; `compile` refuses anything else instead of rendering an empty
+ *  chart with no explanation. */
+const implementedMarks: ReadonlySet<string> = new Set(["bar", "rect", "line", "point", "circle", "area"]);
+
 /** Compile a ChartSpec against a DataSnapshot. */
 export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
     const scales = new Map<string, Scale>();
     const marks: PlanMark[] = [];
     const diagnostics: Diagnostic[] = [];
+
+    // An unimplemented mark must never degrade into a silent empty chart —
+    // refuse it as an authoring error up front.
+    if (!implementedMarks.has(spec.mark)) {
+        diagnostics.push(
+            diag(
+                "error",
+                "davinci.chart.unsupported-mark",
+                `mark "${String(spec.mark)}" has no scene geometry; implemented marks are bar, rect, line, point, circle, area`,
+                String(spec.mark),
+            ),
+        );
+    }
 
     // Resolve the grouping domain once: first-appearance category order is a
     // contract (legend and palette index marks by it), so it is computed here,

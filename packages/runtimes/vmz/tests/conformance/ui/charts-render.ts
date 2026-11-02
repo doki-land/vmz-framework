@@ -3,13 +3,23 @@
  *
  * Asserts:
  * - `compile` → `buildScene` maps plan scale ranges into the pixel viewport
- *   for bar / line / point marks (compile never guesses pixels)
+ *   for bar / line / area / point marks (compile never guesses pixels)
  * - stable ids live on SemanticScene (rowIndex / series); DisplayScene strips
- *   domain semantics as designed, so markup carries geometry only
+ *   domain semantics as designed, so markup carries geometry only — hosts that
+ *   opt into `preserveNodeIds` get `data-dvz-id` hooks for interaction
  * - axes carry baselines, short tick marks and data-derived labels (numeric
- *   4–6 ticks, band one per category) with minimal decimals
- * - a legend appears only when a color / series channel exists, and sits in the
- *   plot's upper right, clear of the ticks
+ *   4–6 ticks, band one per category) with minimal decimals, and horizontal
+ *   grid lines sit behind the marks at every y tick except the baseline
+ * - a legend appears only when a color / series channel exists, laid out as a
+ *   strip above the plot so it never covers data; overflowing entries collapse
+ *   into an explicit `+N` marker
+ * - theme tokens drive every presentation color and font in both light and
+ *   dark variants; font stacks quote each family entry individually
+ * - unimplemented marks are refused with `davinci.chart.unsupported-mark`
+ *   (compile) and a loud builder error — never a silent empty chart
+ * - diagram edges clip to node borders, `arrow` edges carry real filled
+ *   arrowheads, edge labels sit on halo rects, and node labels truncate into
+ *   their box
  * - text bounds are a deterministic size estimate centred on the anchor —
  *   wide CJK glyphs advance one em, half-width glyphs 0.6 em, and categorical
  *   x labels / legend entries truncate with an ellipsis into their slot
@@ -54,6 +64,7 @@
 
 import { readFileSync } from 'node:fs';
 import {
+    DARK_CHART_THEME,
     DEFAULT_CHART_THEME,
     aggregate,
     buildScene,
@@ -117,6 +128,11 @@ function axisStats(semantic) {
     return { groups, paths, texts };
 }
 
+/** Grid lines are direct children with role chart.grid (not inside axis groups). */
+function gridLines(semantic) {
+    return semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.grid');
+}
+
 function collectTexts(node, out = []) {
     if (node.kind === 'text') out.push(node);
     else if (node.kind === 'group') for (const child of node.children) collectTexts(child, out);
@@ -164,12 +180,38 @@ console.log('charts-render: bar → rect marks…');
     if (!groups.some((g) => g.id === 'x-axis') || !groups.some((g) => g.id === 'y-axis')) {
         fail('x-axis / y-axis groups missing');
     }
-    if (count(svg, '<path') !== paths) fail(`svg want ${paths} axis <path>, got ${count(svg, '<path')}`);
+    const grid = gridLines(semantic);
+    if (count(svg, '<path') !== paths + grid.length) {
+        fail(`svg want ${paths} axis + ${grid.length} grid <path>, got ${count(svg, '<path')}`);
+    }
     if (count(svg, '<text') !== texts) fail(`svg want ${texts} axis <text>, got ${count(svg, '<text')}`);
     if (!svg.includes('text-anchor="middle"')) fail('text must declare text-anchor');
     if (!svg.includes('dominant-baseline="middle"')) fail('text must declare dominant-baseline');
     if (svg.includes('NaN')) fail('svg must not carry NaN attributes');
     if (guideGroups(semantic, 'chart.legend').length !== 0) fail('no legend without a color / series channel');
+}
+
+console.log('charts-render: grid lines sit behind marks, aligned to y ticks…');
+{
+    const { semantic, svg } = pipeline(barSpec, barRows);
+    const grid = gridLines(semantic);
+    // Domain [0, 7] → nice ticks 0,2,4,6 → grid skips the baseline (0) and
+    // keeps one horizontal line per remaining tick.
+    const yAxis = guideGroups(semantic, 'chart.axis').find((g) => g.id === 'y-axis');
+    const yTickLabels = yAxis.children.filter((n) => n.kind === 'text').map((n) => n.text);
+    if (grid.length !== yTickLabels.length - 1) {
+        fail(`grid wants one line per y tick except the baseline: ${grid.length} vs ${yTickLabels.length}`);
+    }
+    // Grid spans the plot horizontally and never descends to the baseline pixel.
+    const yTicks = niceLinearTicks([0, 7]).values.filter((v) => v !== 0);
+    if (grid.length !== yTicks.length) fail(`grid count want ${yTicks.length}, got ${grid.length}`);
+    // Visual hierarchy: grid stroke is quieter than the axis stroke, and the
+    // marks come after the grid in document order (data paints on top).
+    const firstGrid = svg.indexOf('stroke="#e5e7eb"');
+    const firstMark = svg.indexOf('<rect');
+    if (firstGrid < 0) fail(`grid must use the theme grid stroke #e5e7eb: ${svg.slice(0, 300)}`);
+    if (firstMark < firstGrid) fail('grid must serialize before marks');
+    if (svg.indexOf('stroke="#9ca3af"') < 0) fail('axis must keep the stronger axis stroke #9ca3af');
 }
 
 console.log('charts-render: axes and ticks come from data…');
@@ -223,7 +265,7 @@ console.log('charts-render: line → sorted single path…');
         { step: 2, score: 3 },
     ];
     const { semantic, svg } = pipeline(lineSpec, lineRows);
-    const paths = semantic.root.children.filter((n) => n.kind === 'path');
+    const paths = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
     if (paths.length !== 1) fail(`want exactly one line path, got ${paths.length}`);
     if (paths[0].id !== 'line:series') fail(`line id want line:series, got ${paths[0].id}`);
     const commands = paths[0].path.commands;
@@ -234,8 +276,9 @@ console.log('charts-render: line → sorted single path…');
         if (xs[i] < xs[i - 1]) fail(`line path must be sorted by x: ${JSON.stringify(xs)}`);
     }
     const { paths: axisPaths } = axisStats(semantic);
-    if (count(svg, '<path') !== 1 + axisPaths) {
-        fail(`svg want 1 mark + ${axisPaths} axis <path>, got ${count(svg, '<path')}`);
+    const grid = gridLines(semantic);
+    if (count(svg, '<path') !== 1 + axisPaths + grid.length) {
+        fail(`svg want 1 mark + ${axisPaths} axis + ${grid.length} grid <path>, got ${count(svg, '<path')}`);
     }
     if (!svg.includes('d="M ')) fail('path markup missing d attribute');
 }
@@ -259,6 +302,72 @@ console.log('charts-render: point / circle → ellipse marks…');
     if (marks[0].id !== 'circle:0' || marks[2].id !== 'circle:2') fail('circle ids must come from rowIndex');
     if (count(svg, '<ellipse') !== 3) fail(`svg want 3 <ellipse>, got ${count(svg, '<ellipse')}`);
     if (count(svg, '<text') === 0) fail('point chart must still emit axis labels');
+    // Points carry the theme point stroke so overlapping glyphs stay separable.
+    for (const mark of marks) {
+        if (!mark.stroke || mark.stroke.width <= 0) fail(`point ${mark.id} must carry a separating stroke`);
+    }
+    if (!svg.includes('stroke="#ffffff"')) fail('default point stroke want #ffffff');
+}
+
+console.log('charts-render: area marks close to the zero baseline…');
+{
+    const areaSpec = {
+        mark: 'area',
+        encoding: [
+            { field: 'day', channel: 'x' },
+            { field: 'visitors', channel: 'y' },
+            { field: 'site', channel: 'color' },
+        ],
+    };
+    const areaRows = [
+        { day: 1, visitors: 120, site: 'A' },
+        { day: 2, visitors: 145, site: 'A' },
+        { day: 3, visitors: 98, site: 'A' },
+        { day: 1, visitors: 80, site: 'B' },
+        { day: 2, visitors: 110, site: 'B' },
+        { day: 3, visitors: 132, site: 'B' },
+    ];
+    const { semantic, svg } = pipeline(areaSpec, areaRows);
+    const areas = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
+    if (areas.length !== 2) fail(`want one area path per series, got ${areas.length}`);
+    if (areas.map((a) => a.id).join(',') !== 'area:A,area:B') {
+        fail(`area ids want area:A,area:B, got ${areas.map((a) => a.id).join(',')}`);
+    }
+    for (const area of areas) {
+        const cmds = area.path.commands;
+        if (cmds[cmds.length - 1].kind !== 'close') fail(`${area.id} must close back to the baseline`);
+        if (!area.fill) fail(`${area.id} must carry a fill`);
+        if (area.fill.color.a <= 0 || area.fill.color.a >= 1) {
+            fail(`${area.id} fill must be translucent, got alpha ${area.fill.color.a}`);
+        }
+        if (!area.stroke || area.stroke.width <= 0) fail(`${area.id} must keep a full-strength stroke`);
+        // First and last open points sit on the zero baseline (same pixel y).
+        const firstY = cmds[0].to.y;
+        const lastOpen = cmds[cmds.length - 2].to.y;
+        if (Math.abs(firstY - lastOpen) > 1e-9) fail(`${area.id} baseline endpoints must share one pixel row`);
+    }
+    if (!svg.includes('fill-opacity="0.25"')) fail(`area fill opacity want 0.25: ${svg.slice(0, 400)}`);
+    // One legend strip above the plot for the two series.
+    const legends = guideGroups(semantic, 'chart.legend');
+    if (legends.length !== 1) fail('area chart wants a legend strip');
+    const labels = legends[0].children.filter((n) => n.kind === 'text').map((n) => n.text);
+    if (labels.join(',') !== 'A,B') fail(`area legend want A,B got ${labels.join(',')}`);
+}
+
+console.log('charts-render: unimplemented marks are refused, never silent…');
+{
+    const plan = compile({ mark: 'tick', encoding: [{ field: 'a', channel: 'x' }, { field: 'b', channel: 'y' }] }, fromRows([{ a: 1, b: 2 }]));
+    const refused = plan.diagnostics.items.find((d) => d.code === 'davinci.chart.unsupported-mark');
+    if (!refused) fail('an unimplemented mark must raise davinci.chart.unsupported-mark');
+    if (refused.severity !== 'error') fail(`unsupported-mark must be an error, got ${refused.severity}`);
+    // A hand-built plan that bypasses compile still fails loudly in the builder.
+    let threw = false;
+    try {
+        buildScene({ ...plan, spec: { ...plan.spec, mark: 'mystery' } }, { width: WIDTH, height: HEIGHT });
+    } catch {
+        threw = true;
+    }
+    if (!threw) fail('the scene builder must refuse a mark with no geometry');
 }
 
 console.log('charts-render: tick labels keep minimal decimals…');
@@ -314,13 +423,25 @@ console.log('charts-render: legend appears only for color / series…');
     if (swatches.length !== 2) fail(`want 2 legend swatches, got ${swatches.length}`);
     if (swatches.some((s) => !s.fill || !(s.w > 0 && s.h > 0))) fail('legend swatches need a fill and a size');
 
-    const plotRight = WIDTH - 16;
-    const plotBottom = HEIGHT - 16;
+    // The legend is a strip above the plot: it starts at the plot's left
+    // edge, and every swatch sits strictly above the highest bar top — the
+    // legend can never cover data.
+    const bars = semantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    const highestBarTop = Math.min(...bars.map((b) => b.y));
+    const yAxis = guideGroups(semantic, 'chart.axis').find((g) => g.id === 'y-axis');
+    const plotLeft = yAxis.children.find((n) => n.id === 'y-axis:baseline').path.commands[0].to.x;
     for (const swatch of swatches) {
-        if (swatch.x < WIDTH / 2) fail(`legend must sit at the plot right side: x=${swatch.x}`);
-        if (swatch.x + swatch.w > plotRight) fail(`legend must stay inside the plot: x=${swatch.x}`);
-        if (swatch.y + swatch.h > plotBottom - 16) fail('legend must stay clear of the x-axis labels');
+        if (swatch.y + swatch.h >= highestBarTop) {
+            fail(`legend must sit above the plot, swatch bottom=${swatch.y + swatch.h} highest bar=${highestBarTop}`);
+        }
+        if (Math.abs(swatch.x - plotLeft) > 1e-9 && swatch.x < plotLeft - 1e-9) {
+            fail(`legend must start at the plot left edge: x=${swatch.x} plot=${plotLeft}`);
+        }
     }
+    // One horizontal row: all swatches share the same y.
+    if (new Set(swatches.map((s) => s.y)).size !== 1) fail('legend entries must share one row');
+    // Entries flow left to right in first-appearance order.
+    if (!(swatches[0].x < swatches[1].x)) fail('legend entries must flow left to right');
 
     const axisTextCount = axisStats(semantic).texts;
     if (count(svg, '<rect') !== colorRows.length + swatches.length) fail('legend swatches must serialize as <rect>');
@@ -334,9 +455,9 @@ console.log('charts-render: text bounds are deterministic estimates…');
     if (texts.length === 0) fail('display scene must carry axis text');
     const alpha = texts.find((t) => t.text === 'alpha');
     if (!alpha) fail('alpha tick label missing');
-    // 5 chars × 11px × 0.6 wide, 1 line × 11px × 1.2 tall.
-    if (Math.abs(alpha.bounds.w - 33) > 1e-9 || Math.abs(alpha.bounds.h - 13.2) > 1e-9) {
-        fail(`alpha bounds want 33×13.2, got ${alpha.bounds.w}×${alpha.bounds.h}`);
+    // 5 chars × 12px × 0.6 wide, 1 line × 12px × 1.2 tall.
+    if (Math.abs(alpha.bounds.w - 36) > 1e-9 || Math.abs(alpha.bounds.h - 14.4) > 1e-9) {
+        fail(`alpha bounds want 36×14.4, got ${alpha.bounds.w}×${alpha.bounds.h}`);
     }
     if (Math.abs(alpha.bounds.x + alpha.bounds.w / 2 - alpha.anchor.x) > 1e-9) {
         fail('text bounds must be centred on the anchor');
@@ -344,7 +465,10 @@ console.log('charts-render: text bounds are deterministic estimates…');
     if (Math.abs(alpha.bounds.y + alpha.bounds.h / 2 - alpha.anchor.y) > 1e-9) {
         fail('text bounds must be centred on the anchor');
     }
-    if (alpha.fontCss !== '400 11px sans-serif') fail(`fontCss want "400 11px sans-serif", got "${alpha.fontCss}"`);
+    // Font stacks quote each family entry individually — never the whole list.
+    const wantFont =
+        '400 12px system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif';
+    if (alpha.fontCss !== wantFont) fail(`fontCss want "${wantFont}", got "${alpha.fontCss}"`);
     if (texts.some((t) => !(t.bounds.w > 0 && t.bounds.h > 0))) fail('every text node needs non-zero bounds');
     if (texts.some((t) => !Number.isFinite(t.bounds.x) || !Number.isFinite(t.bounds.y))) {
         fail('text bounds must stay finite');
@@ -361,7 +485,7 @@ console.log('charts-render: text bounds are deterministic estimates…');
     const { display: cjkDisplay } = pipeline(cjkSpec, [{ 类别: '图表', 数值: 2 }]);
     const cjk = collectTexts(cjkDisplay.root).find((t) => t.text === '图表');
     if (!cjk) fail('CJK tick label missing');
-    if (Math.abs(cjk.bounds.w - 22) > 1e-9) fail(`CJK bounds want 22 wide, got ${cjk.bounds.w}`);
+    if (Math.abs(cjk.bounds.w - 24) > 1e-9) fail(`CJK bounds want 24 wide, got ${cjk.bounds.w}`);
 }
 
 console.log('charts-render: overflow truncates labels into their slot…');
@@ -398,13 +522,14 @@ console.log('charts-render: overflow truncates labels into their slot…');
         .children.filter((n) => n.kind === 'text');
     if (!xLabels[0].text.endsWith('…')) fail(`long category must truncate: ${xLabels[0].text}`);
     if (xLabels[1].text !== 'beta') fail(`short category must stay whole: ${xLabels[1].text}`);
-    const w0 = estimateTextSize(xLabels[0].text, 11).width;
-    const w1 = estimateTextSize(xLabels[1].text, 11).width;
+    const w0 = estimateTextSize(xLabels[0].text, 12).width;
+    const w1 = estimateTextSize(xLabels[1].text, 12).width;
     if (!(Math.abs(xLabels[0].anchor.x - xLabels[1].anchor.x) >= (w0 + w1) / 2 - 1e-9)) {
         fail('truncated x labels must not collide');
     }
 
-    // Long legend entries truncate and stay inside the plot.
+    // Long legend entries truncate into the strip above the plot, the first
+    // category is always kept, and dropped ones leave an explicit +N marker.
     const legendSpec = {
         mark: 'bar',
         encoding: [
@@ -421,11 +546,19 @@ console.log('charts-render: overflow truncates labels into their slot…');
         ]),
     );
     const legendSemantic = buildScene(legendPlan, narrow);
-    const legendTexts = guideGroups(legendSemantic, 'chart.legend')[0].children.filter((n) => n.kind === 'text');
+    const legendGroup = guideGroups(legendSemantic, 'chart.legend')[0];
+    const legendTexts = legendGroup.children.filter((n) => n.kind === 'text');
     if (!legendTexts.some((t) => t.text.endsWith('…'))) fail('long legend entries must truncate');
-    for (const t of legendTexts) {
-        const w = estimateTextSize(t.text, 11).width;
-        if (t.anchor.x + w / 2 > narrow.width - 16 + 1e-9) fail(`legend label must stay inside the plot: ${t.text}`);
+    if (!legendTexts.some((t) => t.text === '+1')) fail(`dropped legend entries must leave a +1 marker: ${legendTexts.map((t) => t.text)}`);
+    // The strip stays inside the viewport and strictly above the plot marks.
+    const narrowBars = legendSemantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'chart.mark');
+    const narrowPlotTop = Math.min(...narrowBars.map((b) => b.y));
+    for (const child of legendGroup.children) {
+        const w = child.kind === 'rect' ? child.w : estimateTextSize(child.text, 12).width;
+        const cx = child.kind === 'rect' ? child.x + child.w / 2 : child.anchor.x;
+        if (cx + w / 2 > narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
+        const cy = child.kind === 'rect' ? child.y + child.h / 2 : child.anchor.y;
+        if (cy >= narrowPlotTop) fail('legend strip must stay above the plot');
     }
 }
 
@@ -673,7 +806,7 @@ console.log('charts-render: line marks never bridge two series…');
         { step: 4, score: 5, series: 'B' },
     ];
     const { semantic, svg } = pipeline(spec, rows);
-    const paths = semantic.root.children.filter((n) => n.kind === 'path');
+    const paths = semantic.root.children.filter((n) => n.kind === 'path' && n.role === 'chart.mark');
     if (paths.length !== 2) fail(`want one path per series, got ${paths.length}`);
     if (paths.map((p) => p.id).join(',') !== 'line:A,line:B') {
         fail(`series paths must follow first appearance: ${paths.map((p) => p.id).join(',')}`);
@@ -695,8 +828,8 @@ console.log('charts-render: line marks never bridge two series…');
     const labels = legend.children.filter((n) => n.kind === 'text').map((n) => n.text);
     if (labels.join(',') !== 'A,B') fail(`legend must list first-seen series, got ${labels}`);
 
-    if (count(svg, '<path') !== paths.length + axisStats(semantic).paths) {
-        fail(`svg want ${paths.length} series + axis <path>, got ${count(svg, '<path')}`);
+    if (count(svg, '<path') !== paths.length + axisStats(semantic).paths + gridLines(semantic).length) {
+        fail(`svg want ${paths.length} series + axis + grid <path>, got ${count(svg, '<path')}`);
     }
     if (svg.includes('NaN')) fail('series paths must not emit NaN');
 }
@@ -821,12 +954,12 @@ console.log('charts-render: theme tokens drive every presentation color…');
         { category: 'beta', value: 7, region: 'B' },
     ];
 
-    // Default theme: the reference palette and neutrals serialize as hex.
+    // Default theme: the VMZ-anchored palette and neutrals serialize as hex.
     const def = pipeline(colorSpec, colorRows);
-    if (!def.svg.includes('fill="#1f77b4"')) fail(`default palette first color want #1f77b4: ${def.svg.slice(0, 400)}`);
-    if (!def.svg.includes('fill="#ff7f0e"')) fail('default palette second color want #ff7f0e');
-    if (!def.svg.includes('stroke="#a0a0a0"')) fail('default axis stroke want #a0a0a0');
-    if (!def.svg.includes('fill="#555555"')) fail('default label color want #555555');
+    if (!def.svg.includes('fill="#1677ff"')) fail(`default palette first color want #1677ff: ${def.svg.slice(0, 400)}`);
+    if (!def.svg.includes('fill="#f59e0b"')) fail('default palette second color want #f59e0b');
+    if (!def.svg.includes('stroke="#9ca3af"')) fail('default axis stroke want #9ca3af');
+    if (!def.svg.includes('fill="#4b5563"')) fail('default label color want #4b5563');
 
     // A legend swatch and its marks resolve the same palette index.
     const legend = guideGroups(def.semantic, 'chart.legend')[0];
@@ -850,7 +983,7 @@ console.log('charts-render: theme tokens drive every presentation color…');
     if (!themedSvg.includes('fill="#ff0000"')) fail(`custom palette want #ff0000: ${themedSvg.slice(0, 400)}`);
     if (!themedSvg.includes('stroke="#0a141e"')) fail('custom axis stroke want #0a141e');
     if (!themedSvg.includes('fill="#010203"')) fail('custom label color want #010203');
-    if (themedSvg.includes('#1f77b4') || themedSvg.includes('#a0a0a0') || themedSvg.includes('#555555')) {
+    if (themedSvg.includes('#1677ff') || themedSvg.includes('#9ca3af') || themedSvg.includes('#4b5563')) {
         fail('custom theme must not leak a default color');
     }
 
@@ -860,6 +993,17 @@ console.log('charts-render: theme tokens drive every presentation color…');
         resolve(buildScene(plainPlan, { width: WIDTH, height: HEIGHT }, { theme: custom }), { width: WIDTH, height: HEIGHT }),
     );
     if (!plainSvg.includes('fill="#000000"')) fail(`ungrouped bars want markFill #000000: ${plainSvg.slice(0, 400)}`);
+
+    // The dark theme lifts palette brightness and quiets the chrome — no
+    // light-theme token survives a dark build.
+    const dark = buildScene(compile(colorSpec, fromRows(colorRows)), { width: WIDTH, height: HEIGHT }, { theme: DARK_CHART_THEME });
+    const darkSvg = renderSvg(resolve(dark, { width: WIDTH, height: HEIGHT }));
+    if (!darkSvg.includes('fill="#60a5fa"')) fail(`dark palette first color want #60a5fa: ${darkSvg.slice(0, 400)}`);
+    if (!darkSvg.includes('stroke="#374151"')) fail('dark grid stroke want #374151');
+    if (!darkSvg.includes('fill="#d1d5db"')) fail('dark label color want #d1d5db');
+    if (darkSvg.includes('#1677ff') || darkSvg.includes('#e5e7eb') || darkSvg.includes('#4b5563')) {
+        fail('dark theme must not leak a light token');
+    }
 }
 
 console.log('charts-render: nice ticks stay domain-derived…');
@@ -1100,23 +1244,53 @@ console.log('charts-render: diagram carries nodes, edges and labels as SVG…');
     if (!svg.includes(`viewBox="0 0 ${display.width} ${display.height}"`)) {
         fail('diagram viewBox must come from the layout canvas');
     }
-    if (count(svg, '<rect') !== nodes.length) fail(`diagram want ${nodes.length} node <rect>, got ${count(svg, '<rect')}`);
+    // Every labeled edge also emits a halo rect behind its text.
+    const halos = semantic.root.children.filter((n) => n.kind === 'rect' && n.role === 'decorative');
+    if (halos.length !== 1) fail(`want 1 edge-label halo, got ${halos.length}`);
+    if (count(svg, '<rect') !== nodes.length + halos.length) {
+        fail(`diagram want ${nodes.length} node + ${halos.length} halo <rect>, got ${count(svg, '<rect')}`);
+    }
     if (count(svg, '<path') !== edges.length) fail(`diagram want ${edges.length} edge <path>, got ${count(svg, '<path')}`);
     if (count(svg, '<text') !== labels.length) fail(`diagram want ${labels.length} <text>, got ${count(svg, '<text')}`);
     if (!svg.includes('>go</text>')) fail(`edge label markup missing: ${svg.slice(-200)}`);
     if (svg.includes('NaN') || svg.includes('Infinity')) fail('diagram markup must never carry NaN / Infinity');
 
+    // Edges are clipped to node boundaries: the segment starts on the source
+    // node's right edge and ends on the target's left edge — never at the
+    // centres (the node body would cover the line).
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
     for (const edge of edges) {
         const cmds = edge.path.commands;
         if (cmds.length !== 2 || cmds[0].kind !== 'move' || cmds[1].kind !== 'line') {
             fail(`edge ${edge.id} must be move → line`);
         }
         if (!(cmds[1].to.x > cmds[0].to.x) || cmds[0].to.y !== cmds[1].to.y) {
-            fail(`edge ${edge.id} must run left → right between node centres`);
+            fail(`edge ${edge.id} must run left → right between node borders`);
         }
+        const fromNode = nodeById.get(`node-${diagramSpec.edges.find((e) => `edge-${e.id}` === edge.id).fromNode}`);
+        const toNode = nodeById.get(`node-${diagramSpec.edges.find((e) => `edge-${e.id}` === edge.id).toNode}`);
+        if (Math.abs(cmds[0].to.x - (fromNode.x + fromNode.w)) > 1e-9) {
+            fail(`edge ${edge.id} must start on the source border: ${cmds[0].to.x} vs ${fromNode.x + fromNode.w}`);
+        }
+        if (Math.abs(cmds[1].to.x - toNode.x) > 1e-9) {
+            fail(`edge ${edge.id} must end on the target border: ${cmds[1].to.x} vs ${toNode.x}`);
+        }
+        // The halo covers the text block at the clipped segment midpoint.
+        const halo = halos.find((h) => h.id === `edge-label-halo-${edge.id.slice('edge-'.length)}`);
+        if (edge.id === 'edge-e1' && !halo) fail('edge-e1 label must carry a halo');
     }
     if (!plan.edges.every((e) => Number.isFinite(e.from.x) && Number.isFinite(e.to.x))) {
         fail('routed edges must stay finite');
+    }
+
+    // The canvas keeps a margin so node strokes never touch the edge.
+    const minNodeX = Math.min(...nodes.map((n) => n.x));
+    if (minNodeX < 12 - 1e-9) fail(`nodes must keep the canvas margin, got ${minNodeX}`);
+
+    // Nodes are rounded and carry the theme fill / stroke.
+    for (const node of nodes) {
+        if (node.rx <= 0) fail(`node ${node.id} must be rounded`);
+        if (!node.fill || !node.stroke) fail(`node ${node.id} must carry theme fill and stroke`);
     }
 
     // Same spec → byte-identical markup; a grown spec must not renumber ids.
@@ -1138,6 +1312,76 @@ console.log('charts-render: diagram carries nodes, edges and labels as SVG…');
             fail(`node ${node.id} moved after appending an unrelated node`);
         }
     }
+}
+
+console.log('charts-render: diagram arrows carry real arrowheads…');
+{
+    const arrowSpec = {
+        kind: 'flowchart',
+        direction: 'LR',
+        nodes: [
+            { id: 'a', label: 'Start' },
+            { id: 'b', label: 'Middle' },
+            { id: 'c', label: 'End' },
+        ],
+        edges: [
+            { id: 'e1', fromNode: 'a', toNode: 'b', edgeKind: 'arrow' },
+            { id: 'e2', fromNode: 'b', toNode: 'c', edgeKind: 'dashed' },
+        ],
+    };
+    const { semantic, svg } = diagramPipeline(arrowSpec);
+    const arrowheads = semantic.root.children.filter(
+        (n) => n.kind === 'path' && n.role === 'diagram.edge' && n.id.startsWith('edge-arrow-to-'),
+    );
+    if (arrowheads.length !== 1) fail(`want 1 arrowhead, got ${arrowheads.length}`);
+    const head = arrowheads[0];
+    if (!head.fill) fail('arrowhead must be filled');
+    const cmds = head.path.commands;
+    if (cmds.length !== 4 || cmds[3].kind !== 'close') fail('arrowhead must be a closed triangle');
+    // The tip lands on the target node's left border.
+    const target = semantic.root.children.find((n) => n.id === 'node-b');
+    if (Math.abs(cmds[0].to.x - target.x) > 1e-9) fail(`arrow tip must land on the target border: ${cmds[0].to.x} vs ${target.x}`);
+    if (count(svg, '<path') !== 2 + 1) fail(`svg want 2 edges + 1 arrowhead, got ${count(svg, '<path')}`);
+    // Dashed edges serialize a dash array.
+    if (!svg.includes('stroke-dasharray="6 4"')) fail('dashed edge must carry a dash array');
+}
+
+console.log('charts-render: diagram node labels truncate into their box…');
+{
+    const longSpec = {
+        kind: 'flowchart',
+        direction: 'LR',
+        nodes: [{ id: 'a', label: 'DataSnapshotWithAVeryLongName' }],
+        edges: [],
+    };
+    const { semantic } = diagramPipeline(longSpec);
+    const label = semantic.root.children.find((n) => n.id === 'node-label-a');
+    const node = semantic.root.children.find((n) => n.id === 'node-a');
+    if (!label.text.endsWith('…')) fail(`long node label must truncate: ${label.text}`);
+    const labelWidth = estimateTextSize(label.text, label.font.sizePx).width;
+    if (labelWidth > node.w - 12 + 1e-9) fail(`truncated label must fit the node: ${labelWidth} vs ${node.w - 12}`);
+}
+
+console.log('charts-render: diagram dark theme replaces every token…');
+{
+    const { DARK_DIAGRAM_THEME } = facadeDiagram;
+    const plan = simpleLayout(diagramSpec);
+    const semantic = buildDiagramScene(diagramSpec, plan, { theme: DARK_DIAGRAM_THEME });
+    const svg = renderSvg(resolve(semantic, { width: plan.canvasBounds.w, height: plan.canvasBounds.h }));
+    if (!svg.includes('fill="#1f2937"')) fail(`dark node fill want #1f2937: ${svg.slice(0, 400)}`);
+    if (!svg.includes('fill="#e5e7eb"')) fail('dark node label color want #e5e7eb');
+    if (svg.includes('#f8fafc')) fail('dark theme must not leak the light node fill');
+}
+
+console.log('charts-render: preserveNodeIds binds DOM back to stable identity…');
+{
+    const { semantic } = pipeline(barSpec, barRows);
+    const withIds = renderSvg(resolve(semantic, { width: WIDTH, height: HEIGHT, preserveNodeIds: true }));
+    if (!withIds.includes('data-dvz-id="bar:0"')) fail('opted-in render must emit data-dvz-id hooks');
+    if (!withIds.includes('data-dvz-id="x-axis:baseline"')) fail('axis nodes must carry ids too');
+    // Default renders stay stripped — no id hooks leak into static output.
+    const plain = pipeline(barSpec, barRows).svg;
+    if (plain.includes('data-dvz-id')) fail('default render must not emit data-dvz-id');
 }
 
 console.log('charts-render: the published facade dist is byte-identical to the internals…');

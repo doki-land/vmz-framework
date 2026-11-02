@@ -32,6 +32,11 @@ export interface ResolveOptions {
     width?: number;
     /** Logical canvas height for the root display scene. */
     height?: number;
+    /** Keep the semantic stable id on each display node. Off by default so
+     *  the display scene stays domain-free; interactive hosts opt in to bind
+     *  rendered DOM elements back to semantic identity (hit highlight,
+     *  selection). */
+    preserveNodeIds?: boolean;
 }
 
 const DEFAULT_STROKE: DisplayStroke = { color: { r: 0, g: 0, b: 0, a: 1 }, width: 1 };
@@ -132,10 +137,27 @@ function isWideCodepoint(cp: number): boolean {
 
 function fontCssOf(font: FontSpec): string {
     const size = Number.isFinite(font.sizePx) && font.sizePx > 0 ? font.sizePx : DEFAULT_TEXT_SIZE;
-    const family = font.family || "sans-serif";
     const style = font.italic ? "italic " : "";
     const weight = font.weight ?? 400;
-    return `${style}${weight} ${size}px ${family.includes(" ") ? `"${family}"` : family}`;
+    return `${style}${weight} ${size}px ${fontFamilyCss(font.family)}`;
+}
+
+/** Format a font family list for CSS: comma-separated entries are quoted
+ *  individually when they contain whitespace, so a real stack like
+ *  `system-ui, 'Segoe UI', sans-serif` survives instead of being quoted as
+ *  one bogus family name. */
+function fontFamilyCss(family: string): string {
+    const entries = (family || "sans-serif")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+    if (entries.length === 0) return "sans-serif";
+    return entries
+        .map((entry) => {
+            const unquoted = entry.replace(/^['"]|['"]$/g, "");
+            return /\s/.test(unquoted) ? `"${unquoted}"` : unquoted;
+        })
+        .join(", ");
 }
 
 /** Resolve a SemanticScene into a DisplayScene.
@@ -146,7 +168,8 @@ function fontCssOf(font: FontSpec): string {
  *  provenance/debug/hit-test target lookup. */
 export function resolve(scene: SemanticScene, opts: ResolveOptions = {}): DisplayScene {
     assertSceneVersion(scene.version, "resolve");
-    const root = resolveNode(scene.root, IDENTITY_AFFINE, undefined) as DisplayGroup;
+    const keepIds = opts.preserveNodeIds === true;
+    const root = resolveNode(scene.root, IDENTITY_AFFINE, undefined, keepIds) as DisplayGroup;
     const width = opts.width ?? root.bounds.w;
     const height = opts.height ?? root.bounds.h;
     return { version: SCENE_VERSION, root, width, height };
@@ -156,15 +179,18 @@ function resolveNode(
     node: SemanticNode,
     parentTransform: Affine2D,
     parentClip: BoundsRect | undefined,
+    keepIds: boolean,
 ): DisplayNode {
     const local = node.transform ?? IDENTITY_AFFINE;
     const worldTransform = multiplyTransform(parentTransform, local);
     const worldClip = intersectClip(parentClip, node.clip);
-    const base = { worldTransform, worldClip };
+    const base = keepIds
+        ? { worldTransform, worldClip, id: node.id }
+        : { worldTransform, worldClip };
 
     switch (node.kind) {
         case "group": {
-            const children = node.children.map((c) => resolveNode(c, worldTransform, worldClip));
+            const children = node.children.map((c) => resolveNode(c, worldTransform, worldClip, keepIds));
             const bounds = unionAll(children.map((c) => c.bounds));
             return { kind: "group", children, bounds, ...base } as DisplayGroup;
         }

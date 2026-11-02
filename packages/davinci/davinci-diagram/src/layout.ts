@@ -46,6 +46,8 @@ const DEFAULT_NODE_W = 120;
 const DEFAULT_NODE_H = 50;
 const NODE_GAP_X = 60;
 const NODE_GAP_Y = 40;
+/** Canvas margin so node strokes and arrowheads never touch the edge. */
+const CANVAS_MARGIN = 12;
 
 /** Compute a simple left-to-right layered layout for flowcharts.
  *  Places nodes by topological order and ranks edges backward.
@@ -98,13 +100,13 @@ export function simpleLayout(spec: DiagramSpec): DiagramLayoutPlan {
     let maxBottom = 0;
     for (let li = 0; li < layers.length; li++) {
         const layerNodes = layers[li];
-        const x = li * (DEFAULT_NODE_W + NODE_GAP_X);
+        const x = CANVAS_MARGIN + li * (DEFAULT_NODE_W + NODE_GAP_X);
         for (let ci = 0; ci < layerNodes.length; ci++) {
             const nid = layerNodes[ci];
             const node = nodes.get(nid)!;
             const w = node.sizeHint?.w ?? DEFAULT_NODE_W;
             const h = node.sizeHint?.h ?? DEFAULT_NODE_H;
-            const y = ci * (h + NODE_GAP_Y);
+            const y = CANVAS_MARGIN + ci * (h + NODE_GAP_Y);
             layoutedNodes.push({
                 id: nid,
                 bounds: { x, y, w, h },
@@ -129,7 +131,7 @@ export function simpleLayout(spec: DiagramSpec): DiagramLayoutPlan {
         routedEdges.push({ id: e.id, from, to, route: [] });
     }
 
-    const canvasBounds: BoundsRect = { x: 0, y: 0, w: maxRight + NODE_GAP_X, h: maxBottom + NODE_GAP_Y };
+    const canvasBounds: BoundsRect = { x: 0, y: 0, w: maxRight + CANVAS_MARGIN, h: maxBottom + CANVAS_MARGIN };
 
     return {
         nodes: layoutedNodes as ReadonlyArray<LayoutedNode>,

@@ -3,4 +3,5 @@
 export * from "./spec.js";
 export * from "./layout.js";
 export * from "./builder.js";
+export * from "./theme.js";
 export * from "./mermaid.js";

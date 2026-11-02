@@ -14,6 +14,7 @@ export type StableId = string;
 export type SemanticRole =
     | "chart.mark"
     | "chart.axis"
+    | "chart.grid"
     | "chart.legend"
     | "diagram.node"
     | "diagram.edge"

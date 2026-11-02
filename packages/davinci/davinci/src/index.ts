@@ -20,8 +20,10 @@ export type {
     DiagramKind,
     DiagramLayoutPlan,
     DiagramNodeSpec,
+    DiagramSceneOptions,
     DiagramSpec,
     DiagramClusterSpec,
+    DiagramTheme,
     FlowDirection,
     LayoutedNode,
     MermaidBlock,
@@ -29,6 +31,8 @@ export type {
     RoutedEdge,
 } from "@doki-land/davinci-diagram";
 export {
+    DARK_DIAGRAM_THEME,
+    DEFAULT_DIAGRAM_THEME,
     fromSpec,
     parseMermaid,
     simpleLayout,

@@ -132,27 +132,30 @@ function leafLines(node: DisplayLeaf, ctx: RenderContext): string[] {
 
 function elementMarkup(node: DisplayLeaf, transform: string): string {
     const transformAttr = transform ? ` transform="${transform}"` : "";
+    // Hosts that resolved with `preserveNodeIds` get a stable DOM hook per
+    // element; standalone renders stay byte-identical to before.
+    const idAttr = node.id ? ` data-dvz-id="${esc(node.id)}"` : "";
     switch (node.kind) {
         case "path": {
             const fill = node.fill ? fillAttrs(node.fill.color) : ' fill="none"';
-            return `<path d="${pathData(node.path)}"${fill}${strokeAttrs(node.stroke)}${transformAttr}/>`;
+            return `<path${idAttr} d="${pathData(node.path)}"${fill}${strokeAttrs(node.stroke)}${transformAttr}/>`;
         }
         case "rect": {
             const radii =
                 node.rx > 0 || node.ry > 0 ? ` rx="${num(node.rx)}" ry="${num(node.ry)}"` : "";
-            return `<rect x="${num(node.x)}" y="${num(node.y)}" width="${num(node.w)}" height="${num(node.h)}"${radii}${paintAttrs(node.fill, node.stroke)}${transformAttr}/>`;
+            return `<rect${idAttr} x="${num(node.x)}" y="${num(node.y)}" width="${num(node.w)}" height="${num(node.h)}"${radii}${paintAttrs(node.fill, node.stroke)}${transformAttr}/>`;
         }
         case "ellipse": {
-            return `<ellipse cx="${num(node.cx)}" cy="${num(node.cy)}" rx="${num(node.rx)}" ry="${num(node.ry)}"${paintAttrs(node.fill, node.stroke)}${transformAttr}/>`;
+            return `<ellipse${idAttr} cx="${num(node.cx)}" cy="${num(node.cy)}" rx="${num(node.rx)}" ry="${num(node.ry)}"${paintAttrs(node.fill, node.stroke)}${transformAttr}/>`;
         }
         case "image": {
-            return `<image x="${num(node.x)}" y="${num(node.y)}" width="${num(node.w)}" height="${num(node.h)}" href="${esc(node.resourceRef)}" preserveAspectRatio="xMidYMid meet"${transformAttr}/>`;
+            return `<image${idAttr} x="${num(node.x)}" y="${num(node.y)}" width="${num(node.w)}" height="${num(node.h)}" href="${esc(node.resourceRef)}" preserveAspectRatio="xMidYMid meet"${transformAttr}/>`;
         }
         case "text": {
             // DisplayText.anchor is the centre of the text block, so alignment
             // is fixed: middle horizontally, middle vertically.
             const font = node.fontCss ? ` style="font:${esc(node.fontCss)}"` : "";
-            return `<text x="${num(node.anchor.x)}" y="${num(node.anchor.y)}" text-anchor="middle" dominant-baseline="middle"${fillAttrs(node.color)}${font}${transformAttr}>${esc(node.text)}</text>`;
+            return `<text${idAttr} x="${num(node.anchor.x)}" y="${num(node.anchor.y)}" text-anchor="middle" dominant-baseline="middle"${fillAttrs(node.color)}${font}${transformAttr}>${esc(node.text)}</text>`;
         }
     }
 }

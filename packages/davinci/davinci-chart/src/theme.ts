@@ -17,29 +17,70 @@ export interface ChartTheme {
     /** Axis baseline and tick stroke. */
     readonly axisStroke: RGBA;
     readonly axisStrokeWidth: number;
+    /** Grid line stroke — lighter than the axis so data stays on top of the
+     *  visual hierarchy. `null` disables grid emission. */
+    readonly gridStroke: RGBA | null;
+    readonly gridStrokeWidth: number;
     /** Tick and legend label color. */
     readonly labelColor: RGBA;
     /** Tick label font — also drives padding and truncation widths. */
     readonly labelFont: FontSpec;
     /** Legend label font. */
     readonly legendFont: FontSpec;
+    /** Stroke painted around point marks so overlapping glyphs stay
+     *  separable; usually the plot background color. `null` disables it. */
+    readonly pointStroke: RGBA | null;
+    /** Opacity of the area-mark fill (the stroke keeps full strength). */
+    readonly areaFillOpacity: number;
 }
 
-/** The reference neutral theme — the values the builder hardcoded before
- *  themes existed, kept as defaults so unstyled output is unchanged. */
+const LABEL_FAMILY = "system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+
+/** The reference light theme — VMZ brand blue anchors the categorical
+ *  palette, grids stay quieter than axes, and axes stay quieter than data. */
 export const DEFAULT_CHART_THEME: ChartTheme = {
     seriesPalette: [
-        rgb8(31, 119, 180),
-        rgb8(255, 127, 14),
-        rgb8(44, 160, 44),
-        rgb8(214, 39, 40),
-        rgb8(148, 103, 189),
-        rgb8(140, 86, 75),
+        rgb8(22, 119, 255), // VMZ brand blue
+        rgb8(245, 158, 11), // amber
+        rgb8(16, 185, 129), // emerald
+        rgb8(239, 68, 68), // red
+        rgb8(139, 92, 246), // violet
+        rgb8(236, 72, 153), // pink
+        rgb8(20, 184, 166), // teal
+        rgb8(249, 115, 22), // orange
     ],
-    markFill: rgb8(51, 51, 51),
-    axisStroke: rgb8(160, 160, 160),
+    markFill: rgb8(22, 119, 255),
+    axisStroke: rgb8(156, 163, 175),
     axisStrokeWidth: 1,
-    labelColor: rgb8(85, 85, 85),
-    labelFont: { family: "sans-serif", sizePx: 11 },
-    legendFont: { family: "sans-serif", sizePx: 11 },
+    gridStroke: rgb8(229, 231, 235),
+    gridStrokeWidth: 1,
+    labelColor: rgb8(75, 85, 99),
+    labelFont: { family: LABEL_FAMILY, sizePx: 12 },
+    legendFont: { family: LABEL_FAMILY, sizePx: 12 },
+    pointStroke: rgb8(255, 255, 255),
+    areaFillOpacity: 0.25,
+};
+
+/** Dark theme — same palette roles with lifted brightness and quiet chrome. */
+export const DARK_CHART_THEME: ChartTheme = {
+    seriesPalette: [
+        rgb8(96, 165, 250), // blue-400
+        rgb8(251, 191, 36), // amber-400
+        rgb8(52, 211, 153), // emerald-400
+        rgb8(248, 113, 113), // red-400
+        rgb8(167, 139, 250), // violet-400
+        rgb8(244, 114, 182), // pink-400
+        rgb8(45, 212, 191), // teal-400
+        rgb8(251, 146, 60), // orange-400
+    ],
+    markFill: rgb8(96, 165, 250),
+    axisStroke: rgb8(107, 114, 128),
+    axisStrokeWidth: 1,
+    gridStroke: rgb8(55, 65, 81),
+    gridStrokeWidth: 1,
+    labelColor: rgb8(209, 213, 219),
+    labelFont: { family: LABEL_FAMILY, sizePx: 12 },
+    legendFont: { family: LABEL_FAMILY, sizePx: 12 },
+    pointStroke: rgb8(17, 24, 39),
+    areaFillOpacity: 0.3,
 };

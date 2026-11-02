@@ -3,13 +3,18 @@
 // The compile plan carries scales with a host-independent range (linear stays
 // in [0, 1], band uses one step per category). This module is the only place
 // that turns those ranges into pixels, so `compile` never guesses a viewport.
-// It emits mark geometry plus axis baselines, tick labels and a minimal legend
-// — no motion or interaction state. Presentation colors and fonts come from a
-// `ChartTheme` resolved here, never chosen by the renderer.
+// It emits mark geometry plus grid lines, axis baselines, tick labels and a
+// legend — no motion or interaction state. Presentation colors and fonts come
+// from a `ChartTheme` resolved here, never chosen by the renderer.
+//
+// Visual hierarchy is a contract: grid lines are the quietest layer, axis
+// chrome sits above them, and data marks are the strongest stroke/fill. The
+// legend lives above the plot, never on top of data.
 //
 // Node identity comes from the plan's stable row `key` (bar / point) or the
-// series value (line), never from the position of an item in a temporary
-// array. The plan is also the only source of the series grouping domain.
+// series value (line / area), never from the position of an item in a
+// temporary array. The plan is also the only source of the series grouping
+// domain.
 
 import type { PathCommand, RGBA } from "@doki-land/davinci-types";
 import {
@@ -58,15 +63,18 @@ interface PositionedMark {
 
 const DEFAULT_PADDING = 16;
 const LINE_STROKE_WIDTH = 2;
-const POINT_RADIUS = 5;
+const POINT_RADIUS = 4;
+const POINT_STROKE_WIDTH = 1.5;
 const BAR_RATIO = 0.72;
+const BAR_RADIUS = 2;
 
 const TICK_LENGTH = 4;
 const LABEL_GAP = 6;
 const LEGEND_SWATCH = 10;
 const LEGEND_SWATCH_GAP = 6;
-const LEGEND_EDGE_GAP = 6;
-const LEGEND_ITEM_STEP = 18;
+const LEGEND_ITEM_GAP = 16;
+const LEGEND_LABEL_BUDGET = 120;
+const LEGEND_BOTTOM_GAP = 10;
 
 /** Options for the scene build. */
 export interface ChartSceneOptions {
@@ -100,10 +108,16 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
     const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
     const seriesCategories = plan.series.field !== null ? plan.series.categories : undefined;
 
-    // Compute adaptive plot padding so axis labels and tick marks do not get
-    // clipped. Defaults are only a floor — Y-axis label width and X-axis
-    // label height expand left and bottom padding as needed.
-    const padding = adaptivePadding(viewport, plan, xEnc, yEnc, theme);
+    // The legend reserves its own strip above the plot, so it can never
+    // cover data. Base padding (from axis labels) fixes the plot width, the
+    // legend is laid out against that width once, and its strip height feeds
+    // the top padding before the final plot rect is computed.
+    const basePadding = adaptivePadding(viewport, plan, xEnc, yEnc, theme);
+    const legendWidth = Math.max(0, dimension(viewport.width) - basePadding.left - basePadding.right);
+    const legendItems =
+        plan.series.field !== null ? layoutLegendItems(plan.series.categories, legendWidth, theme) : [];
+    const legendHeight = legendItems.length > 0 ? legendRowHeight(theme) + LEGEND_BOTTOM_GAP : 0;
+    const padding: ScenePadding = { ...basePadding, top: basePadding.top + legendHeight };
     const plot = plotRect(viewport, padding);
     const children: SemanticNode[] = [];
 
@@ -115,10 +129,11 @@ export function buildScene(plan: ChartCompilePlan, viewport: ChartViewport, opti
 
         if (xScale && yScale && xCol && yCol) {
             const rows = positionedRows(plan, xScale, yScale, xCol, yCol);
+            children.push(...buildGrid(plot, yScale, theme));
             children.push(buildAxis("x-axis", plot, xScale, "horizontal", theme));
             children.push(buildAxis("y-axis", plot, yScale, "vertical", theme));
             children.push(...buildMarks(plan, rows, plot, xScale, yScale, seriesCategories, theme));
-            children.push(...buildLegend(plan, plot, theme));
+            children.push(...buildLegend(plan, plot, legendItems, theme));
         }
     }
 
@@ -214,11 +229,17 @@ function buildMarks(
             return buildBars(plan, rows, plot, xScale, yScale, seriesCategories, theme);
         case "line":
             return buildLines(rows, seriesCategories, theme);
+        case "area":
+            return buildAreas(rows, plot, yScale, seriesCategories, theme);
         case "point":
         case "circle":
             return buildPoints(plan, rows, seriesCategories, theme);
         default:
-            return [];
+            // `compile` rejects unimplemented marks with
+            // `davinci.chart.unsupported-mark`, so reaching this branch means
+            // the plan was hand-built outside the contract. Silence would
+            // render an empty chart with no explanation; refuse loudly.
+            throw new Error(`davinci.chart.unsupported-mark: scene builder has no geometry for mark "${String(plan.spec.mark)}"`);
     }
 }
 
@@ -235,18 +256,26 @@ function buildBars(
     const step = bandWidth > 0 ? bandWidth : plot.w / Math.max(1, rows.length);
     const w = step * BAR_RATIO;
     const baseline = zeroBaseline(yScale, plot);
+    // Rounded caps read well on positive bars; skip the radius when the bar
+    // is shorter than the radius or hangs below zero (it would invert).
+    const radius = (h: number): number => (h >= BAR_RADIUS * 2 ? BAR_RADIUS : 0);
 
-    return rows.map((row) => ({
-        kind: "rect" as const,
-        id: `${plan.spec.mark}:${row.key}`,
-        role: "chart.mark" as const,
-        source: { domain: "chart", path: ["mark", row.key] },
-        x: row.x - w / 2,
-        y: Math.min(row.y, baseline),
-        w,
-        h: Math.abs(baseline - row.y),
-        fill: { color: seriesColor(theme, seriesCategories, row.series) },
-    }));
+    return rows.map((row) => {
+        const h = Math.abs(baseline - row.y);
+        return {
+            kind: "rect" as const,
+            id: `${plan.spec.mark}:${row.key}`,
+            role: "chart.mark" as const,
+            source: { domain: "chart", path: ["mark", row.key] },
+            x: row.x - w / 2,
+            y: Math.min(row.y, baseline),
+            w,
+            h,
+            rx: radius(h),
+            ry: radius(h),
+            fill: { color: seriesColor(theme, seriesCategories, row.series) },
+        };
+    });
 }
 
 /** Pixel y of data value 0, clamped to the plot (log scales have no zero). */
@@ -259,11 +288,8 @@ function zeroBaseline(yScale: Scale, plot: PlotRect): number {
     return Math.min(bottom, Math.max(top, y));
 }
 
-function buildLines(
-    rows: ReadonlyArray<PositionedMark>,
-    seriesCategories: ReadonlyArray<string> | undefined,
-    theme: ChartTheme,
-): SemanticNode[] {
+/** Group positioned rows by series, preserving first-appearance order. */
+function groupBySeries(rows: ReadonlyArray<PositionedMark>): Map<string, PositionedMark[]> {
     const series = new Map<string, PositionedMark[]>();
     for (const row of rows) {
         const key = row.series ?? "series";
@@ -271,9 +297,16 @@ function buildLines(
         if (bucket) bucket.push(row);
         else series.set(key, [row]);
     }
+    return series;
+}
 
+function buildLines(
+    rows: ReadonlyArray<PositionedMark>,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
     const nodes: SemanticNode[] = [];
-    for (const [name, rowsInSeries] of series) {
+    for (const [name, rowsInSeries] of groupBySeries(rows)) {
         const sorted = [...rowsInSeries].sort((a, b) => a.x - b.x || a.rowIndex - b.rowIndex);
         const commands: PathCommand[] = [
             { kind: "move", to: { x: sorted[0].x, y: sorted[0].y } },
@@ -286,6 +319,37 @@ function buildLines(
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
             stroke: { color: seriesColor(theme, seriesCategories, name), width: LINE_STROKE_WIDTH },
+        });
+    }
+    return nodes;
+}
+
+function buildAreas(
+    rows: ReadonlyArray<PositionedMark>,
+    plot: PlotRect,
+    yScale: Scale,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const baseline = zeroBaseline(yScale, plot);
+    const nodes: SemanticNode[] = [];
+    for (const [name, rowsInSeries] of groupBySeries(rows)) {
+        const sorted = [...rowsInSeries].sort((a, b) => a.x - b.x || a.rowIndex - b.rowIndex);
+        const color = seriesColor(theme, seriesCategories, name);
+        const commands: PathCommand[] = [
+            { kind: "move", to: { x: sorted[0].x, y: baseline } },
+            ...sorted.map((row): PathCommand => ({ kind: "line", to: { x: row.x, y: row.y } })),
+            { kind: "line", to: { x: sorted[sorted.length - 1].x, y: baseline } },
+            { kind: "close" },
+        ];
+        nodes.push({
+            kind: "path",
+            id: `area:${name}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["series", name] },
+            path: { commands },
+            fill: { color: { ...color, a: theme.areaFillOpacity } },
+            stroke: { color, width: LINE_STROKE_WIDTH },
         });
     }
     return nodes;
@@ -307,14 +371,43 @@ function buildPoints(
         rx: POINT_RADIUS,
         ry: POINT_RADIUS,
         fill: { color: seriesColor(theme, seriesCategories, row.series) },
+        ...(theme.pointStroke
+            ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } }
+            : {}),
     }));
 }
 
-// ─── Guides: baselines, ticks, labels, legend ────────────────────────────
+// ─── Guides: grid, baselines, ticks, labels, legend ──────────────────────
 
 interface AxisTick {
     readonly label: string;
     readonly position: number;
+}
+
+/** Horizontal grid lines at y-axis tick positions — the quietest layer,
+ *  emitted before axes and marks so data always sits on top. The baseline
+ *  position is skipped: the axis owns that pixel. */
+function buildGrid(plot: PlotRect, yScale: Scale, theme: ChartTheme): SemanticNode[] {
+    if (!theme.gridStroke) return [];
+    if (yScale.kind !== "linear" && yScale.kind !== "log") return [];
+    const baseline = plot.y + plot.h;
+    const nodes: SemanticNode[] = [];
+    axisTicks(yScale).forEach((tick, i) => {
+        if (Math.abs(tick.position - baseline) < 0.5) return;
+        nodes.push({
+            kind: "path",
+            id: `y-grid:${i}`,
+            role: "chart.grid",
+            path: {
+                commands: [
+                    { kind: "move", to: { x: plot.x, y: tick.position } },
+                    { kind: "line", to: { x: plot.x + plot.w, y: tick.position } },
+                ],
+            },
+            stroke: { color: theme.gridStroke!, width: theme.gridStrokeWidth },
+        });
+    });
+    return nodes;
 }
 
 /** One axis group: baseline + short tick marks + data-derived tick labels. */
@@ -451,53 +544,138 @@ function axisTickLabels(scale: Scale): string[] {
     return axisTicks(scale).map((t) => t.label);
 }
 
-/** Color swatches live in the plot's upper-right corner, clear of the ticks. */
-function buildLegend(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme): SemanticNode[] {
-    if (plan.series.field === null) return [];
-    const categories = plan.series.categories;
-    if (categories.length === 0) return [];
+// ─── Legend (strip above the plot) ───────────────────────────────────────
 
+interface LegendItem {
+    readonly category: string;
+    readonly label: string;
+    readonly labelWidth: number;
+    readonly width: number;
+}
+
+/** Row height shared by the strip reservation and the swatch layout. */
+function legendRowHeight(theme: ChartTheme): number {
+    return Math.max(LEGEND_SWATCH, estimateTextSize("Ag", theme.legendFont.sizePx).height);
+}
+
+/** Lay out legend entries left to right on one row against a fixed width.
+ *  The first category is always kept (truncated into the row if needed) so
+ *  a legend never collapses into a bare overflow marker; entries that would
+ *  overflow are dropped and `buildLegend` adds an explicit `+N` marker. The
+ *  marker's own width is reserved up front via a bounded fixed-point pass,
+ *  so the strip never overflows and never pretends the chart has fewer
+ *  series than the data does. */
+function layoutLegendItems(
+    categories: ReadonlyArray<string>,
+    availableWidth: number,
+    theme: ChartTheme,
+): LegendItem[] {
     const size = theme.legendFont.sizePx;
-    const shown = categories.slice(0, Math.max(1, Math.floor((plot.h - LEGEND_EDGE_GAP * 2) / LEGEND_ITEM_STEP)));
-    // Legend labels share the plot width: each entry truncates with an
-    // ellipsis so the swatch block never runs past the plot edge.
-    const budget = Math.max(0, plot.w - LEGEND_EDGE_GAP * 2 - LEGEND_SWATCH - LEGEND_SWATCH_GAP);
-    const labels = shown.map((category) => truncateToWidth(category, budget, size));
-    const widths = labels.map((label) => estimateTextSize(label, size).width);
-    const blockWidth = LEGEND_SWATCH + LEGEND_SWATCH_GAP + Math.max(...widths);
-    const right = plot.x + plot.w - LEGEND_EDGE_GAP;
-    const left = Math.max(plot.x + LEGEND_EDGE_GAP, right - blockWidth);
+    let reserve = 0;
+    for (let pass = 0; pass < 4; pass++) {
+        const items = layoutItemsInto(categories, Math.max(0, availableWidth - reserve), size);
+        const dropped = categories.length - items.length;
+        if (dropped === 0) return items;
+        const marker = estimateTextSize(`+${dropped}`, size).width + LEGEND_ITEM_GAP;
+        if (marker === reserve) return items;
+        reserve = marker;
+    }
+    return layoutItemsInto(categories, Math.max(0, availableWidth - reserve), size);
+}
 
-    const items: SemanticNode[] = [];
-    shown.forEach((category, i) => {
+/** Greedy single-row layout into `width`; the first category squeezes into
+ *  the row instead of dropping when nothing fits. */
+function layoutItemsInto(categories: ReadonlyArray<string>, width: number, size: number): LegendItem[] {
+    let used = 0;
+    const items: LegendItem[] = [];
+    for (const category of categories) {
+        const label = truncateToWidth(category, LEGEND_LABEL_BUDGET, size);
+        const labelWidth = estimateTextSize(label, size).width;
+        const itemWidth = LEGEND_SWATCH + LEGEND_SWATCH_GAP + labelWidth;
+        if (items.length === 0 && itemWidth > width) {
+            const budget = Math.max(0, width - LEGEND_SWATCH - LEGEND_SWATCH_GAP);
+            const squeezed = truncateToWidth(category, budget, size);
+            const squeezedWidth = estimateTextSize(squeezed, size).width;
+            items.push({
+                category,
+                label: squeezed,
+                labelWidth: squeezedWidth,
+                width: LEGEND_SWATCH + LEGEND_SWATCH_GAP + squeezedWidth,
+            });
+            continue;
+        }
+        const step = items.length === 0 ? itemWidth : LEGEND_ITEM_GAP + itemWidth;
+        if (used + step > width) break;
+        items.push({ category, label, labelWidth, width: itemWidth });
+        used += step;
+    }
+    return items;
+}
+
+/** The legend strip: one horizontal row above the plot, swatches aligned
+ *  with palette order. It never overlaps data because its height is part of
+ *  the top padding. */
+function buildLegend(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    items: ReadonlyArray<LegendItem>,
+    theme: ChartTheme,
+): SemanticNode[] {
+    if (items.length === 0) return [];
+    const categories = plan.series.categories;
+    const size = theme.legendFont.sizePx;
+    const rowHeight = legendRowHeight(theme);
+    const stripTop = plot.y - LEGEND_BOTTOM_GAP - rowHeight;
+    const textMid = stripTop + rowHeight / 2;
+    const swatchTop = stripTop + (rowHeight - LEGEND_SWATCH) / 2;
+
+    const children: SemanticNode[] = [];
+    let cursor = plot.x;
+    items.forEach((item, i) => {
         // Use the same palette index as `seriesColor` so legend swatches match
         // mark colors one-for-one.
-        const color = seriesColor(theme, categories, category);
-        const top = plot.y + LEGEND_EDGE_GAP + i * LEGEND_ITEM_STEP;
-        items.push({
+        const color = seriesColor(theme, categories, item.category);
+        children.push({
             kind: "rect",
             id: `legend:swatch:${i}`,
             role: "chart.legend",
-            x: left,
-            y: top + (LEGEND_ITEM_STEP - LEGEND_SWATCH) / 2,
+            x: cursor,
+            y: swatchTop,
             w: LEGEND_SWATCH,
             h: LEGEND_SWATCH,
-            rx: 1,
-            ry: 1,
+            rx: 2,
+            ry: 2,
             fill: { color },
         });
-        items.push({
+        children.push({
             kind: "text",
             id: `legend:label:${i}`,
             role: "chart.legend",
-            text: labels[i],
+            text: item.label,
             font: theme.legendFont,
-            anchor: { x: left + LEGEND_SWATCH + LEGEND_SWATCH_GAP + widths[i] / 2, y: top + LEGEND_ITEM_STEP / 2 },
+            anchor: { x: cursor + LEGEND_SWATCH + LEGEND_SWATCH_GAP + item.labelWidth / 2, y: textMid },
             color: theme.labelColor,
         });
+        cursor += item.width + LEGEND_ITEM_GAP;
     });
 
-    return [{ kind: "group", id: "chart-legend", role: "chart.legend", children: items }];
+    // Dropped categories get an explicit overflow marker — the legend never
+    // silently pretends the chart has fewer series than the data does.
+    const dropped = categories.length - items.length;
+    if (dropped > 0) {
+        const marker = `+${dropped}`;
+        children.push({
+            kind: "text",
+            id: "legend:overflow",
+            role: "chart.legend",
+            text: marker,
+            font: theme.legendFont,
+            anchor: { x: cursor + estimateTextSize(marker, size).width / 2, y: textMid },
+            color: theme.labelColor,
+        });
+    }
+
+    return [{ kind: "group", id: "chart-legend", role: "chart.legend", children }];
 }
 
 // ─── Scale → pixel mapping ───────────────────────────────────────────────

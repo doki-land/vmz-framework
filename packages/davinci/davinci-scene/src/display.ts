@@ -27,6 +27,10 @@ export interface DisplayNodeBase {
     readonly worldClip?: BoundsRect;
     /** Final axis-aligned bounds in world space. */
     readonly bounds: BoundsRect;
+    /** Stable domain id — present only when the host resolved with
+     *  `preserveNodeIds`, so interactive hosts can bind DOM elements back to
+     *  semantic identity. Renderers never depend on it. */
+    readonly id?: string;
 }
 
 export interface DisplayGroup extends DisplayNodeBase {
