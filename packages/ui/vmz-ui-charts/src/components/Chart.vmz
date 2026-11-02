@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="chart" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @mousedown="_onMouseDown" @mouseup="_onMouseUp" @click="_onClick" @keydown="_onKeydown" :data-theme="_themeName()" tabindex="0" :role="tableView ? 'group' : 'img'" :aria-label="_ariaLabel()" :aria-describedby="_describedBy()" class="vmz-ui-charts__chart" :style="hostStyle">
+    <div data-vmz-ui-charts="chart" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @mousedown="_onMouseDown" @mouseup="_onMouseUp" @click="_onClick" @keydown="_onKeydown" @pointerdown="_onPointerDown" @pointermove="_onPointerMove" @pointerup="_onPointerUp" @pointercancel="_onPointerUp" @dblclick="_onDblClick" :data-theme="_themeName()" tabindex="0" :role="tableView ? 'group' : 'img'" :aria-label="_ariaLabel()" :aria-describedby="_describedBy()" class="vmz-ui-charts__chart" :style="hostStyle">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">
             No chart spec or data.
         </div>
@@ -8,7 +8,7 @@
                 Chart compile failed — see diagnostics below.
             </div>
             <div v-if="tableView" v-html="_tableHtml()" class="vmz-ui-charts__table-view" />
-            <div v-if="!tableView" v-html="markup()" class="vmz-ui-charts__svg" />
+            <div v-if="!tableView" v-html="markup()" class="vmz-ui-charts__svg" :data-anim="_animMode()" />
             <canvas v-if="_useCanvas() && !tableView" class="vmz-ui-charts__canvas" />
         </div>
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
@@ -23,6 +23,12 @@
         <div v-if="_brush.active" class="vmz-ui-charts__brush" :style="_brushStyle()" />
         <div v-if="_tooltip.visible" aria-live="polite" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()">
             {{ _tooltip.text }}
+        </div>
+        <button v-if="_zoomResetVisible()" type="button" @click="_resetZoom" class="vmz-ui-charts__zoom-reset" aria-label="重置缩放">
+            重置缩放
+        </button>
+        <div :id="_liveId()" aria-live="polite" class="vmz-ui-charts__sr">
+            {{ _liveText }}
         </div>
         <div :id="_srId()" class="vmz-ui-charts__sr">
             {{ _summary() }}
@@ -41,6 +47,51 @@
     /* 拖拽（brush/pan）期间禁止浏览器文本选择，否则选区高亮会盖在刻度标签上。 */
     user-select: none;
     -webkit-user-select: none;
+    /* 触摸合同：纵向滚动永远归页面，横向手势驱动图表交互。 */
+    touch-action: pan-y;
+    position: relative;
+}
+.vmz-ui-charts__zoom-reset {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 6;
+    padding: 2px 8px;
+    border: 1px solid var(--vmz-line-default, #e5e7eb);
+    border-radius: 4px;
+    background: var(--vmz-surface-paper, #ffffff);
+    color: var(--vmz-text-steel, #4b5563);
+    font: 500 11px/1.4 var(--vmz-font-sans, system-ui, sans-serif);
+    cursor: pointer;
+}
+.vmz-ui-charts__zoom-reset:hover {
+    color: var(--vmz-text-ink, #111827);
+    border-color: var(--vmz-text-steel, #4b5563);
+}
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__zoom-reset {
+    background: var(--vmz-surface-paper, #0b1220);
+    border-color: var(--vmz-line-default, #1f2937);
+    color: var(--vmz-text-steel, #9ca3af);
+}
+/* 数据更新淡入（入场另见 vmz-charts-in；reduced-motion 下一律关闭）。 */
+.vmz-ui-charts__svg[data-anim="fade"] svg {
+    animation: vmz-charts-fade 0.12s ease-out;
+}
+.vmz-ui-charts__svg[data-anim="none"] svg {
+    animation: none;
+}
+@keyframes vmz-charts-fade {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-charts__svg[data-anim="fade"] svg {
+        animation: none;
+    }
 }
 .vmz-ui-charts__chart[data-theme="dark"] {
     background: var(--vmz-surface-paper, #0b1220);
@@ -350,6 +401,17 @@ export default class Chart {
     /** 渲染后端：`"svg"`（默认）| `"canvas"` | `"auto"`（行数超过 50000 自动
      *  切 canvas）。SSR 始终回退 SVG。 */
     public renderer: string | null = null;
+    /** tooltip 触发口径：`"item"`（默认,单 mark）| `"axis"`（同一 x 全部
+     *  系列合并展示）。 */
+    public tooltipTrigger: string | null = null;
+    /** 联动 id：同 `linkId` 的图表共享 crosshair x 值（line/area 族）。 */
+    public linkId: string | null = null;
+    /** 受控选择集（mark id 数组）；传入后组件不自行改选择，只发事件。 */
+    public selection: string[] | null = null;
+    /** 受控缩放域 `[lo, hi]`（数据单位）；null = 非受控。 */
+    public zoomDomain: number[] | null = null;
+    /** 动效开关：`"auto"`（默认,尊重 prefers-reduced-motion）| `"off"`。 */
+    public motion: string | null = null;
 
     /** 交互 runtime state。 */
     public state: RuntimeState | null = null;
@@ -404,6 +466,22 @@ export default class Chart {
     public _wheelBound: ((ev: WheelEvent) => void) | null = null;
     /** brush / pan 结束后的那次 click 是拖拽余波，必须抑制（否则空命中立即清空选择）。 */
     public _suppressClick: boolean = false;
+    /** 图例显隐状态：隐藏的系列名集合（runtime reactive，触发重编译）。 */
+    public _hiddenSeries: string[] = [];
+    /** 图例单独聚焦的系列名（非 null 时只显示它）。 */
+    public _isolatedSeries: string | null = null;
+    /** 钉住的 tooltip（Enter / 长按产生，Esc 或再次 Enter 解除）。 */
+    public _pinnedTooltip: { x: number; y: number; text: string } | null = null;
+    /** aria-live 播报文本（焦点 / 钉住 / 图例变化时更新）。 */
+    public _liveText: string = "";
+    /** 触摸手势跟踪（pointerId → 起点与当前位置）。 */
+    public _pointers: Map<number, { x0: number; y0: number; x: number; y: number }> | null = null;
+    /** 捏合缩放基准（双指起点距离 + 起始域）。 */
+    public _pinch: { startDist: number; lo: number; hi: number } | null = null;
+    /** 长按定时器 id（>=450ms 钉住 tooltip / 图例单独聚焦）。 */
+    public _longPressTimer: number | null = null;
+    /** 本轮触摸手势已判为纵向滚动——后续 move 全部放行给页面。 */
+    public _touchScroll: boolean = false;
 
     // ---- 尺寸与主题 ----
 
@@ -460,7 +538,7 @@ export default class Chart {
             this._plan = null;
             return null;
         }
-        const snapshot = this.snapshot ?? (this.data ? fromRows(this.data) : null);
+        const snapshot = this._filteredSnapshot();
         const effSpec = this._effectiveSpec();
         if (!effSpec || !snapshot) {
             this.diagnostics = [];
@@ -468,7 +546,16 @@ export default class Chart {
             this._plan = null;
             return null;
         }
-        const plan = compile(effSpec, snapshot);
+        let plan = compile(effSpec, snapshot);
+        // 图例显隐过滤后：系列域用未过滤的全量域覆盖——图例保持完整可点，
+        // 可见系列的调色板槽位不随隐藏漂移。
+        if ((this._hiddenSeries.length > 0 || this._isolatedSeries !== null) && plan.series.field !== null) {
+            const baseSnap = this._baseSnapshot();
+            if (baseSnap && baseSnap.rowCount !== snapshot.rowCount) {
+                const fullPlan = compile(effSpec, baseSnap);
+                plan = { ...plan, series: fullPlan.series };
+            }
+        }
         this.diagnostics = plan.diagnostics.items.map((d) => ({
             severity: d.severity,
             code: d.code,
@@ -511,6 +598,9 @@ export default class Chart {
 
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
+        // 每次渲染兜底一次联动注册：props 在水合顺序上晚于 onMount 赋值，
+        // 只靠 onMount 注册会漏掉从未被交互的接收端。
+        this._linkEnsure();
         if (this._zeroSize()) return "";
         const scene = this.scene();
         if (!scene) return "";
@@ -664,6 +754,8 @@ export default class Chart {
         this._attachResizeObserver();
         this._attachThemeMedia();
         this._attachWheel();
+        this._linkEnsure();
+        (this as any).__didFirstPaint = true;
         // canvas 模式的首帧：markup 在挂载前已跑，此时元素已存在，补一次绘制。
         const pending = (this as any).__pendingScene as DisplayScene | null | undefined;
         if (this._useCanvas() && pending) this._scheduleCanvasPaint(pending);
@@ -673,6 +765,8 @@ export default class Chart {
         this._detachResizeObserver();
         this._detachThemeMedia();
         this._detachWheel();
+        this._linkUnregister();
+        this._clearLongPress();
     }
 
     public _attachThemeMedia(): void {
@@ -728,20 +822,262 @@ export default class Chart {
     public _effectiveSpec(): ChartSpec | null {
         const spec = this.spec;
         if (!spec) return null;
-        if (!this._viewDomain || !this._baseXKind) return spec;
+        if (!this._viewDomainEffective() || !this._baseXKind) return spec;
         const scales = new Map<string, Scale>();
         if (spec.scales) {
             for (const entry of Array.from(spec.scales.entries())) {
                 scales.set(entry[0], entry[1]);
             }
         }
-        const domain: [number, number] = [this._viewDomain[0], this._viewDomain[1]];
+        const domain: [number, number] = [this._viewDomainEffective()![0], this._viewDomainEffective()![1]];
         if (this._baseXKind === "log") {
             scales.set("x", { kind: "log", domain, range: [0, 1] });
         } else {
             scales.set("x", { kind: "linear", domain, range: [0, 1] });
         }
         return { ...spec, scales };
+    }
+
+    // ---- 图例显隐（过滤快照，比例尺按可见数据重算） ----
+
+    /** 系列字段名（color / series / group 编码的字段，无分组为 null）。 */
+    public _seriesFieldOf(): string | null {
+        if (!this.spec) return null;
+        const enc = this.spec.encoding.find((e) => e.channel === "color" || e.channel === "series" || e.channel === "group");
+        // heatmap / calendar / geo 的 color 是数值通道，不是分组。
+        const markKind = String(this.spec.mark);
+        if ((markKind === "heatmap" || markKind === "calendar" || markKind === "geo") && enc?.channel === "color") return null;
+        return enc ? enc.field : null;
+    }
+
+    /** 基础快照（未过滤）。 */
+    public _baseSnapshot(): DataSnapshot | null {
+        return this.snapshot ?? (this.data ? fromRows(this.data) : null);
+    }
+
+    /** 图例过滤后的快照：隐藏系列与单独聚焦都会真实滤出行，随后 compile
+     *  按可见数据重算比例尺与堆叠基线（不是留白）。 */
+    public _filteredSnapshot(): DataSnapshot | null {
+        const base = this._baseSnapshot();
+        if (!base) return null;
+        const field = this._seriesFieldOf();
+        if (!field) return base;
+        const hidden = new Set(this._hiddenSeries);
+        if (hidden.size === 0 && this._isolatedSeries === null) return base;
+        const col = base.columns.find((c) => c.name === field);
+        if (!col) return base;
+        const rows: Record<string, unknown>[] = [];
+        for (let r = 0; r < base.rowCount; r++) {
+            const v = col.values[r];
+            const key = v === null || v === undefined ? null : String(v);
+            if (this._isolatedSeries !== null) {
+                if (key === this._isolatedSeries) rows.push(rowOf(base, r));
+            } else if (key === null || !hidden.has(key)) {
+                rows.push(rowOf(base, r));
+            }
+        }
+        return fromRows(rows);
+    }
+
+    /** 图例交互入口：单击切换显隐；最后一项可见系列拒绝隐藏。 */
+    public _toggleLegendSeries(name: string): void {
+        if (this._isolatedSeries !== null) {
+            // 单独聚焦态下单击恢复原状。
+            this._isolatedSeries = null;
+            this._hiddenSeries = [];
+            this._announce(`已恢复全部系列`);
+            return;
+        }
+        const plan = this._plan;
+        const cats = plan && plan.series.field !== null ? plan.series.categories : [];
+        const hidden = new Set(this._hiddenSeries);
+        if (hidden.has(name)) {
+            hidden.delete(name);
+        } else {
+            const visible = cats.filter((c) => !hidden.has(c));
+            if (visible.length <= 1 && visible.includes(name)) {
+                this._announce(`至少保留一个可见系列`);
+                return;
+            }
+            hidden.add(name);
+        }
+        this._hiddenSeries = [...hidden];
+        this._announce(hidden.has(name) ? `已隐藏 ${name}` : `已显示 ${name}`);
+        this._emitLegendChange();
+        // v-html 重渲染后内联样式丢失——下一拍回放缓边/图例透明度。
+        queueMicrotask(() => this._applyDomState());
+    }
+
+    /** 图例单独聚焦：只显示该系列；再次同样操作恢复。 */
+    public _isolateLegendSeries(name: string): void {
+        if (this._isolatedSeries === name) {
+            this._isolatedSeries = null;
+            this._hiddenSeries = [];
+            this._announce(`已恢复全部系列`);
+        } else {
+            this._isolatedSeries = name;
+            this._hiddenSeries = [];
+            this._announce(`单独聚焦 ${name}`);
+        }
+        this._emitLegendChange();
+        queueMicrotask(() => this._applyDomState());
+    }
+
+    /** 图例节点 id → 系列名（`legend:swatch:N` / `legend:label:N`）。 */
+    public _legendNameFromId(id: string): string | null {
+        const m = /^legend:(?:swatch|label):(\d+)$/.exec(id);
+        if (!m) return null;
+        const plan = this._plan;
+        if (!plan || plan.series.field === null) return null;
+        const idx = Number(m[1]);
+        return plan.series.categories[idx] ?? null;
+    }
+
+    // ---- 联动 / 事件外抛 ----
+
+    /** 联动频道：同 `linkId` 的实例互收 crosshair x 值（window 级，空频道自毁）。 */
+    public _linkChannel(): Map<string, Set<object>> | null {
+        if (typeof window === "undefined") return null;
+        const w = window as any;
+        // 注意：嵌套泛型实参会被 VMZ 编译器漏剥成运行时标识符，`new` 表达式一律不带类型实参。
+        if (!w.__vmzChartLinks) w.__vmzChartLinks = new Map();
+        return w.__vmzChartLinks;
+    }
+
+    public _linkRegister(): void {
+        if (!this.linkId) return;
+        const bus = this._linkChannel();
+        if (!bus) return;
+        let set = bus.get(this.linkId);
+        if (!set) {
+            set = new Set<object>();
+            bus.set(this.linkId, set);
+        }
+        set.add(this);
+    }
+
+    /** 惰性注册：props 在水合完成顺序上可能晚于 onMount 才赋值，首个交互
+     *  路径再兜底一次，保证 linkId 一定进频道。 */
+    public _linkEnsure(): void {
+        const bag = this as any;
+        if (bag.__linkRegistered || !this.linkId) return;
+        // SSR 下无频道可注册：不能置旗标，否则客户端永远不再重试。
+        if (typeof window === "undefined") return;
+        bag.__linkRegistered = true;
+        this._linkRegister();
+    }
+
+    public _linkUnregister(): void {
+        (this as any).__linkRegistered = false;
+        if (!this.linkId) return;
+        const bus = this._linkChannel();
+        if (!bus) return;
+        const set = bus.get(this.linkId);
+        if (set) {
+            set.delete(this);
+            if (set.size === 0) bus.delete(this.linkId);
+        }
+    }
+
+    /** 把 crosshair 的数据 x 值广播给同 linkId 的伙伴（不再回播）。 */
+    public _linkBroadcast(xValue: number): void {
+        this._linkEnsure();
+        if (!this.linkId) return;
+        const bus = this._linkChannel();
+        const set = bus ? bus.get(this.linkId) : undefined;
+        if (!set) return;
+        for (const peer of set) {
+            if (peer !== this) (peer as Chart)._linkReceive(xValue, this);
+        }
+    }
+
+    /** 接收伙伴的 crosshair x 值：吸附到本图最近的数据 x（定量 x 专用，
+     *  收端永不回播，天然无循环）。 */
+    public _linkReceive(xValue: number, from: object): void {
+        void from;
+        this._linkEnsure();
+        const plan = this._plan;
+        const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
+        if (!plan || !xEnc) return;
+        const polylines = this._polylines();
+        if (polylines.length === 0) return;
+        let bestKey: string | null = null;
+        let bestD = Infinity;
+        for (const m of plan.marks) {
+            const v = readCell(plan.resolvedData, xEnc.field, m.rowIndex);
+            if (typeof v !== "number" || !Number.isFinite(v)) continue;
+            const d = Math.abs(v - xValue);
+            if (d < bestD) {
+                bestD = d;
+                bestKey = m.key;
+            }
+        }
+        if (bestKey === null) return;
+        for (const pl of polylines) {
+            const i = pl.keys.indexOf(bestKey);
+            if (i < 0) continue;
+            // DOM 写入委托给 `_updateCrosshair`：编译器只对模板事件可达的
+            // 方法插桩写屏障，本方法经 `(peer as Chart)` 调用、不在调用图内，
+            // 裸写入不会触发本组件的 DOM patch。安静旗标防止收端回播成环。
+            const bag = this as any;
+            bag.__linkQuiet = true;
+            try {
+                this._updateCrosshair(pl.points[i]);
+            } finally {
+                bag.__linkQuiet = false;
+            }
+            return;
+        }
+    }
+
+    /** 事件外抛：CustomEvent 从宿主元素冒泡。 */
+    public _emitChartEvent(name: string, detail: unknown): void {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof root.dispatchEvent !== "function") return;
+        root.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
+    }
+
+    public _emitSelectionChange(): void {
+        const sel = this.state ? [...this.state.selection.nodeIds] : [];
+        this._emitChartEvent("vmz-chart-selection-change", { selection: sel });
+    }
+
+    public _emitZoomChange(): void {
+        this._emitChartEvent("vmz-chart-zoom-change", { domain: this._viewDomain ? [this._viewDomain[0], this._viewDomain[1]] : null });
+    }
+
+    public _emitLegendChange(): void {
+        this._emitChartEvent("vmz-chart-legend-change", { hidden: [...this._hiddenSeries], isolated: this._isolatedSeries });
+    }
+
+    // ---- aria-live 播报 ----
+
+    public _liveId(): string {
+        return `${this._resourcePrefix()}-live`;
+    }
+
+    public _announce(text: string): void {
+        // aria-live 只认文本变化——同文本先清空再写，保证每次都播报。
+        if (this._liveText === text) {
+            this._liveText = "";
+            queueMicrotask(() => {
+                this._liveText = text;
+            });
+        } else {
+            this._liveText = text;
+        }
+    }
+
+    // ---- 动效口径 ----
+
+    /** svg 包装的动画口径：首帧入场、更新淡入、off/reduced-motion 关闭。 */
+    public _animMode(): string {
+        if (this.motion === "off") return "none";
+        const bag = this as any;
+        if (!bag.__didFirstPaint) {
+            return "in";
+        }
+        return "fade";
     }
 
     /** 当前是否可缩放/平移：笛卡尔 + 定量 x + 非分面 + 非统计型 mark
@@ -804,11 +1140,7 @@ export default class Chart {
         newLo = Math.max(newLo, base[0]);
         newHi = Math.min(newHi, base[1]);
         if (!(newHi > newLo)) return;
-        if (newLo <= base[0] && newHi >= base[1]) {
-            this._viewDomain = null;
-        } else {
-            this._viewDomain = [newLo, newHi];
-        }
+        this._setViewDomain(newLo <= base[0] && newHi >= base[1] ? null : [newLo, newHi]);
         this._hideCrosshair();
     }
 
@@ -840,16 +1172,159 @@ export default class Chart {
         newLo = Math.max(newLo, base[0]);
         newHi = Math.min(newHi, base[1]);
         if (!(newHi > newLo)) return;
-        if (newLo <= base[0] && newHi >= base[1]) {
-            this._viewDomain = null;
-        } else {
-            this._viewDomain = [newLo, newHi];
+        this._setViewDomain(newLo <= base[0] && newHi >= base[1] ? null : [newLo, newHi]);
+    }
+
+    /** 视域写入的唯一入口：受控 `zoomDomain` 只发事件不落状态。 */
+    public _setViewDomain(d: number[] | null): void {
+        if (this.zoomDomain !== null) {
+            this._emitChartEvent("vmz-chart-zoom-change", { domain: d });
+            return;
+        }
+        this._viewDomain = d;
+        this._emitZoomChange();
+    }
+
+    /** 生效视域：受控 prop 优先。 */
+    public _viewDomainEffective(): number[] | null {
+        return this.zoomDomain ?? this._viewDomain;
+    }
+
+    /** 重置视域到全域（双击 / `0` 键 / 复位按钮同一路径）。 */
+    public _resetView(): void {
+        this._setViewDomain(null);
+    }
+
+    /** 复位按钮可见性：当前处于缩放态时显示。 */
+    public _zoomResetVisible(): boolean {
+        return this._zoomable() && this._viewDomainEffective() !== null;
+    }
+
+    /** 复位按钮点击（模板绑定）。 */
+    public _resetZoom(): void {
+        this._resetView();
+    }
+
+    // ---- 触摸 / 指针（tap 出 tooltip、横向跟随、双指捏合、纵向放行） ----
+
+    /** 清理长按定时器。 */
+    public _clearLongPress(): void {
+        if (this._longPressTimer !== null) {
+            clearTimeout(this._longPressTimer);
+            this._longPressTimer = null;
         }
     }
 
-    /** 重置视域到全域。 */
-    public _resetView(): void {
-        this._viewDomain = null;
+    /** 图例区命中的系列名（用于长按单独聚焦）。 */
+    public _legendNameAtEvent(ev: PointerEvent): string | null {
+        const target = ev.target as Element | null;
+        const legendEl = target && typeof target.closest === "function" ? target.closest('[data-dvz-id^="legend:swatch:"], [data-dvz-id^="legend:label:"]') : null;
+        if (!legendEl) return null;
+        return this._legendNameFromId(legendEl.getAttribute("data-dvz-id") ?? "");
+    }
+
+    public _onPointerDown(ev: PointerEvent): void {
+        (this as any).__lastPointerWasTouch = ev.pointerType !== "mouse";
+        if (ev.pointerType === "mouse") return;
+        // 触摸点按先解钉（再按本次命中重新出 tooltip）。
+        if (this._pinnedTooltip) {
+            this._pinnedTooltip = null;
+            this._announce("tooltip 已关闭");
+        }
+        const point = this._toScenePoint(ev);
+        if (!point) return;
+        if (!this._pointers) this._pointers = new Map();
+        this._pointers.set(ev.pointerId, { x0: point.x, y0: point.y, x: point.x, y: point.y });
+        this._touchScroll = false;
+        if (this._pointers.size === 2) {
+            // 双指：取消长按，进入捏合（仅可缩放时）。
+            this._clearLongPress();
+            if (this._zoomable()) {
+                const [a, b] = [...this._pointers.values()];
+                const dist = Math.hypot(a.x - b.x, a.y - b.y);
+                const base = this._baseXDomain;
+                const cur = this._viewDomainEffective() ?? (base ? [base[0], base[1]] : null);
+                if (dist > 0 && base && cur) {
+                    this._pinch = { startDist: dist, lo: cur[0], hi: cur[1] };
+                }
+            }
+            return;
+        }
+        // 单指：与 hover 等价的焦点；长按 450ms 钉住（图例上长按 = 单独聚焦）。
+        const legendName = this._legendNameAtEvent(ev);
+        this._onMouseMove(ev as unknown as MouseEvent);
+        this._clearLongPress();
+        this._longPressTimer = (
+            typeof window !== "undefined" ? window.setTimeout : setTimeout
+        )(() => {
+            this._longPressTimer = null;
+            if (legendName !== null) {
+                this._isolateLegendSeries(legendName);
+            } else if (this._tooltip.visible) {
+                this._pinnedTooltip = { x: this._tooltip.x, y: this._tooltip.y, text: this._tooltip.text };
+                this._announce(`已钉住 ${this._tooltip.text}`);
+            }
+        }, 450) as unknown as number;
+    }
+
+    public _onPointerMove(ev: PointerEvent): void {
+        if (ev.pointerType === "mouse") return;
+        if (!this._pointers || !this._pointers.has(ev.pointerId)) return;
+        const point = this._toScenePoint(ev);
+        if (!point) return;
+        const rec = this._pointers.get(ev.pointerId)!;
+        rec.x = point.x;
+        rec.y = point.y;
+        // 双指捏合。
+        if (this._pinch && this._pointers.size === 2) {
+            const [a, b] = [...this._pointers.values()];
+            const dist = Math.hypot(a.x - b.x, a.y - b.y);
+            if (dist <= 0) return;
+            const base = this._baseXDomain;
+            if (!base) return;
+            const kind = this._baseXKind;
+            const factor = this._pinch.startDist / dist;
+            const zMid = (zoomSpace(kind, this._pinch.lo) + zoomSpace(kind, this._pinch.hi)) / 2;
+            let newLo = fromZoomSpace(kind, zMid - (zMid - zoomSpace(kind, this._pinch.lo)) * factor);
+            let newHi = fromZoomSpace(kind, zMid + (zoomSpace(kind, this._pinch.hi) - zMid) * factor);
+            newLo = Math.max(newLo, base[0]);
+            newHi = Math.min(newHi, base[1]);
+            if (!(newHi > newLo)) return;
+            this._setViewDomain(newLo <= base[0] && newHi >= base[1] ? null : [newLo, newHi]);
+            return;
+        }
+        // 单指：位移判定——纵向占优即把手势让给页面滚动。
+        const dx = rec.x - rec.x0;
+        const dy = rec.y - rec.y0;
+        if (!this._touchScroll && Math.abs(dy) > 10 && Math.abs(dx) < 10) {
+            this._touchScroll = true;
+            this._clearLongPress();
+            return;
+        }
+        if (this._touchScroll) return;
+        if (Math.abs(dx) + Math.abs(dy) > 6) this._clearLongPress();
+        // 横向跟随：与 hover 等价。
+        this._onMouseMove(ev as unknown as MouseEvent);
+    }
+
+    public _onPointerUp(ev: PointerEvent): void {
+        if (ev.pointerType === "mouse") return;
+        if (this._pointers) {
+            this._pointers.delete(ev.pointerId);
+            if (this._pointers.size < 2) this._pinch = null;
+            if (this._pointers.size === 0) this._pointers = null;
+        }
+        this._clearLongPress();
+    }
+
+    /** 双击 plot 区复位缩放（图例区不触发）。 */
+    public _onDblClick(ev: MouseEvent): void {
+        const point = this._toScenePoint(ev);
+        if (!point) return;
+        if (this._zoomResetVisible()) {
+            ev.preventDefault();
+            this._resetView();
+        }
     }
 
     // ---- Crosshair（line/area 最近点取值） ----
@@ -930,6 +1405,23 @@ export default class Chart {
         this._tooltip.x = this._crosshair.x;
         this._tooltip.y = point.y * scaleY;
         this._tooltip.visible = parts.length > 0;
+        // 联动广播：吸附到的真实数据 x 值（定量 x 才有意义）。
+        // `__linkQuiet`：收端借道本方法刷新 DOM，不得回播成环。
+        if (this.linkId && xEnc && this._plan && !(this as any).__linkQuiet) {
+            for (const pl of polylines) {
+                for (let i = 0; i < pl.points.length; i++) {
+                    if (Math.abs(pl.points[i].x - bestX) > 0.5) continue;
+                    const mark = this._plan.marks.find((m) => m.key === pl.keys[i]);
+                    if (mark) {
+                        const v = readCell(this._plan.resolvedData, xEnc.field, mark.rowIndex);
+                        if (typeof v === "number" && Number.isFinite(v)) this._linkBroadcast(v);
+                    }
+                    i = pl.points.length;
+                    break;
+                }
+                break;
+            }
+        }
     }
 
     public _hideCrosshair(): void {
@@ -1486,7 +1978,7 @@ export default class Chart {
                     hi = base[1];
                     lo = hi - span;
                 }
-                this._viewDomain = lo <= base[0] && hi >= base[1] ? null : [lo, hi];
+                this._setViewDomain(lo <= base[0] && hi >= base[1] ? null : [lo, hi]);
             }
             this._hideCrosshair();
             this._tooltip.visible = false;
@@ -1500,11 +1992,30 @@ export default class Chart {
             return;
         }
 
+        // 钉住态：tooltip 冻结在钉住内容，指针不再改写 tooltip（点击/Esc 解除）。
+        if (this._pinnedTooltip) {
+            this._tooltip.x = this._pinnedTooltip.x;
+            this._tooltip.y = this._pinnedTooltip.y;
+            this._tooltip.text = this._pinnedTooltip.text;
+            this._tooltip.visible = true;
+            return;
+        }
+
         // line/area/bump/slope/streamgraph：plot 内任意位置给 crosshair 最近点取值（吸附数据 x）。
         const markKind = this.spec ? String(this.spec.mark) : "";
         const crosshairMark =
             (markKind === "line" || markKind === "area" || markKind === "bump" || markKind === "slope" || markKind === "streamgraph") &&
             !(this.spec && this.spec.facetField);
+        // axis 触发（bar 族）：同一 x 槽的全部系列合并为一条 tooltip。
+        if (this.tooltipTrigger === "axis" && point && !crosshairMark) {
+            const slot = this._slotFromPoint(point);
+            if (slot !== null) {
+                this._hoverId = null;
+                this._axisTooltipForSlot(slot, point);
+                this._applyDomState();
+                return;
+            }
+        }
         if (crosshairMark && point) {
             this._hoverId = null;
             this._updateCrosshair(point);
@@ -1558,14 +2069,42 @@ export default class Chart {
             this._suppressClick = false;
             return;
         }
+        // 图例项优先：单击切换显隐（mark 命中逻辑不参与）。
+        const target = ev.target as Element | null;
+        const legendEl = target && typeof target.closest === "function" ? target.closest('[data-dvz-id^="legend:swatch:"], [data-dvz-id^="legend:label:"]') : null;
+        if (legendEl) {
+            const name = this._legendNameFromId(legendEl.getAttribute("data-dvz-id") ?? "");
+            if (name !== null) this._toggleLegendSeries(name);
+            return;
+        }
+        // 钉住态 tooltip 存在时，点击只解除钉住，不改选择。触摸点按的解钉
+        // 已在 pointerdown 处理，这里只认鼠标 click。
+        if (this._pinnedTooltip) {
+            if ((this as any).__lastPointerWasTouch) return;
+            this._pinnedTooltip = null;
+            this._tooltip.visible = false;
+            this._announce("tooltip 已关闭");
+            return;
+        }
         const point = this._toScenePoint(ev);
         const hit = point ? this._hitTest(point.x, point.y) : null;
         if (!hit) {
-            this.dispatch({ kind: "clear-selection" });
+            if (this.selection === null) {
+                this.dispatch({ kind: "clear-selection" });
+            }
+            this._emitSelectionChange();
             this._applyDomState();
             return;
         }
-        this.dispatch({ kind: "select-toggle", nodeId: hit });
+        if (this.selection === null) {
+            this.dispatch({ kind: "select-toggle", nodeId: hit });
+        } else {
+            // 受控选择集：只提议，不落状态。
+            const proposed = new Set(this.selection);
+            if (proposed.has(hit)) proposed.delete(hit);
+            else proposed.add(hit);
+            this._emitChartEvent("vmz-chart-selection-change", { selection: [...proposed] });
+        }
         this.onchartSelect({ rowKey: hit });
         this._applyDomState();
     }
@@ -1620,25 +2159,92 @@ export default class Chart {
             ev.preventDefault();
             this._focusIndex = (this._focusIndex - 1 + targets.length) % targets.length;
             this._focusTarget(targets[this._focusIndex]);
-        } else if (ev.key === "Enter" || ev.key === " ") {
+        } else if (ev.key === "Home") {
+            ev.preventDefault();
+            this._focusIndex = 0;
+            this._focusTarget(targets[0]);
+        } else if (ev.key === "End") {
+            ev.preventDefault();
+            this._focusIndex = targets.length - 1;
+            this._focusTarget(targets[this._focusIndex]);
+        } else if (ev.key === "Enter") {
+            // Enter 展开 / 钉住 tooltip（再次 Enter 或 Esc 解除）。
+            if (this._pinnedTooltip) {
+                ev.preventDefault();
+                this._pinnedTooltip = null;
+                this._tooltip.visible = false;
+                this._announce("tooltip 已关闭");
+            } else if (this._hoverId && this._tooltip.visible) {
+                ev.preventDefault();
+                this._pinnedTooltip = { x: this._tooltip.x, y: this._tooltip.y, text: this._tooltip.text };
+                this._announce(`已钉住 ${this._tooltip.text}`);
+            }
+        } else if (ev.key === " ") {
             if (this._hoverId) {
                 ev.preventDefault();
-                this.dispatch({ kind: "select-toggle", nodeId: this._hoverId });
+                if (this.selection === null) {
+                    this.dispatch({ kind: "select-toggle", nodeId: this._hoverId });
+                }
                 this.onchartSelect({ rowKey: this._hoverId });
+                this._emitSelectionChange();
                 this._applyDomState();
             }
         } else if (ev.key === "Escape") {
             this._hoverId = null;
             this._focusIndex = -1;
+            this._pinnedTooltip = null;
             this._tooltip.visible = false;
             this._hideCrosshair();
             this._cancelDrag();
-            this.dispatch({ kind: "clear-selection" });
+            if (this.selection === null) {
+                this.dispatch({ kind: "clear-selection" });
+            }
+            this._emitSelectionChange();
             this._applyDomState();
         }
     }
 
-    /** 键盘聚焦某个导航目标：tooltip 锚到顶点或节点，文本读真实行值。 */
+    /** axis 触发：从 scene 坐标解析 band x 槽的类目（非 band x 返回 null）。 */
+    public _slotFromPoint(point: Point2D): string | null {
+        const plan = this._plan;
+        const bounds = this._plotBounds();
+        const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
+        if (!plan || !bounds || !xEnc) return null;
+        const xs = plan.scales.get("x");
+        if (!xs || xs.kind !== "band") return null;
+        const cats = xs.domain.map(String);
+        if (cats.length === 0) return null;
+        const step = bounds.w / cats.length;
+        const idx = Math.max(0, Math.min(cats.length - 1, Math.floor((point.x - bounds.x) / step)));
+        return cats[idx];
+    }
+
+    /** axis 触发：同一槽全部系列按图例序合并，值读全部编码字段的真实行值。 */
+    public _axisTooltipForSlot(slot: string, point: Point2D): void {
+        const plan = this._plan;
+        const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
+        const yEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "y") : undefined;
+        if (!plan || !xEnc) return;
+        const lines: string[] = [];
+        for (const m of plan.marks) {
+            const xv = readCell(plan.resolvedData, xEnc.field, m.rowIndex);
+            if (xv === null || xv === undefined || String(xv) !== slot) continue;
+            const parts: string[] = [];
+            if (m.series !== null) parts.push(m.series);
+            if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, m.rowIndex))}`);
+            lines.push(parts.join(" "));
+        }
+        if (lines.length === 0) return;
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        const rect = root ? root.getBoundingClientRect() : null;
+        const scaleY = rect && rect.height > 0 ? rect.height / this._effHeight() : 1;
+        this._tooltip.text = `${xEnc.field}: ${slot} · ${lines.join(" · ")}`;
+        this._tooltip.y = point.y * scaleY;
+        this._tooltip.visible = true;
+        this._announce(this._tooltip.text);
+    }
+
+    /** 键盘聚焦某个导航目标：tooltip 锚到顶点或节点，文本读真实行值并播报。 */
     public _focusTarget(target: NavTarget): void {
         this._hoverId = target.id;
         const anchor = target.point ? target.point : this._nodeAnchor(target.id);
@@ -1651,8 +2257,10 @@ export default class Chart {
             this._tooltip.y = anchor.y * scaleY;
             this._tooltip.text = target.key !== null ? this._tooltipForRowKey(target.key) : this._tooltipTextFor(target.id);
             this._tooltip.visible = true;
+            this._announce(this._tooltip.text);
         }
         this.dispatch({ kind: "hover", nodeId: target.id });
+        this._emitChartEvent("vmz-chart-focus", { id: target.id, key: target.key });
         this._applyDomState();
     }
 
@@ -1673,12 +2281,22 @@ export default class Chart {
             bag.__markIdScene = this._semanticScene;
         }
         const markIds = bag.__markIdSet as Set<string>;
-        const selected = this.state ? this.state.selection.nodeIds : new Set<string>();
+        // 受控选择集优先（宿主回灌的 selection prop）。
+        const selected: Set<string> = this.selection !== null ? new Set(this.selection) : this.state ? this.state.selection.nodeIds : new Set<string>();
         const active = this._hoverId !== null || selected.size > 0;
         const nodes = root.querySelectorAll("[data-dvz-id]");
         const elements = Array.from(nodes);
         for (const el of elements) {
             const id = el.getAttribute("data-dvz-id") ?? "";
+            // 图例项按显隐调透明度（隐藏 0.35，单独聚焦时非聚焦 0.35）。
+            if (id.startsWith("legend:swatch:") || id.startsWith("legend:label:")) {
+                const name = this._legendNameFromId(id);
+                if (name !== null) {
+                    const dim = this._isolatedSeries !== null ? this._isolatedSeries !== name : this._hiddenSeries.includes(name);
+                    el.style.opacity = dim ? "0.35" : "1";
+                }
+                continue;
+            }
             if (!markIds.has(id)) {
                 continue;
             }
@@ -1686,6 +2304,15 @@ export default class Chart {
             el.style.opacity = !active || hot ? "1" : "0.35";
         }
     }
+}
+
+/** 快照第 r 行还原为行对象（图例过滤重建快照用）。 */
+function rowOf(snap: DataSnapshot, r: number): Record<string, unknown> {
+    const row: Record<string, unknown> = {};
+    for (const col of snap.columns) {
+        row[col.name] = col.values[r];
+    }
+    return row;
 }
 
 /** 射线法：点是否在闭合多边形内（漏斗 / 桑基流 / 山脊带命中）。 */

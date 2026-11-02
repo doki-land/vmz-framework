@@ -93,6 +93,54 @@
                 <Diagram :spec="diagramSpec" :theme="dark ? 'dark' : 'light'" label="ChartSpec to Display Scene pipeline" />
             </div>
         </section>
+        <section class="card" id="ix-axis">
+            <header class="card__head">
+                <h2>
+                    交互 · axis 合并 tooltip
+                </h2>
+                <p>
+                    tooltipTrigger="axis":同一槽全部系列按图例序合并展示。
+                </p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="ixAxisSpec" :data="ixAxisRows" :height="280" tooltipTrigger="axis" :theme="dark ? 'dark' : 'light'" label="axis trigger bar" />
+            </div>
+        </section>
+        <section class="card">
+            <header class="card__head">
+                <h2>
+                    交互 · 联动 crosshair
+                </h2>
+                <p>
+                    两图同 linkId,指针在任一图上移动时另一图 crosshair 对齐同一 x。
+                </p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="ixLinkASpec" :data="ixLinkARows" :height="240" linkId="bench-link" :theme="dark ? 'dark' : 'light'" label="linked line A" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="ixLinkBSpec" :data="ixLinkBRows" :height="240" linkId="bench-link" :theme="dark ? 'dark' : 'light'" label="linked line B" />
+            </div>
+        </section>
+        <section class="card" id="ix-degrade">
+            <header class="card__head">
+                <h2>
+                    交互 · 退化态
+                </h2>
+                <p>
+                    空数据、单点折线、超多系列的显式退化行为。
+                </p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="ixEmptySpec" :data="ixEmptyRows" :height="200" :theme="dark ? 'dark' : 'light'" label="empty chart" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="ixSingleSpec" :data="ixSingleRows" :height="200" :theme="dark ? 'dark' : 'light'" label="single point line" />
+            </div>
+            <div class="card__canvas">
+                <Chart :spec="ixManySpec" :data="ixManyRows" :height="280" :theme="dark ? 'dark' : 'light'" label="twenty four series bar" />
+            </div>
+        </section>
         <section class="card">
             <header class="card__head">
                 <h2>
@@ -307,12 +355,65 @@ export default class IndexPage {
                 gridStroke: rgb8(220, 232, 225),
                 areaFillOpacity: 0.35,
             },
+            ixAxisSpec: galleryExample("bar-dodge").spec,
+            ixAxisRows: galleryExample("bar-dodge").rows,
+            ixLinkASpec: {
+                mark: "line",
+                encoding: [
+                    { field: "hour", channel: "x" },
+                    { field: "requests", channel: "y" },
+                    { field: "service", channel: "color" },
+                ],
+            },
+            ixLinkARows: galleryExample("area-traffic").rows,
+            ixLinkBSpec: {
+                mark: "line",
+                encoding: [
+                    { field: "hour", channel: "x" },
+                    { field: "latency", channel: "y" },
+                    { field: "service", channel: "color" },
+                ],
+            },
+            ixLinkBRows: galleryExample("area-traffic").rows.map((r: any) => ({ hour: r.hour, service: r.service, latency: Math.round((r.requests as number) * 0.6 + 20) })),
+            ixEmptySpec: { mark: "bar", encoding: [{ field: "x", channel: "x" }, { field: "y", channel: "y" }] },
+            ixEmptyRows: [],
+            ixSingleSpec: { mark: "line", encoding: [{ field: "t", channel: "x" }, { field: "v", channel: "y" }] },
+            ixSingleRows: [{ t: 1, v: 42 }],
+            ixManySpec: {
+                mark: "bar",
+                encoding: [
+                    { field: "q", channel: "x" },
+                    { field: "v", channel: "y" },
+                    { field: "s", channel: "color" },
+                ],
+            },
+            ixManyRows: (() => {
+                const rows: Record<string, unknown>[] = [];
+                for (let s = 0; s < 24; s++) {
+                    for (const q of ["Q1", "Q2", "Q3"]) {
+                        rows.push({ q, v: 10 + ((s * 7 + q.length * 13) % 40), s: `系列-${s + 1}-长名称` });
+                    }
+                }
+                return rows;
+            })(),
         };
     }
 
     public dark: boolean = false;
     public examples: any[] = [];
     public diagramSpec: any = null;
+    public ixAxisSpec: any = null;
+    public ixAxisRows: any[] = [];
+    public ixLinkASpec: any = null;
+    public ixLinkARows: any[] = [];
+    public ixLinkBSpec: any = null;
+    public ixLinkBRows: any[] = [];
+    public ixEmptySpec: any = null;
+    public ixEmptyRows: any[] = [];
+    public ixSingleSpec: any = null;
+    public ixSingleRows: any[] = [];
+    public ixManySpec: any = null;
+    public ixManyRows: any[] = [];
     public perfLineSpec: any = null;
     public perfLineData: any[] = [];
     public darkLineSpec: any = null;
