@@ -3,6 +3,7 @@
     "version": "0.0.0",
     "private": true,
     "type": "module",
+    "description": "Internal acceptance bench for `@vmz/ui-charts`. Not a workspace member and never deployed; the public gallery lives on the homepage `/charts` route.",
     "scripts": {
         "check": "vmz check .",
         "build": "vmz build .",

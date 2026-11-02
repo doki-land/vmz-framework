@@ -5,6 +5,5 @@ packages:
   - 'packages/editors/*'
   - 'packages/plugins/*'
   - 'packages/ui/*'
-  - 'packages/ui/vmz-ui-charts/demo'
   - 'packages/content/*'
   - 'packages/homepage'
