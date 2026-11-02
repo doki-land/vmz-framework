@@ -74,7 +74,7 @@
         },
         {
             "key": { "path": ["text", "muted"] },
-            "value": "#7C8592"
+            "value": "#8891A0"
         },
         {
             "key": { "path": ["text", "on-brand"] },
