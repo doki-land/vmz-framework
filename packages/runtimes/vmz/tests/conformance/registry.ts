@@ -163,9 +163,19 @@ export const CHECKS: Record<string, CheckEntry> = {
     'write-barrier-array': { file: 'runtime/write-barrier-array.ts' },
     'write-barrier-shared': { file: 'runtime/write-barrier-shared.ts' },
     'write-barrier-logical': { file: 'runtime/write-barrier-logical.ts' },
+    'write-barrier-root-update': {
+        file: 'runtime/write-barrier-root-update.ts',
+        description: 'Root-field ++/-- stay plain (setter path), empty write path rejected',
+    },
     'write-barrier-suite': {
-        description: 'WriteBarrier static + array + shared + logical',
-        composite: ['write-barrier', 'write-barrier-array', 'write-barrier-shared', 'write-barrier-logical'],
+        description: 'WriteBarrier static + array + shared + logical + root update',
+        composite: [
+            'write-barrier',
+            'write-barrier-array',
+            'write-barrier-shared',
+            'write-barrier-logical',
+            'write-barrier-root-update',
+        ],
     },
     resume: { file: 'runtime/resume.ts', pre: ['build:vmz-test'] },
     'runtime-identity': { file: 'runtime/runtime-identity.ts', pre: ['build:vmz-test'] },

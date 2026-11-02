@@ -1,0 +1,49 @@
+<template>
+    <section>
+        <strong>
+            {{ count }}
+        </strong>
+        <em>
+            {{ user.count }}
+        </em>
+        <button type="button" id="post" @click="bumpPost">
+            post
+        </button>
+        <button type="button" id="pre" @click="bumpPre">
+            pre
+        </button>
+        <button type="button" id="down" @click="dropPost">
+            down
+        </button>
+        <button type="button" id="downpre" @click="dropPre">
+            downpre
+        </button>
+        <button type="button" id="inline" @click="count++">
+            inline
+        </button>
+        <button type="button" id="nested" @click="bumpNested">
+            nested
+        </button>
+    </section>
+</template>
+<script client>
+export default class WriteBarrierRootUpdateDemo {
+    count = 0;
+    user = { count: 0 };
+    bumpPost() {
+        this.count++;
+    }
+    bumpPre() {
+        ++this.count;
+    }
+    dropPost() {
+        this.count--;
+    }
+    dropPre() {
+        --this.count;
+    }
+    bumpNested() {
+        this.user.count++;
+    }
+}
+</script>
