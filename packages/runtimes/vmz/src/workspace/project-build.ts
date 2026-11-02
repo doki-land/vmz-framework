@@ -214,7 +214,7 @@ export async function buildProjectToOutDirRoot(
         }
 
         if (projectHasDocuments(project)) {
-            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir: artifactDir });
+            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir: artifactDir, engines: cfg.engines });
             if (!docs.ok) {
                 return {
                     ok: false,

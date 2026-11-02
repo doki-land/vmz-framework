@@ -25,6 +25,8 @@ export interface BuildIntegratedDocumentsOpts {
     projectRoot: string;
     outDir: string;
     strict?: boolean;
+    /** Project plugin host engines (`engines.code` wires build-time fence highlight). */
+    engines?: { markdown?: string; code?: string };
 }
 
 export interface BuildIntegratedDocumentsResult {
@@ -58,6 +60,7 @@ export async function buildIntegratedDocuments(opts: BuildIntegratedDocumentsOpt
             outDir,
             appDistDir: outDir,
             strict: Boolean(opts.strict),
+            engines: opts.engines,
         });
         if (!result.ok) {
             const errs = (result.manifest?.diagnostics || []).filter((d) => d.severity === 'error');

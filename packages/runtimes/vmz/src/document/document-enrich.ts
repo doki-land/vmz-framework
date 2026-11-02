@@ -308,3 +308,62 @@ function normalizePageKey(pageKey: string): string {
 function escapeRe(s: string): string {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Author link → route-form href for emitted pages (document layer link form:
+ * `/d/<locale>/<pageKey>` without `.html`, matching application routes).
+ *
+ * Returns `null` for links that must stay as-authored: external/mailto, API
+ * refs, pure anchors, absolute application routes outside the document mount,
+ * and unresolvable relatives (the check pass reports those as broken).
+ */
+export function routeHrefForDocLink(
+    href: string,
+    fromPageKey: string,
+    locale: string,
+    routeBase: string,
+    pageKeySet: Map<string, Set<string>>,
+    routing: DocumentRoutingStrategy = {},
+): string | null {
+    const raw = String(href || '').trim();
+    if (!raw) return null;
+    if (raw.startsWith('#')) return null;
+    if (/^(mailto:|https?:\/\/)/i.test(raw)) return null;
+    if (raw.startsWith('vmz-api:') || raw.startsWith('api:')) return null;
+
+    // Split anchor first; both branches reattach it.
+    let pathPart = raw;
+    let anchor = '';
+    const hash = raw.indexOf('#');
+    if (hash >= 0) {
+        pathPart = raw.slice(0, hash);
+        anchor = raw.slice(hash);
+    }
+
+    if (pathPart.startsWith('/')) {
+        // Absolute: normalize only when it lands on a known document page.
+        const want = pathPart.replace(/\/$/, '') || '/';
+        for (const [loc, keys] of pageKeySet) {
+            for (const pk of keys) {
+                const r = pageRoute(routeBase, loc, pk, routing).replace(/\/$/, '');
+                if (r === want) return r + anchor;
+            }
+        }
+        return null;
+    }
+
+    // Relative author link (usually `./x.md` / `../y/z.md`): resolve to PageKey.
+    const cleaned = pathPart.replace(/\.md$/i, '').replace(/\\/g, '/');
+    const fromDir = pageKeyDir(fromPageKey);
+    const joined = path.posix.normalize(path.posix.join(fromDir || '.', cleaned));
+    let pk = joined === '.' || joined === '' ? 'index' : joined.replace(/^\.\//, '');
+    pk = normalizePageKey(pk);
+    const keys = pageKeySet.get(locale) || new Set<string>();
+    if (!keys.has(pk)) {
+        const indexJoined = path.posix.normalize(path.posix.join(fromPageKey || '.', cleaned));
+        const indexPk = normalizePageKey(indexJoined.replace(/^\.\//, ''));
+        if (keys.has(indexPk)) pk = indexPk;
+        else return null;
+    }
+    return pageRoute(routeBase, locale, pk, routing) + anchor;
+}

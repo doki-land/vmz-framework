@@ -333,7 +333,7 @@ async function cmdBuild(args: ParsedOptions): Promise<number> {
             }
         }
         if (projectHasDocuments(project)) {
-            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir, engines: cfg.engines });
             if (!docs.ok) return 1;
         }
 

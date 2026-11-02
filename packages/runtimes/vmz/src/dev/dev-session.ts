@@ -15,6 +15,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildIntegratedDocuments, projectHasDocuments } from '../document/document-integrate.js';
 import { createWorkspace, resolveNativePath } from '../workspace/public-api.js';
+import { loadVmzConfig } from '../workspace/plugin-host.js';
 import { materializeWechatPackaging } from '../workspace/wechat-packaging.js';
 import { emitLocaleRuntimeModules, localeHasErrors } from '../locale/locale-check.js';
 import { log } from '../workspace/log.js';
@@ -241,6 +242,17 @@ export function createDevSession(options: DevSessionOptions) {
         }
     }
 
+    let docEnginesPromise: Promise<{ markdown?: string; code?: string } | undefined> | null = null;
+    /** `engines.code` / `engines.markdown` for the document layer (loaded once per session). */
+    function docEngines() {
+        if (!docEnginesPromise) {
+            docEnginesPromise = loadVmzConfig(project)
+                .then((cfg) => cfg.engines as { markdown?: string; code?: string } | undefined)
+                .catch(() => undefined);
+        }
+        return docEnginesPromise;
+    }
+
     async function start() {
         const src = path.join(project, 'src');
         if (!existsSync(src)) {
@@ -274,7 +286,7 @@ export function createDevSession(options: DevSessionOptions) {
         reclaimStaleDevHost(outDir);
 
         if (projectHasDocuments(project)) {
-            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+            const docs = await buildIntegratedDocuments({ projectRoot: project, outDir, engines: await docEngines() });
             if (!docs.ok) {
                 throw new Error('vmz dev: integrated document build failed');
             }
@@ -590,7 +602,7 @@ export function createDevSession(options: DevSessionOptions) {
                     dependencyRoots = [...refreshed.dependencyRoots];
 
                     if (batch.docsDirty || projectHasDocuments(project)) {
-                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir, engines: await docEngines() });
                         if (!docs.ok) log.warn('document mount rebuild failed — keeping previous docs');
                     }
                     if (wechatPreview) {
@@ -619,7 +631,7 @@ export function createDevSession(options: DevSessionOptions) {
                     }
                     await emitPublicAndTrack();
                     if (batch.docsDirty || projectHasDocuments(project)) {
-                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir, engines: await docEngines() });
                         if (!docs.ok) {
                             log.warn('document mount rebuild failed — keeping previous docs');
                         } else {
@@ -665,7 +677,7 @@ export function createDevSession(options: DevSessionOptions) {
                     }
                     await emitPublicAndTrack();
                     if (batch.docsDirty || projectHasDocuments(project)) {
-                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+                        const docs = await buildIntegratedDocuments({ projectRoot: project, outDir, engines: await docEngines() });
                         if (!docs.ok) log.warn('document mount rebuild failed — keeping previous docs');
                     }
                     if (wechatPreview) {
@@ -703,7 +715,7 @@ export function createDevSession(options: DevSessionOptions) {
 
                 if (batch.docsDirty) {
                     log.info('documents change detected — rebuilding document mount…');
-                    const docs = await buildIntegratedDocuments({ projectRoot: project, outDir });
+                    const docs = await buildIntegratedDocuments({ projectRoot: project, outDir, engines: await docEngines() });
                     if (!docs.ok) {
                         log.warn('document mount rebuild failed — keeping previous docs');
                         continue;

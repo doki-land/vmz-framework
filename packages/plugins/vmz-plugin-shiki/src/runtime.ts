@@ -196,6 +196,26 @@ export function highlightSync(code: string, lang = 'text', theme: string | null 
     }
 }
 
+/**
+ * Inline-structure sync highlight for embedders that own the `<pre>` chrome
+ * (markdown-it fence callback in the document pipeline). Returns the token
+ * spans only — no `<pre>` wrapper, no inline background. Empty string when no
+ * highlighter is prewarmed so the embedder can fall back to escaped code.
+ */
+export function highlightInline(code: string, lang = 'text', theme: string | null = DEFAULT_THEME): string {
+    if (!cached) return '';
+    try {
+        return cached.codeToHtml(code ?? '', {
+            lang: normalizeLang(lang),
+            theme: normalizeTheme(theme),
+            structure: 'inline',
+            transformers: [stripPreInlineStyle],
+        });
+    } catch {
+        return '';
+    }
+}
+
 function fallbackPre(code: string): string {
     const escaped = String(code ?? '')
         .replace(/&/g, '&amp;')

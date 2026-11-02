@@ -154,7 +154,10 @@ export interface DocumentBuildMeta {
     engine?: string;
     outDir?: string;
     designs?: string | null;
+    /** Site token stylesheet href (`assets/vmz-designs.css`), null when none. */
     designsCss?: string | null;
+    /** Framework document base stylesheet href (`assets/vmz-document.css`). */
+    documentCss?: string | null;
     hostShell?: string;
     pages?: Array<{ route: string; htmlPath: string; viewPath: string }>;
     evidence?: string;

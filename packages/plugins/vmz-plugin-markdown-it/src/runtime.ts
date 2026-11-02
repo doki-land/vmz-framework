@@ -14,6 +14,19 @@ export type MarkdownItRuntimeOptions = {
     breaks?: boolean;
 };
 
+export type MarkdownAnalyzeHooks = {
+    /**
+     * Build-time fence highlighter (sync). Return value is injected as the
+     * fence's inner HTML by markdown-it; return '' to fall back to escaped code.
+     */
+    highlight?: (code: string, lang: string) => string;
+    /**
+     * Rewrite an author link href (e.g. `.md` relatives → site routes).
+     * Return `null`/`undefined` to keep the original href.
+     */
+    resolveHref?: (href: string) => string | null | undefined;
+};
+
 const DEFAULT_OPTIONS: Required<MarkdownItRuntimeOptions> = {
     html: false,
     linkify: true,
@@ -52,6 +65,19 @@ function createMd() {
 }
 
 /**
+ * Hooked instance for build-time document work: a dedicated MarkdownIt with the
+ * `highlight` option wired, never the shared cached one (hooks are per-call).
+ */
+function createHookedMd(hooks: MarkdownAnalyzeHooks) {
+    const md = new MarkdownIt(options);
+    if (hooks.highlight) {
+        const highlight = hooks.highlight;
+        md.options.highlight = (str: string, lang: string) => highlight(str, lang);
+    }
+    return md;
+}
+
+/**
  * @param {string} source
  * @returns {string} HTML fragment (no wrapping document)
  */
@@ -69,9 +95,21 @@ export function renderMarkdown(source) {
  * fences: Array<{ lang: string, info: string, content: string, lineStart: number, lineEnd: number }>
  * }}
  */
-export function analyzeMarkdown(source) {
-    const md = createMd();
+export function analyzeMarkdown(source, hooks?: MarkdownAnalyzeHooks) {
+    const md = hooks ? createHookedMd(hooks) : createMd();
     const tokens = md.parse(String(source ?? ''), {});
+    if (hooks?.resolveHref) {
+        const resolveHref = hooks.resolveHref;
+        for (const t of tokens) {
+            if (t.type !== 'inline' || !Array.isArray(t.children)) continue;
+            for (const c of t.children) {
+                if (c.type !== 'link_open') continue;
+                const href = c.attrGet('href') || '';
+                const rewritten = resolveHref(href);
+                if (typeof rewritten === 'string') c.attrSet('href', rewritten);
+            }
+        }
+    }
     /** @type {Array<{ level: number, id: string, text: string }>} */
     const headings = [];
     /** @type {Array<{ href: string, text: string }>} */

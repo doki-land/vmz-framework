@@ -72,6 +72,14 @@ if (!/<nav[^>]*aria-label="Documents"/i.test(html)) fail('missing Documents nav 
 if (!/<main\b/i.test(html)) fail('missing main landmark');
 if (!html.includes('欢迎阅读') && !html.includes('VMZ')) fail('body content missing');
 if (!html.includes('vmz-designs.css')) fail('designs stylesheet not linked');
+// Document layer contract: framework base stylesheet, route-form in-site
+// links, breadcrumb home nav, and author `.md` links rewritten to routes.
+if (!html.includes('vmz-document.css')) fail('document base stylesheet not linked');
+if (!html.includes('class="site site--docs"')) fail('missing unified document shell');
+if (!html.includes('class="doc-breadcrumb"')) fail('missing document breadcrumb');
+if (!html.includes('href="/docs/zh-hans/guide/install"')) fail('nav links must be route-form (no .html file paths)');
+if (/href="\.\/[^"]*\.html"/i.test(html)) fail('relative .html file links must not appear in the document page');
+if (/href="[^"]*\.md["#]/i.test(html)) fail('author .md links must be rewritten to routes');
 
 const viewPath = path.join(outDir, 'views', 'zh-hans', 'index.view.json');
 if (!fs.existsSync(viewPath)) fail(`missing view fragment ${viewPath}`);

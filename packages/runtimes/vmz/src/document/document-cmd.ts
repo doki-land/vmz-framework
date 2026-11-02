@@ -10,6 +10,7 @@ import { enrichDocumentContent } from './document-enrich.js';
 import { enrichDocumentEvidence } from './document-evidence.js';
 import { resolveMarkdownEngine } from './document-markdown.js';
 import { createWorkspace } from '../workspace/public-api.js';
+import { loadVmzConfig } from '../workspace/plugin-host.js';
 import { log } from '../workspace/log.js';
 import { emitPrettyJson } from '../workspace/pretty-json.js';
 
@@ -73,7 +74,8 @@ async function cmdDocumentBuild(args: ParsedOptions): Promise<number> {
 
     let result;
     try {
-        result = await buildDocuments({ projectRoot, outDir, strict });
+        const cfg = await loadVmzConfig(projectRoot).catch(() => null);
+        result = await buildDocuments({ projectRoot, outDir, strict, engines: cfg?.engines });
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         log.error(`document build failed: ${msg}`);
