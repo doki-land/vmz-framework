@@ -342,6 +342,419 @@ const BAD_SPEC: GalleryExample = {
     ],
 };
 
+const HEATMAP_LOAD: GalleryExample = {
+    id: "heatmap-week",
+    title: "热力图 · 一周分时负载",
+    note: "双类目网格,色阶是真实值域,渐变图例带 min/max。",
+    spec: {
+        mark: "heatmap",
+        keyField: "id",
+        encoding: [
+            { field: "day", channel: "x" },
+            { field: "hour", channel: "y" },
+            { field: "load", channel: "color" },
+        ],
+    },
+    rows: (() => {
+        const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+        const hours = ["09", "12", "15", "18", "21"];
+        const base = [42, 68, 55, 30, 12, 38, 74, 61, 33, 9, 45, 80, 66, 40, 15, 50, 72, 58, 36, 11, 47, 77, 63, 34, 10];
+        const rows: Record<string, unknown>[] = [];
+        days.forEach((day, di) =>
+            hours.forEach((hour, hi) => rows.push({ id: `${day}-${hour}`, day, hour, load: base[di * hours.length + hi] + ((di * 7 + hi * 3) % 9) })),
+        );
+        return rows;
+    })(),
+};
+
+const CANDLESTICK_WEEK: GalleryExample = {
+    id: "candlestick-week",
+    title: "K 线 · 两周日线",
+    note: "实体与影线按涨跌着色,悬停读完整 OHLC。",
+    spec: {
+        mark: "candlestick",
+        keyField: "id",
+        encoding: [
+            { field: "day", channel: "x" },
+            { field: "open", channel: "open" },
+            { field: "high", channel: "high" },
+            { field: "low", channel: "low" },
+            { field: "close", channel: "close" },
+        ],
+    },
+    rows: [
+        { id: "d01", day: "5/6", open: 102, high: 108, low: 99, close: 106 },
+        { id: "d02", day: "5/7", open: 106, high: 109, low: 100, close: 101 },
+        { id: "d03", day: "5/8", open: 101, high: 112, low: 100, close: 110 },
+        { id: "d04", day: "5/9", open: 110, high: 115, low: 107, close: 113 },
+        { id: "d05", day: "5/10", open: 113, high: 114, low: 104, close: 105 },
+        { id: "d06", day: "5/13", open: 105, high: 111, low: 103, close: 109 },
+        { id: "d07", day: "5/14", open: 109, high: 118, low: 108, close: 116 },
+        { id: "d08", day: "5/15", open: 116, high: 120, low: 112, close: 113 },
+        { id: "d09", day: "5/16", open: 113, high: 117, low: 110, close: 115 },
+        { id: "d10", day: "5/17", open: 115, high: 122, low: 114, close: 121 },
+    ],
+};
+
+const BOXPLOT_TEAMS: GalleryExample = {
+    id: "boxplot-teams",
+    title: "箱线 · 三组响应时延分布",
+    note: "五数概括与 1.5 IQR 须在 compile 计算,异常值是真实离群点。",
+    spec: {
+        mark: "boxplot",
+        encoding: [
+            { field: "team", channel: "x" },
+            { field: "latency", channel: "y" },
+        ],
+    },
+    rows: (() => {
+        const mk = (team: string, values: number[]) => values.map((latency) => ({ team, latency }));
+        return [
+            ...mk("api", [42, 45, 47, 48, 50, 51, 53, 55, 58, 60, 61, 63, 66, 70, 240]),
+            ...mk("web", [60, 64, 66, 70, 72, 75, 77, 80, 83, 85, 88, 92, 95]),
+            ...mk("batch", [120, 128, 131, 135, 139, 142, 148, 151, 157, 163, 170, 178, 186, 320, 345]),
+        ];
+    })(),
+};
+
+const HISTOGRAM_LATENCY: GalleryExample = {
+    id: "histogram-latency",
+    title: "直方图 · 请求时延分布",
+    note: "分箱宽度取 Freedman–Diaconis,边界对齐整齐刻度,柱间无缝。",
+    spec: { mark: "histogram", encoding: [{ field: "latency", channel: "x" }] },
+    rows: (() => {
+        const rows: Record<string, unknown>[] = [];
+        let seed = 42;
+        const rand = () => {
+            seed = (seed * 1103515245 + 12345) % 2147483648;
+            return seed / 2147483648;
+        };
+        for (let i = 0; i < 220; i++) {
+            const u = rand();
+            const v = rand();
+            const latency = Math.round(50 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * 18 + (i % 17 === 0 ? 60 : 0));
+            rows.push({ latency });
+        }
+        return rows;
+    })(),
+};
+
+const WATERFALL_PROFIT: GalleryExample = {
+    id: "waterfall-profit",
+    title: "瀑布 · 季度利润桥",
+    note: "每段增量浮在累计水平上,涨跌着色,虚线连接相邻水平。",
+    spec: {
+        mark: "waterfall",
+        keyField: "id",
+        encoding: [
+            { field: "stage", channel: "x" },
+            { field: "delta", channel: "y" },
+        ],
+    },
+    rows: [
+        { id: "w0", stage: "期初现金", delta: 180 },
+        { id: "w1", stage: "销售收入", delta: 240 },
+        { id: "w2", stage: "退款折让", delta: -45 },
+        { id: "w3", stage: "云服务", delta: -90 },
+        { id: "w4", stage: "人力成本", delta: -120 },
+        { id: "w5", stage: "其他收益", delta: 35 },
+    ],
+};
+
+const BUMP_APPS: GalleryExample = {
+    id: "bump-apps",
+    title: "排名 · 应用周活名次",
+    note: "秩次在 compile 计算,并列取最小秩,第 1 名在顶部。",
+    spec: {
+        mark: "bump",
+        keyField: "id",
+        encoding: [
+            { field: "week", channel: "x" },
+            { field: "active", channel: "y" },
+            { field: "app", channel: "color" },
+        ],
+    },
+    rows: (() => {
+        const scores: Record<string, number[]> = {
+            Alpha: [52, 48, 61, 66, 70],
+            Beta: [60, 55, 50, 58, 62],
+            Core: [40, 58, 66, 49, 55],
+            Delta: [45, 40, 44, 60, 48],
+        };
+        const rows: Record<string, unknown>[] = [];
+        Object.entries(scores).forEach(([app, values]) => values.forEach((active, i) => rows.push({ id: `${app}-${i}`, week: `W${i + 1}`, active, app })));
+        return rows;
+    })(),
+};
+
+const SLOPE_SHARE: GalleryExample = {
+    id: "slope-share",
+    title: "坡度 · 两年份额变化",
+    note: "恰两个时点连线,端点值标签在外侧。",
+    spec: {
+        mark: "slope",
+        keyField: "id",
+        encoding: [
+            { field: "year", channel: "x" },
+            { field: "share", channel: "y" },
+            { field: "brand", channel: "color" },
+        ],
+    },
+    rows: [
+        { id: "a20", year: "2023", share: 32, brand: "Alpha" },
+        { id: "a24", year: "2025", share: 41, brand: "Alpha" },
+        { id: "b20", year: "2023", share: 44, brand: "Beta" },
+        { id: "b24", year: "2025", share: 36, brand: "Beta" },
+        { id: "c20", year: "2023", share: 24, brand: "Core" },
+        { id: "c24", year: "2025", share: 23, brand: "Core" },
+    ],
+};
+
+const GAUGE_LOAD: GalleryExample = {
+    id: "gauge-load",
+    title: "仪表盘 · 集群水位",
+    note: "240° 扫掠,值域 0–100,中心读数与五档刻度。",
+    spec: { mark: "gauge", encoding: [{ field: "load", channel: "theta" }], valueDomain: [0, 100] },
+    rows: [{ load: 72 }],
+};
+
+const ROSE_KINDS: GalleryExample = {
+    id: "rose-kinds",
+    title: "玫瑰 · 工单类型分布",
+    note: "等角花瓣半径随值,环刻度是真实数值域。",
+    spec: {
+        mark: "rose",
+        keyField: "id",
+        encoding: [
+            { field: "kind", channel: "x" },
+            { field: "count", channel: "y" },
+        ],
+    },
+    rows: [
+        { id: "k1", kind: "缺陷", count: 46 },
+        { id: "k2", kind: "需求", count: 78 },
+        { id: "k3", kind: "咨询", count: 30 },
+        { id: "k4", kind: "优化", count: 55 },
+        { id: "k5", kind: "安全", count: 22 },
+        { id: "k6", kind: "文档", count: 18 },
+    ],
+};
+
+const RADIAL_GOALS: GalleryExample = {
+    id: "radial-goals",
+    title: "径向条 · 目标完成度",
+    note: "同心环扫掠按 值/域最大值,首类最外环。",
+    spec: {
+        mark: "radial-bar",
+        keyField: "id",
+        encoding: [
+            { field: "goal", channel: "x" },
+            { field: "done", channel: "y" },
+        ],
+    },
+    rows: [
+        { id: "g1", goal: "注册", done: 82 },
+        { id: "g2", goal: "激活", done: 64 },
+        { id: "g3", goal: "留存", done: 47 },
+        { id: "g4", goal: "付费", done: 29 },
+    ],
+};
+
+const BULLET_KPIS: GalleryExample = {
+    id: "bullet-kpis",
+    title: "子弹 · 三项 KPI",
+    note: "定性带 60/85/100%,实测条与目标刻线同轴。",
+    spec: {
+        mark: "bullet",
+        keyField: "id",
+        encoding: [
+            { field: "kpi", channel: "x" },
+            { field: "actual", channel: "y" },
+            { field: "target", channel: "target" },
+            { field: "cap", channel: "range" },
+        ],
+    },
+    rows: [
+        { id: "k1", kpi: "营收(万)", actual: 220, target: 250, cap: 300 },
+        { id: "k2", kpi: "续费率(%)", actual: 86, target: 90, cap: 100 },
+        { id: "k3", kpi: "新客(千)", actual: 41, target: 36, cap: 60 },
+    ],
+};
+
+const TREEMAP_DISK: GalleryExample = {
+    id: "treemap-disk",
+    title: "矩形树图 · 存储占用",
+    note: "squarified 布局,父级面积=叶值求和,顶层着色。",
+    spec: {
+        mark: "treemap",
+        keyField: "id",
+        parentField: "parent",
+        encoding: [{ field: "gb", channel: "size" }],
+    },
+    rows: [
+        { id: "根", parent: null, gb: 0 },
+        { id: "媒体", parent: "根", gb: 0 },
+        { id: "文档", parent: "根", gb: 0 },
+        { id: "系统", parent: "根", gb: 0 },
+        { id: "视频", parent: "媒体", gb: 420 },
+        { id: "图片", parent: "媒体", gb: 260 },
+        { id: "音频", parent: "媒体", gb: 90 },
+        { id: "设计稿", parent: "文档", gb: 140 },
+        { id: "合同", parent: "文档", gb: 60 },
+        { id: "表格", parent: "文档", gb: 45 },
+        { id: "运行时", parent: "系统", gb: 180 },
+        { id: "缓存", parent: "系统", gb: 120 },
+        { id: "日志", parent: "系统", gb: 75 },
+    ],
+};
+
+const SANKEY_FLOW: GalleryExample = {
+    id: "sankey-flow",
+    title: "桑基 · 数据层流转",
+    note: "节点按最长路径分层,流带厚度=真实流量,重心排序减少交叉。",
+    spec: {
+        mark: "sankey",
+        encoding: [
+            { field: "src", channel: "source" },
+            { field: "dst", channel: "target" },
+            { field: "gb", channel: "value" },
+        ],
+    },
+    rows: [
+        { src: "采集", dst: "热层", gb: 120 },
+        { src: "采集", dst: "温层", gb: 80 },
+        { src: "热层", dst: "实时计算", gb: 90 },
+        { src: "热层", dst: "在线缓存", gb: 30 },
+        { src: "温层", dst: "离线计算", gb: 60 },
+        { src: "温层", dst: "归档", gb: 20 },
+        { src: "实时计算", dst: "告警", gb: 25 },
+        { src: "实时计算", dst: "看板", gb: 65 },
+        { src: "离线计算", dst: "报表", gb: 45 },
+        { src: "离线计算", dst: "归档", gb: 15 },
+    ],
+};
+
+const RIDGELINE_SERVICES: GalleryExample = {
+    id: "ridgeline-services",
+    title: "山脊 · 服务时延密度",
+    note: "KDE 在 compile 计算,共享网格,组内归一化峰高。",
+    spec: {
+        mark: "ridgeline",
+        encoding: [
+            { field: "latency", channel: "x" },
+            { field: "service", channel: "y" },
+        ],
+    },
+    rows: (() => {
+        const rows: Record<string, unknown>[] = [];
+        let seed = 7;
+        const rand = () => {
+            seed = (seed * 1103515245 + 12345) % 2147483648;
+            return seed / 2147483648;
+        };
+        const mk = (service: string, center: number, spread: number, n: number) => {
+            for (let i = 0; i < n; i++) {
+                const u = rand();
+                const v = rand();
+                rows.push({ service, latency: Math.round(center + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * spread) });
+            }
+        };
+        mk("api", 48, 12, 160);
+        mk("web", 76, 18, 160);
+        mk("batch", 132, 26, 160);
+        mk("edge", 34, 9, 160);
+        return rows;
+    })(),
+};
+
+const FUNNEL_SIGNUP: GalleryExample = {
+    id: "funnel-signup",
+    title: "漏斗 · 注册转化",
+    note: "阶段降序梯形,宽度随真实人数,标注占首层百分比。",
+    spec: {
+        mark: "funnel",
+        keyField: "id",
+        encoding: [
+            { field: "stage", channel: "x" },
+            { field: "users", channel: "y" },
+        ],
+    },
+    rows: [
+        { id: "f1", stage: "落地页访问", users: 12800 },
+        { id: "f2", stage: "开始注册", users: 5400 },
+        { id: "f3", stage: "验证邮箱", users: 3600 },
+        { id: "f4", stage: "完善资料", users: 2100 },
+        { id: "f5", stage: "首次付费", users: 860 },
+    ],
+};
+
+const BUBBLE_PRODUCTS: GalleryExample = {
+    id: "bubble-products",
+    title: "气泡 · 价格×评分×销量",
+    note: "面积随销量平方根映射,重叠仍可分辨。",
+    spec: {
+        mark: "point",
+        keyField: "id",
+        encoding: [
+            { field: "price", channel: "x" },
+            { field: "rating", channel: "y" },
+            { field: "sales", channel: "size" },
+        ],
+    },
+    rows: [
+        { id: "p1", price: 39, rating: 4.6, sales: 1800 },
+        { id: "p2", price: 59, rating: 4.2, sales: 950 },
+        { id: "p3", price: 79, rating: 4.8, sales: 2600 },
+        { id: "p4", price: 99, rating: 3.9, sales: 420 },
+        { id: "p5", price: 129, rating: 4.4, sales: 1300 },
+        { id: "p6", price: 149, rating: 4.1, sales: 680 },
+        { id: "p7", price: 199, rating: 4.7, sales: 340 },
+        { id: "p8", price: 249, rating: 3.8, sales: 210 },
+        { id: "p9", price: 69, rating: 4.9, sales: 3200 },
+        { id: "p10", price: 89, rating: 4.0, sales: 760 },
+    ],
+};
+
+const ERROR_BAR_GROUPS: GalleryExample = {
+    id: "error-groups",
+    title: "误差线 · 实验组均值",
+    note: "yError 通道工字梁,y 域自动含误差端点。",
+    spec: {
+        mark: "bar",
+        keyField: "id",
+        encoding: [
+            { field: "group", channel: "x" },
+            { field: "mean", channel: "y" },
+            { field: "err", channel: "yError" },
+        ],
+    },
+    rows: [
+        { id: "e1", group: "对照组", mean: 62, err: 9 },
+        { id: "e2", group: "实验 A", mean: 74, err: 12 },
+        { id: "e3", group: "实验 B", mean: 81, err: 7 },
+        { id: "e4", group: "实验 C", mean: 58, err: 14 },
+    ],
+};
+
+const SPARKLINE_TRAFFIC: GalleryExample = {
+    id: "sparkline-traffic",
+    title: "迷你图 · 行内流量",
+    note: "spark 模式去轴去图例,只留数据线本体,命中与 tooltip 保留。",
+    spec: {
+        mark: "area",
+        spark: true,
+        encoding: [
+            { field: "hour", channel: "x" },
+            { field: "req", channel: "y" },
+        ],
+    },
+    rows: [
+        { hour: 0, req: 22 }, { hour: 1, req: 18 }, { hour: 2, req: 15 }, { hour: 3, req: 12 },
+        { hour: 4, req: 16 }, { hour: 5, req: 28 }, { hour: 6, req: 45 }, { hour: 7, req: 68 },
+        { hour: 8, req: 92 }, { hour: 9, req: 120 }, { hour: 10, req: 108 }, { hour: 11, req: 96 },
+    ],
+};
+
 export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     WEEK_VISITORS,
     QUARTER_SALES,
@@ -356,6 +769,24 @@ export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     SCATTER_LATENCY,
     NEGATIVE_DELTAS,
     CJK_LABELS,
+    HEATMAP_LOAD,
+    CANDLESTICK_WEEK,
+    BOXPLOT_TEAMS,
+    HISTOGRAM_LATENCY,
+    WATERFALL_PROFIT,
+    BUMP_APPS,
+    SLOPE_SHARE,
+    GAUGE_LOAD,
+    ROSE_KINDS,
+    RADIAL_GOALS,
+    BULLET_KPIS,
+    TREEMAP_DISK,
+    SANKEY_FLOW,
+    RIDGELINE_SERVICES,
+    FUNNEL_SIGNUP,
+    BUBBLE_PRODUCTS,
+    ERROR_BAR_GROUPS,
+    SPARKLINE_TRAFFIC,
     BAD_SPEC,
 ];
 
