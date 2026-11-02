@@ -2256,4 +2256,676 @@ console.log('charts-render: the published facade dist is byte-identical to the i
     if (!prefixed.includes('<clipPath id="f1-clip-0">')) fail('facade renderSvg must honour resourceIdPrefix');
 }
 
+// ─── Extended mark families (heatmap / finance / distribution / flow / radial) ───
+
+console.log('charts-render: heatmap cells bind band × band slots to a value ramp…');
+{
+    const heatSpec = {
+        mark: 'heatmap',
+        keyField: 'id',
+        encoding: [
+            { field: 'day', channel: 'x' },
+            { field: 'hour', channel: 'y' },
+            { field: 'load', channel: 'color' },
+        ],
+    };
+    const heatRows = [
+        { id: 'a', day: 'Mon', hour: '09', load: 10 },
+        { id: 'b', day: 'Mon', hour: '12', load: 90 },
+        { id: 'c', day: 'Tue', hour: '09', load: 45 },
+        { id: 'd', day: 'Tue', hour: '12', load: 60 },
+    ];
+    const { plan, semantic } = pipeline(heatSpec, heatRows);
+    // color is a value channel here — it must NOT create a series legend.
+    if (plan.series.field !== null) fail('heatmap color must not resolve as a series domain');
+    const cells = semantic.root.children.filter((n) => n.id.startsWith('heatmap:') && n.role === 'chart.mark');
+    if (cells.length !== 4) fail(`want 4 heatmap cells, got ${cells.length}`);
+    // Ramp endpoints: the minimum value samples ramp[0], the maximum ramp[last].
+    const ramp = DEFAULT_CHART_THEME.heatmapRamp;
+    const cellA = cells.find((n) => n.id === 'heatmap:a');
+    const cellB = cells.find((n) => n.id === 'heatmap:b');
+    if (cellA.fill.color.r !== ramp[0].r || cellA.fill.color.g !== ramp[0].g) fail('min value must sample the ramp start');
+    const last = ramp[ramp.length - 1];
+    if (cellB.fill.color.r !== last.r || cellB.fill.color.b !== last.b) fail('max value must sample the ramp end');
+    // Band slots: cells share two distinct x and y slot origins, y top-down.
+    const xs = new Set(cells.map((n) => Math.round(n.x)));
+    const ys = new Set(cells.map((n) => Math.round(n.y)));
+    if (xs.size !== 2 || ys.size !== 2) fail('heatmap cells must tile band × band slots');
+    const mon = cells.find((n) => n.id === 'heatmap:a');
+    const tue = cells.find((n) => n.id === 'heatmap:c');
+    if (!(tue.x > mon.x)) fail('x categories must run left to right');
+    const h09 = cells.find((n) => n.id === 'heatmap:a');
+    const h12 = cells.find((n) => n.id === 'heatmap:b');
+    if (!(h12.y > h09.y)) fail('y categories must run top-down in first-appearance order');
+    // Stepped gradient legend with domain endpoints.
+    const steps = semantic.root.children.filter((n) => n.id.startsWith('heatmap-ramp:') && n.kind === 'rect');
+    if (steps.length !== 24) fail(`want a 24-step gradient legend, got ${steps.length}`);
+    if (!semantic.root.children.some((n) => n.id === 'heatmap-ramp:min')) fail('ramp legend must carry a min label');
+    if (!semantic.root.children.some((n) => n.id === 'heatmap-ramp:max')) fail('ramp legend must carry a max label');
+    // The ramp strip reserves headroom above the plot — it never clips out of
+    // the viewport and never covers a cell.
+    const rampY = steps[0].y;
+    if (rampY < 0) fail(`the ramp legend must stay inside the viewport, got y=${rampY}`);
+    const topCellY = Math.min(...cells.map((n) => n.y));
+    if (rampY + steps[0].h > topCellY) fail('the ramp legend must not overlap heatmap cells');
+    // Cells carry explicit rect hit regions for the host.
+    if (!cells.every((n) => n.hitRegion && n.hitRegion.rect)) fail('heatmap cells must carry rect hit regions');
+    if (validateScene(semantic).some((d) => d.code === 'davinci.scene.duplicate-id')) fail('heatmap ids must be unique');
+}
+
+console.log('charts-render: candlestick draws bodies and wicks with up/down colors…');
+{
+    const candleSpec = {
+        mark: 'candlestick',
+        keyField: 'id',
+        encoding: [
+            { field: 'day', channel: 'x' },
+            { field: 'open', channel: 'open' },
+            { field: 'high', channel: 'high' },
+            { field: 'low', channel: 'low' },
+            { field: 'close', channel: 'close' },
+        ],
+    };
+    const candleRows = [
+        { id: 'd1', day: 'Mon', open: 10, high: 15, low: 8, close: 14 },
+        { id: 'd2', day: 'Tue', open: 14, high: 16, low: 9, close: 11 },
+        { id: 'd3', day: 'Wed', open: 11, high: 18, low: 10, close: 17 },
+    ];
+    const { plan, semantic } = pipeline(candleSpec, candleRows);
+    // The y domain spans the union of low / high, never the zero baseline.
+    const ys = plan.scales.get('y');
+    if (!ys || ys.kind !== 'linear' || ys.domain[0] !== 8 || ys.domain[1] !== 18) {
+        fail(`candlestick y domain must be [min low, max high], got ${JSON.stringify(ys && ys.domain)}`);
+    }
+    const sticks = semantic.root.children.filter((n) => n.id.startsWith('candlestick:') && n.role === 'chart.mark');
+    if (sticks.length !== 3) fail(`want 3 candlesticks, got ${sticks.length}`);
+    const d1 = sticks.find((n) => n.id === 'candlestick:d1');
+    const d2 = sticks.find((n) => n.id === 'candlestick:d2');
+    if (d1.fill.color.g !== DEFAULT_CHART_THEME.upColor.g) fail('close ≥ open must use the up color');
+    if (d2.fill.color.r !== DEFAULT_CHART_THEME.downColor.r) fail('close < open must use the down color');
+    // Hit region spans the full high..low range at body width.
+    if (!d1.hitRegion || !d1.hitRegion.rect) fail('candlestick must carry a rect hit region');
+    // Wick lines: each candle path has more than just the body subpath.
+    if (d1.path.commands.length < 8) fail('candlestick path must carry body + wick subpaths');
+    // Missing OHLC channel is an authoring error.
+    const bad = compile(
+        { mark: 'candlestick', encoding: [{ field: 'open', channel: 'open' }] },
+        fromRows([{ open: 1, high: 2, low: 0, close: 1 }]),
+    );
+    if (!bad.diagnostics.items.some((d) => d.code === 'davinci.chart.missing-encoding')) {
+        fail('candlestick without OHLC channels must raise missing-encoding');
+    }
+}
+
+console.log('charts-render: boxplot summarizes groups into real five-number geometry…');
+{
+    const boxSpec = {
+        mark: 'boxplot',
+        encoding: [
+            { field: 'team', channel: 'x' },
+            { field: 'score', channel: 'y' },
+        ],
+    };
+    const boxRows = [
+        { team: 'A', score: 1 }, { team: 'A', score: 2 }, { team: 'A', score: 3 },
+        { team: 'A', score: 4 }, { team: 'A', score: 5 }, { team: 'A', score: 100 },
+        { team: 'B', score: 10 }, { team: 'B', score: 20 }, { team: 'B', score: 30 },
+    ];
+    const { plan, semantic } = pipeline(boxSpec, boxRows);
+    if (!plan.stat) fail('boxplot must materialize a stat snapshot');
+    // Type-7 quartiles on A = [1,2,3,4,5,100]: q1 2.25, med 3.5, q3 4.75,
+    // fences [−1.5, 8.5] → whiskers 1..5, one outlier 100.
+    const catCol = plan.stat.columns.find((c) => c.name === 'category');
+    const kindCol = plan.stat.columns.find((c) => c.name === 'kind');
+    const medCol = plan.stat.columns.find((c) => c.name === 'median');
+    const highCol = plan.stat.columns.find((c) => c.name === 'high');
+    const boxRowA = 0;
+    if (String(catCol.values[boxRowA]) !== 'A' || String(kindCol.values[boxRowA]) !== 'box') fail('first stat row must be box A');
+    if (Math.abs(medCol.values[boxRowA] - 3.5) > 1e-9) fail(`A median must be 3.5, got ${medCol.values[boxRowA]}`);
+    if (Math.abs(highCol.values[boxRowA] - 5) > 1e-9) fail('A whisker high must be the fence-clamped 5');
+    const outlierIdx = kindCol.values.findIndex((k) => k === 'outlier');
+    if (outlierIdx < 0) fail('A must produce one outlier row');
+    const boxes = semantic.root.children.filter((n) => n.id.startsWith('boxplot:') && n.role === 'chart.mark');
+    if (boxes.length !== 3) fail(`want 2 boxes + 1 outlier, got ${boxes.length}`);
+    const boxA = boxes.find((n) => n.id === 'boxplot:A');
+    if (!boxA || boxA.kind !== 'path') fail('box A must be a path mark');
+    if (boxA.path.commands.length < 13) fail('box path must carry box + whiskers + caps + median');
+    if (!boxA.hitRegion || !boxA.hitRegion.rect) fail('box A must carry a rect hit region');
+    if (!boxes.some((n) => n.id === 'boxplot:A~o0' && n.kind === 'ellipse')) fail('the outlier must be an ellipse mark');
+    // Facet + stat-driven mark is refused loudly.
+    const facetBad = compile({ ...boxSpec, facetField: 'team' }, fromRows(boxRows));
+    if (!facetBad.diagnostics.items.some((d) => d.code === 'davinci.chart.facet-stat-unsupported')) {
+        fail('boxplot + facetField must raise facet-stat-unsupported');
+    }
+}
+
+console.log('charts-render: histogram bins real values into contiguous full-width bars…');
+{
+    const histSpec = { mark: 'histogram', encoding: [{ field: 'latency', channel: 'x' }] };
+    const histRows = Array.from({ length: 20 }, (_, i) => ({ latency: i + 1 }));
+    const { plan, semantic } = pipeline(histSpec, histRows);
+    if (!plan.stat) fail('histogram must materialize a stat snapshot');
+    const countCol = plan.stat.columns.find((c) => c.name === 'count');
+    const total = countCol.values.reduce((a, b) => a + b, 0);
+    if (total !== 20) fail(`bin counts must sum to the input size, got ${total}`);
+    const xs = plan.scales.get('x');
+    const x0Col = plan.stat.columns.find((c) => c.name === 'x0');
+    const x1Col = plan.stat.columns.find((c) => c.name === 'x1');
+    if (xs.domain[0] !== x0Col.values[0] || xs.domain[1] !== x1Col.values[x1Col.values.length - 1]) {
+        fail('the x domain must equal the bin extent');
+    }
+    const ys = plan.scales.get('y');
+    if (!ys || ys.domain[0] !== 0) fail('the count axis must be zero-based');
+    const bars = semantic.root.children.filter((n) => n.id.startsWith('histogram:') && n.role === 'chart.mark');
+    if (bars.length !== plan.stat.rowCount) fail('every bin must draw one bar');
+    // Bars are contiguous: the right edge of one bin meets the next bin's left edge.
+    for (let i = 1; i < bars.length; i++) {
+        const prev = bars[i - 1];
+        const cur = bars[i];
+        if (Math.abs(prev.x + prev.w - cur.x) > 1.5) fail('histogram bars must be contiguous');
+    }
+    if (semantic.root.children.some((n) => n.id === 'chart-legend')) fail('ungrouped histogram must not draw a legend');
+}
+
+console.log('charts-render: waterfall floats deltas on cumulative bases with connectors…');
+{
+    const wfSpec = {
+        mark: 'waterfall',
+        keyField: 'id',
+        encoding: [
+            { field: 'stage', channel: 'x' },
+            { field: 'delta', channel: 'y' },
+        ],
+    };
+    const wfRows = [
+        { id: 'w0', stage: '期初', delta: 100 },
+        { id: 'w1', stage: '增收', delta: 20 },
+        { id: 'w2', stage: '退款', delta: -30 },
+        { id: 'w3', stage: '复购', delta: 10 },
+    ];
+    const { plan, semantic } = pipeline(wfSpec, wfRows);
+    // Cumulative bases: 0, 100, 120, 90.
+    const bases = plan.marks.map((m) => m.stackBase);
+    if (JSON.stringify(bases) !== JSON.stringify([0, 100, 120, 90])) fail(`waterfall bases must accumulate, got ${bases}`);
+    // The y domain covers every prefix sum from zero.
+    const ys = plan.scales.get('y');
+    if (ys.domain[0] !== 0 || ys.domain[1] !== 120) fail(`waterfall y domain must be [0, 120], got ${ys.domain}`);
+    const bars = semantic.root.children.filter((n) => n.id.startsWith('waterfall:') && n.role === 'chart.mark');
+    if (bars.length !== 4) fail(`want 4 waterfall bars, got ${bars.length}`);
+    const w1 = bars.find((n) => n.id === 'waterfall:w1');
+    const w2 = bars.find((n) => n.id === 'waterfall:w2');
+    if (w1.fill.color.g !== DEFAULT_CHART_THEME.upColor.g) fail('a positive delta must use the up color');
+    if (w2.fill.color.r !== DEFAULT_CHART_THEME.downColor.r) fail('a negative delta must use the down color');
+    // Floating: the second bar's bottom sits at the first bar's top, not zero.
+    const w0 = bars.find((n) => n.id === 'waterfall:w0');
+    if (Math.abs(w1.y + w1.h - w0.y) > 1e-9) fail('each delta must float on the previous cumulative level');
+    const links = semantic.root.children.filter((n) => n.id.startsWith('waterfall:link:'));
+    if (links.length !== 3) fail(`want 3 waterfall connectors, got ${links.length}`);
+}
+
+console.log('charts-render: bump ranks series per x with an inverted rank axis…');
+{
+    const bumpSpec = {
+        mark: 'bump',
+        keyField: 'id',
+        encoding: [
+            { field: 'week', channel: 'x' },
+            { field: 'score', channel: 'y' },
+            { field: 'app', channel: 'color' },
+        ],
+    };
+    const bumpRows = [
+        { id: 'a1', week: 'W1', score: 30, app: 'Alpha' },
+        { id: 'b1', week: 'W1', score: 30, app: 'Beta' },
+        { id: 'c1', week: 'W1', score: 10, app: 'Core' },
+        { id: 'a2', week: 'W2', score: 20, app: 'Alpha' },
+        { id: 'b2', week: 'W2', score: 40, app: 'Beta' },
+        { id: 'c2', week: 'W2', score: 10, app: 'Core' },
+    ];
+    const { plan, semantic } = pipeline(bumpSpec, bumpRows);
+    // Competition ranking: W1 ties at 30 share rank 1, 10 takes rank 3.
+    const rankOf = new Map(plan.marks.map((m) => [m.key, m.channels.get('rank')]));
+    if (rankOf.get('a1') !== 1 || rankOf.get('b1') !== 1 || rankOf.get('c1') !== 3) fail('W1 ranks must be 1,1,3');
+    if (rankOf.get('b2') !== 1 || rankOf.get('a2') !== 2 || rankOf.get('c2') !== 3) fail('W2 ranks must be 1,2,3');
+    // The rank axis is inverted: domain [maxRank, 1] so rank 1 sits on top.
+    const ys = plan.scales.get('y');
+    if (ys.domain[0] !== 3 || ys.domain[1] !== 1) fail(`bump y domain must be [maxRank, 1], got ${ys.domain}`);
+    const lines = semantic.root.children.filter((n) => n.id.startsWith('bump-series:'));
+    if (lines.length !== 3) fail(`want 3 bump series lines, got ${lines.length}`);
+    for (const p of lines) {
+        if (!p.hitRegion || !p.hitRegion.polyline) fail('bump lines must carry polyline hit regions with keys');
+    }
+    const dots = semantic.root.children.filter((n) => n.id.startsWith('bump:') && n.kind === 'ellipse');
+    if (dots.length !== 6) fail(`want 6 bump vertex dots, got ${dots.length}`);
+    // Rank 1 projects above rank 3.
+    const a1 = dots.find((n) => n.id === 'bump:a1');
+    const c1 = dots.find((n) => n.id === 'bump:c1');
+    if (!(a1.cy < c1.cy)) fail('rank 1 must project above rank 3');
+}
+
+console.log('charts-render: slope connects exactly two x positions with endpoint labels…');
+{
+    const slopeSpec = {
+        mark: 'slope',
+        keyField: 'id',
+        encoding: [
+            { field: 'year', channel: 'x' },
+            { field: 'share', channel: 'y' },
+            { field: 'brand', channel: 'color' },
+        ],
+    };
+    const slopeRows = [
+        { id: 'a20', year: '2020', share: 30, brand: 'Alpha' },
+        { id: 'a24', year: '2024', share: 45, brand: 'Alpha' },
+        { id: 'b20', year: '2020', share: 50, brand: 'Beta' },
+        { id: 'b24', year: '2024', share: 35, brand: 'Beta' },
+    ];
+    const { semantic } = pipeline(slopeSpec, slopeRows);
+    const lines = semantic.root.children.filter((n) => n.id.startsWith('slope-series:'));
+    if (lines.length !== 2) fail(`want 2 slope segments, got ${lines.length}`);
+    const dots = semantic.root.children.filter((n) => n.id.startsWith('slope:') && n.kind === 'ellipse');
+    if (dots.length !== 4) fail(`want 4 endpoint dots, got ${dots.length}`);
+    const labels = semantic.root.children.filter((n) => n.id.startsWith('slope:label:'));
+    if (labels.length !== 4) fail(`want 4 endpoint labels, got ${labels.length}`);
+    // Three x positions are an authoring error, not a silent line chart.
+    const bad = compile(slopeSpec, fromRows([...slopeRows, { id: 'a22', year: '2022', share: 33, brand: 'Alpha' }]));
+    if (!bad.diagnostics.items.some((d) => d.code === 'davinci.chart.slope-needs-two-x')) {
+        fail('slope with three x positions must raise slope-needs-two-x');
+    }
+}
+
+console.log('charts-render: gauge sweeps one value on a 240° track…');
+{
+    const gaugeSpec = {
+        mark: 'gauge',
+        encoding: [{ field: 'load', channel: 'theta' }],
+        valueDomain: [0, 100],
+    };
+    const { semantic } = pipeline(gaugeSpec, [{ load: 72 }]);
+    const track = semantic.root.children.find((n) => n.id === 'gauge:track');
+    const value = semantic.root.children.find((n) => n.id === 'gauge:0');
+    if (!track || !value) fail('gauge must draw a track and a value sweep');
+    const sector = value.hitRegion && value.hitRegion.sector;
+    if (!sector) fail('the value sweep must carry a sector hit region');
+    const sweep = sector.a1 - sector.a0;
+    const want = 0.72 * ((4 * Math.PI) / 3);
+    if (Math.abs(sweep - want) > 1e-9) fail(`gauge sweep must be 72% of 240°, got ${sweep}`);
+    const ticks = semantic.root.children.filter((n) => n.id.startsWith('gauge:tick:'));
+    if (ticks.length !== 5) fail(`want 5 gauge domain ticks, got ${ticks.length}`);
+    const center = semantic.root.children.find((n) => n.id === 'gauge:value');
+    if (!center || center.text !== '72') fail('gauge must label the value in the center');
+    // Extra rows are invisible — say so.
+    const two = compile(gaugeSpec, fromRows([{ load: 72 }, { load: 30 }]));
+    if (!two.diagnostics.items.some((d) => d.code === 'davinci.chart.gauge-single-value')) {
+        fail('gauge with two rows must raise gauge-single-value');
+    }
+}
+
+console.log('charts-render: rose draws equal-angle petals with value radii…');
+{
+    const roseSpec = {
+        mark: 'rose',
+        keyField: 'id',
+        encoding: [
+            { field: 'kind', channel: 'x' },
+            { field: 'count', channel: 'y' },
+        ],
+    };
+    const roseRows = [
+        { id: 'r-a', kind: 'A', count: 40 },
+        { id: 'r-b', kind: 'B', count: 80 },
+        { id: 'r-c', kind: 'C', count: 20 },
+        { id: 'r-d', kind: 'D', count: 60 },
+    ];
+    const { plan, semantic } = pipeline(roseSpec, roseRows);
+    const petals = semantic.root.children.filter((n) => n.id.startsWith('rose:') && n.role === 'chart.mark');
+    if (petals.length !== 4) fail(`want 4 rose petals, got ${petals.length}`);
+    // Equal angles, radius proportional to value: B (80) is exactly twice D... D (60) → ro_B / ro_D = 80/60.
+    const sectorOf = (id) => petals.find((n) => n.id === id).hitRegion.sector;
+    const sB = sectorOf('rose:r-b');
+    const sD = sectorOf('rose:r-d');
+    if (Math.abs(sB.rOuter / sD.rOuter - 80 / 60) > 1e-9) fail('petal radii must be value-proportional');
+    for (const p of petals) {
+        const sweep = p.hitRegion.sector.a1 - p.hitRegion.sector.a0;
+        if (Math.abs(sweep - (Math.PI * 2) / 4) > 0.03 + 1e-9) fail('petals must share equal angles');
+    }
+    // Categories form the legend domain.
+    if (plan.series.field !== 'kind') fail('rose categories must drive the legend domain');
+    const rings = semantic.root.children.filter((n) => n.id.startsWith('rose:ring:'));
+    if (rings.length === 0) fail('rose must draw value ring grid circles');
+}
+
+console.log('charts-render: radial bar sweeps concentric rings per category…');
+{
+    const radialSpec = {
+        mark: 'radial-bar',
+        keyField: 'id',
+        encoding: [
+            { field: 'goal', channel: 'x' },
+            { field: 'done', channel: 'y' },
+        ],
+    };
+    const radialRows = [
+        { id: 'g1', goal: '注册', done: 80 },
+        { id: 'g2', goal: '激活', done: 50 },
+        { id: 'g3', goal: '留存', done: 30 },
+    ];
+    const { semantic } = pipeline(radialSpec, radialRows);
+    const rings = semantic.root.children.filter((n) => n.id.startsWith('radial-bar:') && n.role === 'chart.mark');
+    if (rings.length !== 3) fail(`want 3 radial bars, got ${rings.length}`);
+    const tracks = semantic.root.children.filter((n) => n.id.startsWith('radial-track:'));
+    if (tracks.length !== 3) fail('every ring must draw a full track');
+    // Distinct concentric radii, first category outermost.
+    const s1 = rings.find((n) => n.id === 'radial-bar:g1').hitRegion.sector;
+    const s2 = rings.find((n) => n.id === 'radial-bar:g2').hitRegion.sector;
+    if (!(s1.rOuter > s2.rOuter)) fail('the first category must take the outermost ring');
+    // Sweep proportional to value / domain max (zero-based): 80 / 80 → full circle, 50 / 80 → 62.5%.
+    const maxV = Math.max(...radialRows.map((r) => r.done));
+    const sweep1 = s1.a1 - s1.a0;
+    if (Math.abs(sweep1 - (80 / maxV) * Math.PI * 2) > 1e-9) fail('radial sweep must be value/max of the domain');
+    const sweep2 = s2.a1 - s2.a0;
+    if (Math.abs(sweep2 - (50 / maxV) * Math.PI * 2) > 1e-9) fail('radial sweep must be value/max of the domain');
+}
+
+console.log('charts-render: bullet layers range bands, measure and target…');
+{
+    const bulletSpec = {
+        mark: 'bullet',
+        keyField: 'id',
+        encoding: [
+            { field: 'kpi', channel: 'x' },
+            { field: 'actual', channel: 'y' },
+            { field: 'target', channel: 'target' },
+            { field: 'cap', channel: 'range' },
+        ],
+    };
+    const bulletRows = [
+        { id: 'k1', kpi: '营收', actual: 220, target: 250, cap: 300 },
+        { id: 'k2', kpi: '续费', actual: 180, target: 150, cap: 240 },
+    ];
+    const { plan, semantic } = pipeline(bulletSpec, bulletRows);
+    // The shared domain spans measure, target and range.
+    const ys = plan.scales.get('y');
+    if (ys.domain[1] !== 300) fail(`bullet domain must cover the range channel, got ${ys.domain}`);
+    const measures = semantic.root.children.filter((n) => n.id.startsWith('bullet:') && n.role === 'chart.mark');
+    if (measures.length !== 2) fail(`want 2 bullet measures, got ${measures.length}`);
+    const bands = semantic.root.children.filter((n) => n.id.startsWith('bullet:range:k1:'));
+    if (bands.length !== 3) fail('each bullet row must draw three range bands');
+    // Bands narrow 100% → 85% → 60% of the range.
+    if (!(bands[0].w > bands[1].w && bands[1].w > bands[2].w)) fail('range bands must narrow 100 / 85 / 60');
+    const targets = semantic.root.children.filter((n) => n.id.startsWith('bullet:target:'));
+    if (targets.length !== 2) fail('each bullet row must draw a target tick');
+    // The second row sits strictly below the first.
+    if (!(measures[1].y > measures[0].y)) fail('bullet rows must stack vertically');
+}
+
+console.log('charts-render: treemap lays out squarified hierarchy with real subtree sums…');
+{
+    const treeSpec = {
+        mark: 'treemap',
+        keyField: 'id',
+        parentField: 'parent',
+        encoding: [{ field: 'size', channel: 'size' }],
+    };
+    const treeRows = [
+        { id: 'root', parent: null, size: 0 },
+        { id: 'a', parent: 'root', size: 8 },
+        { id: 'b', parent: 'root', size: 4 },
+        { id: 'a1', parent: 'a', size: 5 },
+        { id: 'a2', parent: 'a', size: 3 },
+    ];
+    const { plan, semantic } = pipeline(treeSpec, treeRows);
+    // Subtree sums: a = 5+3 = 8 (its own size ignored), root = 12.
+    const subtreeOf = (key) => plan.marks.find((m) => m.key === key).channels.get('subtree');
+    if (subtreeOf('a') !== 8 || subtreeOf('root') !== 12) fail('treemap parents must sum their leaves');
+    const rects = semantic.root.children.filter((n) => n.id.startsWith('treemap:') && n.role === 'chart.mark');
+    if (rects.length !== 5) fail(`want 5 treemap rects, got ${rects.length}`);
+    // Leaf areas follow value proportions: a1 (5) is larger than a2 (3).
+    const a1 = rects.find((n) => n.id === 'treemap:a1');
+    const a2 = rects.find((n) => n.id === 'treemap:a2');
+    if (!(a1.w * a1.h > a2.w * a2.h)) fail('treemap leaf areas must follow value order');
+    // Bigger top group covers more area than the smaller one.
+    const ra = rects.find((n) => n.id === 'treemap:a');
+    const rb = rects.find((n) => n.id === 'treemap:b');
+    if (!(ra.w * ra.h > rb.w * rb.h)) fail('top groups must follow value order');
+    // With a single synthetic root, its children are the color groups: a and b
+    // must take different palette slots, not collapse into one.
+    if (ra.fill.color.r === rb.fill.color.r && ra.fill.color.g === rb.fill.color.g && ra.fill.color.b === rb.fill.color.b) {
+        fail('single-root treemap must color top-level groups distinctly');
+    }
+    const palette0 = DEFAULT_CHART_THEME.seriesPalette[0];
+    const palette1 = DEFAULT_CHART_THEME.seriesPalette[1];
+    if (ra.fill.color.r !== palette0.r || rb.fill.color.r !== palette1.r) fail('top groups must take palette order');
+    // Parent rects carry no label — their labels would collide with children.
+    if (semantic.root.children.some((n) => n.id === 'treemap:label:a')) fail('parent nodes must not draw labels');
+    if (!semantic.root.children.some((n) => n.id === 'treemap:label:a1')) fail('leaf nodes must draw labels');
+    // A parent with its own size warns that the value is ignored.
+    const warn = compile(treeSpec, fromRows([...treeRows.slice(0, 1), { id: 'x', parent: 'root', size: 2 }, ...treeRows.slice(1)]));
+    void warn;
+    const cyc = compile(
+        treeSpec,
+        fromRows([
+            { id: 'a', parent: 'b', size: 1 },
+            { id: 'b', parent: 'a', size: 1 },
+        ]),
+    );
+    if (!cyc.diagnostics.items.some((d) => d.code === 'davinci.chart.treemap-cycle')) {
+        fail('a hierarchy cycle must raise treemap-cycle');
+    }
+    const orphan = compile(
+        treeSpec,
+        fromRows([
+            { id: 'a', parent: 'ghost', size: 1 },
+            { id: 'b', parent: null, size: 2 },
+        ]),
+    );
+    if (!orphan.diagnostics.items.some((d) => d.code === 'davinci.chart.treemap-orphan')) {
+        fail('an unknown parent must raise treemap-orphan');
+    }
+}
+
+console.log('charts-render: sankey lays out layered flows with ribbon polygons…');
+{
+    const sankeySpec = {
+        mark: 'sankey',
+        encoding: [
+            { field: 'src', channel: 'source' },
+            { field: 'dst', channel: 'target' },
+            { field: 'gb', channel: 'value' },
+        ],
+    };
+    const sankeyRows = [
+        { src: '热层', dst: '计算', gb: 10 },
+        { src: '热层', dst: '缓存', gb: 5 },
+        { src: '温层', dst: '计算', gb: 3 },
+        { src: '计算', dst: '归档', gb: 8 },
+        { src: '缓存', dst: '归档', gb: 4 },
+    ];
+    const { semantic } = pipeline(sankeySpec, sankeyRows);
+    const links = semantic.root.children.filter((n) => n.id.startsWith('sankey:') && n.role === 'chart.mark' && n.kind === 'path');
+    if (links.length !== 5) fail(`want 5 sankey link ribbons, got ${links.length}`);
+    for (const l of links) {
+        if (!l.hitRegion || !l.hitRegion.polygon) fail('sankey links must carry polygon hit regions');
+        if (!l.path.commands.some((c) => c.kind === 'cubic')) fail('sankey ribbons must be bezier curves');
+    }
+    const nodes = semantic.root.children.filter((n) => n.id.startsWith('sankey-node:'));
+    if (nodes.length !== 5) fail(`want 5 sankey nodes, got ${nodes.length}`);
+    // Layered columns: sources left of middle left of sink, strictly increasing x by depth.
+    const xOf = (name) => nodes.find((n) => n.id === `sankey-node:${name}`).x;
+    if (!(xOf('热层') < xOf('计算') && xOf('计算') < xOf('归档'))) fail('sankey depths must lay out left to right');
+    // Cycles are refused at compile time.
+    const cyc = compile(
+        sankeySpec,
+        fromRows([
+            { src: 'a', dst: 'b', gb: 1 },
+            { src: 'b', dst: 'a', gb: 1 },
+        ]),
+    );
+    if (!cyc.diagnostics.items.some((d) => d.code === 'davinci.chart.sankey-cycle')) {
+        fail('a link cycle must raise sankey-cycle');
+    }
+}
+
+console.log('charts-render: ridgeline draws one normalized density ribbon per group…');
+{
+    const ridgeSpec = {
+        mark: 'ridgeline',
+        encoding: [
+            { field: 'latency', channel: 'x' },
+            { field: 'service', channel: 'y' },
+        ],
+    };
+    const mkRows = (service, base) =>
+        Array.from({ length: 40 }, (_, i) => ({ service, latency: base + (i % 10) * 2 + Math.floor(i / 10) }));
+    const ridgeRows = [...mkRows('api', 20), ...mkRows('web', 40)];
+    const { plan, semantic } = pipeline(ridgeSpec, ridgeRows);
+    if (!plan.stat) fail('ridgeline must materialize a stat snapshot');
+    // Density is normalized per group: gy never exceeds 1, each group peaks at 1.
+    const gyCol = plan.stat.columns.find((c) => c.name === 'gy');
+    const gCol = plan.stat.columns.find((c) => c.name === 'group');
+    for (const g of ['api', 'web']) {
+        let peak = 0;
+        for (let i = 0; i < plan.stat.rowCount; i++) {
+            if (String(gCol.values[i]) !== g) continue;
+            peak = Math.max(peak, Number(gyCol.values[i]));
+        }
+        if (Math.abs(peak - 1) > 1e-9) fail(`${g} density must peak at 1, got ${peak}`);
+    }
+    const ribbons = semantic.root.children.filter((n) => n.id.startsWith('ridgeline:') && n.role === 'chart.mark');
+    if (ribbons.length !== 2) fail(`want 2 ridgeline ribbons, got ${ribbons.length}`);
+    for (const r of ribbons) {
+        if (!r.hitRegion || !r.hitRegion.polygon) fail('ridgeline ribbons must carry polygon hit regions');
+    }
+    // The first group draws above the second (first appearance = top).
+    const api = ribbons.find((n) => n.id === 'ridgeline:api');
+    const web = ribbons.find((n) => n.id === 'ridgeline:web');
+    const apiTop = Math.min(...api.hitRegion.polygon.points.map((p) => p.y));
+    const webTop = Math.min(...web.hitRegion.polygon.points.map((p) => p.y));
+    if (!(apiTop < webTop)) fail('ridgeline groups must stack top-down in first-appearance order');
+    // Baselines stay inside the plot: the last group's baseline lands on the
+    // plot bottom, and every ribbon peak stays inside the frame.
+    const allYs = ribbons.flatMap((r) => r.hitRegion.polygon.points.map((p) => p.y));
+    const plotBottom = Math.max(...allYs);
+    const axisGroup = semantic.root.children.find((n) => n.id === 'x-axis');
+    const baseline = axisGroup.children.find((c) => c.id === 'x-axis:baseline');
+    const axisY = baseline.path.commands[0].to.y;
+    if (Math.abs(plotBottom - axisY) > 0.75) {
+        fail(`the last ridgeline baseline must land on the plot bottom, got ${plotBottom} vs ${axisY}`);
+    }
+    // Groups form the legend domain.
+    if (plan.series.field !== 'service') fail('ridgeline groups must drive the legend domain');
+}
+
+console.log('charts-render: funnel stacks centered trapezoids by descending value…');
+{
+    const funnelSpec = {
+        mark: 'funnel',
+        keyField: 'id',
+        encoding: [
+            { field: 'stage', channel: 'x' },
+            { field: 'users', channel: 'y' },
+        ],
+    };
+    const funnelRows = [
+        { id: 'f1', stage: '访问', users: 1000 },
+        { id: 'f2', stage: '注册', users: 420 },
+        { id: 'f3', stage: '激活', users: 210 },
+        { id: 'f4', stage: '付费', users: 90 },
+    ];
+    const { semantic } = pipeline(funnelSpec, funnelRows);
+    const segs = semantic.root.children.filter((n) => n.id.startsWith('funnel:') && n.role === 'chart.mark');
+    if (segs.length !== 4) fail(`want 4 funnel segments, got ${segs.length}`);
+    for (const s of segs) {
+        if (!s.hitRegion || !s.hitRegion.polygon) fail('funnel segments must carry polygon hit regions');
+    }
+    // Stages sort descending: 访问 (1000) on top, 付费 (90) at the bottom.
+    const top = segs.find((n) => n.id === 'funnel:f1');
+    const bottom = segs.find((n) => n.id === 'funnel:f4');
+    const topY = Math.min(...top.hitRegion.polygon.points.map((p) => p.y));
+    const bottomY = Math.min(...bottom.hitRegion.polygon.points.map((p) => p.y));
+    if (!(topY < bottomY)) fail('funnel stages must stack descending');
+    // Widths are value-proportional and centered: top width / bottom width = 1000 / 90.
+    const widthOf = (n) => {
+        const pts = n.hitRegion.polygon.points;
+        return Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x));
+    };
+    if (Math.abs(widthOf(top) / widthOf(bottom) - 1000 / 90) > 0.5) fail('funnel widths must be value-proportional');
+}
+
+console.log('charts-render: bubble scales point area by the size channel…');
+{
+    const bubbleSpec = {
+        mark: 'point',
+        keyField: 'id',
+        encoding: [
+            { field: 'price', channel: 'x' },
+            { field: 'rating', channel: 'y' },
+            { field: 'sales', channel: 'size' },
+        ],
+    };
+    const bubbleRows = [
+        { id: 'p1', price: 10, rating: 4, sales: 100 },
+        { id: 'p2', price: 20, rating: 5, sales: 1600 },
+        { id: 'p3', price: 30, rating: 3, sales: 400 },
+    ];
+    const { semantic } = pipeline(bubbleSpec, bubbleRows);
+    const pts = semantic.root.children.filter((n) => n.id.startsWith('point:') && n.role === 'chart.mark');
+    if (pts.length !== 3) fail(`want 3 bubbles, got ${pts.length}`);
+    const rOf = (id) => pts.find((n) => n.id === `point:${id}`).rx;
+    // sqrt area mapping: the largest sale reaches the max radius, the smallest the min.
+    if (Math.abs(rOf('p2') - 16) > 1e-9) fail('the largest size must take the max bubble radius');
+    if (Math.abs(rOf('p1') - 3) > 1e-9) fail('the smallest size must take the min bubble radius');
+    if (!(rOf('p3') > rOf('p1') && rOf('p3') < rOf('p2'))) fail('bubble radii must follow the size order');
+}
+
+console.log('charts-render: error bars extend the domain and draw I-beams…');
+{
+    const errSpec = {
+        mark: 'bar',
+        keyField: 'id',
+        encoding: [
+            { field: 'group', channel: 'x' },
+            { field: 'mean', channel: 'y' },
+            { field: 'err', channel: 'yError' },
+        ],
+    };
+    const errRows = [
+        { id: 'e1', group: 'A', mean: 50, err: 12 },
+        { id: 'e2', group: 'B', mean: 80, err: 6 },
+    ];
+    const { plan, semantic } = pipeline(errSpec, errRows);
+    // The y domain covers y + err (50 + 12 = 62 must not clip).
+    const ys = plan.scales.get('y');
+    if (ys.domain[1] < 86) fail(`error bars must extend the y domain, got ${ys.domain}`);
+    const beams = semantic.root.children.filter((n) => n.id.startsWith('err:'));
+    if (beams.length !== 2) fail(`want 2 error I-beams, got ${beams.length}`);
+    // I-beams are decorative: hit testing stays on the parent bars.
+    if (beams.some((n) => n.role === 'chart.mark')) fail('error beams must stay decorative');
+    const bars = semantic.root.children.filter((n) => n.id.startsWith('bar:') && n.role === 'chart.mark');
+    if (bars.length !== 2) fail('error bars keep the underlying marks');
+}
+
+console.log('charts-render: sparkline strips furniture and keeps marks…');
+{
+    const sparkSpec = {
+        mark: 'line',
+        spark: true,
+        encoding: [
+            { field: 't', channel: 'x' },
+            { field: 'v', channel: 'y' },
+        ],
+    };
+    const sparkRows = [
+        { t: 1, v: 4 },
+        { t: 2, v: 8 },
+        { t: 3, v: 5 },
+    ];
+    const { semantic } = pipeline(sparkSpec, sparkRows);
+    if (semantic.root.children.some((n) => n.role === 'chart.axis')) fail('sparkline must drop axes');
+    if (semantic.root.children.some((n) => n.role === 'chart.grid')) fail('sparkline must drop the grid');
+    if (semantic.root.children.some((n) => n.id === 'chart-legend')) fail('sparkline must drop the legend');
+    const lines = semantic.root.children.filter((n) => n.id.startsWith('line:'));
+    if (lines.length !== 1) fail('sparkline must keep its marks');
+}
+
 console.log('charts-render PASS: chart pipeline + diagnostics + zero baseline + series + diagram SVG');

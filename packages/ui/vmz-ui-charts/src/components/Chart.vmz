@@ -609,6 +609,7 @@ export default class Chart {
         }
         if (this.spec.facetField && !fields.includes(this.spec.facetField)) fields.push(this.spec.facetField);
         if (this.spec.keyField && !fields.includes(this.spec.keyField)) fields.push(this.spec.keyField);
+        if (this.spec.parentField && !fields.includes(this.spec.parentField)) fields.push(this.spec.parentField);
         return fields;
     }
 
@@ -743,10 +744,13 @@ export default class Chart {
         return { ...spec, scales };
     }
 
-    /** 当前是否可缩放/平移：笛卡尔 + 定量 x + 非分面。 */
+    /** 当前是否可缩放/平移：笛卡尔 + 定量 x + 非分面 + 非统计型 mark
+     *  （直方图分箱与山脊密度是全局统计，视域裁剪不会重算，禁止缩放）。 */
     public _zoomable(): boolean {
         if (!this.spec) return false;
         if (this.spec.facetField) return false;
+        const markKind = String(this.spec.mark);
+        if (markKind === "histogram" || markKind === "ridgeline") return false;
         if (this._baseXDomain === null) return false;
         return true;
     }
@@ -857,7 +861,7 @@ export default class Chart {
         if (!this.spec) return out;
         if (this.spec.facetField) return out;
         const markKind = String(this.spec.mark);
-        if (markKind !== "line" && markKind !== "area") return out;
+        if (markKind !== "line" && markKind !== "area" && markKind !== "bump" && markKind !== "slope") return out;
         for (const node of this._markNodes()) {
             // 折线/面积/雷达多边形都带 stroke；没有 stroke 的路径不可见也不出点标记。
             if (node.kind !== "path" || !node.hitRegion || !("polyline" in node.hitRegion)) continue;
@@ -906,7 +910,12 @@ export default class Chart {
                     // 无分组时回退到 y 字段名而不是内部节点 id。
                     const seriesName = mark.series !== null ? mark.series : yEnc ? yEnc.field : pl.id;
                     if (yEnc) {
-                        parts.push(`${seriesName}: ${formatCell(readCell(this._plan.resolvedData, yEnc.field, mark.rowIndex))}`);
+                        const rank = this.spec && String(this.spec.mark) === "bump" ? mark.channels.get("rank") : undefined;
+                        parts.push(
+                            typeof rank === "number"
+                                ? `${seriesName}: 第 ${rank} 名`
+                                : `${seriesName}: ${formatCell(readCell(this._plan.resolvedData, yEnc.field, mark.rowIndex))}`,
+                        );
                     }
                     if (xLabel === "" && xEnc) {
                         xLabel = `${xEnc.field}: ${formatCell(readCell(this._plan.resolvedData, xEnc.field, mark.rowIndex))}`;
@@ -1078,6 +1087,17 @@ export default class Chart {
             }
             return best;
         }
+        // 多边形命中区（漏斗梯形 / 桑基流 / 山脊带）：内部射线法，外部最近边距离。
+        if (node.hitRegion && "polygon" in node.hitRegion) {
+            const pts = node.hitRegion.polygon.points;
+            if (pointInPolygon(px, py, pts)) return 0;
+            let best: number | null = null;
+            for (let i = 0; i < pts.length; i++) {
+                const d = segmentDistance(px, py, pts[i], pts[(i + 1) % pts.length]);
+                if (best === null || d < best) best = d;
+            }
+            return best;
+        }
         if (node.kind === "rect") {
             const inside = px >= node.x && px <= node.x + node.w && py >= node.y && py <= node.y + node.h;
             if (inside) {
@@ -1112,19 +1132,39 @@ export default class Chart {
 
     // ---- Tooltip（真实行数据） ----
 
-    /** 从 mark id 还原 tooltip 文本：series + x/y 字段真实值。 */
+    /** 从 mark id 还原 tooltip 文本：统计型 mark 读 stat 快照，特殊 mark
+     *  读派生量（占比 / 累计 / 秩次），其余读全部编码字段的真实行值。 */
     public _tooltipTextFor(id: string): string {
         const plan = this._plan;
         if (!plan || !this.spec) return id;
         const markKind = String(this.spec.mark);
         const xEnc = this.spec.encoding.find((e) => e.channel === "x");
         const yEnc = this.spec.encoding.find((e) => e.channel === "y");
+        // sankey 节点不是 plan.marks（由链接派生），按前缀还原：名称 + 总流量。
+        if (id.startsWith("sankey-node:")) {
+            const name = id.slice("sankey-node:".length);
+            const sEnc = this.spec.encoding.find((e) => e.channel === "source");
+            const tEnc = this.spec.encoding.find((e) => e.channel === "target");
+            const vEnc = this.spec.encoding.find((e) => e.channel === "value");
+            if (sEnc && tEnc && vEnc) {
+                let sumIn = 0;
+                let sumOut = 0;
+                for (let r = 0; r < plan.resolvedData.rowCount; r++) {
+                    const v = readCell(plan.resolvedData, vEnc.field, r);
+                    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                    if (String(readCell(plan.resolvedData, sEnc.field, r)) === name) sumOut += v;
+                    if (String(readCell(plan.resolvedData, tEnc.field, r)) === name) sumIn += v;
+                }
+                return `${name} · 总量 ${formatCell(Math.max(sumIn, sumOut))}`;
+            }
+            return name;
+        }
         // line / area 的 id 是 series 名；bar / point 是行 key。
         const mark = plan.marks.find((m) => `${markKind}:${m.key}` === id);
         if (mark) {
             const rowIndex = mark.rowIndex;
             const parts: string[] = [];
-            if (mark.series !== null) parts.push(mark.series);
+            if (mark.series !== null && markKind !== "ridgeline") parts.push(mark.series);
             if (markKind === "pie") {
                 // pie 切片报 theta 原值与真实占比（对正切片求和）。
                 const thetaEnc = this.spec.encoding.find((e) => e.channel === "theta");
@@ -1142,8 +1182,115 @@ export default class Chart {
                 }
                 return parts.length > 0 ? parts.join(" · ") : id;
             }
-            if (xEnc) parts.push(`${xEnc.field}: ${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
-            if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, rowIndex))}`);
+            // 统计型 mark：行索引指向 compile 产出的 stat 快照。
+            if (markKind === "histogram" && plan.stat) {
+                const x0 = readCell(plan.stat, "x0", rowIndex);
+                const x1 = readCell(plan.stat, "x1", rowIndex);
+                const count = readCell(plan.stat, "count", rowIndex);
+                return `[${formatCell(x0)}, ${formatCell(x1)}) · count: ${formatCell(count)}`;
+            }
+            if (markKind === "boxplot" && plan.stat) {
+                const kind = String(readCell(plan.stat, "kind", rowIndex));
+                const cat = String(readCell(plan.stat, "category", rowIndex));
+                if (kind === "outlier") {
+                    return `${cat} · 异常值: ${formatCell(readCell(plan.stat, "value", rowIndex))}`;
+                }
+                return [
+                    cat,
+                    `min ${formatCell(readCell(plan.stat, "low", rowIndex))}`,
+                    `Q1 ${formatCell(readCell(plan.stat, "q1", rowIndex))}`,
+                    `中位 ${formatCell(readCell(plan.stat, "median", rowIndex))}`,
+                    `Q3 ${formatCell(readCell(plan.stat, "q3", rowIndex))}`,
+                    `max ${formatCell(readCell(plan.stat, "high", rowIndex))}`,
+                    `n=${formatCell(readCell(plan.stat, "n", rowIndex))}`,
+                ].join(" · ");
+            }
+            if (markKind === "ridgeline") {
+                // 山脊 tooltip 是分组摘要：n 与值域从原始行现算（一次 hover 一次扫描）。
+                const group = mark.series ?? mark.key;
+                if (xEnc && yEnc) {
+                    let n = 0;
+                    let lo = Number.POSITIVE_INFINITY;
+                    let hi = Number.NEGATIVE_INFINITY;
+                    for (let r = 0; r < plan.resolvedData.rowCount; r++) {
+                        if (String(readCell(plan.resolvedData, yEnc.field, r)) !== group) continue;
+                        const v = readCell(plan.resolvedData, xEnc.field, r);
+                        if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                        n++;
+                        if (v < lo) lo = v;
+                        if (v > hi) hi = v;
+                    }
+                    return `${group} · n=${n}${n > 0 ? ` · [${formatCell(lo)}, ${formatCell(hi)}]` : ""}`;
+                }
+                return group;
+            }
+            // 特殊派生量。
+            if (markKind === "waterfall") {
+                const v = yEnc ? readCell(plan.resolvedData, yEnc.field, rowIndex) : null;
+                const cum = (mark.stackBase ?? 0) + (typeof v === "number" ? v : 0);
+                if (xEnc) parts.push(`${xEnc.field}: ${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
+                parts.push(`Δ ${formatCell(v)}`);
+                parts.push(`累计 ${formatCell(cum)}`);
+                return parts.join(" · ");
+            }
+            if (markKind === "funnel") {
+                const v = yEnc ? readCell(plan.resolvedData, yEnc.field, rowIndex) : null;
+                let max = 0;
+                for (const m of plan.marks) {
+                    const mv = yEnc ? readCell(plan.resolvedData, yEnc.field, m.rowIndex) : null;
+                    if (typeof mv === "number" && Number.isFinite(mv) && mv > max) max = mv;
+                }
+                if (xEnc) parts.push(`${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
+                parts.push(`${yEnc?.field ?? "value"}: ${formatCell(v)}`);
+                if (typeof v === "number" && max > 0) parts.push(`占首层 ${Math.round((v / max) * 1000) / 10}%`);
+                return parts.join(" · ");
+            }
+            if (markKind === "gauge") {
+                const thetaEnc = this.spec.encoding.find((e) => e.channel === "theta");
+                const domain = this.spec.valueDomain ?? [0, 100];
+                const v = thetaEnc ? readCell(plan.resolvedData, thetaEnc.field, rowIndex) : null;
+                parts.push(`${thetaEnc?.field ?? "value"}: ${formatCell(v)}`);
+                if (typeof v === "number" && domain[1] > domain[0]) {
+                    parts.push(`${Math.round(((v - domain[0]) / (domain[1] - domain[0])) * 1000) / 10}%`);
+                }
+                return parts.join(" · ");
+            }
+            if (markKind === "treemap") {
+                const subtree = mark.channels.get("subtree");
+                parts.push(mark.key);
+                parts.push(`占比值: ${formatCell(typeof subtree === "number" ? subtree : null)}`);
+                return parts.join(" · ");
+            }
+            if (markKind === "bump") {
+                const rank = mark.channels.get("rank");
+                if (xEnc) parts.push(`${xEnc.field}: ${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
+                if (typeof rank === "number") parts.push(`第 ${rank} 名`);
+                if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, rowIndex))}`);
+                return parts.join(" · ");
+            }
+            if (markKind === "sankey") {
+                const sEnc = this.spec.encoding.find((e) => e.channel === "source");
+                const tEnc = this.spec.encoding.find((e) => e.channel === "target");
+                const vEnc = this.spec.encoding.find((e) => e.channel === "value");
+                if (sEnc && tEnc && vEnc) {
+                    return `${formatCell(readCell(plan.resolvedData, sEnc.field, rowIndex))} → ${formatCell(readCell(plan.resolvedData, tEnc.field, rowIndex))} · ${formatCell(readCell(plan.resolvedData, vEnc.field, rowIndex))}`;
+                }
+            }
+            if (markKind === "radial-bar") {
+                if (xEnc) parts.push(`${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
+                const v = yEnc ? readCell(plan.resolvedData, yEnc.field, rowIndex) : null;
+                parts.push(`${yEnc?.field ?? "value"}: ${formatCell(v)}`);
+                const ys = plan.scales.get("y");
+                if (typeof v === "number" && ys && ys.kind === "linear" && ys.domain[1] > 0) {
+                    parts.push(`${Math.round((v / ys.domain[1]) * 1000) / 10}%`);
+                }
+                return parts.join(" · ");
+            }
+            // 通用路径：系列 + 全部编码字段的真实行值（heatmap / candlestick /
+            // bubble / error bar / bullet / rose / slope 等全覆盖）。
+            for (const enc of this.spec.encoding) {
+                parts.push(`${enc.field}: ${formatCell(readCell(plan.resolvedData, enc.field, rowIndex))}`);
+            }
             return parts.length > 0 ? parts.join(" · ") : id;
         }
         // facet 面板的系列级 id 带 `f<i>:` 前缀（如 `f1:line:North`），剥掉再匹配。
@@ -1179,6 +1326,10 @@ export default class Chart {
         const parts: string[] = [];
         if (mark.series !== null) parts.push(mark.series);
         if (xEnc) parts.push(`${xEnc.field}: ${formatCell(readCell(plan.resolvedData, xEnc.field, mark.rowIndex))}`);
+        if (String(this.spec.mark) === "bump") {
+            const rank = mark.channels.get("rank");
+            if (typeof rank === "number") parts.push(`第 ${rank} 名`);
+        }
         if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, mark.rowIndex))}`);
         return parts.length > 0 ? parts.join(" · ") : key;
     }
@@ -1193,6 +1344,18 @@ export default class Chart {
             const mid = (s.a0 + s.a1) / 2;
             const r = (s.rInner + s.rOuter) / 2;
             return { x: s.cx + r * Math.cos(mid), y: s.cy + r * Math.sin(mid) };
+        }
+        // 多边形命中区的锚点在质心。
+        if (node.hitRegion && "polygon" in node.hitRegion) {
+            const pts = node.hitRegion.polygon.points;
+            if (pts.length === 0) return null;
+            let sx = 0;
+            let sy = 0;
+            for (const p of pts) {
+                sx += p.x;
+                sy += p.y;
+            }
+            return { x: sx / pts.length, y: sy / pts.length };
         }
         if (node.kind === "rect") return { x: node.x + node.w / 2, y: node.y };
         if (node.kind === "ellipse") return { x: node.cx, y: node.cy - node.ry };
@@ -1254,9 +1417,11 @@ export default class Chart {
             return;
         }
 
-        // line/area：plot 内任意位置给 crosshair 最近点取值（吸附数据 x）。
+        // line/area/bump/slope：plot 内任意位置给 crosshair 最近点取值（吸附数据 x）。
         const markKind = this.spec ? String(this.spec.mark) : "";
-        const crosshairMark = (markKind === "line" || markKind === "area") && !(this.spec && this.spec.facetField);
+        const crosshairMark =
+            (markKind === "line" || markKind === "area" || markKind === "bump" || markKind === "slope") &&
+            !(this.spec && this.spec.facetField);
         if (crosshairMark && point) {
             this._hoverId = null;
             this._updateCrosshair(point);
@@ -1417,28 +1582,40 @@ export default class Chart {
         if (!root || typeof root.querySelectorAll !== "function") {
             return;
         }
+        // mark id 集合按 scene 缓存（非响应式 expando），任何 mark 前缀都覆盖，
+        // 新 mark 类型不需要回这里补白名单。
+        const bag = this as any;
+        if (!bag.__markIdSet || bag.__markIdScene !== this._semanticScene) {
+            bag.__markIdSet = new Set(this._markNodes().map((n) => n.id));
+            bag.__markIdScene = this._semanticScene;
+        }
+        const markIds = bag.__markIdSet as Set<string>;
         const selected = this.state ? this.state.selection.nodeIds : new Set<string>();
         const active = this._hoverId !== null || selected.size > 0;
-        const markPrefix = `${this.spec ? String(this.spec.mark) : "bar"}:`;
         const nodes = root.querySelectorAll("[data-dvz-id]");
         const elements = Array.from(nodes);
         for (const el of elements) {
             const id = el.getAttribute("data-dvz-id") ?? "";
-            const isMark =
-                id.startsWith(markPrefix) ||
-                id.startsWith("line:") ||
-                id.startsWith("area:") ||
-                id.startsWith("point:") ||
-                id.startsWith("circle:") ||
-                id.startsWith("rect:") ||
-                id.startsWith("bar:");
-            if (!isMark) {
+            if (!markIds.has(id)) {
                 continue;
             }
             const hot = id === this._hoverId || selected.has(id);
             el.style.opacity = !active || hot ? "1" : "0.35";
         }
     }
+}
+
+/** 射线法：点是否在闭合多边形内（漏斗 / 桑基流 / 山脊带命中）。 */
+function pointInPolygon(px: number, py: number, pts: ReadonlyArray<Point2D>): boolean {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const a = pts[i];
+        const b = pts[j];
+        if (a.y > py !== b.y > py && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x) {
+            inside = !inside;
+        }
+    }
+    return inside;
 }
 
 /** 点到线段的最短距离。 */
