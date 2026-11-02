@@ -343,8 +343,15 @@ fn emit_create_js(
     } else {
         String::new()
     };
+    // The key is known before any DOM write, so rows already present in `keyed`
+    // skip creation — `apply` calls `create` from the first missing index and
+    // trailing rows may already exist (mid-list insert).
+    let key_head = match key_field {
+        Some(f) => format!("  var k = item.{f};\n"),
+        None => "  var k = keyOf(item, i);\n".to_string(),
+    };
     let mut body = format!(
-        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n  var root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
+        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n{key_head}  if (keyed.has(k)) continue;\n  var root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
     );
     // Text writes target the sole Text child via nodeValue (vanillajs-style).
     // Acts are baked into html (`data-vmz-act`) and copied by cloneNode.
@@ -374,13 +381,7 @@ fn emit_create_js(
             on_val, off_val
         ));
     }
-    match key_field {
-        Some(f) => body.push_str(&format!(
-            "  var k = item.{f};\n  root.__vmzKey = k;\n  keyed.set(k, root);\n"
-        )),
-        None => body
-            .push_str("  var k = keyOf(item, i);\n  root.__vmzKey = k;\n  keyed.set(k, root);\n"),
-    }
+    body.push_str("  root.__vmzKey = k;\n  keyed.set(k, root);\n");
     body.push_str("  parent.insertBefore(root, end);\n");
     body.push_str("  if (entryByIndex) entryByIndex[i] = root;\n}\n");
     format!(

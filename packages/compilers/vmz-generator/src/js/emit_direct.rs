@@ -2054,7 +2054,10 @@ fn emit_each_block(
     }
     var parent = end.parentNode;
     if (!parent) return;
-    var firstNew = list.length;
+    // Apply existing rows in place and note the first missing key; `create`
+    // skips keys already present, so a mid-list insert reuses trailing rows
+    // instead of duplicating them.
+    var firstNew = -1;
     for (i = 0; i < list.length; i++) {
       var item = list[i];
       var key = keyOf(item, i);
@@ -2062,12 +2065,11 @@ fn emit_each_block(
       if (root) {
         root.__vmzBox = item;
         rk.apply.call(inst, root, item);
-      } else {
+      } else if (firstNew < 0) {
         firstNew = i;
-        break;
       }
     }
-    if (firstNew < list.length) {
+    if (firstNew >= 0) {
       rk.create.call(inst, list, firstNew, rowTplNode(), keyed, parent, end, keyOf, null);
     }
     // Keyed identity survives a pure reorder (sort by score/owner): move nodes so DOM
