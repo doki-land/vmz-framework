@@ -2,9 +2,7 @@
 //!
 //! Returns `None` when the AST shape is not yet printable.
 
-use oak_typescript::ast::{
-    Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement, TypeAnnotation,
-};
+use oak_typescript::ast::{Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement};
 use vmz_oak_frontend_adapter::parse_expression_snippet;
 
 /// Print a trimmed template expression snippet when Oak lowers and we can emit text.
@@ -177,14 +175,17 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             let body_s = print_arrow_body(body)?;
             wrap_prec(format!("{prefix}{params_s} => {body_s}"), Prec::Assign, min_prec)
         }
-        ExpressionKind::AsExpression { expression, type_annotation }
-        | ExpressionKind::TypeAssertionExpression { expression, type_annotation } => {
+        ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::TypeAssertionExpression { expression, .. } => {
+            // `as T` / `<T>` 是 TS 断言，运行时就是内层表达式：打印时剥离断言，
+            // 按 `as` 的结合强度（一元档）保留内层分组括号，不进产物 JS。
             let expr_s = print_expr(expression, Prec::Unary)?;
-            let ty = print_type_annotation(type_annotation)?;
-            wrap_prec(format!("{expr_s} as {ty}"), Prec::Unary, min_prec)
+            wrap_prec(expr_s, Prec::Unary, min_prec)
         }
         ExpressionKind::NonNullExpression(inner) => {
-            wrap_prec(format!("{}!", print_expr(inner, Prec::Postfix)?), Prec::Postfix, min_prec)
+            // 非空断言 `!` 同为 TS 专有能力。剥离后内层直接顶替本节点的优先级槽
+            // （`!` 的操作数必为左侧表达式，不存在逗号序列形态）。
+            print_expr(inner, min_prec)
         }
         ExpressionKind::FunctionExpression { .. }
         | ExpressionKind::ClassExpression { .. }
@@ -303,21 +304,6 @@ fn print_stmt(stmt: &Statement) -> Option<String> {
     }
 }
 
-fn print_type_annotation(ty: &TypeAnnotation) -> Option<String> {
-    match ty {
-        TypeAnnotation::Identifier(name) | TypeAnnotation::Predefined(name) => Some(name.clone()),
-        TypeAnnotation::Literal(lit) => match lit {
-            oak_typescript::ast::LiteralType::String(s) => Some(print_string(s)),
-            oak_typescript::ast::LiteralType::Number(n) => Some(print_number(*n)),
-            oak_typescript::ast::LiteralType::Boolean(b) => {
-                Some(if *b { "true" } else { "false" }.into())
-            }
-            oak_typescript::ast::LiteralType::BigInt(s) => Some(format!("{s}n")),
-        },
-        _ => None,
-    }
-}
-
 fn print_string(s: &str) -> String {
     if !s.contains('\'') {
         format!("'{}'", escape_js(s, '\''))
@@ -395,5 +381,60 @@ mod tests {
             print_template_expr_via_oak(r#"error ? "true" : "false""#).as_deref(),
             Some("error ? 'true' : 'false'")
         );
+    }
+
+    #[test]
+    fn strips_as_assertions_from_output() {
+        assert_eq!(print_template_expr_via_oak("foo as Bar").as_deref(), Some("foo"));
+        assert_eq!(
+            print_template_expr_via_oak("mod.default as FractalWasm").as_deref(),
+            Some("mod.default")
+        );
+        assert_eq!(
+            print_template_expr_via_oak("(mod) => mod.default as FractalWasm").as_deref(),
+            Some("(mod) => mod.default")
+        );
+        assert_eq!(
+            print_template_expr_via_oak("resolve(mod.default as FractalWasm)").as_deref(),
+            Some("resolve(mod.default)")
+        );
+    }
+
+    #[test]
+    fn stripped_as_keeps_grouping_parens() {
+        // 断言剥离后内层表达式的结合关系不能变：`(a + b) as T` 仍需括号。
+        assert_eq!(print_template_expr_via_oak("(a + b) as T").as_deref(), Some("(a + b)"));
+        assert_eq!(print_template_expr_via_oak("x * (a + b as T)").as_deref(), Some("x * (a + b)"));
+        assert_eq!(
+            print_template_expr_via_oak("flag ? a as T : b").as_deref(),
+            Some("flag ? a : b")
+        );
+    }
+
+    #[test]
+    fn strips_non_null_assertions_from_output() {
+        // 片段解析器目前不接 postfix `!`（parse 级缺口），直接构造 AST 覆盖该打印臂。
+        let el = Expression {
+            kind: Box::new(ExpressionKind::Identifier("el".into())),
+            span: (0..2).into(),
+        };
+        let non_null = Expression {
+            kind: Box::new(ExpressionKind::NonNullExpression(Box::new(el))),
+            span: (0..3).into(),
+        };
+        let dataset = Expression {
+            kind: Box::new(ExpressionKind::Identifier("dataset".into())),
+            span: (4..11).into(),
+        };
+        let member = Expression {
+            kind: Box::new(ExpressionKind::MemberExpression {
+                object: Box::new(non_null),
+                property: Box::new(dataset),
+                computed: false,
+                optional: false,
+            }),
+            span: (0..11).into(),
+        };
+        assert_eq!(print_oak_expression(&member).as_deref(), Some("el.dataset"));
     }
 }

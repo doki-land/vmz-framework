@@ -76,9 +76,7 @@ pub fn erase_types(source: &str) -> Result<String, String> {
 /// The ranges are sorted and merged, so they can be used to map erased output
 /// offsets back to the original source and to keep the minifier from emitting
 /// type-only tokens.
-pub fn erase_types_with_deletions(
-    source: &str,
-) -> Result<(String, Vec<(usize, usize)>), String> {
+pub fn erase_types_with_deletions(source: &str) -> Result<(String, Vec<(usize, usize)>), String> {
     let text = SourceText::new(source);
     let language = TypeScriptLanguage::default();
     let lexer = TypeScriptLexer::new(&language);
@@ -138,7 +136,11 @@ impl<'a> Eraser<'a> {
                     i += 1;
                 }
                 T::Case | T::Default => {
-                    case_head = true;
+                    // `.case` / `.default` 是合法成员名：点访问后不得进入
+                    // case 标签状态，否则后续冒号会被误当 case 冒号吞掉。
+                    if !self.is_member_name(i) {
+                        case_head = true;
+                    }
                     i += 1;
                 }
                 T::Import => {
@@ -296,7 +298,10 @@ impl<'a> Eraser<'a> {
                     i += 1;
                 }
                 T::Class => {
-                    pending_class = true;
+                    // `.class` 是合法成员名，不进入类头追踪。
+                    if !self.is_member_name(i) {
+                        pending_class = true;
+                    }
                     i += 1;
                 }
                 T::Implements => {
@@ -455,17 +460,24 @@ impl<'a> Eraser<'a> {
                 }
                 T::Exclamation => {
                     let next = self.kind(i + 1);
-                    let postfix = ends_expression(prev.unwrap_or(T::Eof))
-                        && next.map_or(true, is_after_non_null);
+                    let postfix =
+                        self.ends_expression_at(i) && next.map_or(true, is_after_non_null);
                     if postfix {
                         self.delete_token(i);
                     }
                     i += 1;
                 }
                 T::As => {
-                    let cast = ends_expression(prev.unwrap_or(T::Eof)) && !self.in_import_clause(i);
+                    let cast = self.ends_expression_at(i) && !self.in_import_clause(i);
                     if cast {
-                        if let Some(span) = self.type_end(i + 1, true) {
+                        let start = i + 1;
+                        if start >= self.tokens.len() || !can_start_type(self.tokens[start].kind) {
+                            return Err(format!(
+                                "type erasure cannot find a type after `as` at byte {}",
+                                token.start
+                            ));
+                        }
+                        if let Some(span) = self.type_end(start, true) {
                             self.delete(self.space_trimmed_start(i), span.end);
                             i = span.next;
                             continue;
@@ -539,6 +551,22 @@ impl<'a> Eraser<'a> {
 
     fn has_newline(&self, from: usize, to: usize) -> bool {
         self.source.get(from..to).is_some_and(|slice| slice.contains('\n'))
+    }
+
+    /// `tokens[index]` sits in member-name position (`.x` / `?.x`). Keywords are
+    /// legal member names there (`mod.default`, `foo?.class`), so handling keyed
+    /// on the keyword kind must not fire for them.
+    fn is_member_name(&self, index: usize) -> bool {
+        index > 0 && matches!(self.tokens[index - 1].kind, T::Dot | T::QuestionDot)
+    }
+
+    /// Whether the token before `index` ends an expression, treating keyword
+    /// member names (`mod.default`) as the identifiers they act as.
+    fn ends_expression_at(&self, index: usize) -> bool {
+        let Some(prev) = index.checked_sub(1).map(|slot| self.tokens[slot].kind) else {
+            return false;
+        };
+        ends_expression(prev) || self.is_member_name(index - 1)
     }
 
     fn space_trimmed_start(&self, index: usize) -> usize {
@@ -972,6 +1000,49 @@ impl<'a> Eraser<'a> {
 
 fn is_trivia(kind: T) -> bool {
     matches!(kind, T::Whitespace | T::Newline | T::LineComment | T::BlockComment)
+}
+
+/// Tokens that can open a type after `as`. Anything else means the cast is
+/// malformed; erasure reports it instead of swallowing following tokens.
+fn can_start_type(kind: T) -> bool {
+    matches!(
+        kind,
+        T::IdentifierName
+            | T::StringLiteral
+            | T::NumericLiteral
+            | T::BigIntLiteral
+            | T::BooleanLiteral
+            | T::TemplateString
+            | T::LeftParen
+            | T::LeftBrace
+            | T::LeftBracket
+            // Leading union / intersection separator.
+            | T::Pipe
+            | T::Ampersand
+            // Negative numeric literal.
+            | T::Minus
+            | T::Const
+            | T::Typeof
+            | T::Keyof
+            | T::Infer
+            | T::New
+            | T::Readonly
+            | T::Unique
+            | T::Any
+            | T::Number
+            | T::String
+            | T::Boolean
+            | T::Object
+            | T::Symbol
+            | T::Unknown
+            | T::Never
+            | T::Void
+            | T::Null
+            | T::Undefined
+            | T::True
+            | T::False
+            | T::This
+    )
 }
 
 fn is_object_literal_brace(prev: Option<T>) -> bool {

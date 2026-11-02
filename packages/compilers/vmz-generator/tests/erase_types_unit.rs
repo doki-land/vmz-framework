@@ -132,3 +132,75 @@ fn rejects_enums_and_namespaces() {
     assert!(erase_types("namespace App {\n  export const x = 1;\n}\n").is_err());
     assert!(erase_types("declare module 'vmz:http' {\n}\n").is_err());
 }
+
+#[test]
+fn erases_as_casts_after_keyword_named_members() {
+    // `default`/`type`/`class`/`new`/`delete` 是关键字，但点访问后是合法成员名；
+    // 其后的 `as` 仍是类型断言，必须剥离（LSystem `fractal-wasm.ts` 实测形态）。
+    let js = erase_types(
+        "import('./fractal.wasm').then((mod) => {\n  resolved = mod.default as FractalWasm;\n});\nconst kind = widget.type as Kind;\nconst ctor = registry.class as Ctor;\nconst made = factory.new as Made;\nconst gone = cache.delete as Gone;\nconst viaOpt = mod?.default as FractalWasm;\nconst self = mod.as as Alias;\n",
+    )
+    .unwrap();
+    assert!(!js.contains(" as "), "{js}");
+    assert!(!js.contains("FractalWasm"), "{js}");
+    assert!(js.contains("resolved = mod.default;"), "{js}");
+    assert!(js.contains("widget.type;"), "{js}");
+    assert!(js.contains("registry.class;"), "{js}");
+    assert!(js.contains("factory.new;"), "{js}");
+    assert!(js.contains("cache.delete;"), "{js}");
+    assert!(js.contains("mod?.default;"), "{js}");
+    assert!(js.contains("mod.as;"), "{js}");
+}
+
+#[test]
+fn erases_as_casts_in_expression_positions() {
+    // 变量初始化、函数实参、箭头函数返回、`then` 回调体、可选链之后。
+    let js = erase_types(
+        "const wasm = mod.default as FractalWasm;\nresolve(mod.default as FractalWasm);\nconst pick = (m) => m.default as FractalWasm;\npromise.then((m) => m.default as FractalWasm);\nconst el = doc?.body as HTMLElement;\n",
+    )
+    .unwrap();
+    assert!(!js.contains(" as "), "{js}");
+    assert!(js.contains("const wasm = mod.default;"), "{js}");
+    assert!(js.contains("resolve(mod.default);"), "{js}");
+    assert!(js.contains("(m) => m.default;"), "{js}");
+    assert!(js.contains("m.default);"), "{js}");
+    assert!(js.contains("doc?.body;"), "{js}");
+}
+
+#[test]
+fn erases_non_null_after_keyword_named_members() {
+    let js = erase_types("mod.default!.init();\nconst t = widget.type!;\n").unwrap();
+    assert!(!js.contains("default!"), "{js}");
+    assert!(!js.contains("type!"), "{js}");
+    assert!(js.contains("mod.default.init();"), "{js}");
+}
+
+#[test]
+fn keyword_named_members_do_not_corrupt_following_constructs() {
+    // `default`/`class` 作为成员名时不得进入 case/class 结构状态，
+    // 否则后续的三元冒号、类型标注与对象字面量会被误处理。
+    let js = erase_types("const x = cond ? mod.default : alt\nconst y: number = 1;\n").unwrap();
+    assert!(js.contains("cond ? mod.default : alt"), "{js}");
+    assert!(!js.contains(": number"), "{js}");
+    let js2 = erase_types("mod.class as Ctor;\nconst o = { a: 1 };\n").unwrap();
+    assert!(!js2.contains(" as "), "{js2}");
+    assert!(js2.contains("{ a: 1 }"), "{js2}");
+}
+
+#[test]
+fn rejects_dangling_as_casts() {
+    // 真正的语法错误仍要报：`as` 后面没有类型时显式拒绝，不静默吞掉后续 token。
+    assert!(erase_types("const x = foo as;\n").is_err());
+    assert!(erase_types("const x = foo as\n").is_err());
+    assert!(erase_types("const x = foo as = 1;\n").is_err());
+}
+
+#[test]
+fn keeps_as_used_as_plain_identifier() {
+    let js = erase_types("let as = 1;\nas;\nconst o = { as: 2 };\nexport { as };\nimport { a as b } from './x';\nexport { b as c };\n").unwrap();
+    assert!(js.contains("let as = 1;"), "{js}");
+    assert!(js.contains("{ as: 2 }"), "{js}");
+    assert!(js.contains("export { as };"), "{js}");
+    assert!(js.contains("import { a as b } from './x';"), "{js}");
+    assert!(js.contains("export { b as c };"), "{js}");
+}
