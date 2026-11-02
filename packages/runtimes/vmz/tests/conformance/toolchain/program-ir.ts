@@ -51,7 +51,15 @@ const report = ws.build();
 const errors = (report.diagnostics || []).filter((d) => d.severity === 'error');
 if (errors.length) fail(`N-API build errors: ${JSON.stringify(errors)}`);
 
-const cliMap = walkProgramJson(distCli);
+const cliMapAll = walkProgramJson(distCli);
+// CLI nests artifacts under the selected delivery profile (`--out-dir` root /
+// `<profile>`); N-API Workspace emits into the raw outDir. The IR byte contract
+// compares program.json content, not delivery layout: locate the CLI artifact
+// root via a unique `Application.program.json` instead of assuming a flat tree.
+const appAnchors = [...cliMapAll.keys()].filter((rel) => rel.endsWith('/Application.program.json') || rel === 'Application.program.json');
+if (appAnchors.length !== 1) fail(`expected exactly one Application.program.json under CLI dist, got ${appAnchors.length}`);
+const cliArtifactRoot = appAnchors[0] === 'Application.program.json' ? distCli : path.join(distCli, appAnchors[0].slice(0, -'Application.program.json'.length));
+const cliMap = walkProgramJson(cliArtifactRoot);
 const napiMap = walkProgramJson(distNapi);
 if (cliMap.size === 0) fail('CLI emitted no *.program.json');
 if (cliMap.size !== napiMap.size) {
