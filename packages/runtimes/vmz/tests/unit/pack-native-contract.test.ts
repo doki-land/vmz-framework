@@ -13,13 +13,15 @@ import {
 } from '../../src/workspace/pack-native.ts';
 import type { PackNativeBinding } from '../../src/workspace/pack-native.ts';
 
+const ABS = process.platform === 'win32' ? 'E:/abs' : '/abs';
+
 const validPlan = {
     artifacts: [
         {
             chunkId: 'entry/main',
             fileName: 'entry-main-ab12cd34.js',
             code: 'export const a=1;',
-            modules: ['E:/abs/src/lib.js'],
+            modules: [`${ABS}/src/lib.js`],
             imports: ['shared-9f8e7d6c.js'],
             dynamic: [],
             sourceMapFileName: 'entry-main-ab12cd34.js.map',
@@ -27,19 +29,19 @@ const validPlan = {
     ],
     assets: [
         {
-            modulePath: 'E:/abs/src/entry.js',
+            modulePath: `${ABS}/src/entry.js`,
             specifier: './logo.svg',
             fileName: 'assets/logo-0123456789abcdef.svg',
             url: '/_vmz/assets/logo-0123456789abcdef.svg',
-            sourcePath: 'E:/abs/src/logo.svg',
+            sourcePath: `${ABS}/src/logo.svg`,
         },
     ],
     styles: [
         {
             fileName: 'style-1234abcd.css',
             url: '/_vmz/style-1234abcd.css',
-            modules: ['E:/abs/src/entry.js'],
-            sourcePaths: ['E:/abs/src/theme.css'],
+            modules: [`${ABS}/src/entry.js`],
+            sourcePaths: [`${ABS}/src/theme.css`],
         },
     ],
     entryFiles: [{ logical: 'main', file: 'entry-main-ab12cd34.js' }],
@@ -69,16 +71,16 @@ function fakeBinding(planResponse: string): PackNativeBinding & { calls: string[
 describe('pack-native buildPackRequest (v0)', () => {
     it('assembles the contract request JSON with exact fields', () => {
         const requestJson = buildPackRequest({
-            entries: { main: 'E:/abs/src/entry.js' },
+            entries: { main: `${ABS}/src/entry.js` },
             target: 'browser',
-            root: 'E:/abs/project',
+            root: `${ABS}/project`,
             uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
             publicBase: '/_vmz/',
         });
         assert.deepEqual(JSON.parse(requestJson), {
-            entries: [{ logical: 'main', path: 'E:/abs/src/entry.js' }],
+            entries: [{ logical: 'main', path: `${ABS}/src/entry.js` }],
             target: 'browser',
-            root: 'E:/abs/project',
+            root: `${ABS}/project`,
             uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
             publicBase: '/_vmz/',
         });
@@ -86,9 +88,9 @@ describe('pack-native buildPackRequest (v0)', () => {
 
     it('passes the execution/exports demand through without guessing', () => {
         const requestJson = buildPackRequest({
-            entries: { main: 'E:/abs/src/entry.js' },
+            entries: { main: `${ABS}/src/entry.js` },
             target: 'node',
-            root: 'E:/abs/project',
+            root: `${ABS}/project`,
             uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
         });
@@ -98,39 +100,41 @@ describe('pack-native buildPackRequest (v0)', () => {
     });
 
     it('carries projection origins only when provided, and validates absoluteness', () => {
+        // 模板字面量作对象计算键超出 Node 类型擦除的解析面：先建表再赋值。
+        const good: Record<string, string> = {};
+        good[`${ABS}/dist/components/Widget.client.js`] = `${ABS}/node_modules/pkg/src/Widget.vmz`;
         const withOrigins = buildPackRequest({
-            entries: { main: 'E:/abs/dist/entry.js' },
+            entries: { main: `${ABS}/dist/entry.js` },
             target: 'browser',
-            root: 'E:/abs/project',
+            root: `${ABS}/project`,
             uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
-            origins: { 'E:/abs/dist/components/Widget.client.js': 'E:/abs/node_modules/pkg/src/Widget.vmz' },
+            origins: good,
         });
-        assert.deepEqual(JSON.parse(withOrigins).origins, {
-            'E:/abs/dist/components/Widget.client.js': 'E:/abs/node_modules/pkg/src/Widget.vmz',
-        });
+        assert.deepEqual(JSON.parse(withOrigins).origins, good);
 
         // 空表等同缺省：不上 wire（老读者不认这个键）。
         const empty = buildPackRequest({
-            entries: { main: 'E:/abs/dist/entry.js' },
+            entries: { main: `${ABS}/dist/entry.js` },
             target: 'browser',
-            root: 'E:/abs/project',
+            root: `${ABS}/project`,
             uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
             origins: {},
         });
         assert.equal(JSON.parse(empty).origins, undefined);
 
-        for (const origins of [
-            { 'dist/components/Widget.client.js': 'E:/abs/src/Widget.vmz' },
-            { 'E:/abs/dist/Widget.client.js': 'src/Widget.vmz' },
-        ]) {
+        const relativeKey: Record<string, string> = {};
+        relativeKey['dist/components/Widget.client.js'] = `${ABS}/src/Widget.vmz`;
+        const relativeValue: Record<string, string> = {};
+        relativeValue[`${ABS}/dist/Widget.client.js`] = 'src/Widget.vmz';
+        for (const origins of [relativeKey, relativeValue]) {
             assert.throws(
                 () =>
                     buildPackRequest({
-                        entries: { main: 'E:/abs/dist/entry.js' },
+                        entries: { main: `${ABS}/dist/entry.js` },
                         target: 'browser',
-                        root: 'E:/abs/project',
+                        root: `${ABS}/project`,
                         uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                         publicBase: '/_vmz/',
                         origins,
@@ -148,9 +152,9 @@ describe('pack-native buildPackRequest (v0)', () => {
         assert.throws(
             () =>
                 buildPackRequest({
-                    entries: { main: 'E:/abs/src/entry.js' },
+                    entries: { main: `${ABS}/src/entry.js` },
                     target: 'browser',
-                    root: 'E:/abs/project',
+                    root: `${ABS}/project`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'ghost' } } as never],
                     publicBase: '/_vmz/',
                 }),
@@ -163,9 +167,9 @@ describe('pack-native buildPackRequest (v0)', () => {
         assert.throws(
             () =>
                 buildPackRequest({
-                    entries: { main: 'E:/abs/src/entry.js' },
+                    entries: { main: `${ABS}/src/entry.js` },
                     target: 'browser',
-                    root: 'E:/abs/project',
+                    root: `${ABS}/project`,
                     uses: [{ logical: 'main', execution: 'partial', exports: { kind: 'all' } } as never],
                     publicBase: '/_vmz/',
                 }),
@@ -181,9 +185,9 @@ describe('pack-native buildPackRequest (v0)', () => {
         assert.throws(
             () =>
                 buildPackRequest({
-                    entries: { main: 'E:/abs/src/entry.js', island: 'E:/abs/src/island.js' },
+                    entries: { main: `${ABS}/src/entry.js`, island: `${ABS}/src/island.js` },
                     target: 'browser',
-                    root: 'E:/abs/project',
+                    root: `${ABS}/project`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
@@ -200,9 +204,9 @@ describe('pack-native buildPackRequest (v0)', () => {
         assert.throws(
             () =>
                 buildPackRequest({
-                    entries: { main: 'E:/abs/src/entry.js' },
+                    entries: { main: `${ABS}/src/entry.js` },
                     target: 'deno' as 'node',
-                    root: 'E:/abs/project',
+                    root: `${ABS}/project`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
@@ -220,7 +224,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                 buildPackRequest({
                     entries: { main: 'src/entry.js' },
                     target: 'browser',
-                    root: 'E:/abs/project',
+                    root: `${ABS}/project`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
@@ -235,9 +239,9 @@ describe('pack-native buildPackRequest (v0)', () => {
 
 describe('pack-native runPackPlan / runPackWrite (v0)', () => {
     const requestJson = buildPackRequest({
-        entries: { main: 'E:/abs/src/entry.js' },
+        entries: { main: `${ABS}/src/entry.js` },
         target: 'browser',
-        root: 'E:/abs/project',
+        root: `${ABS}/project`,
         uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
         publicBase: '/_vmz/',
     });
@@ -256,16 +260,16 @@ describe('pack-native runPackPlan / runPackWrite (v0)', () => {
 
     it('runPackWrite forwards the request and outDir to the binding', () => {
         const binding = fakeBinding(okResponseJson());
-        const response = runPackWrite(requestJson, 'E:/abs/dist', { binding });
+        const response = runPackWrite(requestJson, `${ABS}/dist`, { binding });
         assert.equal(response.plan.assets[0].url, '/_vmz/assets/logo-0123456789abcdef.svg');
-        assert.equal(binding.calls[0], `write:${requestJson}:E:/abs/dist`);
+        assert.equal(binding.calls[0], `write:${requestJson}:${ABS}/dist`);
     });
 
     it('throws with every diagnostic when ok is false', () => {
         const failing = JSON.stringify({
             ok: false,
             diagnostics: [
-                { code: 'pack.unresolved', message: 'cannot resolve "lodash"', path: 'E:/abs/src/entry.js', span: [10, 20] },
+                { code: 'pack.unresolved', message: 'cannot resolve "lodash"', path: `${ABS}/src/entry.js`, span: [10, 20] },
                 { code: 'pack.cycle', message: 'import cycle detected' },
             ],
         });
@@ -279,7 +283,7 @@ describe('pack-native runPackPlan / runPackWrite (v0)', () => {
             assert.deepEqual(error.diagnostics[0], {
                 code: 'pack.unresolved',
                 message: 'cannot resolve "lodash"',
-                path: 'E:/abs/src/entry.js',
+                path: `${ABS}/src/entry.js`,
                 span: [10, 20],
             });
             assert.equal(error.diagnostics[1].code, 'pack.cycle');
