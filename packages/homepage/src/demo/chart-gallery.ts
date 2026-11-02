@@ -716,6 +716,316 @@ const CHART_INPUTS: ChartInput[] = [
             { hour: 8, req: 92 }, { hour: 9, req: 120 }, { hour: 10, req: 108 }, { hour: 11, req: 96 },
         ],
     },
+    {
+        id: 'violin-teams',
+        title: '小提琴 · 两组时延分布',
+        note: 'KDE 对称密度含内嵌箱线,五数概括在编译期计算。',
+        spec: {
+            mark: 'violin',
+            encoding: [
+                { field: 'team', channel: 'x' },
+                { field: 'latency', channel: 'y' },
+            ],
+        },
+        rows: (() => {
+            const mk = (team: string, center: number, spread: number, seed0: number) => {
+                let seed = seed0;
+                const rand = () => {
+                    seed = (seed * 1103515245 + 12345) % 2147483648;
+                    return seed / 2147483648;
+                };
+                return Array.from({ length: 120 }, () => {
+                    const u = rand();
+                    const v = rand();
+                    return { team, latency: Math.round(center + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * spread) };
+                });
+            };
+            return [...mk('api', 52, 14, 11), ...mk('web', 96, 22, 29)];
+        })(),
+    },
+    {
+        id: 'strip-groups',
+        title: '抖动散点 · 三组原始样本',
+        note: '抖动偏移由行键确定性哈希,SSR 与水合一致。',
+        spec: {
+            mark: 'strip',
+            keyField: 'id',
+            encoding: [
+                { field: 'grp', channel: 'x' },
+                { field: 'val', channel: 'y' },
+            ],
+        },
+        rows: (() => {
+            let seed = 5;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            return Array.from({ length: 60 }, (_, i) => ({
+                id: `s${i}`,
+                grp: ['A', 'B', 'C'][i % 3],
+                val: Math.round(40 + rand() * 40 + (i % 3) * 8),
+            }));
+        })(),
+    },
+    {
+        id: 'beeswarm-latency',
+        title: '蜂群 · 请求时延样本',
+        note: '点按值序贪心避碰,不重叠,值轴共享。',
+        spec: {
+            mark: 'beeswarm',
+            keyField: 'id',
+            encoding: [{ field: 'latency', channel: 'y' }],
+        },
+        rows: (() => {
+            let seed = 13;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            return Array.from({ length: 90 }, (_, i) => ({ id: `w${i}`, latency: Math.round(35 + rand() * 60 + (i % 9 === 0 ? 40 : 0)) }));
+        })(),
+    },
+    {
+        id: 'band-temp',
+        title: '置信带 · 日均温与区间',
+        note: 'yLow/yHigh 通道绘制半透明带,y 域自动覆盖边界。',
+        spec: {
+            mark: 'line',
+            keyField: 'id',
+            encoding: [
+                { field: 'day', channel: 'x' },
+                { field: 'temp', channel: 'y' },
+                { field: 'lo', channel: 'yLow' },
+                { field: 'hi', channel: 'yHigh' },
+            ],
+        },
+        rows: [
+            { id: 'b1', day: 'Mon', temp: 22, lo: 18, hi: 26 },
+            { id: 'b2', day: 'Tue', temp: 25, lo: 21, hi: 29 },
+            { id: 'b3', day: 'Wed', temp: 23, lo: 19, hi: 27 },
+            { id: 'b4', day: 'Thu', temp: 27, lo: 23, hi: 31 },
+            { id: 'b5', day: 'Fri', temp: 26, lo: 22, hi: 30 },
+            { id: 'b6', day: 'Sat', temp: 24, lo: 20, hi: 28 },
+            { id: 'b7', day: 'Sun', temp: 21, lo: 17, hi: 25 },
+        ],
+    },
+    {
+        id: 'streamgraph-apps',
+        title: '流图 · 应用时长构成',
+        note: 'wiggle 偏移让每层围绕零轴流动,悬停读真实小时数。',
+        spec: {
+            mark: 'streamgraph',
+            keyField: 'id',
+            encoding: [
+                { field: 'week', channel: 'x' },
+                { field: 'hours', channel: 'y' },
+                { field: 'app', channel: 'color' },
+            ],
+        },
+        rows: (() => {
+            const series: Record<string, number[]> = {
+                社交: [22, 26, 31, 28, 35, 33],
+                视频: [30, 34, 28, 40, 36, 42],
+                工具: [12, 10, 16, 14, 18, 15],
+                阅读: [8, 12, 10, 14, 11, 16],
+            };
+            const rows: Record<string, unknown>[] = [];
+            Object.entries(series).forEach(([app, values]) =>
+                values.forEach((hours, i) => rows.push({ id: `${app}-${i}`, week: `W${i + 1}`, hours, app })),
+            );
+            return rows;
+        })(),
+    },
+    {
+        id: 'percent-share',
+        title: '百分比堆叠 · 渠道构成',
+        note: 'seriesLayout percent 把每槽归一到 0–100,悬停读原始值。',
+        spec: {
+            mark: 'bar',
+            seriesLayout: 'percent',
+            keyField: 'id',
+            encoding: [
+                { field: 'q', channel: 'x' },
+                { field: 'v', channel: 'y' },
+                { field: 'seg', channel: 'color' },
+            ],
+        },
+        rows: [
+            { id: 'p1', q: 'Q1', v: 320, seg: '直营' },
+            { id: 'p2', q: 'Q1', v: 180, seg: '代理' },
+            { id: 'p3', q: 'Q1', v: 90, seg: '分销' },
+            { id: 'p4', q: 'Q2', v: 280, seg: '直营' },
+            { id: 'p5', q: 'Q2', v: 240, seg: '代理' },
+            { id: 'p6', q: 'Q2', v: 60, seg: '分销' },
+            { id: 'p7', q: 'Q3', v: 410, seg: '直营' },
+            { id: 'p8', q: 'Q3', v: 150, seg: '代理' },
+            { id: 'p9', q: 'Q3', v: 130, seg: '分销' },
+        ],
+    },
+    {
+        id: 'calendar-commits',
+        title: '日历热力 · 一季度提交',
+        note: 'ISO 周列 × 周日行,色阶是真实提交数,月标签对齐。',
+        spec: {
+            mark: 'calendar',
+            encoding: [
+                { field: 'date', channel: 'x' },
+                { field: 'commits', channel: 'color' },
+            ],
+        },
+        rows: (() => {
+            const rows: Record<string, unknown>[] = [];
+            let seed = 3;
+            const rand = () => {
+                seed = (seed * 1103515245 + 12345) % 2147483648;
+                return seed / 2147483648;
+            };
+            const start = Date.UTC(2026, 0, 5);
+            for (let i = 0; i < 84; i++) {
+                const d = new Date(start + i * 86400000);
+                const iso = d.toISOString().slice(0, 10);
+                const dow = d.getUTCDay();
+                const base = dow === 0 || dow === 6 ? 1 : 5;
+                rows.push({ date: iso, commits: Math.round(base + rand() * 9) });
+            }
+            return rows;
+        })(),
+    },
+    {
+        id: 'sunburst-disk',
+        title: '旭日图 · 存储占用层级',
+        note: '环层按子树和比例展开,单根下按顶层分组着色。',
+        spec: {
+            mark: 'sunburst',
+            keyField: 'id',
+            parentField: 'parent',
+            encoding: [{ field: 'gb', channel: 'size' }],
+        },
+        rows: [
+            { id: '根', parent: null, gb: 0 },
+            { id: '媒体', parent: '根', gb: 0 },
+            { id: '文档', parent: '根', gb: 0 },
+            { id: '系统', parent: '根', gb: 0 },
+            { id: '视频', parent: '媒体', gb: 420 },
+            { id: '图片', parent: '媒体', gb: 260 },
+            { id: '音频', parent: '媒体', gb: 90 },
+            { id: '设计稿', parent: '文档', gb: 140 },
+            { id: '合同', parent: '文档', gb: 60 },
+            { id: '运行时', parent: '系统', gb: 180 },
+            { id: '缓存', parent: '系统', gb: 120 },
+        ],
+    },
+    {
+        id: 'tree-org',
+        title: '树图 · 组织结构',
+        note: '确定性 tidy 布局,深度向右,父节点居中于子节点。',
+        spec: {
+            mark: 'tree',
+            keyField: 'id',
+            parentField: 'parent',
+            encoding: [{ field: 'size', channel: 'size' }],
+        },
+        rows: [
+            { id: '总裁办', parent: null, size: 0 },
+            { id: '研发', parent: '总裁办', size: 0 },
+            { id: '产品', parent: '总裁办', size: 0 },
+            { id: '运营', parent: '总裁办', size: 0 },
+            { id: '前端', parent: '研发', size: 0 },
+            { id: '后端', parent: '研发', size: 0 },
+            { id: '算法', parent: '研发', size: 0 },
+            { id: '设计', parent: '产品', size: 0 },
+            { id: '策划', parent: '产品', size: 0 },
+            { id: '市场', parent: '运营', size: 0 },
+        ],
+    },
+    {
+        id: 'dumbbell-change',
+        title: '哑铃 · 改版前后对比',
+        note: '两端点为 y 与 yEnd,双色读方向。',
+        spec: {
+            mark: 'dumbbell',
+            keyField: 'id',
+            encoding: [
+                { field: 'team', channel: 'x' },
+                { field: 'before', channel: 'y' },
+                { field: 'after', channel: 'yEnd' },
+            ],
+        },
+        rows: [
+            { id: 'd1', team: '首页', before: 42, after: 61 },
+            { id: 'd2', team: '列表', before: 68, after: 55 },
+            { id: 'd3', team: '详情', before: 35, after: 58 },
+            { id: 'd4', team: '结算', before: 74, after: 66 },
+            { id: 'd5', team: '我的', before: 48, after: 72 },
+        ],
+    },
+    {
+        id: 'lollipop-scores',
+        title: '棒棒糖 · 品类评分',
+        note: '杆对齐零基线,端点读精确值。',
+        spec: {
+            mark: 'lollipop',
+            keyField: 'id',
+            encoding: [
+                { field: 'item', channel: 'x' },
+                { field: 'score', channel: 'y' },
+            ],
+        },
+        rows: [
+            { id: 'l1', item: '稳定性', score: 82 },
+            { id: 'l2', item: '性能', score: 68 },
+            { id: 'l3', item: '易用性', score: 91 },
+            { id: 'l4', item: '生态', score: 47 },
+            { id: 'l5', item: '文档', score: 73 },
+        ],
+    },
+    {
+        id: 'mosaic-regions',
+        title: '马赛克 · 区域×套餐占比',
+        note: '列宽随区域总量,段高随列内占比,双向读构成。',
+        spec: {
+            mark: 'mosaic',
+            keyField: 'id',
+            encoding: [
+                { field: 'region', channel: 'x' },
+                { field: 'users', channel: 'y' },
+                { field: 'plan', channel: 'color' },
+            ],
+        },
+        rows: [
+            { id: 'm1', region: '华东', users: 420, plan: '旗舰' },
+            { id: 'm2', region: '华东', users: 260, plan: '标准' },
+            { id: 'm3', region: '华东', users: 90, plan: '免费' },
+            { id: 'm4', region: '华南', users: 180, plan: '旗舰' },
+            { id: 'm5', region: '华南', users: 240, plan: '标准' },
+            { id: 'm6', region: '华南', users: 120, plan: '免费' },
+            { id: 'm7', region: '西部', users: 90, plan: '旗舰' },
+            { id: 'm8', region: '西部', users: 110, plan: '标准' },
+            { id: 'm9', region: '西部', users: 160, plan: '免费' },
+        ],
+    },
+    {
+        id: 'gantt-roadmap',
+        title: '甘特 · 季度路线图',
+        note: '区间条按真实起止日期,日期轴自动识别。',
+        spec: {
+            mark: 'gantt',
+            keyField: 'id',
+            encoding: [
+                { field: 'task', channel: 'y' },
+                { field: 'begin', channel: 'start' },
+                { field: 'finish', channel: 'end' },
+            ],
+        },
+        rows: [
+            { id: 't1', task: '需求冻结', begin: '2026-03-02', finish: '2026-03-08' },
+            { id: 't2', task: '交互设计', begin: '2026-03-06', finish: '2026-03-18' },
+            { id: 't3', task: '内核开发', begin: '2026-03-12', finish: '2026-04-10' },
+            { id: 't4', task: '联调验收', begin: '2026-04-06', finish: '2026-04-22' },
+            { id: 't5', task: '灰度发布', begin: '2026-04-20', finish: '2026-04-30' },
+        ],
+    },
 ];
 
 /** 画廊分区：同一批示例按读者意图归类展示。 */
@@ -728,26 +1038,26 @@ const SECTION_DEFS: ReadonlyArray<{
     {
         id: 'basics',
         title: '基础图表',
-        note: '柱状、折线、面积与散点,覆盖分组、堆叠、负值与长标签。',
-        ids: ['bar-quarter', 'bar-dodge', 'bar-stack', 'line-weekly', 'area-traffic', 'scatter-latency', 'bar-delta', 'bar-cjk'],
+        note: '柱状、折线、面积、散点、哑铃、棒棒糖与百分比堆叠,覆盖分组、堆叠、负值与长标签。',
+        ids: ['bar-quarter', 'bar-dodge', 'bar-stack', 'line-weekly', 'area-traffic', 'scatter-latency', 'bar-delta', 'bar-cjk', 'dumbbell-change', 'lollipop-scores', 'percent-share'],
     },
     {
         id: 'distribution',
         title: '分布与统计',
-        note: '分箱、五数概括、核密度、气泡面积与误差线,统计都在编译期完成。',
-        ids: ['histogram-latency', 'boxplot-teams', 'ridgeline-services', 'bubble-products', 'error-groups'],
+        note: '分箱、五数概括、核密度、小提琴、抖动、蜂群、气泡、误差线与置信带,统计都在编译期完成。',
+        ids: ['histogram-latency', 'boxplot-teams', 'violin-teams', 'ridgeline-services', 'strip-groups', 'beeswarm-latency', 'bubble-products', 'error-groups', 'band-temp'],
     },
     {
         id: 'flow',
-        title: '流程与转化',
-        note: '累计瀑布、转化漏斗与分层流量,每段几何都对应真实数值。',
-        ids: ['waterfall-profit', 'funnel-signup', 'sankey-flow'],
+        title: '流程与计划',
+        note: '累计瀑布、转化漏斗、分层流量、流图与甘特路线,每段几何都对应真实数值。',
+        ids: ['waterfall-profit', 'funnel-signup', 'sankey-flow', 'streamgraph-apps', 'gantt-roadmap'],
     },
     {
         id: 'hierarchy',
         title: '层级结构',
-        note: 'squarified 矩形树图,父级面积是叶值求和。',
-        ids: ['treemap-disk'],
+        note: '矩形树图、旭日与正交树,共享同一套 keyField / parentField 层级输入。',
+        ids: ['treemap-disk', 'sunburst-disk', 'tree-org'],
     },
     {
         id: 'ranking',
@@ -764,8 +1074,8 @@ const SECTION_DEFS: ReadonlyArray<{
     {
         id: 'grid',
         title: '网格热力',
-        note: '双类目网格配顺序色阶,渐变图例读值域。',
-        ids: ['heatmap-week'],
+        note: '双类目网格与 ISO 周日历,顺序色阶读值域。',
+        ids: ['heatmap-week', 'calendar-commits'],
     },
     {
         id: 'finance',
@@ -775,9 +1085,9 @@ const SECTION_DEFS: ReadonlyArray<{
     },
     {
         id: 'compact',
-        title: '迷你与多面板',
-        note: 'spark 迷你线与共享刻度的小倍数网格。',
-        ids: ['sparkline-traffic', 'facet-platform'],
+        title: '占比与迷你',
+        note: '马赛克双维构成、spark 迷你线与共享刻度的小倍数网格。',
+        ids: ['mosaic-regions', 'sparkline-traffic', 'facet-platform'],
     },
 ];
 
