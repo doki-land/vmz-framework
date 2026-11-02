@@ -115,9 +115,14 @@ export async function importAndRegisterComponentEntries(
 ): Promise<ComponentRegistryMap> {
     const map: ComponentRegistryMap = {};
     const loaded = opts.loaded ?? null;
+    const packNode = readPackNodeManifest(distDir);
     for (const entry of entries) {
         if (loaded && loaded.has(entry.chunkId)) continue;
-        const abs = path.join(distDir, entry.entry);
+        // Node/SSR consumes the packed unit bytes (`_vmz/pack-node/`) whenever the
+        // build packed the node graph — bare package imports in dependency
+        // components only exist in vendored form there. Dev sessions do not pack:
+        // the unpacked `${chunkId}.client.js` remains the module identity.
+        const abs = packNode ? packNodeEntryAbs(distDir, entry, packNode) : path.join(distDir, entry.entry);
         let href = pathToFileURL(abs).href;
         if (opts.cacheBust != null && opts.cacheBust !== '') {
             href = `${href}?t=${encodeURIComponent(String(opts.cacheBust))}`;
@@ -128,6 +133,46 @@ export async function importAndRegisterComponentEntries(
     }
     if (Object.keys(map).length) registerComponents(map);
     return map;
+}
+
+/** `vmz.pack.node-manifest.v0` 的唯一消费点：缺失即未打包（dev），调用方回退未打包模块。 */
+function readPackNodeManifest(distDir: string): { entryFiles: Array<{ logical?: string; file?: string }> } | null {
+    const manifestPath = path.join(distDir, '_vmz', 'pack-node-manifest.json');
+    if (!fs.existsSync(manifestPath)) return null;
+    // Freshness gate: `vmz build` writes the deployment document first and packs
+    // the node graph strictly after; a dev soft rebuild rewrites the deployment
+    // document without re-packing. A deployment newer than the manifest means the
+    // unpacked tree moved on — packed bytes are stale and must not be served.
+    try {
+        const deploymentMtime = fs.statSync(path.join(distDir, 'vmz-deployment.json')).mtimeMs;
+        const manifestMtime = fs.statSync(manifestPath).mtimeMs;
+        if (deploymentMtime > manifestMtime) return null;
+    } catch {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { entryFiles?: Array<{ logical?: string; file?: string }> };
+        return Array.isArray(parsed.entryFiles) ? { entryFiles: parsed.entryFiles } : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Packed node chunk for one component entry; missing logical/file is an explicit error, never a fallback. */
+function packNodeEntryAbs(
+    distDir: string,
+    entry: ComponentEntry,
+    manifest: { entryFiles: Array<{ logical?: string; file?: string }> },
+): string {
+    const hit = manifest.entryFiles.find((e) => e && e.logical === entry.chunkId);
+    if (!hit || typeof hit.file !== 'string' || !hit.file) {
+        throw new Error(`vmz: pack-node manifest has no entry file for "${entry.chunkId}" under ${distDir}`);
+    }
+    const abs = path.join(distDir, '_vmz', 'pack-node', ...hit.file.split('/'));
+    if (!fs.existsSync(abs)) {
+        throw new Error(`vmz: pack-node chunk missing on disk for "${entry.chunkId}": ${path.relative(distDir, abs)}`);
+    }
+    return abs;
 }
 
 export async function bootstrapComponentRegistry(

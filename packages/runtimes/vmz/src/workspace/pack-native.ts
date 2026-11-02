@@ -46,6 +46,13 @@ export interface PackRequest {
     root: string;
     uses: PackRequestUse[];
     publicBase: string;
+    /**
+     * Projection provenance: absolute emitted file → absolute source file.
+     * Bare-specifier package discovery for a projected module walks up from its
+     * source location (Node realpath semantics for symlinked packages); relative
+     * specifiers keep resolving against the emitted tree.
+     */
+    origins?: Record<string, string>;
 }
 
 export interface PackChunkArtifact {
@@ -294,6 +301,8 @@ export interface BuildPackRequestInput {
     root: string;
     uses: PackRequestUse[];
     publicBase: string;
+    /** Emitted absolute path → source absolute path (projection provenance). */
+    origins?: Record<string, string>;
 }
 
 /** Assemble the request JSON. Every gap is an explicit error — nothing is guessed. */
@@ -370,7 +379,20 @@ export function buildPackRequest(input: BuildPackRequestInput): string {
         );
     }
 
-    const request: PackRequest = { entries, target: input.target, root: input.root, uses, publicBase: input.publicBase };
+    let origins: Record<string, string> | undefined;
+    if (input.origins !== undefined) {
+        if (!isPlainObject(input.origins)) throw requestInvalid('origins must be a record of absolute paths');
+        origins = {};
+        for (const [emitted, source] of Object.entries(input.origins)) {
+            if (!path.isAbsolute(emitted) || typeof source !== 'string' || !path.isAbsolute(source)) {
+                throw requestInvalid(`origins must map absolute emitted paths to absolute source paths: ${JSON.stringify(emitted)}`);
+            }
+            origins[emitted] = source;
+        }
+        if (!Object.keys(origins).length) origins = undefined;
+    }
+
+    const request: PackRequest = { entries, target: input.target, root: input.root, uses, publicBase: input.publicBase, ...(origins ? { origins } : {}) };
     return JSON.stringify(request);
 }
 

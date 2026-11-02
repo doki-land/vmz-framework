@@ -5,7 +5,7 @@
  * explicit failure propagation, and `packEntryHref` resolution.
  */
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -335,6 +335,31 @@ describe('packSsrFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.match(manifest.chunks[0].digest, /^[a-f0-9]{64}$/);
         assert.deepEqual(manifest.nativeManifest, JSON.parse(nodePlanResponse.plan.manifestJson));
         assert.match(manifest.packDigest as string, /^[a-f0-9]{64}$/);
+    });
+
+    it('maps emitted unit entries back to their source files as projection origins', () => {
+        const srcDir = path.join(root, 'node-src');
+        mkdirSync(path.join(srcDir, 'components'), { recursive: true });
+        const widgetSource = path.join(srcDir, 'components', 'Widget.vmz');
+        writeFileSync(widgetSource, '<template><span /></template>');
+        const units = [
+            ...nodeUnits,
+            {
+                chunkId: 'components/Widget',
+                kind: 'component',
+                clientEntry: 'components/Widget.client.js',
+                source: widgetSource,
+            },
+        ];
+        const distDir = makeDistWithUnits('node-origins', units, {
+            ...nodeClientFiles,
+            'components/Widget.client.js': 'export default class Widget {}',
+        });
+        const binding = fakeBinding(nodePlanResponse);
+        packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
+        const request = JSON.parse(binding.calls[0].requestJson);
+        const emitted = realpathSync(path.join(distDir, 'components', 'Widget.client.js'));
+        assert.deepEqual(request.origins, { [emitted]: realpathSync(widgetSource) });
     });
 
     it('collapses repeated deployment units by chunkId into one node entry', () => {

@@ -23,9 +23,10 @@
  */
 
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr } from './bundler-adapter.js';
+import type { DeploymentIr } from './bundler-adapter.js';
 import { buildPackRequest, runPackWrite } from './pack-native.js';
 import type { PackNativeBinding, PackRequestUse } from './pack-native.js';
 import { deliveryRuntimeFilePairs } from './delivery-runtime-files.js';
@@ -39,6 +40,28 @@ export const PACK_OUTPUT_DIR_REL = '_vmz/pack';
 
 /** Site root base — VMZ static delivery has no configurable base (see delivery-profile). */
 export const PACK_PUBLIC_BASE = '/';
+
+/**
+ * Projection provenance for the pack graph: each deployment unit's emitted
+ * client entry maps back to its source `.vmz`. Bare-specifier package discovery
+ * then walks up from the source location — dependency components (e.g. a
+ * `@vmz/ui` component importing its own peer) keep their source package's
+ * node_modules visibility, matching Node realpath semantics. Relative
+ * specifiers keep resolving against the emitted tree.
+ */
+export function deploymentUnitOrigins(absOut: string, ir: DeploymentIr): Record<string, string> {
+    const origins: Record<string, string> = {};
+    for (const unit of ir.units || []) {
+        const source = String(unit.source || '');
+        const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
+        if (!source || !chunkId) continue;
+        const rel = (unit.clientEntry ? String(unit.clientEntry) : `${chunkId}.client.js`).replace(/\\/g, '/');
+        const emitted = path.join(absOut, ...rel.split('/'));
+        if (!existsSync(emitted) || !existsSync(source)) continue;
+        origins[realpathSync(emitted)] = realpathSync(source);
+    }
+    return origins;
+}
 
 /** Bootstrap modules that are browser pack entries when present in outDir. */
 const BOOTSTRAP_ENTRIES = ['entry-client.js', 'entry-event.js'];
@@ -97,7 +120,10 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         execution: 'full',
         exports: { kind: 'all' },
     }));
-    const requestJson = buildPackRequest({ entries, target: 'browser', root, uses, publicBase: PACK_PUBLIC_BASE });
+    // Browser graph entries are the bootstrap modules; page/island units join
+    // through the bootstrap dynamic-import tables and need projection provenance.
+    const origins = deploymentUnitOrigins(absOut, loadDeploymentIr(absOut));
+    const requestJson = buildPackRequest({ entries, target: 'browser', root, uses, publicBase: PACK_PUBLIC_BASE, origins });
 
     const packOutDir = path.join(absOut, ...PACK_OUTPUT_DIR_REL.split('/'));
     const { plan } = runPackWrite(requestJson, packOutDir, opts.binding ? { binding: opts.binding } : {});
@@ -248,7 +274,8 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
     if (!Object.keys(entries).length) {
         throw new Error(`packSsrFromDeploymentIr: deployment IR has no units in ${absOut}`);
     }
-    const requestJson = buildPackRequest({ entries, target: 'node', root, uses, publicBase: PACK_PUBLIC_BASE });
+    const origins = deploymentUnitOrigins(absOut, ir);
+    const requestJson = buildPackRequest({ entries, target: 'node', root, uses, publicBase: PACK_PUBLIC_BASE, origins });
 
     const packOutDir = path.join(absOut, ...PACK_NODE_OUTPUT_DIR_REL.split('/'));
     const { plan } = runPackWrite(requestJson, packOutDir, opts.binding ? { binding: opts.binding } : {});

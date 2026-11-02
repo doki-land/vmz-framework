@@ -97,6 +97,53 @@ describe('pack-native buildPackRequest (v0)', () => {
         ]);
     });
 
+    it('carries projection origins only when provided, and validates absoluteness', () => {
+        const withOrigins = buildPackRequest({
+            entries: { main: 'E:/abs/dist/entry.js' },
+            target: 'browser',
+            root: 'E:/abs/project',
+            uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
+            publicBase: '/_vmz/',
+            origins: { 'E:/abs/dist/components/Widget.client.js': 'E:/abs/node_modules/pkg/src/Widget.vmz' },
+        });
+        assert.deepEqual(JSON.parse(withOrigins).origins, {
+            'E:/abs/dist/components/Widget.client.js': 'E:/abs/node_modules/pkg/src/Widget.vmz',
+        });
+
+        // 空表等同缺省：不上 wire（老读者不认这个键）。
+        const empty = buildPackRequest({
+            entries: { main: 'E:/abs/dist/entry.js' },
+            target: 'browser',
+            root: 'E:/abs/project',
+            uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
+            publicBase: '/_vmz/',
+            origins: {},
+        });
+        assert.equal(JSON.parse(empty).origins, undefined);
+
+        for (const origins of [
+            { 'dist/components/Widget.client.js': 'E:/abs/src/Widget.vmz' },
+            { 'E:/abs/dist/Widget.client.js': 'src/Widget.vmz' },
+        ]) {
+            assert.throws(
+                () =>
+                    buildPackRequest({
+                        entries: { main: 'E:/abs/dist/entry.js' },
+                        target: 'browser',
+                        root: 'E:/abs/project',
+                        uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
+                        publicBase: '/_vmz/',
+                        origins,
+                    }),
+                (error: unknown) => {
+                    assert.ok(error instanceof PackNativeError);
+                    assert.equal(error.code, 'pack.native.request-invalid');
+                    return true;
+                },
+            );
+        }
+    });
+
     it('rejects execution and exports spellings outside the contract', () => {
         assert.throws(
             () =>
