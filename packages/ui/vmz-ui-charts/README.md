@@ -1,0 +1,71 @@
+# @vmz/ui-charts
+
+VMZ chart components backed by the DaVinci engine — the same `ChartSpec` + data rows drive SVG rendering, interaction, theming, and an accessible table fallback.
+
+```vue
+<Chart :spec="spec" :data="rows" label="Weekly visitors" />
+```
+
+```ts
+const spec = {
+    mark: "line", // bar | line | area | point | circle | pie | radar
+    encoding: [
+        { field: "day", channel: "x" },
+        { field: "visitors", channel: "y" },
+        { field: "product", channel: "color" }, // series + legend
+    ],
+    // seriesLayout: "overlap" | "stack" | "dodge"  (bars dodge by default)
+    // innerRadiusRatio: 0.6                        (pie → donut)
+    // facetField: "region"                         (small multiples)
+    // keyField: "id"                               (stable row identity)
+};
+```
+
+## Props
+
+| Prop | Type | Default | Purpose |
+|------|------|---------|---------|
+| `spec` | `ChartSpec` | — | mark + encodings (+ `seriesLayout`, `innerRadiusRatio`, `facetField`, `keyField`) |
+| `data` / `snapshot` | rows / `DataSnapshot` | — | source rows; `data` is the usual path |
+| `width` / `height` | `number \| null` | `null` | `null` measures the container (ResizeObserver) |
+| `theme` | `"light" \| "dark" \| "auto"` | `"light"` | named base theme; `auto` follows the OS |
+| `themeTokens` | `Partial<ChartTheme> \| null` | `null` | token overrides merged over the base theme |
+| `label` | `string \| null` | derived | accessible name; also the table caption |
+| `tableView` | `boolean` | `false` | render the data table instead of the SVG |
+| `resourceIdPrefix` | `string \| null` | derived | SVG resource id prefix for edge cases |
+
+## Theming by token
+
+`themeTokens` is a shallow merge over the active base theme (`light` / `dark`), so every presentation decision stays data-driven per chart — brand palette, quieter grid, heavier area fill:
+
+```vue
+<Chart :spec="spec" :data="rows" theme="dark" :themeTokens="brand" />
+```
+
+```ts
+import { rgb8 } from "@doki-land/davinci/types";
+
+const brand = {
+    seriesPalette: [rgb8(5, 122, 85), rgb8(251, 146, 60)],
+    markFill: rgb8(5, 122, 85),
+    gridStroke: rgb8(220, 232, 225),
+    areaFillOpacity: 0.35,
+};
+```
+
+Available tokens: `seriesPalette`, `markFill`, `axisStroke`, `axisStrokeWidth`, `gridStroke` (`null` disables grid lines), `gridStrokeWidth`, `labelColor`, `labelFont`, `legendFont`, `pointStroke` (`null` disables the halo), `areaFillOpacity`.
+
+## Interaction
+
+- Hover / focus shows real cell values; line and area charts get a crosshair that snaps to the nearest data x across all series.
+- Arrow keys walk marks (line/area walk per-vertex values), `Enter` selects, `Escape` clears.
+- Drag empty plot space to brush-select marks; shift+drag pans a quantitative x axis; the wheel zooms around the pointer; `+` / `-` / `0` zoom and reset from the keyboard.
+- Host events: `onchartHover({ rowKey, x, y })`, `onchartSelect({ rowKey })`, `onchartBrush({ keys })` — override them on the instance.
+
+## Accessibility
+
+Every chart is `role="img"` with a derived or explicit `label`, plus a visually hidden data table linked via `aria-describedby` — screen readers get the actual numbers, not just a summary sentence. `tableView` swaps the SVG for that table for users who prefer it, and switches the container to `role="group"`. Tables render at most 1000 rows with an explicit truncation note. All motion respects `prefers-reduced-motion`.
+
+## Diagnostics, not blank charts
+
+Unknown fields, negative pie slices, unsupported marks, and invalid scale domains surface as structured diagnostics rendered under the chart (`severity` + `code`), never as a silent empty frame.

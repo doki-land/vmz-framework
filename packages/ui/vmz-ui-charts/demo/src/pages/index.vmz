@@ -44,6 +44,16 @@
 
         <section class="card">
             <header class="card__head">
+                <h2>主题定制 · 品牌令牌</h2>
+                <p>themeTokens 浅合并到亮暗基础主题,色板/网格/透明度逐项可换。</p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="brandSpec" :data="brandRows" :height="300" :theme="dark ? 'dark' : 'light'" :themeTokens="brandTokens" label="brand themed stacked area" />
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card__head">
                 <h2>数据表视图 · 可切换降级</h2>
                 <p>同一 Chart 组件切到原生表格渲染,图表形态下读屏器也能经 aria-describedby 拿到隐藏表格。</p>
             </header>
@@ -194,6 +204,7 @@
  */
 import { buildScene, compile, fromRows } from "@doki-land/davinci/chart";
 import { renderSvg, resolve } from "@doki-land/davinci/scene";
+import { rgb8 } from "@doki-land/davinci/types";
 import {
     FLOW_DIAGRAM,
     GALLERY_EXAMPLES,
@@ -239,6 +250,22 @@ export default class IndexPage {
             darkRadarRows: galleryExample("radar-score").rows,
             tableSpec: galleryExample("line-weekly").spec,
             tableRows: galleryExample("line-weekly").rows,
+            brandSpec: {
+                mark: "area",
+                seriesLayout: "stack",
+                encoding: [
+                    { field: "hour", channel: "x" },
+                    { field: "requests", channel: "y" },
+                    { field: "service", channel: "color" },
+                ],
+            },
+            brandRows: galleryExample("area-traffic").rows,
+            brandTokens: {
+                seriesPalette: [rgb8(5, 122, 85), rgb8(251, 146, 60)],
+                markFill: rgb8(5, 122, 85),
+                gridStroke: rgb8(220, 232, 225),
+                areaFillOpacity: 0.35,
+            },
         };
     }
 
@@ -258,6 +285,9 @@ export default class IndexPage {
     public tableSpec: any = null;
     public tableRows: any[] = [];
     public tableView: boolean = false;
+    public brandSpec: any = null;
+    public brandRows: any[] = [];
+    public brandTokens: any = null;
     public perfReport: string[] = ["measuring…"];
 
     toggleDark() {

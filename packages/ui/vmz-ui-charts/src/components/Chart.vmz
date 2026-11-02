@@ -323,6 +323,9 @@ export default class Chart {
     /** true 时用原生数据表代替 SVG 渲染（降级视图）；false 时表格仍以视觉
      *  隐藏形式挂在 `aria-describedby` 上供读屏器取数。 */
     public tableView: boolean = false;
+    /** 主题令牌覆盖：按字段浅合并到当前亮/暗基础主题上（如品牌色板、网格
+     *  颜色、面积透明度）。null 时用内置主题。 */
+    public themeTokens: Partial<ChartTheme> | null = null;
 
     /** 交互 runtime state。 */
     public state: RuntimeState | null = null;
@@ -399,7 +402,10 @@ export default class Chart {
     }
 
     public _chartTheme(): ChartTheme {
-        return this._themeName() === "dark" ? DARK_CHART_THEME : DEFAULT_CHART_THEME;
+        const base = this._themeName() === "dark" ? DARK_CHART_THEME : DEFAULT_CHART_THEME;
+        if (!this.themeTokens) return base;
+        // 浅合并：每个令牌字段整体替换，未给的字段沿用基础主题。
+        return { ...base, ...this.themeTokens };
     }
 
     /** 零尺寸 guard —— 宽或高为 0 时跳过渲染避免 NaN / 空 SVG 闪烁。 */
