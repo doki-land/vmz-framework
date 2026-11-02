@@ -1,6 +1,14 @@
 /**
  * Shared class/style normalization for Direct SSR + client (0.1.33).
  * Vue-compatible: string | string[] | object map | falsy parts.
+ *
+ * Style keys are normalized to CSS property spelling so SSR text and client
+ * patches agree: camelCase becomes kebab-case, custom properties (`--x`) pass
+ * through untouched, and names that cannot be CSS properties (whitespace, `;`,
+ * `:`, leading digit) are dropped — the same fate invalid declarations have in
+ * the browser. Numeric values gain `px` except for unitless properties, `0`,
+ * and custom properties. Array values emit repeated declarations (vendor
+ * fallback chains) and nested arrays flatten.
  */
 
 function pushClassTokens(out: string[], value: unknown): void {
@@ -32,33 +40,122 @@ export function mergeClassParts(...parts: unknown[]): string {
     return [...new Set(tokens)].join(' ');
 }
 
-function parseStyleObject(value: unknown): Record<string, string> {
-    const out: Record<string, string> = {};
-    if (value == null || value === false) return out;
+/** CSS properties whose numeric values stay unitless (kebab-case names). */
+const UNITLESS_STYLE_PROPS = new Set([
+    'animation-iteration-count',
+    'aspect-ratio',
+    'border-image-outset',
+    'border-image-slice',
+    'border-image-width',
+    'box-flex',
+    'box-flex-group',
+    'box-ordinal-group',
+    'column-count',
+    'columns',
+    'flex',
+    'flex-grow',
+    'flex-positive',
+    'flex-shrink',
+    'flex-negative',
+    'flex-order',
+    'grid-row',
+    'grid-row-end',
+    'grid-row-span',
+    'grid-row-start',
+    'grid-column',
+    'grid-column-end',
+    'grid-column-span',
+    'grid-column-start',
+    'font-weight',
+    'line-clamp',
+    'line-height',
+    'opacity',
+    'order',
+    'orphans',
+    'scale',
+    'tab-size',
+    'widows',
+    'z-index',
+    'zoom',
+    'fill-opacity',
+    'flood-opacity',
+    'stop-opacity',
+    'stroke-dasharray',
+    'stroke-dashoffset',
+    'stroke-miterlimit',
+    'stroke-opacity',
+    'stroke-width',
+]);
+
+/** camelCase → kebab-case, `--custom` preserved; `null` when not a CSS property name. */
+function normalizeStyleKey(raw: string): string | null {
+    const key = raw.trim();
+    if (!key) return null;
+    if (key.startsWith('--')) {
+        return /^--[\w-]+$/.test(key) ? key : null;
+    }
+    const kebab = key.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+    return /^[a-z][a-z0-9-]*$/.test(kebab) ? kebab : null;
+}
+
+/** One style value as declaration text; `null` drops the declaration. */
+function normalizeStyleValue(key: string, value: unknown): string | null {
+    if (value == null || value === false) return null;
+    if (typeof value === 'number' && value !== 0 && !key.startsWith('--') && !isUnitlessStyleProp(key)) {
+        return `${value}px`;
+    }
+    return String(value);
+}
+
+/** Unitless lookup ignores vendor prefixes (`webkit-line-clamp` ≙ `line-clamp`). */
+function isUnitlessStyleProp(key: string): boolean {
+    const unprefixed = key.replace(/^(?:-?(?:webkit|moz|ms|o))-/, '');
+    return UNITLESS_STYLE_PROPS.has(unprefixed);
+}
+
+function pushStyleValues(out: string[], key: string, value: unknown): void {
+    if (Array.isArray(value)) {
+        for (const item of value) pushStyleValues(out, key, item);
+        return;
+    }
+    const text = normalizeStyleValue(key, value);
+    if (text != null) out.push(text);
+}
+
+function collectStyleDeclarations(merged: Map<string, string[]>, value: unknown): void {
+    if (value == null || value === false) return;
     if (typeof value === 'string') {
         for (const chunk of value.split(';')) {
             const idx = chunk.indexOf(':');
             if (idx < 0) continue;
-            const key = chunk.slice(0, idx).trim();
-            const val = chunk.slice(idx + 1).trim();
-            if (key) out[key] = val;
+            const key = normalizeStyleKey(chunk.slice(0, idx));
+            if (!key) continue;
+            merged.set(key, [chunk.slice(idx + 1).trim()]);
         }
-        return out;
+        return;
     }
-    if (typeof value === 'object' && !Array.isArray(value)) {
-        for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-            if (raw == null || raw === false) continue;
-            out[key] = String(raw);
+    if (Array.isArray(value)) {
+        for (const item of value) collectStyleDeclarations(merged, item);
+        return;
+    }
+    if (typeof value === 'object') {
+        for (const [rawKey, raw] of Object.entries(value as Record<string, unknown>)) {
+            const key = normalizeStyleKey(rawKey);
+            if (!key) continue;
+            const values: string[] = [];
+            pushStyleValues(values, key, raw);
+            if (values.length) merged.set(key, values);
         }
     }
-    return out;
 }
 
 /** Merge static + dynamic style fragments; later parts override same keys. */
 export function mergeStyleParts(...parts: unknown[]): string {
-    const merged: Record<string, string> = {};
-    for (const part of parts) Object.assign(merged, parseStyleObject(part));
-    return Object.entries(merged)
-        .map(([key, val]) => `${key}: ${val}`)
-        .join('; ');
+    const merged = new Map<string, string[]>();
+    for (const part of parts) collectStyleDeclarations(merged, part);
+    const out: string[] = [];
+    for (const [key, values] of merged) {
+        for (const value of values) out.push(`${key}: ${value}`);
+    }
+    return out.join('; ');
 }
