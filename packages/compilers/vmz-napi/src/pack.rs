@@ -37,6 +37,9 @@ const INVALID_REQUEST: &str = "vmz::napi::pack::invalid_request";
 // ---------------------------------------------------------------------------
 
 /// Packed request: entries + target + root + per-entry link demands + public base.
+/// `origins`（可缺省 = 空）把 canonical 产物路径映射回 canonical 源文件路径：
+/// 编译投影（`dist/**.client.js` ← `src/**.vmz`，含依赖包组件）的裸说明符
+/// 包发现以源位置上溯，语义等同 Node 对符号链接包取 realpath。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RequestWire {
@@ -45,6 +48,8 @@ struct RequestWire {
     root: String,
     uses: Vec<UseWire>,
     public_base: String,
+    #[serde(default)]
+    origins: std::collections::HashMap<String, String>,
 }
 
 /// One logical entry with its absolute file path.
@@ -298,6 +303,25 @@ enum Chain {
     Planned(EmitPlan),
 }
 
+/// `origins` wire map → canonical 路径对。两端都 canonicalize（pnpm 符号链接
+/// 由此并入 realpath 口径，与图节点身份一致）；任一端不落盘即请求级拒绝，
+/// 不静默丢 provenance。
+fn canonicalize_origins(
+    origins: &std::collections::HashMap<String, String>,
+) -> Result<std::collections::HashMap<PathBuf, PathBuf>, ResponseWire> {
+    let mut out = std::collections::HashMap::with_capacity(origins.len());
+    for (emitted, source) in origins {
+        let emitted_canon = std::fs::canonicalize(emitted).map_err(|err| {
+            invalid_request(format!("origins key `{emitted}` cannot canonicalize: {err}"))
+        })?;
+        let source_canon = std::fs::canonicalize(source).map_err(|err| {
+            invalid_request(format!("origins value `{source}` cannot canonicalize: {err}"))
+        })?;
+        out.insert(emitted_canon, source_canon);
+    }
+    Ok(out)
+}
+
 /// Parse + validate the request, then run graph → link → chunks → plan_emit.
 /// Never panics; every failure is a diagnostic vector for the response.
 fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
@@ -346,7 +370,16 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
         })
         .collect();
 
-    let graph = vmz_pack::graph::build_graph(&entries, target, Path::new(&request.root));
+    let origins = match canonicalize_origins(&request.origins) {
+        Ok(origins) => origins,
+        Err(response) => return Err(response),
+    };
+    let graph = vmz_pack::graph::build_graph_with_origins(
+        &entries,
+        target,
+        Path::new(&request.root),
+        &origins,
+    );
     if !graph.diagnostics.is_empty() {
         return Ok(Chain::Failed(graph.diagnostics.clone()));
     }
@@ -635,5 +668,96 @@ mod tests {
         let response = parse(&pack_plan_core(&request(&root, "deno", full_uses())));
         assert_eq!(response["ok"], Value::Bool(false));
         assert_eq!(response["diagnostics"][0]["code"], INVALID_REQUEST);
+    }
+
+    /// 投影 provenance 端到端：entry → dist 产物模块（裸导入只在源树可见）。
+    /// `origins` 缺省行为不变；提供时按源位置上溯；键非绝对路径即请求级拒绝。
+    #[test]
+    fn origins_wire_projects_bare_resolution_to_source_tree() {
+        let root =
+            std::env::temp_dir().join(format!("vmz-napi-pack-origins-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("app/dist/components")).unwrap();
+        fs::create_dir_all(root.join("pkg/src/components")).unwrap();
+        fs::create_dir_all(root.join("pkg/node_modules/core-x/dist")).unwrap();
+        fs::write(root.join("app/package.json"), r#"{"name":"app","version":"0.0.0"}"#).unwrap();
+        fs::write(
+            root.join("app/dist/entry.js"),
+            "import label from './components/Widget.client.js';\nexport const run = label;\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("app/dist/components/Widget.client.js"),
+            "import { marker } from 'core-x';\nexport default marker;\n",
+        )
+        .unwrap();
+        fs::write(root.join("pkg/src/components/Widget.vmz"), "<template><span /></template>\n")
+            .unwrap();
+        fs::write(
+            root.join("pkg/node_modules/core-x/package.json"),
+            r#"{"name":"core-x","version":"0.0.0","type":"module","exports":{".":"./dist/index.js"}}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join("pkg/node_modules/core-x/dist/index.js"),
+            "export const marker = 'vendored';\n",
+        )
+        .unwrap();
+
+        let entry = root.join("app/dist/entry.js");
+        let emitted = fs::canonicalize(root.join("app/dist/components/Widget.client.js")).unwrap();
+        let source = fs::canonicalize(root.join("pkg/src/components/Widget.vmz")).unwrap();
+        let uses = json!([{ "logical": "main", "execution": "side-effects", "exports": { "kind": "named", "names": ["run"] } }]);
+
+        // 无 origins：解析失败（包只在源树可见），响应为结构化拒绝。
+        let without = json!({
+            "entries": [{ "logical": "main", "path": entry.display().to_string() }],
+            "target": "browser",
+            "root": root.join("app").display().to_string(),
+            "uses": uses,
+            "publicBase": "/_vmz/"
+        })
+        .to_string();
+        let response = parse(&pack_plan_core(&without));
+        assert_eq!(response["ok"], Value::Bool(false));
+        let message = response["diagnostics"][0]["message"].as_str().unwrap();
+        assert!(message.contains("core-x"), "{message}");
+
+        // 有 origins：裸导入从源树解析并 vendor 进 chunk。
+        let with = json!({
+            "entries": [{ "logical": "main", "path": entry.display().to_string() }],
+            "target": "browser",
+            "root": root.join("app").display().to_string(),
+            "uses": uses,
+            "publicBase": "/_vmz/",
+            "origins": { emitted.display().to_string(): source.display().to_string() }
+        })
+        .to_string();
+        let response = parse(&pack_plan_core(&with));
+        assert_eq!(response["ok"], Value::Bool(true), "{response}");
+        let artifacts = response["plan"]["artifacts"].as_array().unwrap();
+        assert!(
+            artifacts.iter().any(|a| a["code"].as_str().unwrap().contains("vendored")),
+            "{artifacts:?}"
+        );
+        for artifact in artifacts {
+            assert!(!artifact["code"].as_str().unwrap().contains("core-x'"), "{artifact}");
+        }
+
+        // origins 键必须绝对路径。
+        let bad = json!({
+            "entries": [{ "logical": "main", "path": entry.display().to_string() }],
+            "target": "browser",
+            "root": root.join("app").display().to_string(),
+            "uses": uses,
+            "publicBase": "/_vmz/",
+            "origins": { "dist/components/Widget.client.js": source.display().to_string() }
+        })
+        .to_string();
+        let response = parse(&pack_plan_core(&bad));
+        assert_eq!(response["ok"], Value::Bool(false));
+        assert_eq!(response["diagnostics"][0]["code"], INVALID_REQUEST);
+
+        let _ = fs::remove_dir_all(&root);
     }
 }
