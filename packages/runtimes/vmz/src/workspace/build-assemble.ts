@@ -76,10 +76,11 @@ export async function assembleDelivery(outDir: string, ctx: Record<string, unkno
         steps: [],
     };
 
-    if (assembly === 'web-static' || assembly === 'cdn+server') {
+    if (assembly === 'web-static' || assembly === 'cdn+server' || assembly === 'local-static') {
         const staticResult = await emitWebStatic(outDir, {
             origin: ctx.origin as string,
             projectRoot: ctx.projectRoot as string,
+            deliveryProfile: assembly === 'local-static' ? 'local-static' : undefined,
         });
         result.steps.push({
             kind: 'web-static',
@@ -102,8 +103,9 @@ export async function assembleDelivery(outDir: string, ctx: Record<string, unkno
                 note: `removed=${pruned.removed} faces=${pruned.keptFaces.length}`,
             });
         }
-    } else if (assembly === 'server-host' || assembly === 'local-static') {
-        // SSR / local packs: favicon + opaque public/ for serve-host.
+    } else if (assembly === 'server-host') {
+        // SSR host: favicon + opaque public/ (local-static shares the static
+        // document emit above, so it no longer joins this branch).
         emitSiteFavicon(outDir, { projectRoot: ctx.projectRoot as string });
         emitPublicStaticAssets(outDir, { projectRoot: ctx.projectRoot as string });
     }
@@ -112,7 +114,7 @@ export async function assembleDelivery(outDir: string, ctx: Record<string, unkno
         result.steps.push({
             kind: 'local-static',
             status: 'modules-ready',
-            note: 'client modules packed; no ServerArtifact',
+            note: 'entry HTML emitted; full module tree kept for local embed (no prune, no ServerArtifact)',
         });
     }
 

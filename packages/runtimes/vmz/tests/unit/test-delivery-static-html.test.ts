@@ -70,4 +70,66 @@ export default defineConfig({
         const html = fs.readFileSync(path.join(serveRoot, 'index.html'), 'utf8');
         expect(html.includes('CIRCLE') || html.length > 0).toBe(true);
     });
+
+    it('buildProjectToOutDirRoot writes entry HTML for local-static', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-test-app-html-'));
+        fs.mkdirSync(path.join(dir, 'src', 'pages'), { recursive: true });
+        fs.writeFileSync(
+            path.join(dir, 'src', 'pages', 'index.vmz'),
+            `<template>
+  <h1>LOCAL</h1>
+</template>
+<script client>
+export default class IndexPage {}
+</script>
+`,
+        );
+        fs.writeFileSync(
+            path.join(dir, 'src', 'Application.vmz'),
+            `<template><slot /></template>
+<script client>
+export default class Application {}
+</script>
+`,
+        );
+        fs.writeFileSync(
+            path.join(dir, 'vmz.config.ts'),
+            `import { defineConfig } from ${JSON.stringify(vmzEntry)};
+export default defineConfig({
+  delivery: {
+    default: 'desktop',
+    profiles: {
+      desktop: { host: 'browser', assembly: 'local-static', name: 'app' },
+    },
+  },
+});
+`,
+        );
+
+        const outDirRoot = path.join(dir, 'dist');
+        const built = await buildProjectToOutDirRoot(dir, outDirRoot, { quiet: true });
+        expect(built.ok).toBe(true);
+        if (!built.ok) return;
+
+        expect(built.artifactDir).toBe(path.join(outDirRoot, 'app'));
+
+        // local-static is a browser-consumable static tree (Tauri/webview
+        // frontendDist): the entry document must exist and reference the packed
+        // client bootstrap, never stop at bare client modules.
+        const indexPath = path.join(built.artifactDir, 'index.html');
+        expect(fs.existsSync(indexPath)).toBe(true);
+
+        const html = fs.readFileSync(indexPath, 'utf8');
+        expect(html).toContain('LOCAL');
+        const scriptSrc = html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"/)?.[1] ?? '';
+        expect(scriptSrc.length > 0).toBe(true);
+        const scriptAbs = path.join(built.artifactDir, ...scriptSrc.replace(/^\//, '').split('/'));
+        expect(fs.existsSync(scriptAbs)).toBe(true);
+
+        const manifest = JSON.parse(
+            fs.readFileSync(path.join(built.artifactDir, '_vmz', 'assemble-manifest.json'), 'utf8'),
+        ) as { steps?: Array<{ kind?: string; htmlFiles?: number }> };
+        const staticStep = (manifest.steps || []).find((s) => s.kind === 'web-static');
+        expect(staticStep != null && (staticStep.htmlFiles ?? 0) >= 1).toBe(true);
+    });
 });

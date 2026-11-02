@@ -438,7 +438,7 @@ export function semanticIdsForAssembly(assembly) {
         case 'rust-embedded':
             return ['site-fallback', 'asset-graph'];
         case 'local-static':
-            return ['asset-graph'];
+            return ['static-delivery', 'asset-graph'];
         default:
             return [];
     }

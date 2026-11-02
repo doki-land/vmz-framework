@@ -35,6 +35,8 @@ export type EmitWebStaticOpts = {
     applicationId?: string;
     staticParams?: Record<string, Array<Record<string, string>>>;
     projectRoot?: string;
+    /** Assembly recorded in the manifest (`local-static` overrides the static default). */
+    deliveryProfile?: string;
 };
 
 type PageMeta = {
@@ -84,6 +86,7 @@ type StaticDeliveryManifest = {
 export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {}) {
     const origin = String(opts.origin || process.env.VMZ_SITE_ORIGIN || 'https://example.test').replace(/\/$/, '');
     const applicationId = opts.applicationId || path.basename(path.dirname(distDir));
+    const deliveryProfile = String(opts.deliveryProfile || 'static');
 
     const domPath = path.join(distDir, 'vmz-dom.js');
     if (!fs.existsSync(domPath)) {
@@ -271,7 +274,7 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const manifest: StaticDeliveryManifest = {
         schema: STATIC_DELIVERY_MANIFEST_SCHEMA,
         applicationId,
-        deliveryProfile: 'static',
+        deliveryProfile,
         origin,
         generatedAt: new Date().toISOString(),
         spaFallback: false,
@@ -316,7 +319,7 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     writePrettyJsonFile(path.join(vmzDir, 'static-emit-plan.json'), {
         schema: STATIC_EMIT_PLAN_SCHEMA,
         applicationId,
-        deliveryProfile: 'static',
+        deliveryProfile,
         origin,
         localeLinks: localeLinkPlan,
         assetPlanPath: '_vmz/asset-plan.json',
