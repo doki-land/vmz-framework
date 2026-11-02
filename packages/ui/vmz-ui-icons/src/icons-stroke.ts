@@ -1,15 +1,27 @@
 import type { IconDef } from './icon-types.ts';
 
-/** Outlined icon set — 24 grid, 1.75 stroke, 3–21 safe area. */
+/**
+ * Outlined icon set — executable design rules:
+ * - 24×24 viewBox; the optical box is 16 units wide (4–20), centerline geometry stays inside 3–21.
+ * - One stroke width (`DEFAULT_STROKE_WIDTH`, 1.75) for the whole set, no per-icon overrides.
+ * - Round line caps and joins are applied by the renderer, shapes are authored for them.
+ * - Square and frame glyphs occupy 4–20; line-only glyphs span 4–20 on their main axis.
+ * - Crosses use 6–18, chevrons 6–18 × 9–15, plus/minus 5–19, checks 5–19 × 7–17.
+ * - The mathematical mean mark uses an overbar at 6–18 over a cross at 7.5–16.5 × 10–19.
+ * - Filled dots use r=1.35 so they carry the same optical weight as a 1.75 stroke.
+ * - Multi-part glyphs must physically connect: arrowheads join their arc, stems join outlines.
+ * - Optically centered at (12,12); ground-biased metaphors keep the baseline on y=20.
+ * - One silhouette per concept: duplicate or near-duplicate glyphs are gate failures.
+ */
 export const STROKE_ICONS: Record<string, IconDef> = {
     'action.search': {
         kind: 'stroke',
-        circles: [{ cx: 10.5, cy: 10.5, r: 7.5 }],
-        paths: ['M15.8 15.8L20 20'],
+        circles: [{ cx: 11, cy: 11, r: 7 }],
+        paths: ['M16 16L20 20'],
     },
     'action.close': {
         kind: 'stroke',
-        paths: ['M7 7L17 17', 'M17 7L7 17'],
+        paths: ['M6 6L18 18', 'M18 6L6 18'],
     },
     'action.check': {
         kind: 'stroke',
@@ -17,11 +29,11 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.chevron-down': {
         kind: 'stroke',
-        paths: ['M7 10L12 15L17 10'],
+        paths: ['M6 9L12 15L18 9'],
     },
     'action.chevron-right': {
         kind: 'stroke',
-        paths: ['M10 7L15 12L10 17'],
+        paths: ['M9 6L15 12L9 18'],
     },
     'action.menu': {
         kind: 'stroke',
@@ -33,15 +45,15 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.copy': {
         kind: 'stroke',
-        paths: ['M9 9H17V17H9Z', 'M6 6H14V14'],
+        paths: ['M8 8H20V20H8Z', 'M16 8V4H4V16H8'],
     },
     'action.chevron-up': {
         kind: 'stroke',
-        paths: ['M7 14L12 9L17 14'],
+        paths: ['M6 15L12 9L18 15'],
     },
     'action.chevron-left': {
         kind: 'stroke',
-        paths: ['M14 7L9 12L14 17'],
+        paths: ['M15 6L9 12L15 18'],
     },
     'action.minus': {
         kind: 'stroke',
@@ -49,7 +61,12 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.more': {
         kind: 'stroke',
-        paths: ['M6 12H6.01', 'M12 12H12.01', 'M18 12H18.01'],
+        paths: [],
+        dots: [
+            { cx: 5, cy: 12, r: 1.35 },
+            { cx: 12, cy: 12, r: 1.35 },
+            { cx: 19, cy: 12, r: 1.35 },
+        ],
     },
     'action.filter': {
         kind: 'stroke',
@@ -61,11 +78,11 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.upload': {
         kind: 'stroke',
-        paths: ['M12 16V4', 'M7 9L12 4L17 9', 'M4 16V20H20V16'],
+        paths: ['M12 15V4', 'M7 9L12 4L17 9', 'M4 16V20H20V16'],
     },
     'action.download': {
         kind: 'stroke',
-        paths: ['M12 4V16', 'M7 11L12 16L17 11', 'M4 20H20'],
+        paths: ['M12 4V15', 'M7 10L12 15L17 10', 'M4 16V20H20V16'],
     },
     'action.sort': {
         kind: 'stroke',
@@ -73,11 +90,11 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.sort-asc': {
         kind: 'stroke',
-        paths: ['M8 18V6', 'M5 9L8 6L11 9', 'M15 18H21'],
+        paths: ['M8 18V6', 'M5 9L8 6L11 9', 'M14 14V18', 'M17 11V18', 'M20 8V18'],
     },
     'action.sort-desc': {
         kind: 'stroke',
-        paths: ['M8 6V18', 'M5 15L8 18L11 15', 'M15 6H21'],
+        paths: ['M8 6V18', 'M5 15L8 18L11 15', 'M14 8V18', 'M17 11V18', 'M20 14V18'],
     },
     'action.external': {
         kind: 'stroke',
@@ -97,16 +114,15 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.edit': {
         kind: 'stroke',
-        paths: ['M4 20H8L19 9L15 5L4 16V20Z'],
+        paths: ['M4 20L5 16L16 5L19 8L8 19L4 20Z', 'M13.5 7.5L16.5 10.5'],
     },
     'action.refresh': {
         kind: 'stroke',
-        paths: ['M20 12A8 8 0 1 1 17.5 6.5', 'M20 4V9H15'],
+        paths: ['M20 12A8 8 0 1 1 17.1 5.9L20 8', 'M15.5 8H20V3.5'],
     },
     'action.history': {
         kind: 'stroke',
-        circles: [{ cx: 12, cy: 12, r: 8.5 }],
-        paths: ['M12 7V12L15.5 14'],
+        paths: ['M4 12A8 8 0 1 0 6.9 5.9L4 8', 'M4 3.5V8H8.5', 'M12 7V12L15.5 14'],
     },
     'action.moon': {
         kind: 'stroke',
@@ -115,7 +131,16 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     'action.sun': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 4 }],
-        paths: ['M12 2V4', 'M12 20V22', 'M2 12H4', 'M20 12H22', 'M5 5L6.5 6.5', 'M17.5 17.5L19 19', 'M19 5L17.5 6.5', 'M6.5 17.5L5 19'],
+        paths: [
+            'M12 3V6',
+            'M12 18V21',
+            'M3 12H6',
+            'M18 12H21',
+            'M5.6 5.6L7.8 7.8',
+            'M16.2 16.2L18.4 18.4',
+            'M18.4 5.6L16.2 7.8',
+            'M7.8 16.2L5.6 18.4',
+        ],
     },
     'action.monitor': {
         kind: 'stroke',
@@ -123,8 +148,8 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'action.search-document': {
         kind: 'stroke',
-        paths: ['M5 4H15L19 8V20H5Z', 'M15 4V8H19'],
-        circles: [{ cx: 11, cy: 14, r: 2.5 }],
+        paths: ['M4 4H13L17 8V20H4Z', 'M13 4V8H17', 'M16.1 16.1L20 20'],
+        circles: [{ cx: 14, cy: 14, r: 3 }],
     },
     'nav.home': {
         kind: 'stroke',
@@ -133,63 +158,58 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     'nav.language': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
-        paths: ['M12 3V21', 'M3 12H21', 'M5.5 7.5C8 5.5 16 5.5 18.5 7.5', 'M5.5 16.5C8 18.5 16 18.5 18.5 16.5'],
+        paths: ['M3 12H21', 'M12 3C15.5 5.5 17 8.5 17 12C17 15.5 15.5 18.5 12 21C8.5 18.5 7 15.5 7 12C7 8.5 8.5 5.5 12 3Z'],
     },
     'status.info': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
         paths: ['M12 11V16'],
-        dots: [{ cx: 12, cy: 8, r: 1 }],
+        dots: [{ cx: 12, cy: 8, r: 1.35 }],
     },
     'status.warning': {
         kind: 'stroke',
-        paths: ['M12 4L20 19H4L12 4Z', 'M12 10V14'],
-        dots: [{ cx: 12, cy: 17, r: 1 }],
+        paths: ['M12 4L20 20H4Z', 'M12 9V13'],
+        dots: [{ cx: 12, cy: 17, r: 1.35 }],
     },
     'status.success': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
-        paths: ['M8 12L11 15L16 9'],
+        paths: ['M7 12L10.5 15.5L17 9'],
     },
     'status.danger': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
-        paths: ['M12 8V13'],
-        dots: [{ cx: 12, cy: 16.5, r: 1 }],
+        paths: ['M12 7.5V13.5'],
+        dots: [{ cx: 12, cy: 17, r: 1.35 }],
     },
     'feature.incremental': {
         kind: 'stroke',
-        circles: [
-            { cx: 5, cy: 12, r: 2 },
-            { cx: 19, cy: 12, r: 2 },
-            { cx: 12, cy: 6, r: 2 },
-        ],
-        paths: ['M7 12H10', 'M14 12H17', 'M12 8V10', 'M8.2 11.2L11 8.5', 'M12.8 8.5L15.6 11.2'],
+        paths: ['M4 20H20', 'M6 20V16H10V12H14V8H18'],
     },
     'feature.runtime': {
         kind: 'stroke',
-        paths: ['M8.5 7.5H15.5V16.5H8.5Z', 'M11 10L14.5 12L11 14Z'],
+        paths: ['M7 7H17V17H7Z', 'M10 4V7', 'M14 4V7', 'M10 17V20', 'M14 17V20', 'M4 10H7', 'M4 14H7', 'M17 10H20', 'M17 14H20'],
     },
     'feature.deploy': {
         kind: 'stroke',
-        paths: ['M4 16H20', 'M12 6V14', 'M8.5 10.5L12 6L15.5 10.5'],
+        paths: ['M4 18H20', 'M12 15V6', 'M8 10L12 6L16 10'],
     },
     'tool.url': {
         kind: 'stroke',
-        paths: ['M10.5 8.5a3 3 0 0 1 4.2 0l.8.8a3 3 0 0 1 0 4.2l-.8.8', 'M13.5 15.5a3 3 0 0 1-4.2 0l-.8-.8a3 3 0 0 1 0-4.2l.8-.8'],
+        paths: ['M10 8H8A4 4 0 0 0 8 16H10', 'M14 8H16A4 4 0 0 1 16 16H14', 'M9 12H15'],
     },
     'tool.temperature': {
         kind: 'stroke',
-        circles: [{ cx: 12, cy: 18, r: 3 }],
-        paths: ['M12 4V15', 'M10 9H14'],
+        circles: [{ cx: 12, cy: 16.5, r: 3.5 }],
+        paths: ['M10 5A2 2 0 0 1 14 5', 'M10 5V14', 'M14 5V14', 'M12 8V14'],
     },
     'tool.length': {
         kind: 'stroke',
-        paths: ['M4 12H20', 'M6 9V15', 'M10 10V14', 'M14 10V14', 'M18 9V15', 'M4 12L7 9', 'M4 12L7 15', 'M20 12L17 9', 'M20 12L17 15'],
+        paths: ['M4 9H20V15H4Z', 'M8 9V12', 'M12 9V13.5', 'M16 9V12'],
     },
     'tool.weight': {
         kind: 'stroke',
-        paths: ['M6 8H18', 'M12 8V16', 'M8 16H16', 'M9 6H15'],
+        paths: ['M4 9V15', 'M7 7V17', 'M17 7V17', 'M20 9V15', 'M7 12H17'],
     },
     'tool.time-units': {
         kind: 'stroke',
@@ -198,63 +218,63 @@ export const STROKE_ICONS: Record<string, IconDef> = {
     },
     'tool.color': {
         kind: 'stroke',
-        paths: ['M12 4C8.5 4 6 6.5 6 10s2.5 6 6 6', 'M12 4c3.5 0 6 2.5 6 6s-2.5 6-6 6'],
-        dots: [
-            { cx: 8, cy: 10, r: 1.2 },
-            { cx: 12, cy: 8, r: 1.2 },
-            { cx: 16, cy: 10, r: 1.2 },
-        ],
+        paths: ['M12 3C10 5.5 6 10.5 6 14A6 6 0 0 0 18 14C18 10.5 14 5.5 12 3Z'],
     },
     'tool.percentage': {
         kind: 'stroke',
         circles: [
-            { cx: 9.5, cy: 9.5, r: 2 },
-            { cx: 14.5, cy: 14.5, r: 2 },
+            { cx: 8.5, cy: 8.5, r: 2.6 },
+            { cx: 15.5, cy: 15.5, r: 2.6 },
         ],
-        paths: ['M16 8L8 16'],
+        paths: ['M17.2 6.8L6.8 17.2'],
     },
     'tool.area': {
         kind: 'stroke',
-        paths: ['M5 5H19V19H5Z', 'M8 8H16V16H8Z'],
+        paths: ['M4 4H20V20H4Z', 'M8 8H16V16H8Z'],
     },
     'tool.volume': {
         kind: 'stroke',
-        paths: ['M5 9H19V19H5Z', 'M8 6H16', 'M8 6V9', 'M16 6V9'],
+        paths: ['M12 4L20 8.5V15.5L12 20L4 15.5V8.5Z', 'M4 8.5L12 12L20 8.5', 'M12 12V20'],
     },
     'tool.data-size': {
         kind: 'stroke',
-        paths: ['M5 7H19', 'M5 11H15', 'M5 15H19'],
+        paths: [
+            'M5 6C5 4.3 8.1 3 12 3C15.9 3 19 4.3 19 6V18C19 19.7 15.9 21 12 21C8.1 21 5 19.7 5 18V6Z',
+            'M5 6C5 7.7 8.1 9 12 9C15.9 9 19 7.7 19 6',
+            'M5 12C5 13.7 8.1 15 12 15C15.9 15 19 13.7 19 12',
+        ],
     },
     'tool.ratio': {
         kind: 'stroke',
-        paths: ['M5 7H19', 'M5 17H19', 'M8 10V14', 'M16 10V14'],
+        paths: ['M4 10H10V16H4Z', 'M12 8H20V16H12Z'],
     },
     'tool.average': {
         kind: 'stroke',
-        paths: ['M4 18H20', 'M6 15L10 9L14 13L18 7'],
+        paths: ['M6 6H18', 'M7.5 10L16.5 19', 'M16.5 10L7.5 19'],
     },
     'tool.tip': {
         kind: 'stroke',
-        paths: ['M12 4C9.5 4 8 6 8 8.5c0 1.8 1 3.2 2.5 4V15h3v-2.5c1.5-.8 2.5-2.2 2.5-4C16 6 14.5 4 12 4Z', 'M9.5 18H14.5', 'M10 20H14'],
+        paths: ['M12 4C9.5 4 8 6 8 8.5C8 10.3 9 11.7 10.5 12.5V15H13.5V12.5C15 11.7 16 10.3 16 8.5C16 6 14.5 4 12 4Z', 'M9.5 18H14.5', 'M10 20H14'],
     },
     'tool.aspect-ratio': {
         kind: 'stroke',
-        paths: ['M5 7H19V17H5Z', 'M8 9H16V15H8Z'],
+        paths: ['M4 7H20V17H4Z', 'M8 7V11H4', 'M16 17V13H20'],
     },
     'tool.bandwidth': {
         kind: 'stroke',
-        paths: ['M4 12H6', 'M8 8V16', 'M11 10V14', 'M14 6V18', 'M17 9V15', 'M20 12H22'],
+        paths: ['M4 20H20', 'M5 20V16', 'M9 20V12', 'M13 20V8', 'M17 20V4'],
     },
     'tool.percent-change': {
         kind: 'stroke',
-        paths: ['M5 17L12 9L15 13L19 6', 'M4 19H20'],
+        paths: ['M4 17L9 12L12 15L20 6', 'M15.5 6H20V10.5'],
     },
     'tool.ohm': {
         kind: 'stroke',
-        paths: ['M8 11c0-2.2 1.8-4 4-4s4 1.8 4 4', 'M8 11V16', 'M16 11V16', 'M8 16H16'],
+        paths: ['M7 14C7 10.5 9.3 8 12 8C14.7 8 17 10.5 17 14', 'M7 14V17', 'M17 14V17', 'M4.5 17H9.5', 'M14.5 17H19.5'],
     },
     'tool.speed': {
         kind: 'stroke',
-        paths: ['M5.5 14A7 7 0 0 1 18.5 14', 'M12 12L15.5 8.5'],
+        paths: ['M5 14A7 7 0 0 1 19 14', 'M12 14L16 10'],
+        dots: [{ cx: 12, cy: 14, r: 1.35 }],
     },
 };
