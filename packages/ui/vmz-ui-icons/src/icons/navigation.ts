@@ -9,7 +9,7 @@ export const NAVIGATION_ICONS: Record<string, IconDef> = {
     'nav.language': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
-        paths: ['M3 12H21', 'M12 3C15.5 5.5 17 8.5 17 12C17 15.5 15.5 18.5 12 21C8.5 18.5 7 15.5 7 12C7 8.5 8.5 5.5 12 3Z'],
+        paths: ['M3 12H21', 'M12 3C14.4 5.6 15.4 8.7 15.4 12C15.4 15.3 14.4 18.4 12 21C9.6 18.4 8.6 15.3 8.6 12C8.6 8.7 9.6 5.6 12 3Z'],
     },
     'nav.anchor': {
         kind: 'stroke',
@@ -22,6 +22,6 @@ export const NAVIGATION_ICONS: Record<string, IconDef> = {
     'nav.compass': {
         kind: 'stroke',
         circles: [{ cx: 12, cy: 12, r: 9 }],
-        paths: ['M15.5 8.5L13.5 13.5L8.5 15.5L10.5 10.5L15.5 8.5Z'],
+        paths: ['M15.17 9.34L13.5 13.5L8.83 14.67Q8.5 15.5 9.34 15.17L10.5 10.5L14.67 8.83Q15.5 8.5 15.17 9.34Z'],
     },
 };

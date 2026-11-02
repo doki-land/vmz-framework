@@ -4,7 +4,7 @@ import type { IconDef } from '../icon-types.ts';
 export const MEDIA_ICONS: Record<string, IconDef> = {
     'media.play': {
         kind: 'stroke',
-        paths: ['M8 5.5L18.5 12L8 18.5V5.5Z'],
+        paths: ['M8.77 6.04L17.65 11.47Q18.5 12 17.65 12.53L8.77 17.96Q8 18.5 8 17.6V6.4Q8 5.5 8.77 6.04Z'],
     },
     'media.pause': {
         kind: 'stroke',
@@ -16,11 +16,11 @@ export const MEDIA_ICONS: Record<string, IconDef> = {
     },
     'media.next': {
         kind: 'stroke',
-        paths: ['M6.5 6L14.5 12L6.5 18V6Z', 'M17.5 6V18'],
+        paths: ['M7.06 6.42L13.78 11.4Q14.5 12 13.78 12.6L7.06 17.58Q6.5 18 6.5 17.3V6.7Q6.5 6 7.06 6.42Z', 'M17.5 6V18'],
     },
     'media.previous': {
         kind: 'stroke',
-        paths: ['M17.5 6L9.5 12L17.5 18V6Z', 'M6.5 6V18'],
+        paths: ['M16.94 6.42L10.22 11.4Q9.5 12 10.22 12.6L16.94 17.58Q17.5 18 17.5 17.3V6.7Q17.5 6 16.94 6.42Z', 'M6.5 6V18'],
     },
     'media.volume': {
         kind: 'stroke',

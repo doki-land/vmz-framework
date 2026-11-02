@@ -1,6 +1,10 @@
 import type { IconDef } from '../icon-types.ts';
 
-/** Commerce glyphs (`commerce.*`) — payment instruments, carts and scan codes. */
+/**
+ * Commerce glyphs (`commerce.*`) — payment instruments, carts and scan codes.
+ * `commerce.qr` keeps a 2×2 dot matrix at 2-unit pitch: a scan code is dense by
+ * definition, so it is the documented exception to the ≥2.25-unit spacing rule.
+ */
 export const COMMERCE_ICONS: Record<string, IconDef> = {
     'commerce.card': {
         kind: 'stroke',

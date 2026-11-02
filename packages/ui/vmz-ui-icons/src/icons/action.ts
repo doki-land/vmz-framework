@@ -174,7 +174,7 @@ export const ACTION_ICONS: Record<string, IconDef> = {
     },
     'action.eye-off': {
         kind: 'stroke',
-        paths: ['M2.5 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 21.5 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2.5 12Z', 'M4 5L20 19'],
+        paths: ['M2.5 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 21.5 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2.5 12Z', 'M4 19L20 5'],
         circles: [{ cx: 12, cy: 12, r: 3 }],
     },
     'action.mail': {

@@ -10,8 +10,8 @@ export const STATUS_ICONS: Record<string, IconDef> = {
     },
     'status.warning': {
         kind: 'stroke',
-        paths: ['M12 4L20 20H4Z', 'M12 9V13'],
-        dots: [{ cx: 12, cy: 17, r: 1.5 }],
+        paths: ['M12.5 5.1L19.5 18.9Q20 20 18.8 20H5.2Q4 20 4.5 18.9L11.5 5.1Q12 4 12.5 5.1Z', 'M12 9V13'],
+        dots: [{ cx: 12, cy: 16.5, r: 1.5 }],
     },
     'status.success': {
         kind: 'stroke',
@@ -32,7 +32,7 @@ export const STATUS_ICONS: Record<string, IconDef> = {
     },
     'status.offline': {
         kind: 'stroke',
-        paths: ['M3 9A13 13 0 0 1 21 9', 'M6.5 12.5A8.5 8.5 0 0 1 17.5 12.5', 'M4 4L20 20'],
+        paths: ['M3 9A13 13 0 0 1 21 9', 'M6.5 12.5A8.5 8.5 0 0 1 17.5 12.5', 'M4 20L20 4'],
         dots: [{ cx: 12, cy: 16, r: 1.5 }],
     },
 };
