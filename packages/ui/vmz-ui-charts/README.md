@@ -35,13 +35,17 @@ Every mark renders real geometry with hit-testing, keyboard navigation, tooltips
 | Distribution | `histogram`, `boxplot`, `violin`, `ridgeline` | binning / five-number / KDE all computed at compile time |
 | Finance | `candlestick` | `open`/`high`/`low`/`close` channels, up/down tokens |
 | Flow | `waterfall`, `funnel`, `sankey`, `streamgraph`, `gantt` | waterfall connectors, DAG-checked sankey, wiggle ribbons, date-aware gantt |
-| Hierarchy | `treemap`, `sunburst`, `tree` | one `keyField` + `parentField` (+ `size`) contract for all three |
+| Hierarchy | `treemap`, `sunburst`, `tree` | one `keyField` + `parentField` (+ `size`) contract; `treeLayout: "tidy" / "dendrogram" / "radial"` |
 | Part-to-whole | `pie` (+ donut), `mosaic`, `percent` layout | rose / radial-bar live under polar |
 | Polar | `radar`, `rose`, `radial-bar`, `gauge` | 240° gauge with `valueDomain` |
 | Grid | `heatmap`, `calendar` | sequential `heatmapRamp`; calendar takes strict `YYYY-MM-DD` |
+| Density | `hexbin`, `contour` | compile-time hex grid / 2D KDE + marching squares, nice levels |
+| Multi-axis | `parallel` | `dimensions: string[]`, one independent axis per entry |
+| Network | `force`, `chord` | deterministic seeded force layout; chord shares the sankey edge list |
+| Geo | `geo` | `geo: { map, projection }` + host-registered basemap (`registerGeoMap`); Natural Earth lite lives in the independent `@doki-land/davinci-geo-assets` pack |
 | Aux channels | `size` (bubble), `yError` / `yErrorMinus` / `yErrorPlus`, `yLow` / `yHigh` (band) | composable with the base marks |
 
-Stat-driven marks (`histogram`, `boxplot`, `ridgeline`, `bump`, `violin`, `calendar`, `streamgraph`, `mosaic`) compute their statistics globally at compile time and therefore refuse `facetField` with an explicit diagnostic.
+Stat-driven marks (`histogram`, `boxplot`, `ridgeline`, `bump`, `violin`, `calendar`, `streamgraph`, `mosaic`, `force`, `hexbin`, `contour`, `chord`) compute their statistics globally at compile time and therefore refuse `facetField` with an explicit diagnostic.
 
 ## Props
 
