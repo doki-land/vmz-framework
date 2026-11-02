@@ -1,5 +1,5 @@
 <template>
-    <div data-vmz-ui-charts="diagram" @mouseover="_onMouseOver" @mouseout="_onMouseOut" @mousemove="_onMouseMove" @click="_onClick" class="vmz-ui-charts__diagram" :style="hostStyle">
+    <div data-vmz-ui-charts="diagram" @mousemove="_onMouseMove" @mouseleave="_onMouseLeave" @click="_onClick" @keydown="_onKeydown" class="vmz-ui-charts__diagram" :style="hostStyle" :data-theme="_themeName()" tabindex="0" role="img" :aria-label="_ariaLabel()" :aria-describedby="_srId()">
         <div v-if="_isEmpty()" class="vmz-ui-charts__empty">
             No diagram spec.
         </div>
@@ -16,19 +16,31 @@
                 {{ d.message }}
             </div>
         </div>
-        <div v-if="_tooltip.visible" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()">
+        <div v-if="_tooltip.visible" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()" aria-live="polite">
             {{ _tooltip.text }}
         </div>
+        <div class="vmz-ui-charts__sr" :id="_srId()">{{ _summary() }}</div>
     </div>
 </template>
 <style>
-/* 同 Chart 基础样式，独立声明避免依赖继承 */
 .vmz-ui-charts__diagram {
-    display: inline-block;
-    background: var(--vmz-surface-paper, #fff);
-    border: 1px solid var(--vmz-line-default, #e5e5e5);
-    border-radius: 2px;
+    display: block;
+    background: var(--vmz-surface-paper, #ffffff);
+    border: 1px solid var(--vmz-line-default, #e5e7eb);
+    border-radius: 4px;
     overflow: hidden;
+    box-sizing: border-box;
+}
+.vmz-ui-charts__diagram[data-theme="dark"] {
+    background: var(--vmz-surface-paper-dark, #0b1220);
+    border-color: var(--vmz-line-default-dark, #1f2937);
+}
+.vmz-ui-charts__diagram:focus-visible {
+    outline: 2px solid #1677ff;
+    outline-offset: 2px;
+}
+.vmz-ui-charts__diagram[data-theme="dark"]:focus-visible {
+    outline-color: #60a5fa;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__svg {
     width: 100%;
@@ -39,6 +51,38 @@
     width: 100%;
     height: 100%;
     display: block;
+    animation: vmz-diagram-in 0.24s ease-out;
+}
+.vmz-ui-charts__diagram .vmz-ui-charts__svg svg [data-dvz-id] {
+    transition: opacity 0.15s ease;
+}
+@keyframes vmz-diagram-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .vmz-ui-charts__diagram .vmz-ui-charts__svg svg { animation: none; }
+    .vmz-ui-charts__diagram .vmz-ui-charts__svg svg [data-dvz-id] { transition: none; }
+}
+.vmz-ui-charts__diagram .vmz-ui-charts__empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vmz-text-muted, #6b7280);
+    font-size: 0.875rem;
+}
+.vmz-ui-charts__diagram .vmz-ui-charts__error-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #b91c1c;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    z-index: 2;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__diag {
     position: absolute;
@@ -53,45 +97,51 @@
     padding: 0.25rem 0.5rem;
     border-top: 1px solid var(--vmz-line-default, #e5e5e5);
 }
+.vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__diag {
+    background: color-mix(in srgb, var(--vmz-surface-paper-dark, #0b1220) 88%, transparent);
+    border-top-color: var(--vmz-line-default-dark, #1f2937);
+    color: #e5e7eb;
+}
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item {
     padding: 1px 0;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item[data-sev="error"] {
-    color: #c0392b;
+    color: #b91c1c;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__diag-item[data-sev="warning"] {
     color: #b7791f;
 }
-.vmz-ui-charts__diagram .vmz-ui-charts__empty {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--vmz-text-muted, #999);
-    font-size: 0.875rem;
+.vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__diag-item[data-sev="error"] {
+    color: #f87171;
 }
-.vmz-ui-charts__diagram .vmz-ui-charts__error-banner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: #c0392b;
-    color: #fff;
-    font-size: 0.75rem;
-    padding: 4px 8px;
-    z-index: 2;
+.vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__diag-item[data-sev="warning"] {
+    color: #fbbf24;
 }
 .vmz-ui-charts__diagram .vmz-ui-charts__tooltip {
     position: absolute;
     z-index: 999;
     pointer-events: none;
-    background: rgba(0, 0, 0, 0.8);
-    color: #fff;
+    background: rgba(17, 24, 39, 0.92);
+    color: #f9fafb;
     font-size: 0.75rem;
+    line-height: 1.4;
     padding: 4px 8px;
-    border-radius: 3px;
-    transform: translate(8px, 8px);
+    border-radius: 4px;
+    transform: translate(10px, 10px);
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.vmz-ui-charts__diagram[data-theme="dark"] .vmz-ui-charts__tooltip {
+    background: rgba(249, 250, 251, 0.95);
+    color: #111827;
+}
+.vmz-ui-charts__diagram .vmz-ui-charts__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
     white-space: nowrap;
 }
 </style>
@@ -100,28 +150,45 @@
  * VMZ UI Charts — Diagram 组件。
  *
  * 作者面：
- *   <Diagram :spec="{...nodes, edges...}" direction="LR" />
+ *   <Diagram :spec="{...nodes, edges...}" direction="LR" theme="light|dark|auto" />
  *
  * 管线：DiagramSpec → simpleLayout → buildScene → resolve → DisplayScene →
- * `@doki-land/davinci/scene` 的 SVG 串行化。组件不画形状。
+ * `@doki-land/davinci/scene` 的 SVG 串行化。组件只做绑定、容器尺寸、生命
+ * 周期与可访问呈现，不画形状。
+ *
+ * 交互：pointer / 键盘命中测试直接读 SemanticScene 节点边界与边几何，
+ * tooltip 展示真实节点 / 边标签；选择事件指向 spec 里的稳定 id。
  */
 import {
-    simpleLayout,
+    DARK_DIAGRAM_THEME,
+    DEFAULT_DIAGRAM_THEME,
     buildScene as buildDiagramScene,
+    simpleLayout,
     type DiagramSpec,
+    type DiagramTheme,
 } from "@doki-land/davinci/diagram";
-import { renderSvg, resolve, resolveResourceIdPrefix, type DisplayScene } from "@doki-land/davinci/scene";
+import {
+    renderSvg,
+    resolve,
+    resolveResourceIdPrefix,
+    type DisplayScene,
+    type SemanticNode,
+    type SemanticScene,
+} from "@doki-land/davinci/scene";
 import { initialState, reduce, type RuntimeState, type Action } from "@doki-land/davinci/runtime";
+import type { Point2D } from "@doki-land/davinci/types";
+
+const HIT_TOLERANCE_PX = 8;
 
 export default class Diagram {
     /** DiagramSpec（nodes / edges / clusters）。 */
     public spec: DiagramSpec | null = null;
     /** 布局方向（覆盖 spec.direction）。 */
     public direction: "LR" | "RL" | "TB" | "BT" | null = null;
-    public width: number = 800;
-    public height: number = 500;
-    /** 是否自动适应布局画布（忽略 width/height 用 canvasBounds）。 */
-    public autoSize: boolean = true;
+    /** 主题："light" | "dark" | "auto"。auto 在客户端跟随系统，SSR 为 light。 */
+    public theme: string | null = null;
+    /** 可访问名称。缺省时派生一句话摘要。 */
+    public label: string | null = null;
     /** 宿主显式提供的 SVG 资源 id 前缀。null 时从声明式输入确定性派生，
      *  同页多实例不撞 id；需要绝对唯一时由宿主传入。 */
     public resourceIdPrefix: string | null = null;
@@ -134,10 +201,16 @@ export default class Diagram {
 
     /** 每次 recompile 递增。异步返回时先比对再应用，为未来异步管线预留。 */
     public _latestRevision: number = 0;
-    /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
+    /** ResizeObserver 实例，onMount 创建 onUnmount 断开（autoSize 下仅同步容器 state）。 */
     public _resizeObserver: ResizeObserver | null = null;
-    /** 当前 hover 的节点或边 id —— 简化占位。 */
-    public _hoverNodeId: string | null = null;
+    /** auto 主题的 matchMedia 状态。 */
+    public _themeMedia: { matches: boolean } | null = null;
+    /** 渲染期缓存：命中测试直接读，不重布局。 */
+    public _semanticScene: SemanticScene | null = null;
+    /** 当前 hover / 键盘聚焦的节点或边 id。 */
+    public _hoverId: string | null = null;
+    /** 键盘聚焦索引（节点顺序）。 */
+    public _focusIndex: number = -1;
     /** Tooltip 状态。 */
     public _tooltip: { visible: boolean; x: number; y: number; text: string } = {
         visible: false,
@@ -146,10 +219,20 @@ export default class Diagram {
         text: "",
     };
 
+    public _themeName(): string {
+        if (this.theme === "dark") return "dark";
+        if (this.theme === "auto" && this._themeMedia && this._themeMedia.matches) return "dark";
+        return "light";
+    }
+
+    public _diagramTheme(): DiagramTheme {
+        return this._themeName() === "dark" ? DARK_DIAGRAM_THEME : DEFAULT_DIAGRAM_THEME;
+    }
+
     /** 零尺寸 guard —— 宽或高为 0 时跳过渲染避免 NaN。 */
     public _zeroSize(): boolean {
-        const w = this.scene && this.autoSize ? this.scene.width : this.width;
-        const h = this.scene && this.autoSize ? this.scene.height : this.height;
+        const w = this.scene ? this.scene.width : 0;
+        const h = this.scene ? this.scene.height : 0;
         return w <= 0 || h <= 0;
     }
 
@@ -164,10 +247,9 @@ export default class Diagram {
     }
 
     public get hostStyle(): string {
-        const w = this.scene && this.autoSize ? this.scene.width : this.width;
-        const h = this.scene && this.autoSize ? this.scene.height : this.height;
-        const hide = this._zeroSize() ? "display:none;" : "";
-        return `width:${w}px;height:${h}px;position:relative;${hide}`;
+        const w = this.scene ? this.scene.width : 0;
+        const h = this.scene ? this.scene.height : 0;
+        return `width:100%;max-width:${Math.ceil(w)}px;height:${h}px;position:relative;`;
     }
 
     /** SVG 资源 id 前缀 —— 显式 prop 优先，否则从声明式输入（spec + direction）
@@ -179,23 +261,65 @@ export default class Diagram {
 
     /** DisplayScene → 确定性 SVG markup（SSR 安全，无 DOM API）。 */
     public markup(): string {
+        this._ensureCompiled();
         if (this._zeroSize()) return "";
         return this.scene ? renderSvg(this.scene, { resourceIdPrefix: this._resourcePrefix() }) : "";
     }
 
+    // ---- 可访问呈现 ----
+
+    public _srId(): string {
+        return `${this._resourcePrefix()}summary`;
+    }
+
+    public _ariaLabel(): string {
+        if (this.label) return this.label;
+        return this.spec ? `${this.spec.kind} diagram` : "diagram";
+    }
+
+    public _summary(): string {
+        if (!this.spec) return "Empty diagram.";
+        return `${this._ariaLabel()} with ${this.spec.nodes.length} nodes and ${this.spec.edges.length} edges.`;
+    }
+
+    // ---- 生命周期 ----
+
     onMount() {
-        this.recompile();
+        this._ensureCompiled();
+        this.state = initialState(this.scene ? this.scene.width : 0, this.scene ? this.scene.height : 0);
         this._attachResizeObserver();
+        this._attachThemeMedia();
     }
 
     onUnmount() {
         this._detachResizeObserver();
+        this._themeMedia = null;
+    }
+
+    public _attachThemeMedia(): void {
+        if (this.theme !== "auto") return;
+        if (typeof matchMedia !== "function") return;
+        const media = matchMedia("(prefers-color-scheme: dark)");
+        this._themeMedia = { matches: media.matches };
+    }
+
+    /** SSR 与首渲染共用：spec 就绪而 scene 未建时同步编译一次。 */
+    public _ensureCompiled(): void {
+        if (!this.spec) {
+            this.scene = null;
+            this._semanticScene = null;
+            this.diagnostics = [];
+            return;
+        }
+        if (this.scene && this._semanticScene) return;
+        this.recompile();
     }
 
     public recompile() {
         this._latestRevision++;
         if (!this.spec) {
             this.scene = null;
+            this._semanticScene = null;
             this.diagnostics = [];
             return;
         }
@@ -206,8 +330,13 @@ export default class Diagram {
             code: d.code,
             message: d.message,
         }));
-        const sem = buildDiagramScene(effectiveSpec, plan);
-        this.scene = resolve(sem, { width: plan.canvasBounds.w, height: plan.canvasBounds.h });
+        const semantic = buildDiagramScene(effectiveSpec, plan, { theme: this._diagramTheme() });
+        this._semanticScene = semantic;
+        this.scene = resolve(semantic, {
+            width: plan.canvasBounds.w,
+            height: plan.canvasBounds.h,
+            preserveNodeIds: true,
+        });
         this.state = initialState(this.scene.width, this.scene.height);
     }
 
@@ -217,7 +346,7 @@ export default class Diagram {
         return this.state;
     }
 
-    // ---- ResizeObserver ----
+    // ---- ResizeObserver（autoSize：只同步 runtime 容器状态，不回写尺寸） ----
 
     public _attachResizeObserver(): void {
         if (typeof ResizeObserver === "undefined") return;
@@ -227,13 +356,12 @@ export default class Diagram {
             for (const entry of entries) {
                 const cr = (entry as any).contentRect as DOMRectReadOnly | undefined;
                 if (!cr) continue;
-                const w = Math.round(cr.width);
-                const h = Math.round(cr.height);
-                if (this.autoSize) continue; // autoSize 跟随 scene 尺寸，不跟随容器
-                if (w > 0 && w !== this.width) this.width = w;
-                if (h > 0 && h !== this.height) this.height = h;
                 if (this.state) {
-                    this.state = reduce(this.state, { kind: "container-resize", w, h });
+                    this.state = reduce(this.state, {
+                        kind: "container-resize",
+                        w: Math.round(cr.width),
+                        h: Math.round(cr.height),
+                    });
                 }
             }
         });
@@ -248,17 +376,102 @@ export default class Diagram {
         }
     }
 
-    // ---- Mouse → tooltip placeholder ----
+    // ---- 命中测试 ----
+
+    public _toScenePoint(ev: MouseEvent): Point2D | null {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || !this.scene) return null;
+        const rect = root.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || this.scene.width <= 0 || this.scene.height <= 0) return null;
+        return {
+            x: ((ev.clientX - rect.left) / rect.width) * this.scene.width,
+            y: ((ev.clientY - rect.top) / rect.height) * this.scene.height,
+        };
+    }
+
+    /** 可命中的节点与边（role=diagram.node / diagram.edge 的 rect 与 path）。 */
+    public _hitTargets(): SemanticNode[] {
+        if (!this._semanticScene) {
+            return [];
+        }
+        return this._semanticScene.root.children.filter(
+            (n) => (n.role === "diagram.node" && n.kind === "rect") || (n.role === "diagram.edge" && n.kind === "path")
+        );
+    }
+
+    /** 命中测试：节点优先（包含即中），其次到边的折线距离。 */
+    public _hitTest(px: number, py: number): string | null {
+        if (!this._semanticScene) {
+            return null;
+        }
+        for (const node of this._semanticScene.root.children) {
+            if (node.role === "diagram.node" && node.kind === "rect") {
+                if (px >= node.x && px <= node.x + node.w && py >= node.y && py <= node.y + node.h) {
+                    return node.id;
+                }
+            }
+        }
+        let bestId: string | null = null;
+        let bestDist: number = Number.POSITIVE_INFINITY;
+        for (const node of this._semanticScene.root.children) {
+            if (node.role !== "diagram.edge" || node.kind !== "path") {
+                continue;
+            }
+            const points = [];
+            for (const cmd of node.path.commands) {
+                if (cmd.kind === "move" || cmd.kind === "line") {
+                    points.push(cmd.to);
+                }
+            }
+            for (let i = 1; i < points.length; i++) {
+                const d = segmentDistance(px, py, points[i - 1], points[i]);
+                if (d <= HIT_TOLERANCE_PX && (bestId === null || d < bestDist)) {
+                    bestId = node.id;
+                    bestDist = d;
+                }
+            }
+        }
+        return bestId;
+    }
+
+    /** tooltip 文本：节点标签或边标签，缺省回退稳定 id。 */
+    public _tooltipTextFor(id: string): string {
+        if (this.spec) {
+            if (id.startsWith("node-")) {
+                const nodeId = id.slice("node-".length);
+                const node = this.spec.nodes.find((n) => n.id === nodeId);
+                if (node) return node.label ?? node.id;
+            }
+            if (id.startsWith("edge-")) {
+                const edgeId = id.slice("edge-".length);
+                const edge = this.spec.edges.find((e) => e.id === edgeId);
+                if (edge) return edge.label ?? `${edge.fromNode} → ${edge.toNode}`;
+            }
+        }
+        return id;
+    }
+
+    /** 节点 / 边的 scene 锚点（tooltip 定位）。 */
+    public _nodeAnchor(id: string): Point2D | null {
+        if (!this._semanticScene) return null;
+        const node = this._semanticScene.root.children.find((n) => n.id === id);
+        if (!node) return null;
+        if (node.kind === "rect") return { x: node.x + node.w / 2, y: node.y };
+        if (node.kind === "path") {
+            const pts = [];
+            for (const cmd of node.path.commands) {
+                if (cmd.kind === "move" || cmd.kind === "line") pts.push(cmd.to);
+            }
+            if (pts.length > 0) return pts[Math.floor(pts.length / 2)];
+        }
+        return null;
+    }
+
+    // ---- Pointer 交互 ----
 
     /** 宿主可 override 的 hover 回调（事件名 `diagram-hover`）。 */
     public ondiagramHover(payload: { nodeId: string }): void {
         // 默认空实现，宿主在组件实例上 override 即可接收事件。
-    }
-
-    public _onMouseOver(ev: MouseEvent): void {
-        const id = this.state && this.state.hoveredId ? this.state.hoveredId : "node";
-        this._hoverNodeId = id;
-        this._tooltip.text = "hovering (" + id + ")";
     }
 
     public _onMouseMove(ev: MouseEvent): void {
@@ -267,15 +480,27 @@ export default class Diagram {
         const rect = root.getBoundingClientRect();
         this._tooltip.x = ev.clientX - rect.left;
         this._tooltip.y = ev.clientY - rect.top;
-        this._tooltip.visible = true;
-        if (this._hoverNodeId !== null) {
-            this.ondiagramHover({ nodeId: this._hoverNodeId });
+        const point = this._toScenePoint(ev);
+        const hit = point ? this._hitTest(point.x, point.y) : null;
+        this._hoverId = hit;
+        if (hit) {
+            this._tooltip.text = this._tooltipTextFor(hit);
+            this._tooltip.visible = true;
+            this.dispatch({ kind: "hover", nodeId: hit });
+            this.ondiagramHover({ nodeId: hit });
+        } else {
+            this._tooltip.visible = false;
+            this.dispatch({ kind: "hover", nodeId: null });
         }
+        this._focusIndex = hit ? this._hitTargets().findIndex((n) => n.id === hit) : -1;
+        this._applyDomState();
     }
 
-    public _onMouseOut(): void {
+    public _onMouseLeave(): void {
         this._tooltip.visible = false;
-        this._hoverNodeId = null;
+        this._hoverId = null;
+        this.dispatch({ kind: "hover", nodeId: null });
+        this._applyDomState();
     }
 
     public _tooltipStyle(): string {
@@ -291,13 +516,100 @@ export default class Diagram {
 
     public _onClick(ev: MouseEvent): void {
         if (!this.state) return;
-        const id = this.state.hoveredId;
-        if (!id) {
+        const point = this._toScenePoint(ev);
+        const hit = point ? this._hitTest(point.x, point.y) : null;
+        if (!hit) {
             this.dispatch({ kind: "clear-selection" });
+            this._applyDomState();
             return;
         }
-        this.dispatch({ kind: "select-toggle", nodeId: id });
-        this.ondiagramSelect({ nodeId: id });
+        this.dispatch({ kind: "select-toggle", nodeId: hit });
+        this.ondiagramSelect({ nodeId: hit });
+        this._applyDomState();
     }
+
+    // ---- 键盘等价入口 ----
+
+    public _onKeydown(ev: KeyboardEvent): void {
+        const targets = this._hitTargets();
+        if (targets.length === 0) return;
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+            ev.preventDefault();
+            this._focusIndex = (this._focusIndex + 1) % targets.length;
+            this._focusTarget(targets[this._focusIndex].id);
+        } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+            ev.preventDefault();
+            this._focusIndex = (this._focusIndex - 1 + targets.length) % targets.length;
+            this._focusTarget(targets[this._focusIndex].id);
+        } else if (ev.key === "Enter" || ev.key === " ") {
+            if (this._hoverId) {
+                ev.preventDefault();
+                this.dispatch({ kind: "select-toggle", nodeId: this._hoverId });
+                this.ondiagramSelect({ nodeId: this._hoverId });
+                this._applyDomState();
+            }
+        } else if (ev.key === "Escape") {
+            this._hoverId = null;
+            this._focusIndex = -1;
+            this._tooltip.visible = false;
+            this.dispatch({ kind: "clear-selection" });
+            this._applyDomState();
+        }
+    }
+
+    public _focusTarget(id: string): void {
+        this._hoverId = id;
+        const anchor = this._nodeAnchor(id);
+        if (anchor && this.scene) {
+            const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+            const rect = root ? root.getBoundingClientRect() : null;
+            const scaleX = rect && rect.width > 0 ? rect.width / this.scene.width : 1;
+            const scaleY = rect && rect.height > 0 ? rect.height / this.scene.height : 1;
+            this._tooltip.x = anchor.x * scaleX;
+            this._tooltip.y = anchor.y * scaleY;
+            this._tooltip.text = this._tooltipTextFor(id);
+            this._tooltip.visible = true;
+        }
+        this.dispatch({ kind: "hover", nodeId: id });
+        this._applyDomState();
+    }
+
+    // ---- DOM 高亮回放 ----
+
+    public _applyDomState(): void {
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof root.querySelectorAll !== "function") {
+            return;
+        }
+        const selected = this.state ? this.state.selection.nodeIds : new Set();
+        const active = this._hoverId !== null || selected.size > 0;
+        const nodes = root.querySelectorAll("[data-dvz-id]");
+        const elements = Array.from(nodes);
+        for (const el of elements) {
+            const id = el.getAttribute("data-dvz-id") ?? "";
+            const isTarget = id.startsWith("node-") || id.startsWith("edge-");
+            if (!isTarget) {
+                continue;
+            }
+            const hot = id === this._hoverId || selected.has(id);
+            el.style.opacity = !active || hot ? "1" : "0.4";
+        }
+    }
+}
+
+/** 点到线段的最短距离。 */
+function segmentDistance(
+    px: number,
+    py: number,
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+): number {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq === 0) return Math.hypot(px - a.x, py - a.y);
+    let t = ((px - a.x) * dx + (py - a.y) * dy) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
 }
 </script>
