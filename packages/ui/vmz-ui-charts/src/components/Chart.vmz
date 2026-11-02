@@ -476,6 +476,26 @@ export default class Chart {
             const dy = Math.max(node.y - py, 0, py - (node.y + node.h));
             return Math.hypot(dx, dy);
         }
+        if (node.kind === "ellipse") {
+            const radial = Math.hypot(px - node.cx, py - node.cy);
+            return Math.max(0, radial - node.rx);
+        }
+        if (node.kind === "path") {
+            const points = [];
+            for (const cmd of node.path.commands) {
+                if (cmd.kind === "move" || cmd.kind === "line") {
+                    points.push(cmd.to);
+                }
+            }
+            let best: number | null = null;
+            for (let i = 1; i < points.length; i++) {
+                const d = segmentDistance(px, py, points[i - 1], points[i]);
+                if (best === null || d < best) {
+                    best = d;
+                }
+            }
+            return best;
+        }
         return null;
     }
 
@@ -534,6 +554,20 @@ export default class Chart {
         const rect = root.getBoundingClientRect();
         this._tooltip.x = ev.clientX - rect.left;
         this._tooltip.y = ev.clientY - rect.top;
+        const point = this._toScenePoint(ev);
+        const hit = point ? this._hitTest(point.x, point.y) : null;
+        this._hoverId = hit;
+        if (hit) {
+            this._tooltip.text = this._tooltipTextFor(hit);
+            this._tooltip.visible = true;
+            this.dispatch({ kind: "hover", nodeId: hit });
+            this.onchartHover({ rowKey: hit, x: this._tooltip.x, y: this._tooltip.y });
+        } else {
+            this._tooltip.visible = false;
+            this.dispatch({ kind: "hover", nodeId: null });
+        }
+        this._focusIndex = hit ? this._markNodes().findIndex((n) => n.id === hit) : -1;
+        this._applyDomState();
     }
     public _onMouseLeave(): void {
         this._tooltip.visible = false;
