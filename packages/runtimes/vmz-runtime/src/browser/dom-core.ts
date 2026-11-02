@@ -17,6 +17,7 @@ export { registerComponents } from './dom/registry.js';
 export { getRegisteredComponent } from './dom/registry.js';
 export { resolveComponent } from './dom/registry.js';
 export { mount } from './dom/component.js';
+export { adoptTopLevelDomRoot } from './dom/component.js';
 export { settlePendingChildMounts } from './dom/component.js';
 export { runDirectCreate } from './dom/component.js';
 export { findOwnedDefaultSlot } from './dom/component.js';

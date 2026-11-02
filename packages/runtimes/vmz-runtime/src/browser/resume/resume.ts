@@ -1,5 +1,6 @@
 import { applyDirectHostBox, directHostBoxStyleAttr } from '../direct-host-box.js';
 import {
+    adoptTopLevelDomRoot,
     applyDomAttr,
     applyPreservedState,
     BOOLEAN_HTML_ATTRS,
@@ -66,10 +67,7 @@ export async function resume(Component, container, slice = null) {
     if (Component.__vmzDirect && typeof Component.__vmzCreate === 'function') {
         if (!hasMeaningfulChild(container)) {
             const node = runDirectCreate(Component, inst);
-            if (node) {
-                inst.__vmzDomRoot = node;
-                container.appendChild(node);
-            }
+            adoptTopLevelDomRoot(inst, node, container);
         } else {
             // Island leaf adopt: preserve Element identity (resume nodeIdentity).
             const node = runDirectResume(Component, inst, container);

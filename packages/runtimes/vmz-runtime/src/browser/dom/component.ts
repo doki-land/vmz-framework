@@ -44,16 +44,28 @@ export async function mount(Component, container, props: any = {}) {
     inst.__vmzDepToBindings = Object.create(null);
     container.replaceChildren();
     const node = await createFromComponent(Component, inst);
-    if (node) {
-        inst.__vmzDomRoot = node;
-        container.appendChild(node);
-    }
+    adoptTopLevelDomRoot(inst, node, container);
     if (typeof inst.onMount === 'function') {
         await inst.onMount();
     }
     await settlePendingChildMounts(inst);
     container.__vmzInst = inst;
     return inst;
+}
+
+/**
+ * Root ownership for top-level creates (`mount` / `hydrate` / `resume`).
+ *
+ * Multi-root templates compile to a DocumentFragment; `appendChild` moves the
+ * children into the container and leaves the fragment empty and detached. The
+ * instance root must track the live container in that case — the same contract
+ * nested component hosts already follow (`nodeType === 11 ? host : node`) — or
+ * slot outlet searches and dispose walks run against a detached tree.
+ */
+export function adoptTopLevelDomRoot(inst, node, container) {
+    if (!node) return;
+    inst.__vmzDomRoot = node.nodeType === 11 ? container : node;
+    container.appendChild(node);
 }
 
 export async function settlePendingChildMounts(inst) {

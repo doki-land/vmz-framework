@@ -1,5 +1,6 @@
 import { applyDirectHostBox, directHostBoxStyleAttr } from '../direct-host-box.js';
 import {
+    adoptTopLevelDomRoot,
     applyDomAttr,
     applyPreservedState,
     BOOLEAN_HTML_ATTRS,
@@ -113,10 +114,7 @@ export async function hydrate(Component, container, props: any = {}, opts: any =
     // onMount may still patch state / redirect afterwards (same end state as SSR order).
     if (!hasMeaningfulChild(container)) {
         const node = runDirectCreate(Component, inst);
-        if (node) {
-            inst.__vmzDomRoot = node;
-            container.appendChild(node);
-        }
+        adoptTopLevelDomRoot(inst, node, container);
     } else {
         // Deep adopt: park SSR children, rebuild schedule, reclaim nodes (no orphan siblings).
         const node = runDirectResume(Component, inst, container);
