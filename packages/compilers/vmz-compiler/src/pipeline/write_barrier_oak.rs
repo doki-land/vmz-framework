@@ -149,7 +149,12 @@ fn collect_expression(
             collect_expression(right, source, owned, aliases, hits);
         }
         ExpressionKind::UpdateExpression { operator, argument, .. } => {
-            if let Some((root, segments)) = owned_path(argument, owned, aliases, source) {
+            // Root field updates (`++this.count`) stay plain JS: the field setter
+            // reports the write, same as `this.count = this.count + 1`. Lowering
+            // them here would emit an empty path, which the runtime rejects.
+            if let Some((root, segments)) = owned_path(argument, owned, aliases, source)
+                && !segments.is_empty()
+            {
                 hits.push(OakBarrierHit {
                     span: expression.span.clone().into(),
                     root,

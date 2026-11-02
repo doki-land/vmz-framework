@@ -304,3 +304,109 @@ export default class Demo {
     assert!(!out.source.contains("__vmzReadPath"));
     assert!(!out.source.contains("rows[i].label +="));
 }
+
+#[test]
+fn leaves_root_field_postfix_update() {
+    let src = r#"
+export default class Demo {
+  count = 0;
+  bump() {
+    this.count++;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["count"]));
+    assert_eq!(out.rewritten, 0, "root update must stay plain:\n{}", out.source);
+    assert!(out.source.contains("this.count++"));
+    assert!(
+        !out.source.contains("__vmzWritePathCompound(this, \"count\", []"),
+        "empty path write:\n{}",
+        out.source
+    );
+}
+
+#[test]
+fn leaves_root_field_prefix_update() {
+    let src = r#"
+export default class Demo {
+  count = 0;
+  bump() {
+    ++this.count;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["count"]));
+    assert_eq!(out.rewritten, 0, "root update must stay plain:\n{}", out.source);
+    assert!(out.source.contains("++this.count"));
+    assert!(!out.source.contains("__vmzWritePathCompound(this, \"count\", []"));
+}
+
+#[test]
+fn leaves_root_field_decrements() {
+    let src = r#"
+export default class Demo {
+  count = 0;
+  drop() {
+    this.count--;
+    --this.count;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["count"]));
+    assert_eq!(out.rewritten, 0, "root decrement must stay plain:\n{}", out.source);
+    assert!(out.source.contains("this.count--"));
+    assert!(out.source.contains("--this.count"));
+    assert!(!out.source.contains("__vmzWritePathCompound(this, \"count\", []"));
+}
+
+#[test]
+fn ignores_local_update() {
+    let src = r#"
+export default class Demo {
+  count = 0;
+  bump() {
+    let n = 0;
+    n++;
+    this.count = n;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["count"]));
+    assert!(out.source.contains("n++"), "local update untouched:\n{}", out.source);
+    assert!(!out.source.contains("__vmzWritePathCompound"));
+}
+
+#[test]
+fn no_emit_contains_empty_path_writes() {
+    let src = r#"
+export default class Demo {
+  count = 0;
+  user = { count: 0 };
+  flags = { on: false };
+  bump() {
+    this.count++;
+    ++this.count;
+    this.count--;
+    --this.count;
+    this.user.count++;
+    this.user.count += 2;
+    this.flags.on ||= true;
+    this.user.count = 3;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["count", "user", "flags"]));
+    assert!(
+        !out.source.contains(", [], ") && !out.source.contains(", [])"),
+        "empty path write must never be emitted:\n{}",
+        out.source
+    );
+    assert!(out.source.contains("__vmzWritePathCompound(this, \"user\", [\"count\"], \"+\", 1)"));
+    assert!(out.source.contains("__vmzWritePathCompound(this, \"user\", [\"count\"], \"+\", 2)"));
+    assert!(out.source.contains("__vmzWritePathLogical(this, \"flags\", [\"on\"], \"||\""));
+    assert!(out.source.contains("__vmzWritePath(this, \"user\", [\"count\"], 3)"));
+    assert!(out.source.contains("this.count++"));
+    assert!(out.source.contains("++this.count"));
+    assert!(out.source.contains("this.count--"));
+    assert!(out.source.contains("--this.count"));
+}

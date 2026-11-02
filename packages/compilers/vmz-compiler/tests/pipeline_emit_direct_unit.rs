@@ -717,3 +717,48 @@ export default class MarkerSlotHost {
     assert!(!js.contains("api.projectDefaultSlot("), "no default projection: {js}");
     assert!(!js.contains("#header"), "component slot marker must not reach props: {js}");
 }
+
+#[test]
+fn root_field_updates_and_template_handler_emit_no_empty_write_path() {
+    let src = r#"
+export default class CounterDemo {
+  count = 0;
+  user = { count: 0 };
+  bumpPost() {
+    this.count++;
+  }
+  bumpPre() {
+    ++this.count;
+  }
+  drop() {
+    this.count--;
+  }
+  bumpNested() {
+    this.user.count++;
+  }
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<section><strong>{{ count }}</strong><button type="button" @click="count++">+</button></section>"#,
+    )
+    .unwrap();
+    let program = build_program_module("CounterDemo.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        !js.contains(", [], ") && !js.contains(", [])"),
+        "empty write path must never be emitted: {js}"
+    );
+    assert!(js.contains("this.count++"), "method root update stays plain: {js}");
+    assert!(js.contains("++this.count"), "prefix root update stays plain: {js}");
+    assert!(js.contains("this.count--"), "root decrement stays plain: {js}");
+    assert!(
+        js.contains("__vmzWritePathCompound(this, \"user\", [\"count\"], \"+\", 1)"),
+        "nested update still lowers to the write path: {js}"
+    );
+    assert!(
+        js.contains("(this.count++)"),
+        "template inline handler stays a plain root update: {js}"
+    );
+}
