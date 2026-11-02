@@ -34,19 +34,21 @@ const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--ou
 });
 if (build.status !== 0) fail(`build exited ${build.status}`);
 
-const dynJs = fs.readFileSync(path.join(dist, 'components', 'WriteBarrierDynDemo.client.js'), 'utf8');
+const dynJs = fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierDynDemo.client.js'), 'utf8');
 if (!dynJs.includes('__vmzWriteBarrier = true')) fail('DynDemo missing barrier flag');
-if (!dynJs.includes('String(this.selected)')) {
+if (!dynJs.includes('__vmzWritePathItem(this, "tags", this.selected, "label"')) {
     fail(`missing dynamic selected index rewrite:\n${dynJs}`);
 }
-if (!dynJs.includes('String(i)')) fail('missing String(i) dynamic index');
+if (!dynJs.includes('__vmzWritePathItem(this, "tags", i, "label"')) {
+    fail('missing dynamic i index rewrite');
+}
 if (!dynJs.includes('__vmzWritePathCompound(this, "user", ["count"], "+", 1)')) {
     fail('missing compound/update WritePathCompound');
 }
 if (/this\.user\.count\s*\+=/.test(dynJs)) fail('bare += still present');
 if (/this\.user\.count\+\+/.test(dynJs)) fail('bare ++ still present');
 
-const sharedJs = fs.readFileSync(path.join(dist, 'components', 'WriteBarrierSharedDemo.client.js'), 'utf8');
+const sharedJs = fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierSharedDemo.client.js'), 'utf8');
 if (!sharedJs.includes('__vmzWriteBarrier = true')) fail('SharedDemo missing barrier flag');
 if (!sharedJs.includes('__vmzWritePath(this, "secondary", ["name"]')) {
     fail('SharedDemo missing secondary.name rewrite');
@@ -60,9 +62,9 @@ globalThis.Node = window.Node;
 globalThis.DocumentFragment = window.DocumentFragment;
 globalThis.Text = window.Text;
 
-const dom = await import(pathToFileURL(path.join(dist, 'vmz-dom.js')).href);
-const { default: WriteBarrierSharedDemo } = await import(pathToFileURL(path.join(dist, 'components', 'WriteBarrierSharedDemo.client.js')).href);
-const { default: WriteBarrierDynDemo } = await import(pathToFileURL(path.join(dist, 'components', 'WriteBarrierDynDemo.client.js')).href);
+const dom = await import(pathToFileURL(path.join(dist, 'web-ssr', 'vmz-dom.js')).href);
+const { default: WriteBarrierSharedDemo } = await import(pathToFileURL(path.join(dist, 'web-ssr', 'components', 'WriteBarrierSharedDemo.client.js')).href);
+const { default: WriteBarrierDynDemo } = await import(pathToFileURL(path.join(dist, 'web-ssr', 'components', 'WriteBarrierDynDemo.client.js')).href);
 
 // --- Shared multi-owner ---
 const sharedRoot = window.document.getElementById('shared');

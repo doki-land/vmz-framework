@@ -29,7 +29,7 @@ const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--ou
 });
 if (build.status !== 0) fail(`build exited ${build.status}`);
 
-const logicalJs = fs.readFileSync(path.join(dist, 'components', 'WriteBarrierLogicalDemo.client.js'), 'utf8');
+const logicalJs = fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierLogicalDemo.client.js'), 'utf8');
 if (!logicalJs.includes('__vmzWriteBarrier = true')) fail('LogicalDemo missing barrier');
 if (!logicalJs.includes('__vmzWritePathLogical(this, "user", ["flag"], "||"')) {
     fail(`missing ||= rewrite:\n${logicalJs}`);
@@ -42,7 +42,7 @@ if (!logicalJs.includes('__vmzWritePathLogical(this, "user", ["flag"], "&&"')) {
 }
 if (/this\.user\.flag\s*\|\|=/.test(logicalJs)) fail('bare ||= still present');
 
-const crossJs = fs.readFileSync(path.join(dist, 'components', 'WriteBarrierCrossDemo.client.js'), 'utf8');
+const crossJs = fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierCrossDemo.client.js'), 'utf8');
 if (!crossJs.includes('__vmzWriteBarrier = true')) fail('CrossDemo missing barrier');
 
 const { window } = parseHTML('<!DOCTYPE html><html><body><div id="a"></div><div id="b"></div><div id="logic"></div></body></html>');
@@ -53,11 +53,11 @@ globalThis.Node = window.Node;
 globalThis.DocumentFragment = window.DocumentFragment;
 globalThis.Text = window.Text;
 
-const dom = await import(pathToFileURL(path.join(dist, 'vmz-dom.js')).href);
+const dom = await import(pathToFileURL(path.join(dist, 'web-ssr', 'vmz-dom.js')).href);
 const { default: WriteBarrierLogicalDemo } = await import(
-    pathToFileURL(path.join(dist, 'components', 'WriteBarrierLogicalDemo.client.js')).href
+    pathToFileURL(path.join(dist, 'web-ssr', 'components', 'WriteBarrierLogicalDemo.client.js')).href
 );
-const { default: WriteBarrierCrossDemo } = await import(pathToFileURL(path.join(dist, 'components', 'WriteBarrierCrossDemo.client.js')).href);
+const { default: WriteBarrierCrossDemo } = await import(pathToFileURL(path.join(dist, 'web-ssr', 'components', 'WriteBarrierCrossDemo.client.js')).href);
 
 // --- Logical assigns ---
 const logicRoot = window.document.getElementById('logic');

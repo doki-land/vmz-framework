@@ -1,0 +1,38 @@
+<template>
+    <section>
+        <strong>{{ cells.length }}</strong>
+        <em>{{ meta.note.count }}</em>
+        <button type="button" id="insert" @click="insertInput">insert</button>
+        <button type="button" id="push" @click="pushPlain">push</button>
+        <button type="button" id="patch" @click="patchFirst">patch</button>
+        <button type="button" id="count" @click="bumpNote">count</button>
+        <ul>
+            <li v-for="cell in cells" :key="cell.id">{{ cell.text }}</li>
+        </ul>
+    </section>
+</template>
+<script client>
+export default class WriteBarrierMutatorDemo {
+    cells = [
+        { id: "a", text: "A" },
+        { id: "b", text: "B" },
+    ];
+    meta = { note: { count: 0 } };
+    insertInput() {
+        this.insertBelow("x", "X");
+    }
+    insertBelow(id, text) {
+        const cell = { id, text };
+        this.cells.splice(1, 0, cell);
+    }
+    pushPlain() {
+        this.cells.push({ id: "p", text: "P" });
+    }
+    patchFirst() {
+        this.cells[0] = { ...this.cells[0], text: "A2" };
+    }
+    bumpNote() {
+        this.meta.note.count++;
+    }
+}
+</script>

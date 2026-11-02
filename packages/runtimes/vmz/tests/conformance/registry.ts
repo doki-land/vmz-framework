@@ -167,14 +167,19 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'runtime/write-barrier-root-update.ts',
         description: 'Root-field ++/-- stay plain (setter path), empty write path rejected',
     },
+    'write-barrier-mutator-args': {
+        file: 'runtime/write-barrier-mutator-args.ts',
+        description: 'Mutator args array contract + dynamic path segments + hydrate first event',
+    },
     'write-barrier-suite': {
-        description: 'WriteBarrier static + array + shared + logical + root update',
+        description: 'WriteBarrier static + array + shared + logical + root update + mutator args',
         composite: [
             'write-barrier',
             'write-barrier-array',
             'write-barrier-shared',
             'write-barrier-logical',
             'write-barrier-root-update',
+            'write-barrier-mutator-args',
         ],
     },
     resume: { file: 'runtime/resume.ts', pre: ['build:vmz-test'] },

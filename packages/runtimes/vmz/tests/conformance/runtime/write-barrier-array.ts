@@ -34,7 +34,7 @@ const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--ou
 if (build.status !== 0) fail(`build exited ${build.status}`);
 
 // --- Alias rewrite on WriteBarrierDemo ---
-const demoJs = fs.readFileSync(path.join(dist, 'components', 'WriteBarrierDemo.client.js'), 'utf8');
+const demoJs = fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierDemo.client.js'), 'utf8');
 if (!demoJs.includes('__vmzWriteBarrier = true')) fail('WriteBarrierDemo missing barrier flag');
 if (!demoJs.includes('__vmzWritePath(this, "user", ["name"]')) {
     fail('WriteBarrierDemo missing path rewrite');
@@ -42,7 +42,7 @@ if (!demoJs.includes('__vmzWritePath(this, "user", ["name"]')) {
 if (/u\.name\s*=/.test(demoJs)) fail('alias u.name = still present');
 
 // --- Array rewrite on WriteBarrierArrayDemo ---
-const arrPath = path.join(dist, 'components', 'WriteBarrierArrayDemo.client.js');
+const arrPath = path.join(dist, 'web-ssr', 'components', 'WriteBarrierArrayDemo.client.js');
 if (!fs.existsSync(arrPath)) fail('WriteBarrierArrayDemo.client.js missing');
 const arrJs = fs.readFileSync(arrPath, 'utf8');
 if (!arrJs.includes('__vmzWriteBarrier = true')) fail('ArrayDemo missing barrier flag');
@@ -51,18 +51,23 @@ if (!arrJs.includes('__vmzArrayMutate(this, "tags", [], "push"')) {
 }
 if (/this\.tags\.push\(/.test(arrJs)) fail('bare this.tags.push still present');
 if (/t\.push\(/.test(arrJs)) fail('bare alias t.push still present');
-if (!arrJs.includes('__vmzWritePath(this, "tags", ["0", "label"]')) {
+if (!arrJs.includes('__vmzWritePathItem(this, "tags", 0, "label"')) {
     fail(`missing static index leaf rewrite:\n${arrJs}`);
 }
 if (/this\.tags\[0\]\.label\s*=/.test(arrJs)) fail('bare tags[0].label = still present');
 
-const ir = JSON.parse(fs.readFileSync(path.join(dist, 'components', 'WriteBarrierArrayDemo.reactive.json'), 'utf8'));
-const labelBinding = ir.components[0].bindings.find(
+const ir = JSON.parse(fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierArrayDemo.reactive.json'), 'utf8'));
+const arrComp = ir.components[0];
+const arrSlotName = (i) => arrComp.state_slots?.[i]?.name;
+const arrPropName = (i) => arrComp.properties?.[i]?.name;
+const labelBinding = arrComp.bindings.find(
     (b) =>
         b.kind === 'text' &&
         b.reads.some(
             (r) =>
-                typeof r.stable === 'string' && (r.stable === 'tags.*.label' || (r.stable.endsWith('.label') && r.stable.startsWith('tags['))),
+                r.kind === 'list-item' &&
+                arrSlotName(r.value.list) === 'tags' &&
+                r.value.path.map(arrPropName).join('.') === 'label',
         ),
 );
 if (!labelBinding) {
@@ -77,8 +82,8 @@ globalThis.Node = window.Node;
 globalThis.DocumentFragment = window.DocumentFragment;
 globalThis.Text = window.Text;
 
-const dom = await import(pathToFileURL(path.join(dist, 'vmz-dom.js')).href);
-const { default: WriteBarrierDemo } = await import(pathToFileURL(path.join(dist, 'components', 'WriteBarrierDemo.client.js')).href);
+const dom = await import(pathToFileURL(path.join(dist, 'web-ssr', 'vmz-dom.js')).href);
+const { default: WriteBarrierDemo } = await import(pathToFileURL(path.join(dist, 'web-ssr', 'components', 'WriteBarrierDemo.client.js')).href);
 const { default: WriteBarrierArrayDemo } = await import(pathToFileURL(arrPath).href);
 
 if (typeof WriteBarrierDemo.__vmzWritePath !== 'function') {
@@ -133,9 +138,10 @@ dom.__vmzPrecisionReset();
 arrInst.setFirstLabel('A2');
 await dom.flushPending(arrInst);
 const snap = dom.__vmzPrecisionSnapshot();
-const labelKey = String(labelBinding.id);
-if ((snap.patchesByBinding[labelKey] ?? 0) < 1) {
-    fail(`expected item label patch, snap=${JSON.stringify(snap)}`);
+// Item leaf writes land through the row-kernel leaf apply: the text node updates
+// in place with zero list DOM churn (no create/move/remove of `li` rows).
+if ((snap.domCreates ?? 0) !== 0 || (snap.domMoves ?? 0) !== 0 || (snap.domRemoves ?? 0) !== 0) {
+    fail(`item label write must not churn list DOM, snap=${JSON.stringify(snap)}`);
 }
 const first = arrRoot.querySelector('li');
 if (!first || first.textContent !== 'A2') {

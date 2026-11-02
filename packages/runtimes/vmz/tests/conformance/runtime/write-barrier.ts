@@ -34,7 +34,7 @@ const build = spawnSync(process.execPath, [vmzBin(root), 'build', example, '--ou
 });
 if (build.status !== 0) fail(`build exited ${build.status}`);
 
-const clientPath = path.join(dist, 'components', 'WriteBarrierDemo.client.js');
+const clientPath = path.join(dist, 'web-ssr', 'components', 'WriteBarrierDemo.client.js');
 if (!fs.existsSync(clientPath)) fail('WriteBarrierDemo.client.js missing');
 const clientJs = fs.readFileSync(clientPath, 'utf8');
 
@@ -48,9 +48,23 @@ if (/this\.user\.name\s*=/.test(clientJs)) {
     fail('bare this.user.name = still present (rewrite failed)');
 }
 
-const ir = JSON.parse(fs.readFileSync(path.join(dist, 'components', 'WriteBarrierDemo.reactive.json'), 'utf8'));
-const nameBinding = ir.components[0].bindings.find((b) => b.kind === 'text' && b.reads.some((r) => r.stable === 'user.name'));
-const bioBinding = ir.components[0].bindings.find((b) => b.kind === 'text' && b.reads.some((r) => r.stable === 'user.bio'));
+const ir = JSON.parse(fs.readFileSync(path.join(dist, 'web-ssr', 'components', 'WriteBarrierDemo.reactive.json'), 'utf8'));
+const irComp = ir.components[0];
+const slotName = (i) => irComp.state_slots?.[i]?.name;
+const propName = (i) => irComp.properties?.[i]?.name;
+const textBindingReading = (rootName, propPath) =>
+    irComp.bindings.find(
+        (b) =>
+            b.kind === 'text' &&
+            b.reads.some(
+                (r) =>
+                    r.kind === 'static-path' &&
+                    slotName(r.value.root) === rootName &&
+                    r.value.properties.map(propName).join('.') === propPath,
+            ),
+    );
+const nameBinding = textBindingReading('user', 'name');
+const bioBinding = textBindingReading('user', 'bio');
 if (!nameBinding || !bioBinding) fail('IR missing user.name / user.bio text bindings');
 
 const { window } = parseHTML('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
@@ -61,7 +75,7 @@ globalThis.Node = window.Node;
 globalThis.DocumentFragment = window.DocumentFragment;
 globalThis.Text = window.Text;
 
-const dom = await import(pathToFileURL(path.join(dist, 'vmz-dom.js')).href);
+const dom = await import(pathToFileURL(path.join(dist, 'web-ssr', 'vmz-dom.js')).href);
 const { default: WriteBarrierDemo } = await import(pathToFileURL(clientPath).href);
 
 if (!WriteBarrierDemo.__vmzWriteBarrier) fail('runtime flag __vmzWriteBarrier not set');
