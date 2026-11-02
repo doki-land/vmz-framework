@@ -37,7 +37,18 @@ export type MarkKind =
     | "slope"
     | "rose"
     | "radial-bar"
-    | "bullet";
+    | "bullet"
+    | "violin"
+    | "streamgraph"
+    | "mosaic"
+    | "calendar"
+    | "sunburst"
+    | "dumbbell"
+    | "lollipop"
+    | "strip"
+    | "beeswarm"
+    | "gantt"
+    | "tree";
 
 /** Encoding channel — how a data field maps to a visual property. */
 export interface EncodingChannel {
@@ -59,8 +70,10 @@ export interface ChartSpec {
     /** How grouped (series) marks share the x slot. `undefined` is the
      *  natural per-mark default: `bar`/`rect` dodge side by side, everything
      *  else overlaps. `stack` accumulates positive and negative values
-     *  separately from the zero baseline (bars and areas only). */
-    readonly seriesLayout?: "overlap" | "stack" | "dodge";
+     *  separately from the zero baseline (bars and areas only). `percent`
+     *  normalizes each x slot's stack into a shared 0–100 percent domain
+     *  (bars and areas only, negative values are dropped with a warning). */
+    readonly seriesLayout?: "overlap" | "stack" | "dodge" | "percent";
     /** Pie only: inner radius as a fraction of the outer radius (0 = pie,
      *  0.55–0.75 reads as a donut). */
     readonly innerRadiusRatio?: number;
@@ -125,7 +138,7 @@ export interface ChartCompilePlan {
 const seriesChannels: ReadonlySet<string> = new Set(["series", "color", "group"]);
 
 /** Mark kinds measured from a zero baseline. */
-const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area", "radar", "bullet", "rose"]);
+const zeroBasedMarks: ReadonlySet<MarkKind> = new Set(["bar", "rect", "area", "radar", "bullet", "rose", "lollipop"]);
 
 /** Channels whose value decides whether a row can be positioned at all. */
 const basePositionChannels: ReadonlySet<string> = new Set(["x", "y", "theta"]);
@@ -136,12 +149,16 @@ const markRequiredChannels: ReadonlyMap<string, ReadonlyArray<string>> = new Map
     ["heatmap", ["color"]],
     ["sankey", ["source", "target", "value"]],
     ["treemap", ["size"]],
+    ["sunburst", ["size"]],
     ["bullet", ["target"]],
+    ["calendar", ["color"]],
+    ["dumbbell", ["yEnd"]],
+    ["gantt", ["start", "end"]],
 ]);
 
 /** Mark kinds whose `color` encoding is a quantitative value channel, not a
- *  series grouping (heatmap cells read color as data). */
-const colorAsValueMarks: ReadonlySet<string> = new Set(["heatmap"]);
+ *  series grouping (heatmap and calendar cells read color as data). */
+const colorAsValueMarks: ReadonlySet<string> = new Set(["heatmap", "calendar"]);
 
 /** Mark kinds whose legend / palette comes from a positional category field
  *  instead of a series encoding: ridgeline ridges and rose / radial-bar /
@@ -153,9 +170,9 @@ const categorySeriesField: ReadonlyMap<string, string> = new Map([
     ["funnel", "x"],
 ]);
 
-/** Marks whose statistics are computed globally — faceting them would need
- *  per-panel statistics, which is a separate contract. */
-const statDrivenMarks: ReadonlySet<string> = new Set(["histogram", "boxplot", "ridgeline", "bump"]);
+/** Marks whose statistics or shared offsets are computed globally — faceting
+ *  them would need per-panel statistics, which is a separate contract. */
+const statDrivenMarks: ReadonlySet<string> = new Set(["histogram", "boxplot", "ridgeline", "bump", "violin", "calendar", "streamgraph", "mosaic"]);
 
 /** Encoding channels each mark needs before any row can position. */
 const markEncodingNeeds: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -174,6 +191,16 @@ const markEncodingNeeds: Readonly<Record<string, ReadonlyArray<string>>> = {
     rose: ["x", "y"],
     "radial-bar": ["x", "y"],
     bullet: ["x", "y", "target"],
+    violin: ["x", "y"],
+    streamgraph: ["x", "y"],
+    mosaic: ["x", "y", "color"],
+    calendar: ["x", "color"],
+    sunburst: ["size"],
+    dumbbell: ["x", "y", "yEnd"],
+    lollipop: ["x", "y"],
+    strip: ["x", "y"],
+    beeswarm: ["y"],
+    gantt: ["y", "start", "end"],
 };
 
 /** Mark kinds with real scene geometry. Kept in sync with the scene
@@ -203,11 +230,22 @@ const implementedMarks: ReadonlySet<string> = new Set([
     "rose",
     "radial-bar",
     "bullet",
+    "violin",
+    "streamgraph",
+    "mosaic",
+    "calendar",
+    "sunburst",
+    "dumbbell",
+    "lollipop",
+    "strip",
+    "beeswarm",
+    "gantt",
+    "tree",
 ]);
 
 /** Resolve the effective series layout. `undefined` is the natural per-mark
  *  default: grouped bars dodge, everything else overlaps. */
-export function resolveSeriesLayout(spec: ChartSpec, hasSeries: boolean): "overlap" | "stack" | "dodge" {
+export function resolveSeriesLayout(spec: ChartSpec, hasSeries: boolean): "overlap" | "stack" | "dodge" | "percent" {
     if (!hasSeries) return "overlap";
     if (spec.seriesLayout) return spec.seriesLayout;
     return spec.mark === "bar" || spec.mark === "rect" ? "dodge" : "overlap";
@@ -593,22 +631,24 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
     }
 
-    // Treemap hierarchy: ids from keyField, parents from parentField. Orphans
-    // hang at the root with a warning; cycles are an error; a parent row's own
-    // size is ignored (its value is the sum of its leaves) with a warning.
+    // Treemap / sunburst hierarchy: ids from keyField, parents from
+    // parentField. Orphans hang at the root with a warning; cycles are an
+    // error; a parent row's own size is ignored (its value is the sum of its
+    // leaves) with a warning. Both marks share the same input contract.
     let treemapSubtree: Map<number, number> | null = null;
-    if (spec.mark === "treemap") {
+    if (spec.mark === "treemap" || spec.mark === "sunburst") {
+        const markLabel = spec.mark;
         if (!spec.keyField) {
             diagnostics.push(
-                diag("error", "davinci.chart.treemap-needs-key", `treemap needs keyField naming the id field`, "keyField"),
+                diag("error", `davinci.chart.${markLabel}-needs-key`, `${markLabel} needs keyField naming the id field`, "keyField"),
             );
         }
         if (!spec.parentField) {
             diagnostics.push(
                 diag(
                     "error",
-                    "davinci.chart.treemap-needs-parent",
-                    `treemap needs parentField naming the parent id field`,
+                    `davinci.chart.${markLabel}-needs-parent`,
+                    `${markLabel} needs parentField naming the parent id field`,
                     "parentField",
                 ),
             );
@@ -657,7 +697,7 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 diagnostics.push(
                     diag(
                         "warning",
-                        "davinci.chart.treemap-orphan",
+                        `davinci.chart.${markLabel}-orphan`,
                         `parentField "${spec.parentField}" names an unknown parent for ${orphans} row${orphans === 1 ? "" : "s"}; they hang at the root`,
                         spec.parentField,
                     ),
@@ -679,7 +719,7 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             }
             if (cyclic) {
                 diagnostics.push(
-                    diag("error", "davinci.chart.treemap-cycle", `treemap hierarchy contains a cycle`, spec.parentField),
+                    diag("error", `davinci.chart.${markLabel}-cycle`, `${markLabel} hierarchy contains a cycle`, spec.parentField),
                 );
             }
             const childrenOf = new Map<number, number[]>();
@@ -715,7 +755,7 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 diagnostics.push(
                     diag(
                         "warning",
-                        "davinci.chart.treemap-parent-value",
+                        `davinci.chart.${markLabel}-parent-value`,
                         `${parentValues} parent row${parentValues === 1 ? "" : "s"} carry a size value; a parent's size is the sum of its leaves and the own value is ignored`,
                         sizeEnc?.field,
                     ),
@@ -910,6 +950,399 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         }
     }
 
+    // Streamgraph wiggle offsets: each x slot's stacked ribbons balance around
+    // zero at −Σ/2, so the silhouette wiggles instead of sitting on a baseline.
+    if (spec.mark === "streamgraph") {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol) {
+            stackOffsets = new Map();
+            const byX = new Map<string, number[]>();
+            for (let r = 0; r < data.rowCount; r++) {
+                const xv = xCol.values[r];
+                if (xv === null || xv === undefined) continue;
+                const key = String(xv);
+                const bucket = byX.get(key);
+                if (bucket) bucket.push(r);
+                else byX.set(key, [r]);
+            }
+            let lo = 0;
+            let hi = 0;
+            for (const rows of byX.values()) {
+                let total = 0;
+                for (const r of rows) {
+                    const v = yCol.values[r];
+                    if (typeof v === "number" && Number.isFinite(v)) total += v;
+                }
+                let cum = -total / 2;
+                if (cum < lo) lo = cum;
+                for (const category of seriesCategories) {
+                    for (const r of rows) {
+                        const cell = legendCol ? legendCol.values[r] : null;
+                        if (legendCol && (cell === null || cell === undefined || String(cell) !== category)) continue;
+                        const v = yCol.values[r];
+                        if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                        stackOffsets.set(r, cum);
+                        cum += v;
+                    }
+                }
+                if (cum > hi) hi = cum;
+            }
+            stackExtent = [lo, hi];
+        }
+    }
+
+    // Percent stack: same slot accumulation as `stack`, normalized so every x
+    // slot totals exactly 100. Negative shares are dropped with a warning.
+    let percentShares: Map<number, number> | null = null;
+    if (layout === "percent" && stackable) {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol && legendCol) {
+            stackOffsets = new Map();
+            percentShares = new Map();
+            let dropped = 0;
+            const byX = new Map<string, number[]>();
+            for (let r = 0; r < data.rowCount; r++) {
+                const xv = xCol.values[r];
+                if (xv === null || xv === undefined) continue;
+                const key = String(xv);
+                const bucket = byX.get(key);
+                if (bucket) bucket.push(r);
+                else byX.set(key, [r]);
+            }
+            for (const rows of byX.values()) {
+                let total = 0;
+                for (const r of rows) {
+                    const v = yCol.values[r];
+                    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                    if (v < 0) {
+                        dropped++;
+                        continue;
+                    }
+                    total += v;
+                }
+                if (!(total > 0)) continue;
+                let cum = 0;
+                for (const category of seriesCategories) {
+                    for (const r of rows) {
+                        const cell = legendCol.values[r];
+                        if (cell === null || cell === undefined || String(cell) !== category) continue;
+                        const v = yCol.values[r];
+                        if (typeof v !== "number" || !Number.isFinite(v) || v < 0) continue;
+                        const share = (v / total) * 100;
+                        stackOffsets.set(r, cum);
+                        percentShares.set(r, share);
+                        cum += share;
+                    }
+                }
+            }
+            if (dropped > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.percent-negative-share",
+                        `${dropped} negative row${dropped === 1 ? "" : "s"} dropped: percent stacks need non-negative shares`,
+                        yEnc?.field,
+                    ),
+                );
+            }
+            stackExtent = [0, 100];
+        }
+    }
+
+    // Violin densities per category on the shared value domain, plus the
+    // five-number summary embedded in the mark channels.
+    interface ViolinCat {
+        cat: string;
+        firstStatRow: number;
+        q1: number;
+        median: number;
+        q3: number;
+        low: number;
+        high: number;
+        n: number;
+    }
+    let violinCats: ViolinCat[] = [];
+    if (spec.mark === "violin") {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol) {
+            const byCat = new Map<string, number[]>();
+            for (let r = 0; r < data.rowCount; r++) {
+                const xv = xCol.values[r];
+                const yv = yCol.values[r];
+                if (xv === null || xv === undefined) continue;
+                if (typeof yv !== "number" || !Number.isFinite(yv)) continue;
+                const cat = String(xv);
+                const bucket = byCat.get(cat);
+                if (bucket) bucket.push(yv);
+                else byCat.set(cat, [yv]);
+            }
+            const all = yCol.values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+            if (byCat.size > 0 && all.length > 0) {
+                let lo = Math.min(...all);
+                let hi = Math.max(...all);
+                if (lo === hi) {
+                    lo -= 0.5;
+                    hi += 0.5;
+                }
+                const G = 64;
+                const grid: number[] = [];
+                for (let i = 0; i < G; i++) grid.push(lo + ((hi - lo) * i) / (G - 1));
+                const rows: Record<string, unknown>[] = [];
+                violinCats = [];
+                for (const [cat, xs] of byCat) {
+                    const bs = boxStats(xs);
+                    if (!bs) continue;
+                    const firstStatRow = rows.length;
+                    const bw = silvermanBandwidth(xs);
+                    const dens = kde(xs, grid, bw);
+                    const peak = Math.max(...dens);
+                    for (let i = 0; i < G; i++) {
+                        rows.push({ category: cat, gy: grid[i], density: peak > 0 ? dens[i] / peak : 0 });
+                    }
+                    violinCats.push({ cat, firstStatRow, q1: bs.q1, median: bs.median, q3: bs.q3, low: bs.low, high: bs.high, n: bs.n });
+                }
+                stat = fromRows(rows);
+            }
+        }
+    }
+
+    // Calendar cells: strict YYYY-MM-DD dates mapped to ISO week columns and
+    // weekday rows. Invalid dates never reach the grid.
+    if (spec.mark === "calendar") {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const cEnc = spec.encoding.find((e) => e.channel === "color");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const cCol = cEnc ? column(data, cEnc.field) : undefined;
+        if (xCol && cCol) {
+            const parsed: { date: string; days: number; value: number }[] = [];
+            let invalid = 0;
+            for (let r = 0; r < data.rowCount; r++) {
+                const raw = xCol.values[r];
+                const v = cCol.values[r];
+                if (raw === null || raw === undefined) continue;
+                if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                const days = parseCalendarDate(raw);
+                if (days === null) {
+                    invalid++;
+                    continue;
+                }
+                parsed.push({ date: String(raw), days, value: v });
+            }
+            if (invalid > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.calendar-invalid-date",
+                        `${invalid} row${invalid === 1 ? "" : "s"} are not strict YYYY-MM-DD dates and never reach the calendar grid`,
+                        xEnc?.field,
+                    ),
+                );
+            }
+            if (parsed.length > 0) {
+                const minDays = Math.min(...parsed.map((p) => p.days));
+                const firstMonday = minDays - ((weekdayOfDays(minDays) + 6) % 7);
+                const rows: Record<string, unknown>[] = parsed.map((p) => {
+                    const weekday = (weekdayOfDays(p.days) + 6) % 7;
+                    const monday = p.days - weekday;
+                    return { date: p.date, week: Math.floor((monday - firstMonday) / 7), weekday, value: p.value };
+                });
+                stat = fromRows(rows);
+            }
+        }
+    }
+
+    // Mosaic shares: every x slot gets a width share of the grand total and
+    // segment shares inside its slot — all ratios resolved before the scene.
+    let mosaicOffsets: Map<string, number> | null = null;
+    let mosaicWidths: Map<string, number> | null = null;
+    let mosaicShares: Map<number, number> | null = null;
+    if (spec.mark === "mosaic") {
+        const xEnc = spec.encoding.find((e) => e.channel === "x");
+        const yEnc = spec.encoding.find((e) => e.channel === "y");
+        const xCol = xEnc ? column(data, xEnc.field) : undefined;
+        const yCol = yEnc ? column(data, yEnc.field) : undefined;
+        if (xCol && yCol && legendCol) {
+            const byX = new Map<string, number[]>();
+            const order: string[] = [];
+            for (let r = 0; r < data.rowCount; r++) {
+                const xv = xCol.values[r];
+                if (xv === null || xv === undefined) continue;
+                const key = String(xv);
+                const bucket = byX.get(key);
+                if (bucket) bucket.push(r);
+                else {
+                    byX.set(key, [r]);
+                    order.push(key);
+                }
+            }
+            const totals = new Map<string, number>();
+            let grand = 0;
+            let dropped = 0;
+            for (const [key, rows] of byX) {
+                let total = 0;
+                for (const r of rows) {
+                    const v = yCol.values[r];
+                    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                    if (v < 0) {
+                        dropped++;
+                        continue;
+                    }
+                    total += v;
+                }
+                totals.set(key, total);
+                grand += total;
+            }
+            if (dropped > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.mosaic-negative-share",
+                        `${dropped} negative row${dropped === 1 ? "" : "s"} dropped: mosaic segments need non-negative shares`,
+                        yEnc?.field,
+                    ),
+                );
+            }
+            if (grand > 0) {
+                mosaicOffsets = new Map();
+                mosaicWidths = new Map();
+                mosaicShares = new Map();
+                stackOffsets = new Map();
+                let cumX = 0;
+                for (const key of order) {
+                    const total = totals.get(key)!;
+                    mosaicOffsets.set(key, cumX / grand);
+                    mosaicWidths.set(key, total / grand);
+                    cumX += total;
+                    let cum = 0;
+                    for (const category of seriesCategories) {
+                        for (const r of byX.get(key)!) {
+                            const cell = legendCol.values[r];
+                            if (cell === null || cell === undefined || String(cell) !== category) continue;
+                            const v = yCol.values[r];
+                            if (typeof v !== "number" || !Number.isFinite(v) || v < 0) continue;
+                            if (!(total > 0)) continue;
+                            stackOffsets.set(r, cum / total);
+                            mosaicShares.set(r, v / total);
+                            cum += v;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Gantt spans: start / end parse as numbers or strict YYYY-MM-DD dates;
+    // rows without both ends parsed never reach the frame.
+    let ganttSpans: Map<number, [number, number]> | null = null;
+    if (spec.mark === "gantt") {
+        const sEnc = spec.encoding.find((e) => e.channel === "start");
+        const eEnc = spec.encoding.find((e) => e.channel === "end");
+        const sCol = sEnc ? column(data, sEnc.field) : undefined;
+        const eCol = eEnc ? column(data, eEnc.field) : undefined;
+        if (sCol && eCol) {
+            ganttSpans = new Map();
+            let invalid = 0;
+            for (let r = 0; r < data.rowCount; r++) {
+                const s = parseGanttValue(sCol.values[r]);
+                const e = parseGanttValue(eCol.values[r]);
+                if (s === null || e === null) {
+                    invalid++;
+                    continue;
+                }
+                ganttSpans.set(r, [Math.min(s, e), Math.max(s, e)]);
+            }
+            if (invalid > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.gantt-invalid-span",
+                        `${invalid} row${invalid === 1 ? "" : "s"} lack a parseable start / end (number or YYYY-MM-DD) and never reach the frame`,
+                        sEnc?.field,
+                    ),
+                );
+            }
+        }
+    }
+
+    // Tree hierarchy: same id / parent contract as treemap, no size channel —
+    // layout only needs structure. Orphans and cycles are diagnosed alike.
+    if (spec.mark === "tree") {
+        if (!spec.keyField) {
+            diagnostics.push(diag("error", "davinci.chart.tree-needs-key", `tree needs keyField naming the id field`, "keyField"));
+        }
+        if (!spec.parentField) {
+            diagnostics.push(
+                diag("error", "davinci.chart.tree-needs-parent", `tree needs parentField naming the parent id field`, "parentField"),
+            );
+        }
+        const parentCol = spec.parentField ? column(data, spec.parentField) : undefined;
+        if (spec.parentField && !parentCol && data.columns.length > 0) {
+            diagnostics.push(
+                diag("error", "davinci.chart.unknown-field", `parentField "${spec.parentField}" is not in the data`, spec.parentField),
+            );
+        }
+        if (keyCol && parentCol) {
+            const rowOfId = new Map<string, number>();
+            for (let r = 0; r < data.rowCount; r++) {
+                const v = keyCol.values[r];
+                if (v === null || v === undefined) continue;
+                if (typeof v === "number" && !Number.isFinite(v)) continue;
+                const id = String(v);
+                if (!rowOfId.has(id)) rowOfId.set(id, r);
+            }
+            const parentOf = new Map<number, number | null>();
+            let orphans = 0;
+            for (let r = 0; r < data.rowCount; r++) {
+                const pv = parentCol.values[r];
+                let parent: number | null = null;
+                if (pv !== null && pv !== undefined && !(typeof pv === "number" && !Number.isFinite(pv))) {
+                    const pr = rowOfId.get(String(pv));
+                    if (pr === undefined || pr === r) {
+                        if (pr === undefined) orphans++;
+                    } else {
+                        parent = pr;
+                    }
+                }
+                parentOf.set(r, parent);
+            }
+            if (orphans > 0) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.tree-orphan",
+                        `parentField "${spec.parentField}" names an unknown parent for ${orphans} row${orphans === 1 ? "" : "s"}; they hang at the root`,
+                        spec.parentField,
+                    ),
+                );
+            }
+            let cyclic = false;
+            for (let r = 0; r < data.rowCount && !cyclic; r++) {
+                const seen = new Set<number>([r]);
+                let p = parentOf.get(r) ?? null;
+                while (p !== null) {
+                    if (seen.has(p)) {
+                        cyclic = true;
+                        break;
+                    }
+                    seen.add(p);
+                    p = parentOf.get(p) ?? null;
+                }
+            }
+            if (cyclic) {
+                diagnostics.push(diag("error", "davinci.chart.tree-cycle", `tree hierarchy contains a cycle`, spec.parentField));
+            }
+        }
+    }
+
     for (const enc of spec.encoding) {
         const col = column(data, enc.field);
         if (!col) {
@@ -1053,13 +1486,15 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
         scales.set("y", { kind: "linear", domain: [0, top > 0 ? top : 1], range: [0, 1] });
     }
     // Error bars stretch the y domain to cover y ± error, so I-beams never
-    // clip at the frame edge.
+    // clip at the frame edge; yLow / yHigh bands stretch it the same way.
     {
         const yEnc = spec.encoding.find((e) => e.channel === "y");
         const symEnc = spec.encoding.find((e) => e.channel === "yError");
         const minusEnc = spec.encoding.find((e) => e.channel === "yErrorMinus");
         const plusEnc = spec.encoding.find((e) => e.channel === "yErrorPlus");
-        if (yEnc && (symEnc || minusEnc || plusEnc) && !spec.scales?.has("y")) {
+        const lowEnc = spec.encoding.find((e) => e.channel === "yLow");
+        const highEnc = spec.encoding.find((e) => e.channel === "yHigh");
+        if (yEnc && (symEnc || minusEnc || plusEnc || lowEnc || highEnc) && !spec.scales?.has("y")) {
             const yCol = column(data, yEnc.field);
             const symCol = symEnc ? column(data, symEnc.field) : undefined;
             const minusCol = minusEnc ? column(data, minusEnc.field) : undefined;
@@ -1083,11 +1518,36 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                     if (loV < lo) lo = loV;
                     if (hiV > hi) hi = hiV;
                 }
+                const lowCol = lowEnc ? column(data, lowEnc.field) : undefined;
+                const highCol = highEnc ? column(data, highEnc.field) : undefined;
+                for (const col of [lowCol, highCol]) {
+                    if (!col) continue;
+                    for (const v of col.values) {
+                        if (typeof v !== "number" || !Number.isFinite(v)) continue;
+                        if (v < lo) lo = v;
+                        if (v > hi) hi = v;
+                    }
+                }
                 if (lo <= hi) {
                     scales.set("y", { kind: "linear", domain: [lo, hi], range: [0, 1] });
                 }
             }
         }
+    }
+
+    if (spec.mark === "gantt" && ganttSpans && ganttSpans.size > 0 && !spec.scales?.has("x")) {
+        let lo = Number.POSITIVE_INFINITY;
+        let hi = Number.NEGATIVE_INFINITY;
+        for (const [s, e] of ganttSpans.values()) {
+            if (s < lo) lo = s;
+            if (e > hi) hi = e;
+        }
+        scales.set("x", { kind: "linear", domain: [lo, hi], range: [0, 1] });
+    }
+    if (spec.mark === "mosaic") {
+        // Mosaic y is the in-slot share domain [0, 1]; x widths come from the
+        // per-slot offset / width channels, not from a band scale.
+        scales.set("y", { kind: "linear", domain: [0, 1], range: [0, 1] });
     }
 
     // Rows without a usable required channel never become marks. Marks of
@@ -1128,6 +1588,46 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
                 channels: new Map<string, number | string>([["group", g]]),
             });
         });
+    } else if (spec.mark === "violin" && stat) {
+        for (const vc of violinCats) {
+            marks.push({
+                rowIndex: vc.firstStatRow,
+                key: vc.cat,
+                series: null,
+                channels: new Map<string, number | string>([
+                    ["category", vc.cat],
+                    ["q1", vc.q1],
+                    ["median", vc.median],
+                    ["q3", vc.q3],
+                    ["low", vc.low],
+                    ["high", vc.high],
+                    ["n", vc.n],
+                ]),
+            });
+        }
+    } else if (spec.mark === "calendar" && stat) {
+        const dateColS = column(stat, "date");
+        const weekColS = column(stat, "week");
+        const weekdayColS = column(stat, "weekday");
+        const valueColS = column(stat, "value");
+        const usedCalKeys = new Set<string>();
+        for (let i = 0; i < stat.rowCount; i++) {
+            const date = String(dateColS?.values[i] ?? i);
+            let key = date;
+            if (usedCalKeys.has(key)) key = `${date}~${i}`;
+            usedCalKeys.add(key);
+            marks.push({
+                rowIndex: i,
+                key,
+                series: null,
+                channels: new Map<string, number | string>([
+                    ["date", date],
+                    ["week", Number(weekColS?.values[i])],
+                    ["weekday", Number(weekdayColS?.values[i])],
+                    ["value", Number(valueColS?.values[i])],
+                ]),
+            });
+        }
     } else {
     // Build one mark per usable row, applying scales.
     for (let r = 0; r < data.rowCount; r++) {
@@ -1239,8 +1739,39 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             const rank = bumpRanks.get(r);
             if (rank !== undefined) channels.set("rank", rank);
         }
-        if (spec.mark === "treemap" && treemapSubtree) {
+        if ((spec.mark === "treemap" || spec.mark === "sunburst") && treemapSubtree) {
             channels.set("subtree", treemapSubtree.get(r) ?? 0);
+        }
+        // Strip charts jitter deterministically from the row key, so SSR and
+        // hydration agree on every offset.
+        if (spec.mark === "strip") {
+            channels.set("jitter", hash01(key) - 0.5);
+        }
+        if (spec.mark === "mosaic" && mosaicOffsets && mosaicWidths && mosaicShares) {
+            const xEnc2 = spec.encoding.find((e) => e.channel === "x");
+            const xRaw = xEnc2 ? column(data, xEnc2.field)?.values[r] : null;
+            const xKey = xRaw === null || xRaw === undefined ? "" : String(xRaw);
+            const share = mosaicShares.get(r);
+            if (share !== undefined) {
+                channels.set("share", share);
+                channels.set("xOffset", mosaicOffsets.get(xKey) ?? 0);
+                channels.set("xWidth", mosaicWidths.get(xKey) ?? 0);
+            } else {
+                positioned = false;
+            }
+        }
+        if (layout === "percent" && percentShares) {
+            const share = percentShares.get(r);
+            if (share !== undefined) channels.set("share", share);
+        }
+        if (spec.mark === "gantt" && ganttSpans) {
+            const span = ganttSpans.get(r);
+            if (!span) {
+                positioned = false;
+            } else {
+                channels.set("startV", span[0]);
+                channels.set("endV", span[1]);
+            }
         }
         // Rows without a usable x / y position never become marks; the rest
         // still keep their original row index and key so ids do not renumber.
@@ -1263,6 +1794,44 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
  *  endpoint poisons the whole mapping. */
 function isLogDomainUsable(domain: readonly [number, number]): boolean {
     return Number.isFinite(domain[0]) && Number.isFinite(domain[1]) && domain[0] > 0 && domain[1] > 0;
+}
+
+/** Deterministic string hash into [0, 1) — FNV-1a 32-bit. Powers strip-chart
+ *  jitter that SSR and hydration reproduce identically. */
+function hash01(text: string): number {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0) / 4294967296;
+}
+
+/** Parse a strict `YYYY-MM-DD` date into epoch days; anything else is null. */
+function parseCalendarDate(raw: number | string | boolean | null): number | null {
+    if (typeof raw !== "string") return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    const ms = Date.UTC(y, mo - 1, d);
+    const check = new Date(ms);
+    if (check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) return null;
+    return ms / 86400000;
+}
+
+/** Day of week for an epoch-day number (0 = Sunday, matching Date#getUTCDay). */
+function weekdayOfDays(days: number): number {
+    return new Date(days * 86400000).getUTCDay();
+}
+
+/** Gantt span endpoint: a finite number, or a strict `YYYY-MM-DD` date string
+ *  converted to epoch days. Anything else is null. */
+function parseGanttValue(raw: number | string | boolean | null): number | null {
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    return parseCalendarDate(raw);
 }
 
 /** Whether a raw cell can be turned into a finite number (or a real category). */

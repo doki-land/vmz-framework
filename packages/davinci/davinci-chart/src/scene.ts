@@ -205,6 +205,13 @@ function markOwnFrame(mark: string): boolean {
         case "ridgeline":
         case "bullet":
         case "boxplot":
+        case "violin":
+        case "calendar":
+        case "sunburst":
+        case "mosaic":
+        case "gantt":
+        case "tree":
+        case "beeswarm":
             return true;
         default:
             return false;
@@ -245,6 +252,20 @@ function buildMarkPanel(
             return buildBullet(plan, plot, theme, idPrefix);
         case "boxplot":
             return buildBoxplot(plan, plot, theme, idPrefix);
+        case "violin":
+            return buildViolin(plan, plot, theme, idPrefix);
+        case "calendar":
+            return buildCalendar(plan, plot, theme, idPrefix);
+        case "sunburst":
+            return buildSunburst(plan, plot, theme, idPrefix);
+        case "mosaic":
+            return buildMosaic(plan, plot, seriesCategories, theme, idPrefix);
+        case "gantt":
+            return buildGantt(plan, plot, seriesCategories, theme, idPrefix);
+        case "tree":
+            return buildTree(plan, plot, theme, idPrefix);
+        case "beeswarm":
+            return buildBeeswarmFrame(plan, plot, seriesCategories, theme, idPrefix);
         default:
             return buildCartesianPanel(plan, plot, seriesCategories, theme, idPrefix);
     }
@@ -376,9 +397,11 @@ function buildMarks(
         case "waterfall":
             return buildWaterfall(plan, rows, plot, xScale, yScale, seriesCategories, theme, layout);
         case "line":
-            return buildLines(rows, seriesCategories, theme, idPrefix);
+            return [...buildErrorBands(plan, rows, yScale, seriesCategories, theme, idPrefix), ...buildLines(rows, seriesCategories, theme, idPrefix)];
         case "area":
-            return buildAreas(rows, plot, yScale, seriesCategories, theme, layout, idPrefix);
+            return buildAreas(plan, rows, plot, yScale, seriesCategories, theme, layout, idPrefix);
+        case "streamgraph":
+            return buildAreas(plan, rows, plot, yScale, seriesCategories, theme, "stack", idPrefix, "streamgraph");
         case "point":
         case "circle":
             return buildPoints(plan, rows, seriesCategories, theme);
@@ -390,6 +413,12 @@ function buildMarks(
             return buildBump(plan, rows, plot, yScale, seriesCategories, theme, idPrefix);
         case "slope":
             return buildSlope(plan, rows, seriesCategories, theme, idPrefix);
+        case "dumbbell":
+            return buildDumbbells(plan, rows, plot, xScale, yScale, theme);
+        case "lollipop":
+            return buildLollipops(plan, rows, plot, yScale, seriesCategories, theme);
+        case "strip":
+            return buildStripPoints(plan, rows, plot, xScale, seriesCategories, theme);
         default:
             // `compile` rejects unimplemented marks with
             // `davinci.chart.unsupported-mark`, so reaching this branch means
@@ -397,6 +426,52 @@ function buildMarks(
             // render an empty chart with no explanation; refuse loudly.
             throw new Error(`davinci.chart.unsupported-mark: scene builder has no geometry for mark "${String(plan.spec.mark)}"`);
     }
+}
+
+/** Error bands: a translucent yLow..yHigh ribbon behind each line series. */
+function buildErrorBands(
+    plan: ChartCompilePlan,
+    rows: ReadonlyArray<PositionedMark>,
+    yScale: Scale,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+    idPrefix: string,
+): SemanticNode[] {
+    const loEnc = plan.spec.encoding.find((e) => e.channel === "yLow");
+    const hiEnc = plan.spec.encoding.find((e) => e.channel === "yHigh");
+    if (!loEnc || !hiEnc) return [];
+    const loCol = column(plan.resolvedData, loEnc.field);
+    const hiCol = column(plan.resolvedData, hiEnc.field);
+    if (!loCol || !hiCol) return [];
+    const nodes: SemanticNode[] = [];
+    for (const [name, rowsInSeries] of groupBySeries(rows)) {
+        const pts = rowsInSeries
+            .map((row) => {
+                const lo = loCol.values[row.rowIndex];
+                const hi = hiCol.values[row.rowIndex];
+                return {
+                    x: row.x,
+                    lo: typeof lo === "number" && Number.isFinite(lo) ? lo : NaN,
+                    hi: typeof hi === "number" && Number.isFinite(hi) ? hi : NaN,
+                };
+            })
+            .filter((p) => Number.isFinite(p.lo) && Number.isFinite(p.hi))
+            .sort((a, b) => a.x - b.x);
+        if (pts.length === 0) continue;
+        const color = seriesColor(theme, seriesCategories, name);
+        const commands: PathCommand[] = [{ kind: "move", to: { x: pts[0].x, y: project(yScale, pts[0].hi) } }];
+        for (const p of pts.slice(1)) commands.push({ kind: "line", to: { x: p.x, y: project(yScale, p.hi) } });
+        for (let i = pts.length - 1; i >= 0; i--) commands.push({ kind: "line", to: { x: pts[i].x, y: project(yScale, pts[i].lo) } });
+        commands.push({ kind: "close" });
+        nodes.push({
+            kind: "path",
+            id: `${idPrefix}band:${name}`,
+            role: "decorative",
+            path: { commands },
+            fill: { color: { ...color, a: theme.areaFillOpacity * 0.6 } },
+        });
+    }
+    return nodes;
 }
 
 /** Error-bar I-beams for bar / line / point charts with `yError`,
@@ -464,13 +539,18 @@ function buildBars(
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
-    layout: "overlap" | "stack" | "dodge",
+    layout: "overlap" | "stack" | "dodge" | "percent",
 ): SemanticNode[] {
     const bandWidth = xScale.kind === "band" ? bandwidth(xScale) : 0;
     const step = bandWidth > 0 ? bandWidth : plot.w / Math.max(1, rows.length);
     // Rounded caps read well on positive bars; skip the radius when the bar
     // is shorter than the radius or hangs below zero (it would invert).
     const radius = (h: number): number => (h >= BAR_RADIUS * 2 ? BAR_RADIUS : 0);
+    // Percent stacks span share units inside the [0, 100] domain, not raw y.
+    const shareOf =
+        layout === "percent"
+            ? new Map(plan.marks.map((m) => [m.key, typeof m.channels.get("share") === "number" ? (m.channels.get("share") as number) : 0]))
+            : null;
 
     return rows.map((row) => {
         const waterfall = plan.spec.mark === "waterfall";
@@ -478,11 +558,12 @@ function buildBars(
         let yTop = row.y;
         let yBottom = zeroBaseline(yScale, plot);
 
-        if ((layout === "stack" || waterfall) && row.stackBase !== null && row.yRaw !== null) {
-            // Stacked / waterfall: span from the cumulative base to base +
-            // value. The y scale domain already covers the cumulative extent.
+        if ((layout === "stack" || layout === "percent" || waterfall) && row.stackBase !== null && (row.yRaw !== null || shareOf !== null)) {
+            // Stacked / waterfall / percent: span from the cumulative base to
+            // base + value (percent reads the normalized share channel).
+            const span = layout === "percent" ? (shareOf!.get(row.key) ?? 0) : (row.yRaw ?? 0);
             const a = project(yScale, row.stackBase);
-            const b = project(yScale, row.stackBase + row.yRaw);
+            const b = project(yScale, row.stackBase + span);
             yTop = Math.min(a, b);
             yBottom = Math.max(a, b);
         }
@@ -508,8 +589,8 @@ function buildBars(
             y: Math.min(yTop, yBottom),
             w,
             h,
-            rx: layout === "stack" || waterfall ? 0 : radius(h),
-            ry: layout === "stack" || waterfall ? 0 : radius(h),
+            rx: layout === "stack" || layout === "percent" || waterfall ? 0 : radius(h),
+            ry: layout === "stack" || layout === "percent" || waterfall ? 0 : radius(h),
             fill: {
                 color: waterfall
                     ? row.yRaw !== null && row.yRaw >= 0
@@ -531,7 +612,7 @@ function buildWaterfall(
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
-    layout: "overlap" | "stack" | "dodge",
+    layout: "overlap" | "stack" | "dodge" | "percent",
 ): SemanticNode[] {
     const bars = buildBars(plan, rows, plot, xScale, yScale, seriesCategories, theme, layout);
     const step = xScale.kind === "band" ? bandwidth(xScale) : plot.w / Math.max(1, rows.length);
@@ -832,27 +913,34 @@ function buildLines(
 }
 
 function buildAreas(
+    plan: ChartCompilePlan,
     rows: ReadonlyArray<PositionedMark>,
     plot: PlotRect,
     yScale: Scale,
     seriesCategories: ReadonlyArray<string> | undefined,
     theme: ChartTheme,
-    layout: "overlap" | "stack" | "dodge",
+    layout: "overlap" | "stack" | "dodge" | "percent",
     idPrefix: string = "",
+    markLabel: string = "area",
 ): SemanticNode[] {
     const baseline = zeroBaseline(yScale, plot);
     const nodes: SemanticNode[] = [];
+    // Percent stacks span share units inside the [0, 100] domain.
+    const shareOf =
+        layout === "percent"
+            ? new Map(plan.marks.map((m) => [m.key, typeof m.channels.get("share") === "number" ? (m.channels.get("share") as number) : 0]))
+            : null;
+    const spanOf = (row: PositionedMark): number => (layout === "percent" ? (shareOf!.get(row.key) ?? 0) : (row.yRaw ?? 0));
     for (const [name, rowsInSeries] of groupBySeries(rows)) {
         const sorted = [...rowsInSeries].sort((a, b) => a.x - b.x || a.rowIndex - b.rowIndex);
         const color = seriesColor(theme, seriesCategories, name);
         let commands: PathCommand[];
-        if (layout === "stack") {
+        if (layout === "stack" || layout === "percent") {
             // Stacked area: top edge follows base + value, the closing edge
             // walks the cumulative base back — a ribbon, not a zero drop.
             const top = sorted.map((row): PathCommand => {
                 const base = row.stackBase ?? 0;
-                const value = row.yRaw ?? 0;
-                return { kind: "line", to: { x: row.x, y: project(yScale, base + value) } };
+                return { kind: "line", to: { x: row.x, y: project(yScale, base + spanOf(row)) } };
             });
             const bottom = [...sorted].reverse().map((row): PathCommand => {
                 const base = row.stackBase ?? 0;
@@ -869,7 +957,7 @@ function buildAreas(
         }
         nodes.push({
             kind: "path",
-            id: `${idPrefix}area:${name}`,
+            id: `${idPrefix}${markLabel}:${name}`,
             role: "chart.mark",
             source: { domain: "chart", path: ["series", name] },
             path: { commands },
@@ -878,8 +966,8 @@ function buildAreas(
             hitRegion: {
                 polyline: {
                     points: sorted.map((row) =>
-                        layout === "stack"
-                            ? { x: row.x, y: project(yScale, (row.stackBase ?? 0) + (row.yRaw ?? 0)) }
+                        layout === "stack" || layout === "percent"
+                            ? { x: row.x, y: project(yScale, (row.stackBase ?? 0) + spanOf(row)) }
                             : { x: row.x, y: row.y },
                     ),
                     keys: sorted.map((row) => row.key),
@@ -889,6 +977,218 @@ function buildAreas(
             stroke: { color, width: LINE_STROKE_WIDTH },
         });
     }
+    return nodes;
+}
+
+/** Dumbbells: one segment per row between the y and yEnd values, dots at
+ *  both ends — change between two points reads at a glance. */
+function buildDumbbells(
+    plan: ChartCompilePlan,
+    rows: ReadonlyArray<PositionedMark>,
+    plot: PlotRect,
+    xScale: Scale,
+    yScale: Scale,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const eEnc = plan.spec.encoding.find((e) => e.channel === "yEnd");
+    const eCol = eEnc ? column(plan.resolvedData, eEnc.field) : undefined;
+    if (!eCol) return [];
+    const bandW = xScale.kind === "band" ? bandwidth(xScale) : plot.w / Math.max(1, rows.length);
+    const nodes: SemanticNode[] = [];
+    const palette = theme.seriesPalette;
+    const startColor = palette.length > 0 ? palette[0] : theme.markFill;
+    const endColor = palette.length > 1 ? palette[1] : theme.markFill;
+    for (const row of rows) {
+        const v2 = eCol.values[row.rowIndex];
+        if (typeof v2 !== "number" || !Number.isFinite(v2)) continue;
+        const y2 = project(yScale, v2);
+        if (!Number.isFinite(y2)) continue;
+        const x = row.x;
+        nodes.push({
+            kind: "path",
+            id: `dumbbell:${row.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", row.key] },
+            path: {
+                commands: [
+                    { kind: "move", to: { x, y: row.y } },
+                    { kind: "line", to: { x, y: y2 } },
+                ],
+            },
+            stroke: { color: theme.axisStroke, width: 1.5 },
+            hitRegion: {
+                rect: {
+                    x: x - bandW * 0.3,
+                    y: Math.min(row.y, y2) - 6,
+                    w: bandW * 0.6,
+                    h: Math.abs(y2 - row.y) + 12,
+                },
+            },
+        });
+        nodes.push({
+            kind: "ellipse",
+            id: `dumbbell:start:${row.key}`,
+            role: "decorative",
+            cx: x,
+            cy: row.y,
+            rx: POINT_RADIUS,
+            ry: POINT_RADIUS,
+            fill: { color: startColor },
+        });
+        nodes.push({
+            kind: "ellipse",
+            id: `dumbbell:end:${row.key}`,
+            role: "decorative",
+            cx: x,
+            cy: y2,
+            rx: POINT_RADIUS,
+            ry: POINT_RADIUS,
+            fill: { color: endColor },
+        });
+    }
+    return nodes;
+}
+
+/** Lollipops: a stem from the zero baseline and a dot at the value — the
+ *  dot keeps precision, the stem keeps the baseline honest. */
+function buildLollipops(
+    plan: ChartCompilePlan,
+    rows: ReadonlyArray<PositionedMark>,
+    plot: PlotRect,
+    yScale: Scale,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const baseline = zeroBaseline(yScale, plot);
+    const nodes: SemanticNode[] = [];
+    for (const row of rows) {
+        const color = seriesColor(theme, seriesCategories, row.series);
+        nodes.push({
+            kind: "path",
+            id: `lollipop:stem:${row.key}`,
+            role: "decorative",
+            path: {
+                commands: [
+                    { kind: "move", to: { x: row.x, y: baseline } },
+                    { kind: "line", to: { x: row.x, y: row.y } },
+                ],
+            },
+            stroke: { color, width: 2 },
+        });
+        nodes.push({
+            kind: "ellipse",
+            id: `lollipop:${row.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", row.key] },
+            cx: row.x,
+            cy: row.y,
+            rx: POINT_RADIUS + 1,
+            ry: POINT_RADIUS + 1,
+            fill: { color },
+            ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
+        });
+    }
+    return nodes;
+}
+
+/** Strip: one dot per raw row with deterministic jitter from the row key —
+ *  density reads without overlap magic, SSR and hydration agree exactly. */
+function buildStripPoints(
+    plan: ChartCompilePlan,
+    rows: ReadonlyArray<PositionedMark>,
+    plot: PlotRect,
+    xScale: Scale,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+): SemanticNode[] {
+    const bandW = xScale.kind === "band" ? bandwidth(xScale) : plot.w / Math.max(1, rows.length);
+    const jitterOf = new Map(plan.marks.map((m) => [m.key, typeof m.channels.get("jitter") === "number" ? (m.channels.get("jitter") as number) : 0]));
+    return rows.map((row) => ({
+        kind: "ellipse" as const,
+        id: `strip:${row.key}`,
+        role: "chart.mark" as const,
+        source: { domain: "chart", path: ["mark", row.key] },
+        cx: row.x + (jitterOf.get(row.key) ?? 0) * bandW * 0.7,
+        cy: row.y,
+        rx: 3,
+        ry: 3,
+        fill: { color: seriesColor(theme, seriesCategories, row.series) },
+        ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
+    }));
+}
+
+/** Beeswarm: dots packed without overlap along a shared value axis. Each
+ *  series gets a lane; placement is greedy in value order, so it is fully
+ *  deterministic for a given viewport. */
+function buildBeeswarmFrame(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+    idPrefix: string,
+): SemanticNode[] {
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    const yCol = yEnc ? column(plan.resolvedData, yEnc.field) : undefined;
+    const vScale = pixelScale(plan.scales.get("y"), [plot.x, plot.x + plot.w]);
+    if (!yCol || !vScale || vScale.kind !== "linear") return [];
+    const groups = seriesCategories && seriesCategories.length > 0 ? [...seriesCategories] : [null];
+    const R = 3.5;
+    const laneH = plot.h / groups.length;
+    const nodes: SemanticNode[] = [];
+    nodes.push(buildAxis(`${idPrefix}x-axis`, plot, vScale, "horizontal", theme));
+    groups.forEach((g, gi) => {
+        const cy = plot.y + laneH * gi + laneH / 2;
+        const color = seriesColor(theme, seriesCategories, g);
+        const pts = plan.marks
+            .filter((m) => (g === null ? true : m.series === g))
+            .map((m) => ({ key: m.key, v: yCol.values[m.rowIndex] }))
+            .filter((p): p is { key: string; v: number } => typeof p.v === "number" && Number.isFinite(p.v))
+            .sort((a, b) => a.v - b.v);
+        const placed: { x: number; y: number }[] = [];
+        for (const p of pts) {
+            const cx = project(vScale, p.v);
+            if (!Number.isFinite(cx)) continue;
+            let dy = 0;
+            let step = 0;
+            let done = false;
+            while (!done) {
+                const candidates = step === 0 ? [0] : [step, -step];
+                for (const cand of candidates) {
+                    const y = cy + cand;
+                    if (Math.abs(cand) + R > laneH / 2) continue;
+                    let ok = true;
+                    for (const q of placed) {
+                        const dx = q.x - cx;
+                        const dyy = q.y - y;
+                        if (dx * dx + dyy * dyy < (R * 2 - 0.5) * (R * 2 - 0.5)) {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    if (ok) {
+                        dy = cand;
+                        done = true;
+                        break;
+                    }
+                }
+                step += R * 1.8;
+                if (step > laneH) break;
+            }
+            placed.push({ x: cx, y: cy + dy });
+            nodes.push({
+                kind: "ellipse",
+                id: `beeswarm:${p.key}`,
+                role: "chart.mark",
+                source: { domain: "chart", path: ["mark", p.key] },
+                cx,
+                cy: cy + dy,
+                rx: R,
+                ry: R,
+                fill: { color },
+                ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
+            });
+        }
+    });
     return nodes;
 }
 
@@ -1817,16 +2117,19 @@ function buildHeatmap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
 }
 
 /** Stepped gradient strip for the heatmap color domain, with min / max
- *  labels at the ends. Sits in the legend strip above the plot. */
+ *  labels at the ends. Sits in the legend strip above the plot; calendar
+ *  pins it to the right so month labels keep the left corner. */
 function buildHeatmapRampLegend(
     plot: PlotRect,
     domain: readonly [number, number],
     theme: ChartTheme,
     idPrefix: string,
+    align: "left" | "right" = "left",
 ): SemanticNode[] {
     const STEPS = 24;
     const stripW = Math.min(180, Math.max(60, plot.w / 2));
     const stripH = 10;
+    const stripX = align === "right" ? plot.x + plot.w - stripW : plot.x;
     const y = plot.y - LEGEND_BOTTOM_GAP - stripH;
     const nodes: SemanticNode[] = [];
     const stepW = stripW / STEPS;
@@ -1835,7 +2138,7 @@ function buildHeatmapRampLegend(
             kind: "rect",
             id: `${idPrefix}heatmap-ramp:${i}`,
             role: "chart.legend",
-            x: plot.x + i * stepW,
+            x: stripX + i * stepW,
             y,
             w: stepW + 0.5,
             h: stripH,
@@ -1851,7 +2154,7 @@ function buildHeatmapRampLegend(
         role: "chart.legend",
         text: minLabel,
         font: theme.legendFont,
-        anchor: { x: plot.x - LABEL_GAP - minW / 2, y: y + stripH / 2 },
+        anchor: { x: stripX - LABEL_GAP - minW / 2, y: y + stripH / 2 },
         color: theme.labelColor,
     });
     const maxW = estimateTextSize(maxLabel, theme.legendFont.sizePx).width;
@@ -1861,7 +2164,7 @@ function buildHeatmapRampLegend(
         role: "chart.legend",
         text: maxLabel,
         font: theme.legendFont,
-        anchor: { x: plot.x + stripW + LABEL_GAP + maxW / 2, y: y + stripH / 2 },
+        anchor: { x: stripX + stripW + LABEL_GAP + maxW / 2, y: y + stripH / 2 },
         color: theme.labelColor,
     });
     return nodes;
@@ -2912,6 +3215,613 @@ function buildBoxplot(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
             stroke: { color: theme.markFill, width: 1.5 },
             hitRegion: { rect: { x: x0, y: Math.min(yHigh, yLow), w: bw, h: Math.abs(yLow - yHigh) } },
         });
+    }
+    return nodes;
+}
+
+// ─── Violin / calendar / sunburst / mosaic / gantt / tree ───────────────
+
+/** Violin: per-category KDE mirrored around the slot center with an embedded
+ *  five-number box — density shape and quantiles in one mark. */
+function buildViolin(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const catCol = column(stat, "category");
+    const gyCol = column(stat, "gy");
+    const denCol = column(stat, "density");
+    if (!catCol || !gyCol || !denCol) return [];
+    const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    if (!xEnc || !yEnc) return [];
+    const xScale = pixelScale(plan.scales.get("x"), [plot.x, plot.x + plot.w]);
+    const yScale = pixelScale(plan.scales.get("y"), [plot.y + plot.h, plot.y]);
+    if (!xScale || xScale.kind !== "band" || !yScale) return [];
+    const slotW = bandwidth(xScale);
+    const halfW = slotW * 0.38;
+
+    const nodes: SemanticNode[] = [];
+    const spark = plan.spec.spark === true;
+    if (!spark) {
+        nodes.push(...buildGrid(plot, yScale, theme, idPrefix));
+        nodes.push(buildAxis(`${idPrefix}x-axis`, plot, xScale, "horizontal", theme));
+        nodes.push(buildAxis(`${idPrefix}y-axis`, plot, yScale, "vertical", theme));
+    }
+    for (const mark of plan.marks) {
+        const cat = String(mark.channels.get("category") ?? mark.key);
+        const cx = project(xScale, cat);
+        if (!Number.isFinite(cx)) continue;
+        const pts: { gy: number; den: number }[] = [];
+        for (let i = mark.rowIndex; i < stat.rowCount; i++) {
+            if (String(catCol.values[i]) !== cat) break;
+            pts.push({ gy: Number(gyCol.values[i]), den: Number(denCol.values[i]) });
+        }
+        if (pts.length === 0) continue;
+        // Mirrored outline: right edge top-to-bottom, left edge back up.
+        const right = pts.map((p) => ({ x: cx + p.den * halfW, y: project(yScale, p.gy) }));
+        const left = [...pts].reverse().map((p) => ({ x: cx - p.den * halfW, y: project(yScale, p.gy) }));
+        const outline = [...right, ...left];
+        if (!outline.every((p) => Number.isFinite(p.y))) continue;
+        nodes.push({
+            kind: "path",
+            id: `violin:${cat}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            path: {
+                commands: [
+                    { kind: "move", to: outline[0] },
+                    ...outline.slice(1).map((p) => ({ kind: "line" as const, to: p })),
+                    { kind: "close" },
+                ],
+            },
+            hitRegion: { polygon: { points: outline } },
+            fill: { color: { ...theme.markFill, a: 0.35 } },
+            stroke: { color: theme.markFill, width: 1.5 },
+        });
+        // Embedded box: thick IQR block, median tick, whisker line.
+        const yQ1 = project(yScale, Number(mark.channels.get("q1")));
+        const yMed = project(yScale, Number(mark.channels.get("median")));
+        const yQ3 = project(yScale, Number(mark.channels.get("q3")));
+        const yLow = project(yScale, Number(mark.channels.get("low")));
+        const yHigh = project(yScale, Number(mark.channels.get("high")));
+        if ([yQ1, yMed, yQ3, yLow, yHigh].every(Number.isFinite)) {
+            const bw = slotW * 0.12;
+            nodes.push({
+                kind: "rect",
+                id: `${idPrefix}violin:box:${cat}`,
+                role: "decorative",
+                x: cx - bw / 2,
+                y: Math.min(yQ1, yQ3),
+                w: bw,
+                h: Math.max(1, Math.abs(yQ1 - yQ3)),
+                fill: { color: theme.markFill },
+            });
+            nodes.push({
+                kind: "path",
+                id: `${idPrefix}violin:median:${cat}`,
+                role: "decorative",
+                path: {
+                    commands: [
+                        { kind: "move", to: { x: cx - bw / 2, y: yMed } },
+                        { kind: "line", to: { x: cx + bw / 2, y: yMed } },
+                    ],
+                },
+                stroke: { color: theme.pointStroke ?? theme.trackColor, width: 2 },
+            });
+            nodes.push({
+                kind: "path",
+                id: `${idPrefix}violin:whisker:${cat}`,
+                role: "decorative",
+                path: {
+                    commands: [
+                        { kind: "move", to: { x: cx, y: yLow } },
+                        { kind: "line", to: { x: cx, y: yHigh } },
+                    ],
+                },
+                stroke: { color: theme.markFill, width: 1 },
+            });
+        }
+    }
+    return nodes;
+}
+
+/** Calendar heatmap: ISO week columns × weekday rows, cells colored on the
+ *  sequential ramp, month labels along the top. */
+function buildCalendar(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const stat = plan.stat;
+    if (!stat) return [];
+    const dateCol = column(stat, "date");
+    const weekCol = column(stat, "week");
+    const weekdayCol = column(stat, "weekday");
+    const valueCol = column(stat, "value");
+    if (!dateCol || !weekCol || !weekdayCol || !valueCol) return [];
+    const cScale = plan.scales.get("color");
+    if (!cScale || cScale.kind !== "linear") return [];
+    const [d0, d1] = cScale.domain;
+    const colorOf = (v: number): RGBA => sampleRamp(theme.heatmapRamp, d1 > d0 ? (v - d0) / (d1 - d0) : 1);
+
+    let maxWeek = 0;
+    for (let i = 0; i < stat.rowCount; i++) maxWeek = Math.max(maxWeek, Number(weekCol.values[i]));
+    const weeks = maxWeek + 1;
+    if (weeks <= 0) return [];
+    const labelSpace = 24;
+    const cell = Math.min((plot.w - labelSpace) / weeks, plot.h / 7);
+    if (!(cell > 1)) return [];
+    const gridX = plot.x + labelSpace;
+    const gridW = cell * weeks;
+
+    const nodes: SemanticNode[] = [];
+    const spark = plan.spec.spark === true;
+    // Weekday row labels (Mon / Wed / Fri / Sun).
+    if (!spark) {
+        const names = ["一", "三", "五", "日"];
+        const rows = [0, 2, 4, 6];
+        rows.forEach((row, i) => {
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}calendar:weekday:${row}`,
+                role: "chart.axis",
+                text: names[i],
+                font: theme.labelFont,
+                anchor: { x: gridX - LABEL_GAP - estimateTextSize(names[i], theme.labelFont.sizePx).width / 2, y: plot.y + row * cell + cell / 2 },
+                color: theme.labelColor,
+            });
+        });
+        // Month labels at the week column where the month first appears.
+        let lastMonth = "";
+        const seen = new Set<number>();
+        for (let i = 0; i < stat.rowCount; i++) {
+            const week = Number(weekCol.values[i]);
+            if (seen.has(week)) continue;
+            seen.add(week);
+            const month = String(dateCol.values[i]).slice(0, 7);
+            if (month !== lastMonth) {
+                lastMonth = month;
+                nodes.push({
+                    kind: "text",
+                    id: `${idPrefix}calendar:month:${week}`,
+                    role: "chart.axis",
+                    text: month,
+                    font: theme.labelFont,
+                    anchor: { x: gridX + week * cell + estimateTextSize(month, theme.labelFont.sizePx).width / 2 - 1, y: plot.y - LABEL_GAP - 3 },
+                    color: theme.labelColor,
+                });
+            }
+        }
+    }
+    for (const mark of plan.marks) {
+        const week = Number(weekCol.values[mark.rowIndex]);
+        const weekday = Number(weekdayCol.values[mark.rowIndex]);
+        const value = Number(valueCol.values[mark.rowIndex]);
+        if (!Number.isFinite(week) || !Number.isFinite(weekday) || !Number.isFinite(value)) continue;
+        const x = gridX + week * cell;
+        const y = plot.y + weekday * cell;
+        nodes.push({
+            kind: "rect",
+            id: `calendar:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            x: x + 0.5,
+            y: y + 0.5,
+            w: Math.max(0.5, cell - 1),
+            h: Math.max(0.5, cell - 1),
+            rx: 1,
+            ry: 1,
+            fill: { color: colorOf(value) },
+            hitRegion: { rect: { x, y, w: cell, h: cell } },
+        });
+    }
+    if (!spark) {
+        // Right-aligned ramp: month labels own the top-left corner.
+        nodes.push(...buildHeatmapRampLegend(plot, cScale.domain, theme, idPrefix, "right"));
+    }
+    void gridW;
+    return nodes;
+}
+
+/** Sunburst: hierarchical radial partition. Depth rings, angles proportional
+ *  to compile-time subtree sums, colored by top-level group. */
+function buildSunburst(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const keyField = plan.spec.keyField;
+    const parentField = plan.spec.parentField;
+    if (!keyField || !parentField) return [];
+    const keyCol = column(plan.resolvedData, keyField);
+    const parentCol = column(plan.resolvedData, parentField);
+    if (!keyCol || !parentCol) return [];
+
+    interface SBNode {
+        key: string;
+        value: number;
+        children: string[];
+    }
+    const nodesByKey = new Map<string, SBNode>();
+    for (const mark of plan.marks) {
+        nodesByKey.set(mark.key, { key: mark.key, value: Number(mark.channels.get("subtree") ?? 0), children: [] });
+    }
+    const roots: string[] = [];
+    for (const mark of plan.marks) {
+        const pv = parentCol.values[mark.rowIndex];
+        const parent = pv === null || pv === undefined || (typeof pv === "number" && !Number.isFinite(pv)) ? null : String(pv);
+        if (parent !== null && nodesByKey.has(parent) && parent !== mark.key) {
+            nodesByKey.get(parent)!.children.push(mark.key);
+        } else {
+            roots.push(mark.key);
+        }
+    }
+    const maxDepth = ((): number => {
+        let depth = 0;
+        const walk = (key: string, d: number): void => {
+            depth = Math.max(depth, d);
+            for (const c of nodesByKey.get(key)?.children ?? []) walk(c, d + 1);
+        };
+        for (const r of roots) walk(r, 1);
+        return depth;
+    })();
+    if (maxDepth === 0) return [];
+
+    // Color groups follow the treemap rule: a single synthetic root means its
+    // children are the groups.
+    const colorRoots = roots.length === 1 ? (nodesByKey.get(roots[0])?.children ?? roots) : roots;
+    const topOf = new Map<string, string>();
+    const assignTop = (key: string, top: string): void => {
+        topOf.set(key, top);
+        for (const c of nodesByKey.get(key)?.children ?? []) assignTop(c, top);
+    };
+    if (roots.length === 1) {
+        for (const g of colorRoots) assignTop(g, g);
+    } else {
+        for (const r of roots) assignTop(r, r);
+    }
+
+    const cx = plot.x + plot.w / 2;
+    const cy = plot.y + plot.h / 2;
+    const ringW = Math.min(plot.w, plot.h) / 2 / maxDepth;
+    if (!(ringW > 2)) return [];
+
+    const nodes: SemanticNode[] = [];
+    const lay = (key: string, a0: number, a1: number, depth: number): void => {
+        const node = nodesByKey.get(key)!;
+        const top = topOf.get(key) ?? key;
+        const base = seriesColor(theme, colorRoots, top);
+        const alpha = depth === 0 ? 0.35 : Math.max(0.45, 1 - 0.12 * (depth - 1));
+        const rIn = depth === 0 ? 0 : depth * ringW;
+        const rOut = (depth + 1) * ringW;
+        nodes.push({
+            kind: "path",
+            id: `sunburst:${key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", key] },
+            path: { commands: sliceCommands(cx, cy, rOut, rIn, a0, a1) },
+            fill: { color: { ...base, a: depth === 0 ? alpha : Math.min(1, alpha) } },
+            hitRegion: { sector: { cx, cy, rOuter: rOut, rInner: rIn, a0, a1 } },
+        });
+        const labelR = (rIn + rOut) / 2;
+        const label = truncateToWidth(key, 72, theme.labelFont.sizePx);
+        if (depth > 0 && arcLengthFits((a1 - a0) * labelR, label, theme.labelFont.sizePx)) {
+            const mid = (a0 + a1) / 2;
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}sunburst:label:${key}`,
+                role: "text",
+                text: label,
+                font: theme.labelFont,
+                anchor: { x: cx + labelR * Math.cos(mid), y: cy + labelR * Math.sin(mid) },
+                color: contrastText({ ...base, a: 1 }),
+            });
+        }
+        const total = node.value;
+        if (!(total > 0)) return;
+        let acc = a0;
+        for (const c of node.children) {
+            const cv = nodesByKey.get(c)!.value;
+            const span = (a1 - a0) * (cv / total);
+            lay(c, acc, acc + span, depth + 1);
+            acc += span;
+        }
+    };
+    const grand = roots.reduce((a, r) => a + nodesByKey.get(r)!.value, 0);
+    if (!(grand > 0)) return [];
+    if (roots.length === 1) {
+        lay(roots[0], 0, Math.PI * 2, 0);
+    } else {
+        let acc = 0;
+        for (const r of roots) {
+            const span = (Math.PI * 2 * nodesByKey.get(r)!.value) / grand;
+            lay(r, acc, acc + span, 0);
+            acc += span;
+        }
+    }
+    return nodes;
+}
+
+/** Mosaic: variable-width stacked columns — column widths share the grand
+ *  total, segment heights share the slot total. */
+function buildMosaic(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+    idPrefix: string,
+): SemanticNode[] {
+    const xEnc = plan.spec.encoding.find((e) => e.channel === "x");
+    const xCol = xEnc ? column(plan.resolvedData, xEnc.field) : undefined;
+    if (!xCol) return [];
+    const yScale = pixelScale(plan.scales.get("y"), [plot.y + plot.h, plot.y]);
+    if (!yScale) return [];
+    const nodes: SemanticNode[] = [];
+    const spark = plan.spec.spark === true;
+    if (!spark) {
+        nodes.push(...buildGrid(plot, yScale, theme, idPrefix));
+        nodes.push(buildAxis(`${idPrefix}y-axis`, plot, yScale, "vertical", theme));
+    }
+    const labelOf = new Map<string, { x: number; w: number }>();
+    for (const mark of plan.marks) {
+        const share = mark.channels.get("share");
+        const xOff = mark.channels.get("xOffset");
+        const xW = mark.channels.get("xWidth");
+        if (typeof share !== "number" || typeof xOff !== "number" || typeof xW !== "number" || mark.stackBase === undefined || mark.stackBase === null) continue;
+        const px = plot.x + xOff * plot.w;
+        const pw = xW * plot.w;
+        const y0 = project(yScale, mark.stackBase);
+        const y1 = project(yScale, mark.stackBase + share);
+        if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
+        nodes.push({
+            kind: "rect",
+            id: `mosaic:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            x: px + 0.5,
+            y: Math.min(y0, y1) + 0.5,
+            w: Math.max(0.5, pw - 1),
+            h: Math.max(0.5, Math.abs(y1 - y0) - 1),
+            fill: { color: seriesColor(theme, seriesCategories, mark.series) },
+            hitRegion: { rect: { x: px, y: Math.min(y0, y1), w: pw, h: Math.abs(y1 - y0) } },
+        });
+        const xRaw = xCol.values[mark.rowIndex];
+        if (xRaw !== null && xRaw !== undefined) labelOf.set(String(xRaw), { x: px, w: pw });
+    }
+    // Column category labels centered under each variable-width column.
+    if (!spark) {
+        for (const [cat, slot] of labelOf) {
+            const label = truncateToWidth(cat, Math.max(0, slot.w - 4), theme.labelFont.sizePx);
+            if (label === "") continue;
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}mosaic:label:${cat}`,
+                role: "chart.axis",
+                text: label,
+                font: theme.labelFont,
+                anchor: { x: slot.x + slot.w / 2, y: plot.y + plot.h + TICK_LENGTH + estimateTextSize(label, theme.labelFont.sizePx).height / 2 },
+                color: theme.labelColor,
+            });
+        }
+    }
+    return nodes;
+}
+
+/** Gantt: interval bars on a shared start..end axis, one row per task. */
+function buildGantt(
+    plan: ChartCompilePlan,
+    plot: PlotRect,
+    seriesCategories: ReadonlyArray<string> | undefined,
+    theme: ChartTheme,
+    idPrefix: string,
+): SemanticNode[] {
+    const xScale = pixelScale(plan.scales.get("x"), [plot.x, plot.x + plot.w]);
+    if (!xScale || xScale.kind !== "linear") return [];
+    const yEnc = plan.spec.encoding.find((e) => e.channel === "y");
+    const yCol = yEnc ? column(plan.resolvedData, yEnc.field) : undefined;
+    const sEnc = plan.spec.encoding.find((e) => e.channel === "start");
+    const sCol = sEnc ? column(plan.resolvedData, sEnc.field) : undefined;
+    const dateMode = sCol ? sCol.values.some((v) => typeof v === "string") : false;
+    const n = plan.marks.length;
+    if (n === 0) return [];
+    const slotH = plot.h / n;
+    const barH = Math.min(slotH * 0.55, 22);
+
+    const nodes: SemanticNode[] = [];
+    // Date-aware ticks when the input was date strings.
+    if (dateMode) {
+        const ticks = niceLinearTicks(xScale.domain);
+        const baseline = plot.y + plot.h;
+        nodes.push({
+            kind: "path",
+            id: `${idPrefix}x-axis:baseline`,
+            role: "chart.axis",
+            path: {
+                commands: [
+                    { kind: "move", to: { x: plot.x, y: baseline } },
+                    { kind: "line", to: { x: plot.x + plot.w, y: baseline } },
+                ],
+            },
+            stroke: axisStroke(theme),
+        });
+        for (const t of ticks.values) {
+            const px = project(xScale, t);
+            if (!Number.isFinite(px)) continue;
+            const label = new Date(t * 86400000).toISOString().slice(0, 10);
+            nodes.push({
+                kind: "path",
+                id: `${idPrefix}x-axis:tick:${label}`,
+                role: "chart.axis",
+                path: {
+                    commands: [
+                        { kind: "move", to: { x: px, y: baseline } },
+                        { kind: "line", to: { x: px, y: baseline + TICK_LENGTH } },
+                    ],
+                },
+                stroke: axisStroke(theme),
+            });
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}x-axis:label:${label}`,
+                role: "chart.axis",
+                text: label,
+                font: theme.labelFont,
+                anchor: { x: px, y: baseline + TICK_LENGTH + estimateTextSize(label, theme.labelFont.sizePx).height / 2 },
+                color: theme.labelColor,
+            });
+        }
+    } else {
+        nodes.push(buildAxis(`${idPrefix}x-axis`, plot, xScale, "horizontal", theme));
+    }
+    plan.marks.forEach((mark, i) => {
+        const s = mark.channels.get("startV");
+        const e = mark.channels.get("endV");
+        if (typeof s !== "number" || typeof e !== "number") return;
+        const px0 = project(xScale, s);
+        const px1 = project(xScale, e);
+        if (!Number.isFinite(px0) || !Number.isFinite(px1)) return;
+        const cy = plot.y + slotH * i + slotH / 2;
+        nodes.push({
+            kind: "rect",
+            id: `gantt:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            x: px0,
+            y: cy - barH / 2,
+            w: Math.max(1, px1 - px0),
+            h: barH,
+            rx: 2,
+            ry: 2,
+            fill: { color: seriesColor(theme, seriesCategories, mark.series) },
+        });
+        if (yCol) {
+            const cat = yCol.values[mark.rowIndex];
+            const label = truncateToWidth(cat === null || cat === undefined ? mark.key : String(cat), Math.max(0, plot.x - 8), theme.labelFont.sizePx);
+            if (label !== "" && plot.x - 8 > 20) {
+                const w = estimateTextSize(label, theme.labelFont.sizePx).width;
+                nodes.push({
+                    kind: "text",
+                    id: `${idPrefix}gantt:label:${mark.key}`,
+                    role: "chart.axis",
+                    text: label,
+                    font: theme.labelFont,
+                    anchor: { x: plot.x - LABEL_GAP - w / 2, y: cy },
+                    color: theme.labelColor,
+                });
+            }
+        }
+    });
+    return nodes;
+}
+
+/** Tree: deterministic tidy layout, left-to-right. Depth maps to x, leaf
+ *  order maps to y, parents center over their children. */
+function buildTree(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
+    const keyField = plan.spec.keyField;
+    const parentField = plan.spec.parentField;
+    if (!keyField || !parentField) return [];
+    const keyCol = column(plan.resolvedData, keyField);
+    const parentCol = column(plan.resolvedData, parentField);
+    if (!keyCol || !parentCol) return [];
+
+    const childrenOf = new Map<string, string[]>();
+    const roots: string[] = [];
+    const keys = plan.marks.map((m) => m.key);
+    const keySet = new Set(keys);
+    for (const mark of plan.marks) {
+        const pv = parentCol.values[mark.rowIndex];
+        const parent = pv === null || pv === undefined || (typeof pv === "number" && !Number.isFinite(pv)) ? null : String(pv);
+        if (parent !== null && keySet.has(parent) && parent !== mark.key) {
+            const list = childrenOf.get(parent);
+            if (list) list.push(mark.key);
+            else childrenOf.set(parent, [mark.key]);
+        } else {
+            roots.push(mark.key);
+        }
+    }
+    let maxDepth = 1;
+    let leafCount = 0;
+    const measure = (key: string, depth: number): void => {
+        maxDepth = Math.max(maxDepth, depth);
+        const children = childrenOf.get(key) ?? [];
+        if (children.length === 0) leafCount++;
+        for (const c of children) measure(c, depth + 1);
+    };
+    for (const r of roots) measure(r, 1);
+    if (leafCount === 0) return [];
+
+    const depthW = maxDepth > 1 ? (plot.w - 20) / (maxDepth - 1) : 0;
+    const leafH = plot.h / Math.max(1, leafCount);
+    const pos = new Map<string, { x: number; y: number }>();
+    let leafIdx = 0;
+    const place = (key: string, depth: number): void => {
+        const children = childrenOf.get(key) ?? [];
+        let y: number;
+        if (children.length === 0) {
+            y = plot.y + leafH * (leafIdx + 0.5);
+            leafIdx++;
+        } else {
+            for (const c of children) place(c, depth + 1);
+            y = (pos.get(children[0])!.y + pos.get(children[children.length - 1])!.y) / 2;
+        }
+        pos.set(key, { x: plot.x + depth * depthW, y });
+    };
+    for (const r of roots) place(r, 0);
+
+    // Color groups: single root → its children are the groups.
+    const colorRoots = roots.length === 1 ? (childrenOf.get(roots[0]) ?? roots) : roots;
+    const topOf = new Map<string, string>();
+    const assignTop = (key: string, top: string): void => {
+        topOf.set(key, top);
+        for (const c of childrenOf.get(key) ?? []) assignTop(c, top);
+    };
+    for (const g of colorRoots) assignTop(g, g);
+
+    const nodes: SemanticNode[] = [];
+    for (const [parent, children] of childrenOf) {
+        const p = pos.get(parent);
+        if (!p) continue;
+        for (const c of children) {
+            const q = pos.get(c);
+            if (!q) continue;
+            nodes.push({
+                kind: "path",
+                id: `${idPrefix}tree:edge:${parent}:${c}`,
+                role: "chart.grid",
+                path: {
+                    commands: [
+                        { kind: "move", to: { x: p.x + 4, y: p.y } },
+                        { kind: "line", to: { x: q.x - 4, y: q.y } },
+                    ],
+                },
+                stroke: { color: theme.gridStroke ?? theme.axisStroke, width: 1 },
+            });
+        }
+    }
+    for (const mark of plan.marks) {
+        const p = pos.get(mark.key);
+        if (!p) continue;
+        const top = topOf.get(mark.key) ?? mark.key;
+        const color = seriesColor(theme, colorRoots, top);
+        nodes.push({
+            kind: "ellipse",
+            id: `tree:${mark.key}`,
+            role: "chart.mark",
+            source: { domain: "chart", path: ["mark", mark.key] },
+            cx: p.x,
+            cy: p.y,
+            rx: 4,
+            ry: 4,
+            fill: { color },
+            ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
+        });
+        const label = truncateToWidth(mark.key, Math.max(24, depthW - 14), theme.labelFont.sizePx);
+        if (label !== "") {
+            const w = estimateTextSize(label, theme.labelFont.sizePx).width;
+            // Deepest nodes would overflow the right edge — flip their labels
+            // to the left side of the dot.
+            const fitsRight = p.x + 8 + w <= plot.x + plot.w;
+            nodes.push({
+                kind: "text",
+                id: `${idPrefix}tree:label:${mark.key}`,
+                role: "chart.axis",
+                text: label,
+                font: theme.labelFont,
+                anchor: fitsRight ? { x: p.x + 8 + w / 2, y: p.y } : { x: p.x - 8 - w / 2, y: p.y },
+                color: theme.labelColor,
+            });
+        }
     }
     return nodes;
 }

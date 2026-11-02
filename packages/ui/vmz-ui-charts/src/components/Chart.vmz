@@ -861,7 +861,7 @@ export default class Chart {
         if (!this.spec) return out;
         if (this.spec.facetField) return out;
         const markKind = String(this.spec.mark);
-        if (markKind !== "line" && markKind !== "area" && markKind !== "bump" && markKind !== "slope") return out;
+        if (markKind !== "line" && markKind !== "area" && markKind !== "bump" && markKind !== "slope" && markKind !== "streamgraph") return out;
         for (const node of this._markNodes()) {
             // 折线/面积/雷达多边形都带 stroke；没有 stroke 的路径不可见也不出点标记。
             if (node.kind !== "path" || !node.hitRegion || !("polyline" in node.hitRegion)) continue;
@@ -1189,6 +1189,47 @@ export default class Chart {
                 const count = readCell(plan.stat, "count", rowIndex);
                 return `[${formatCell(x0)}, ${formatCell(x1)}) · count: ${formatCell(count)}`;
             }
+            if (markKind === "calendar" && plan.stat) {
+                const date = readCell(plan.stat, "date", rowIndex);
+                const cEnc = this.spec.encoding.find((e) => e.channel === "color");
+                return `${formatCell(date)} · ${cEnc?.field ?? "value"}: ${formatCell(readCell(plan.stat, "value", rowIndex))}`;
+            }
+            if (markKind === "violin") {
+                const cat = mark.key;
+                const num = (k: string) => formatCell(typeof mark.channels.get(k) === "number" ? (mark.channels.get(k) as number) : null);
+                return [
+                    cat,
+                    `min ${num("low")}`,
+                    `Q1 ${num("q1")}`,
+                    `中位 ${num("median")}`,
+                    `Q3 ${num("q3")}`,
+                    `max ${num("high")}`,
+                    `n=${num("n")}`,
+                ].join(" · ");
+            }
+            if (markKind === "sunburst") {
+                const subtree = mark.channels.get("subtree");
+                return `${mark.key} · 占比值: ${formatCell(typeof subtree === "number" ? subtree : null)}`;
+            }
+            if (markKind === "mosaic") {
+                const share = mark.channels.get("share");
+                if (xEnc) parts.push(`${formatCell(readCell(plan.resolvedData, xEnc.field, rowIndex))}`);
+                if (yEnc) parts.push(`${yEnc.field}: ${formatCell(readCell(plan.resolvedData, yEnc.field, rowIndex))}`);
+                if (typeof share === "number") parts.push(`占列 ${Math.round(share * 1000) / 10}%`);
+                return parts.join(" · ");
+            }
+            if (markKind === "gantt") {
+                const sEnc = this.spec.encoding.find((e) => e.channel === "start");
+                const eEnc = this.spec.encoding.find((e) => e.channel === "end");
+                const sv = mark.channels.get("startV");
+                const ev = mark.channels.get("endV");
+                if (yEnc) parts.push(`${formatCell(readCell(plan.resolvedData, yEnc.field, rowIndex))}`);
+                if (sEnc && eEnc) {
+                    parts.push(`${formatCell(readCell(plan.resolvedData, sEnc.field, rowIndex))} → ${formatCell(readCell(plan.resolvedData, eEnc.field, rowIndex))}`);
+                }
+                if (typeof sv === "number" && typeof ev === "number") parts.push(`时长 ${formatCell(ev - sv)}`);
+                return parts.join(" · ");
+            }
             if (markKind === "boxplot" && plan.stat) {
                 const kind = String(readCell(plan.stat, "kind", rowIndex));
                 const cat = String(readCell(plan.stat, "category", rowIndex));
@@ -1417,10 +1458,10 @@ export default class Chart {
             return;
         }
 
-        // line/area/bump/slope：plot 内任意位置给 crosshair 最近点取值（吸附数据 x）。
+        // line/area/bump/slope/streamgraph：plot 内任意位置给 crosshair 最近点取值（吸附数据 x）。
         const markKind = this.spec ? String(this.spec.mark) : "";
         const crosshairMark =
-            (markKind === "line" || markKind === "area" || markKind === "bump" || markKind === "slope") &&
+            (markKind === "line" || markKind === "area" || markKind === "bump" || markKind === "slope" || markKind === "streamgraph") &&
             !(this.spec && this.spec.facetField);
         if (crosshairMark && point) {
             this._hoverId = null;

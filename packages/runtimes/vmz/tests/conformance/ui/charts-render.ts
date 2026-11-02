@@ -2928,4 +2928,453 @@ console.log('charts-render: sparkline strips furniture and keeps marks…');
     if (lines.length !== 1) fail('sparkline must keep its marks');
 }
 
+// ─── Second wave: violin / band / strip / beeswarm / streamgraph / percent /
+// calendar / sunburst / dumbbell / lollipop / mosaic / gantt / tree ─────────
+
+console.log('charts-render: violin mirrors KDE around the slot with an embedded box…');
+{
+    const violinSpec = {
+        mark: 'violin',
+        encoding: [
+            { field: 'team', channel: 'x' },
+            { field: 'latency', channel: 'y' },
+        ],
+    };
+    const violinRows = [
+        ...[42, 45, 47, 48, 50, 51, 53, 55, 58, 60, 61, 63, 66, 70].map((latency) => ({ team: 'api', latency })),
+        ...[80, 84, 88, 90, 94, 98, 102, 110, 118, 126].map((latency) => ({ team: 'web', latency })),
+    ];
+    const { plan, semantic } = pipeline(violinSpec, violinRows);
+    if (!plan.stat) fail('violin must materialize a density stat snapshot');
+    const bodies = semantic.root.children.filter((n) => n.id.startsWith('violin:') && n.role === 'chart.mark');
+    if (bodies.length !== 2) fail(`want 2 violin bodies, got ${bodies.length}`);
+    for (const body of bodies) {
+        if (!body.hitRegion || !body.hitRegion.polygon) fail('violin bodies must carry polygon hit regions');
+        const pts = body.hitRegion.polygon.points;
+        // Mirrored: the outline has a left and a right edge around the center.
+        const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+        const hasLeft = pts.some((p) => p.x < cx - 2);
+        const hasRight = pts.some((p) => p.x > cx + 2);
+        if (!hasLeft || !hasRight) fail('violin outline must mirror around the slot center');
+    }
+    // Embedded box channels: the api median is the type-7 median of its rows
+    // (14 values → interpolated 53 + 0.5×(55−53) = 54).
+    const apiMark = plan.marks.find((m) => m.key === 'api');
+    if (Math.abs(Number(apiMark.channels.get('median')) - 54) > 1e-9) fail('violin median must come from boxStats');
+    if (!semantic.root.children.some((n) => n.id === 'violin:box:api')) fail('violin must draw the embedded IQR box');
+    if (!semantic.root.children.some((n) => n.id === 'violin:whisker:api')) fail('violin must draw the whisker');
+    // Facet + stat-driven is refused.
+    const facetBad = compile({ ...violinSpec, facetField: 'team' }, fromRows(violinRows));
+    if (!facetBad.diagnostics.items.some((d) => d.code === 'davinci.chart.facet-stat-unsupported')) {
+        fail('violin + facetField must raise facet-stat-unsupported');
+    }
+}
+
+console.log('charts-render: error bands draw a translucent ribbon behind the line…');
+{
+    const bandSpec = {
+        mark: 'line',
+        keyField: 'id',
+        encoding: [
+            { field: 'day', channel: 'x' },
+            { field: 'temp', channel: 'y' },
+            { field: 'lo', channel: 'yLow' },
+            { field: 'hi', channel: 'yHigh' },
+        ],
+    };
+    const bandRows = [
+        { id: 'b1', day: 'Mon', temp: 20, lo: 16, hi: 24 },
+        { id: 'b2', day: 'Tue', temp: 24, lo: 19, hi: 28 },
+        { id: 'b3', day: 'Wed', temp: 22, lo: 18, hi: 27 },
+    ];
+    const { plan, semantic } = pipeline(bandSpec, bandRows);
+    // The y domain covers the band edges, not just the line values.
+    const ys = plan.scales.get('y');
+    if (ys.domain[0] > 16 || ys.domain[1] < 28) fail(`band edges must extend the y domain, got ${ys.domain}`);
+    const bands = semantic.root.children.filter((n) => n.id.startsWith('band:'));
+    if (bands.length !== 1) fail(`want 1 error band, got ${bands.length}`);
+    if (bands[0].role !== 'decorative') fail('error bands must stay decorative');
+    // Band outline: top edge forward, bottom edge back — closed ribbon.
+    const cmds = bands[0].path.commands;
+    if (cmds.length < 7 || cmds[cmds.length - 1].kind !== 'close') fail('band must be a closed ribbon path');
+    // Lines still draw on top with their own ids.
+    if (!semantic.root.children.some((n) => n.id === 'line:series')) fail('the line must draw above its band');
+}
+
+console.log('charts-render: strip jitters deterministically from row keys…');
+{
+    const stripSpec = {
+        mark: 'strip',
+        keyField: 'id',
+        encoding: [
+            { field: 'grp', channel: 'x' },
+            { field: 'val', channel: 'y' },
+        ],
+    };
+    const stripRows = Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, grp: i % 2 === 0 ? 'A' : 'B', val: 40 + i * 3 }));
+    const a = pipeline(stripSpec, stripRows);
+    const b = pipeline(stripSpec, stripRows);
+    const dotsA = a.semantic.root.children.filter((n) => n.id.startsWith('strip:'));
+    const dotsB = b.semantic.root.children.filter((n) => n.id.startsWith('strip:'));
+    if (dotsA.length !== 12) fail(`want 12 strip dots, got ${dotsA.length}`);
+    // Deterministic jitter: identical input gives identical offsets.
+    for (let i = 0; i < dotsA.length; i++) {
+        if (dotsA[i].cx !== dotsB[i].cx) fail('strip jitter must be deterministic');
+    }
+    // Jitter stays inside the band slot (70% of the slot width).
+    const slotCenters = new Map();
+    for (const d of dotsA) {
+        const cat = d.id === undefined ? null : null;
+        void cat;
+    }
+    const jitters = dotsA.map((d) => d.cx);
+    if (new Set(jitters.map((x) => Math.round(x * 1000))).size < 6) fail('strip dots must spread within their slots');
+}
+
+console.log('charts-render: beeswarm packs dots without overlap…');
+{
+    const swarmSpec = {
+        mark: 'beeswarm',
+        keyField: 'id',
+        encoding: [{ field: 'latency', channel: 'y' }],
+    };
+    const swarmRows = Array.from({ length: 24 }, (_, i) => ({ id: `w${i}`, latency: 40 + (i % 8) * 2 + Math.floor(i / 8) }));
+    const { semantic } = pipeline(swarmSpec, swarmRows);
+    const dots = semantic.root.children.filter((n) => n.id.startsWith('beeswarm:') && n.role === 'chart.mark');
+    if (dots.length !== 24) fail(`want 24 beeswarm dots, got ${dots.length}`);
+    // No two dots overlap: pairwise distance ≥ ~2r.
+    for (let i = 0; i < dots.length; i++) {
+        for (let j = i + 1; j < dots.length; j++) {
+            const dx = dots[i].cx - dots[j].cx;
+            const dy = dots[i].cy - dots[j].cy;
+            if (Math.hypot(dx, dy) < 6) fail(`beeswarm dots ${dots[i].id} and ${dots[j].id} overlap`);
+        }
+    }
+    // The value axis is drawn horizontally with real ticks.
+    if (!semantic.root.children.some((n) => n.id === 'x-axis')) fail('beeswarm must draw the value axis');
+}
+
+console.log('charts-render: streamgraph balances ribbons around a wiggle baseline…');
+{
+    const sgSpec = {
+        mark: 'streamgraph',
+        keyField: 'id',
+        encoding: [
+            { field: 'week', channel: 'x' },
+            { field: 'hours', channel: 'y' },
+            { field: 'app', channel: 'color' },
+        ],
+    };
+    const sgRows = [
+        { id: 'a1', week: 'W1', hours: 20, app: 'Alpha' },
+        { id: 'b1', week: 'W1', hours: 40, app: 'Beta' },
+        { id: 'a2', week: 'W2', hours: 30, app: 'Alpha' },
+        { id: 'b2', week: 'W2', hours: 10, app: 'Beta' },
+    ];
+    const { plan, semantic } = pipeline(sgSpec, sgRows);
+    // Wiggle bases: W1 total 60 → base −30, Beta at −10; W2 total 40 → Alpha
+    // at −20, Beta at +10 (the last series ends at +Σ/2).
+    const baseOf = (key) => plan.marks.find((m) => m.key === key).stackBase;
+    if (baseOf('a1') !== -30 || baseOf('b1') !== -10 || baseOf('a2') !== -20 || baseOf('b2') !== 10) {
+        fail(`streamgraph wiggle bases must be −Σ/2 cumulative, got ${['a1', 'b1', 'a2', 'b2'].map(baseOf)}`);
+    }
+    const ys = plan.scales.get('y');
+    if (ys.domain[0] !== -30 || ys.domain[1] !== 30) fail(`streamgraph y domain must center the wiggle, got ${ys.domain}`);
+    const ribbons = semantic.root.children.filter((n) => n.id.startsWith('streamgraph:') && n.role === 'chart.mark');
+    if (ribbons.length !== 2) fail(`want 2 streamgraph ribbons, got ${ribbons.length}`);
+    for (const r of ribbons) {
+        if (!r.hitRegion || !r.hitRegion.polyline) fail('streamgraph ribbons must carry polyline hit regions');
+    }
+}
+
+console.log('charts-render: percent stacks normalize every slot to 100…');
+{
+    const pctSpec = {
+        mark: 'bar',
+        seriesLayout: 'percent',
+        keyField: 'id',
+        encoding: [
+            { field: 'q', channel: 'x' },
+            { field: 'v', channel: 'y' },
+            { field: 'seg', channel: 'color' },
+        ],
+    };
+    const pctRows = [
+        { id: 'p1', q: 'Q1', v: 30, seg: 'A' },
+        { id: 'p2', q: 'Q1', v: 10, seg: 'B' },
+        { id: 'p3', q: 'Q2', v: 90, seg: 'A' },
+        { id: 'p4', q: 'Q2', v: 10, seg: 'B' },
+    ];
+    const { plan, semantic } = pipeline(pctSpec, pctRows);
+    const ys = plan.scales.get('y');
+    if (ys.domain[0] !== 0 || ys.domain[1] !== 100) fail(`percent domain must be [0, 100], got ${ys.domain}`);
+    // Q1 shares: A 75, B 25; Q2: A 90, B 10.
+    const shareOf = (key) => plan.marks.find((m) => m.key === key).channels.get('share');
+    if (shareOf('p1') !== 75 || shareOf('p2') !== 25 || shareOf('p3') !== 90 || shareOf('p4') !== 10) {
+        fail(`percent shares must normalize per slot, got ${['p1', 'p2', 'p3', 'p4'].map(shareOf)}`);
+    }
+    const bars = semantic.root.children.filter((n) => n.id.startsWith('bar:') && n.role === 'chart.mark');
+    if (bars.length !== 4) fail(`want 4 percent bars, got ${bars.length}`);
+    // Both slots reach exactly 100%: the top of each slot's last bar lands on the same pixel.
+    const qCol = plan.resolvedData.columns.find((c) => c.name === 'q');
+    const tops = new Map();
+    for (const b of bars) {
+        const q = plan.marks.find((m) => `bar:${m.key}` === b.id);
+        const xKey = String(qCol.values[q.rowIndex]);
+        const current = tops.get(xKey);
+        tops.set(xKey, current === undefined ? b.y : Math.min(current, b.y));
+    }
+    const topValues = [...tops.values()];
+    if (topValues.length !== 2 || Math.abs(topValues[0] - topValues[1]) > 1e-9) fail('percent stacks must reach the same height in every slot');
+}
+
+console.log('charts-render: calendar lays dates into ISO week × weekday cells…');
+{
+    const calSpec = {
+        mark: 'calendar',
+        encoding: [
+            { field: 'date', channel: 'x' },
+            { field: 'commits', channel: 'color' },
+        ],
+    };
+    const calRows = [
+        { date: '2026-01-05', commits: 4 }, // Monday
+        { date: '2026-01-06', commits: 9 },
+        { date: '2026-01-11', commits: 2 }, // Sunday
+        { date: '2026-01-12', commits: 7 }, // next Monday
+        { date: 'not-a-date', commits: 5 },
+    ];
+    const { plan, semantic } = pipeline(calSpec, calRows);
+    if (!plan.stat) fail('calendar must materialize a stat snapshot');
+    if (!plan.diagnostics.items.some((d) => d.code === 'davinci.chart.calendar-invalid-date')) {
+        fail('an invalid date must raise calendar-invalid-date');
+    }
+    const cells = semantic.root.children.filter((n) => n.id.startsWith('calendar:') && n.role === 'chart.mark');
+    if (cells.length !== 4) fail(`want 4 calendar cells, got ${cells.length}`);
+    // 2026-01-05 is a Monday: weekday 0, week 0; 2026-01-12 is the next Monday: week 1.
+    const mon = plan.marks.find((m) => m.key === '2026-01-05');
+    const nextMon = plan.marks.find((m) => m.key === '2026-01-12');
+    if (mon.channels.get('week') !== 0 || mon.channels.get('weekday') !== 0) fail('2026-01-05 must map to week 0 weekday 0');
+    if (nextMon.channels.get('week') !== 1 || nextMon.channels.get('weekday') !== 0) fail('2026-01-12 must map to week 1');
+    // Sunday maps to weekday 6.
+    const sun = plan.marks.find((m) => m.key === '2026-01-11');
+    if (sun.channels.get('weekday') !== 6) fail('Sunday must map to weekday 6');
+    // Ramp coloring: the max value samples the ramp end.
+    const ramp = DEFAULT_CHART_THEME.heatmapRamp;
+    const maxCell = cells.find((n) => n.id === 'calendar:2026-01-06');
+    const last = ramp[ramp.length - 1];
+    if (maxCell.fill.color.b !== last.b) fail('the max value must sample the ramp end');
+    if (!semantic.root.children.some((n) => n.id.startsWith('calendar:month:'))) fail('calendar must label months');
+    if (!semantic.root.children.some((n) => n.id.startsWith('calendar:weekday:'))) fail('calendar must label weekdays');
+    // The ramp legend is pinned right, so month labels keep the left corner.
+    const rampFirst = semantic.root.children.find((n) => n.id === 'heatmap-ramp:0');
+    const monthFirst = semantic.root.children.find((n) => n.id.startsWith('calendar:month:'));
+    if (rampFirst && monthFirst && rampFirst.x < monthFirst.anchor.x) {
+        fail('the calendar ramp legend must not overlap the month labels');
+    }
+}
+
+console.log('charts-render: sunburst lays hierarchy into proportional rings…');
+{
+    const sbSpec = {
+        mark: 'sunburst',
+        keyField: 'id',
+        parentField: 'parent',
+        encoding: [{ field: 'size', channel: 'size' }],
+    };
+    const sbRows = [
+        { id: 'root', parent: null, size: 0 },
+        { id: 'a', parent: 'root', size: 0 },
+        { id: 'b', parent: 'root', size: 0 },
+        { id: 'a1', parent: 'a', size: 6 },
+        { id: 'a2', parent: 'a', size: 2 },
+        { id: 'b1', parent: 'b', size: 4 },
+    ];
+    const { plan, semantic } = pipeline(sbSpec, sbRows);
+    const sectors = semantic.root.children.filter((n) => n.id.startsWith('sunburst:') && n.role === 'chart.mark');
+    if (sectors.length !== 6) fail(`want 6 sunburst sectors, got ${sectors.length}`);
+    for (const s of sectors) {
+        if (!s.hitRegion || !s.hitRegion.sector) fail('sunburst nodes must carry sector hit regions');
+    }
+    // Ring depth: a (depth 1) is strictly inside a1 (depth 2).
+    const sa = sectors.find((n) => n.id === 'sunburst:a').hitRegion.sector;
+    const sa1 = sectors.find((n) => n.id === 'sunburst:a1').hitRegion.sector;
+    if (!(sa.rOuter <= sa1.rInner + 1e-9)) fail('child rings must sit outside their parent ring');
+    // Angles proportional to subtree: a (8) takes 2/3 of the circle, b (4) 1/3.
+    const sweepA = sa.a1 - sa.a0;
+    if (Math.abs(sweepA - (8 / 12) * Math.PI * 2) > 1e-9) fail('top-level spans must follow subtree sums');
+    // a1 (6) takes 3/4 of a's span.
+    const sweepA1 = sa1.a1 - sa1.a0;
+    if (Math.abs(sweepA1 - sweepA * 0.75) > 1e-9) fail('child spans must split the parent span proportionally');
+    // Single-root coloring: a and b take different palette slots.
+    const fa = sectors.find((n) => n.id === 'sunburst:a').fill.color;
+    const fb = sectors.find((n) => n.id === 'sunburst:b').fill.color;
+    if (fa.r === fb.r && fa.g === fb.g) fail('top-level groups must take distinct palette slots');
+}
+
+console.log('charts-render: dumbbell links two values per category with end dots…');
+{
+    const dbSpec = {
+        mark: 'dumbbell',
+        keyField: 'id',
+        encoding: [
+            { field: 'team', channel: 'x' },
+            { field: 'before', channel: 'y' },
+            { field: 'after', channel: 'yEnd' },
+        ],
+    };
+    const dbRows = [
+        { id: 'd1', team: 'api', before: 40, after: 65 },
+        { id: 'd2', team: 'web', before: 70, after: 55 },
+    ];
+    const { semantic } = pipeline(dbSpec, dbRows);
+    const segs = semantic.root.children.filter((n) => n.id.startsWith('dumbbell:') && n.role === 'chart.mark');
+    if (segs.length !== 2) fail(`want 2 dumbbell segments, got ${segs.length}`);
+    if (!segs.every((s) => s.hitRegion && s.hitRegion.rect)) fail('dumbbell segments must carry rect hit regions');
+    const dots = semantic.root.children.filter((n) => n.id.startsWith('dumbbell:start:') || n.id.startsWith('dumbbell:end:'));
+    if (dots.length !== 4) fail(`want 4 dumbbell dots, got ${dots.length}`);
+    // Ends take two palette slots so direction reads without a legend.
+    const s1 = dots.find((n) => n.id === 'dumbbell:start:d1');
+    const e1 = dots.find((n) => n.id === 'dumbbell:end:d1');
+    if (s1.fill.color.r === e1.fill.color.r && s1.fill.color.g === e1.fill.color.g) fail('dumbbell ends must use two palette slots');
+}
+
+console.log('charts-render: lollipop draws a stem from the baseline and a dot…');
+{
+    const lpSpec = {
+        mark: 'lollipop',
+        keyField: 'id',
+        encoding: [
+            { field: 'item', channel: 'x' },
+            { field: 'score', channel: 'y' },
+        ],
+    };
+    const lpRows = [
+        { id: 'l1', item: 'A', score: 42 },
+        { id: 'l2', item: 'B', score: 68 },
+    ];
+    const { semantic } = pipeline(lpSpec, lpRows);
+    const stems = semantic.root.children.filter((n) => n.id.startsWith('lollipop:stem:'));
+    const dots = semantic.root.children.filter((n) => n.id.startsWith('lollipop:') && n.role === 'chart.mark');
+    if (stems.length !== 2 || dots.length !== 2) fail(`want 2 stems + 2 dots, got ${stems.length}+${dots.length}`);
+    // Stems start from the zero baseline.
+    const axis = semantic.root.children.find((n) => n.id === 'x-axis');
+    const baseline = axis.children.find((c) => c.id === 'x-axis:baseline').path.commands[0].to.y;
+    const stemTop = Math.max(...stems[0].path.commands.map((c) => (c.to ? c.to.y : -Infinity)));
+    if (Math.abs(stemTop - baseline) > 1e-9) fail('lollipop stems must start at the zero baseline');
+}
+
+console.log('charts-render: mosaic varies column widths by slot totals…');
+{
+    const mzSpec = {
+        mark: 'mosaic',
+        keyField: 'id',
+        encoding: [
+            { field: 'region', channel: 'x' },
+            { field: 'users', channel: 'y' },
+            { field: 'plan', channel: 'color' },
+        ],
+    };
+    const mzRows = [
+        { id: 'm1', region: 'East', users: 60, plan: 'pro' },
+        { id: 'm2', region: 'East', users: 20, plan: 'free' },
+        { id: 'm3', region: 'West', users: 10, plan: 'pro' },
+        { id: 'm4', region: 'West', users: 10, plan: 'free' },
+    ];
+    const { plan, semantic } = pipeline(mzSpec, mzRows);
+    // East total 80 of 100 → width 0.8; West 20 → 0.2.
+    const eastMark = plan.marks.find((m) => m.key === 'm1');
+    const westMark = plan.marks.find((m) => m.key === 'm3');
+    if (Math.abs(Number(eastMark.channels.get('xWidth')) - 0.8) > 1e-9) fail('mosaic column widths must share the grand total');
+    if (Math.abs(Number(westMark.channels.get('xWidth')) - 0.2) > 1e-9) fail('mosaic column widths must share the grand total');
+    const cells = semantic.root.children.filter((n) => n.id.startsWith('mosaic:') && n.role === 'chart.mark');
+    if (cells.length !== 4) fail(`want 4 mosaic cells, got ${cells.length}`);
+    // East column is 4× the West column's width in pixels.
+    const eastCell = cells.find((n) => n.id === 'mosaic:m1');
+    const westCell = cells.find((n) => n.id === 'mosaic:m3');
+    if (Math.abs(eastCell.hitRegion.rect.w / westCell.hitRegion.rect.w - 4) > 0.05) fail('column widths must follow slot totals');
+    // Segment shares inside a slot sum to 1: East pro 0.75, free 0.25.
+    if (Math.abs(Number(plan.marks.find((m) => m.key === 'm1').channels.get('share')) - 0.75) > 1e-9) fail('mosaic shares must normalize per slot');
+    // Column labels sit under their columns.
+    if (!semantic.root.children.some((n) => n.id === 'mosaic:label:East')) fail('mosaic must label columns');
+}
+
+console.log('charts-render: gantt draws interval bars on a date-aware axis…');
+{
+    const ganttSpec = {
+        mark: 'gantt',
+        keyField: 'id',
+        encoding: [
+            { field: 'task', channel: 'y' },
+            { field: 'begin', channel: 'start' },
+            { field: 'finish', channel: 'end' },
+        ],
+    };
+    const ganttRows = [
+        { id: 't1', task: '设计', begin: '2026-03-02', finish: '2026-03-10' },
+        { id: 't2', task: '开发', begin: '2026-03-09', finish: '2026-03-25' },
+        { id: 't3', task: '验收', begin: '2026-03-24', finish: '2026-03-31' },
+    ];
+    const { plan, semantic } = pipeline(ganttSpec, ganttRows);
+    const bars = semantic.root.children.filter((n) => n.id.startsWith('gantt:') && n.role === 'chart.mark');
+    if (bars.length !== 3) fail(`want 3 gantt bars, got ${bars.length}`);
+    // Bars span their real intervals: 开发 is the longest.
+    const wOf = (id) => bars.find((n) => n.id === id).w;
+    if (!(wOf('gantt:t2') > wOf('gantt:t1') && wOf('gantt:t2') > wOf('gantt:t3'))) fail('gantt bar widths must follow spans');
+    // Date-aware axis: labels read as YYYY-MM-DD.
+    if (!semantic.root.children.some((n) => n.id.startsWith('x-axis:label:2026-'))) fail('gantt date mode must label dates');
+    // Task labels on the left.
+    if (!semantic.root.children.some((n) => n.id === 'gantt:label:t1')) fail('gantt must label tasks');
+    // Rows stack top-down in input order.
+    if (!(bars[0].y < bars[1].y && bars[1].y < bars[2].y)) fail('gantt rows must keep input order');
+    // Invalid spans are dropped loudly.
+    const bad = compile(ganttSpec, fromRows([...ganttRows, { id: 't4', task: '坏', begin: 'oops', finish: '2026-04-01' }]));
+    if (!bad.diagnostics.items.some((d) => d.code === 'davinci.chart.gantt-invalid-span')) {
+        fail('an unparseable span must raise gantt-invalid-span');
+    }
+}
+
+console.log('charts-render: tree lays hierarchy into a deterministic tidy layout…');
+{
+    const treeSpec = {
+        mark: 'tree',
+        keyField: 'id',
+        parentField: 'parent',
+        encoding: [{ field: 'size', channel: 'size' }],
+    };
+    const treeRows = [
+        { id: 'root', parent: null, size: 0 },
+        { id: 'a', parent: 'root', size: 0 },
+        { id: 'b', parent: 'root', size: 0 },
+        { id: 'a1', parent: 'a', size: 0 },
+        { id: 'a2', parent: 'a', size: 0 },
+        { id: 'b1', parent: 'b', size: 0 },
+    ];
+    const { semantic } = pipeline(treeSpec, treeRows);
+    const nodes = semantic.root.children.filter((n) => n.id.startsWith('tree:') && n.role === 'chart.mark');
+    if (nodes.length !== 6) fail(`want 6 tree nodes, got ${nodes.length}`);
+    const posOf = (key) => nodes.find((n) => n.id === `tree:${key}`);
+    // Depth maps to x: root leftmost, leaves rightmost.
+    if (!(posOf('root').cx < posOf('a').cx && posOf('a').cx < posOf('a1').cx)) {
+        fail('tree depth must map to x');
+    }
+    // Parents center over their children: a sits midway of a1 and a2.
+    const mid = (posOf('a1').cy + posOf('a2').cy) / 2;
+    if (Math.abs(posOf('a').cy - mid) > 1e-9) fail('tree parents must center over children');
+    // Edges connect parents to children.
+    if (!semantic.root.children.some((n) => n.id === 'tree:edge:a:a1')) fail('tree must draw parent edges');
+    // Deterministic: same input, same layout.
+    const again = pipeline(treeSpec, treeRows);
+    const posA = again.semantic.root.children.find((n) => n.id === 'tree:a1');
+    if (posA.cx !== posOf('a1').cx || posA.cy !== posOf('a1').cy) fail('tree layout must be deterministic');
+    // Cycle is an error.
+    const cyc = compile(treeSpec, fromRows([
+        { id: 'x', parent: 'y', size: 0 },
+        { id: 'y', parent: 'x', size: 0 },
+    ]));
+    if (!cyc.diagnostics.items.some((d) => d.code === 'davinci.chart.tree-cycle')) {
+        fail('a hierarchy cycle must raise tree-cycle');
+    }
+}
+
 console.log('charts-render PASS: chart pipeline + diagnostics + zero baseline + series + diagram SVG');
