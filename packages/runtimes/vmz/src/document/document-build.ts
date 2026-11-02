@@ -149,6 +149,7 @@ export async function buildDocuments(opts: BuildDocumentsOpts): Promise<BuildDoc
             headings: info.headings,
             title: info.title,
             route: info.route,
+            routeBase: enriched.routeBase,
             locale: page.identity.locale,
             routing,
             searchShellHtml: shells.searchHtml,
@@ -245,6 +246,8 @@ interface DocumentSlotHtmlOpts {
     headings: DocumentHeading[];
     title: string;
     route: string;
+    /** Document mount route base (e.g. `/d`), from the enriched manifest. */
+    routeBase: string;
     locale: string;
     routing: LocalesRouting;
     searchShellHtml?: string;
@@ -270,6 +273,7 @@ function buildDocumentSlotHtml({
     headings,
     title,
     route,
+    routeBase,
     locale,
     routing,
     searchShellHtml = '',
@@ -289,7 +293,7 @@ function buildDocumentSlotHtml({
                   .map((h) => `      <li class="h${h.level}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`)
                   .join('\n')}\n    </ol>\n  </nav>\n`
             : '';
-    const docsRoot = pageRoute(routeBaseOf(route), locale, 'index', routing);
+    const docsRoot = pageRoute(routeBase, locale, 'index', routing);
     const breadcrumb = `<nav class="doc-breadcrumb" aria-label="Breadcrumb"><a href="/">${esc(copy.home)}</a><span aria-hidden="true"> / </span><a href="${esc(docsRoot)}">${esc(copy.docs)}</a><span aria-hidden="true"> / </span><span aria-current="page">${esc(title)}</span></nav>`;
     const docsNav = `  <p class="doc-sidebar__label">${esc(copy.docs)}</p>
   <nav aria-label="Documents" class="doc-subnav">
@@ -379,10 +383,4 @@ function documentRenderHooks(
         resolveHref: (href) => routeHrefForDocLink(href, page.identity.pageKey, page.identity.locale, routeBase, pageKeySet, routing),
         ...(highlighter ? { highlight: (code: string, lang: string) => highlighter.highlightFenceInline(code, lang) } : {}),
     };
-}
-
-/** Route base recovered from a page route (`/d/zh-hans/guide/x` → `/d`). */
-function routeBaseOf(route: string): string {
-    const parts = String(route || '').replace(/^\//, '').split('/').filter(Boolean);
-    return parts.length ? `/${parts[0]}` : '/';
 }
