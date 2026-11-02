@@ -5,7 +5,7 @@
     "type": "module",
     "description": "VMZ official site — homepage + integrated documents at /d/",
     "scripts": {
-        "check": "vmz check .",
+        "check": "vmz check . && node tests/icon-duplication.gate.mjs",
         "prebuild": "pnpm --filter @doki-land/davinci run build",
         "build": "vmz build .",
         "build:cloudflare": "npx --yes @vmz/vmz@0.3.5 build .",
