@@ -1632,6 +1632,30 @@ export default class Chart {
         const markKind = String(this.spec.mark);
         const xEnc = this.spec.encoding.find((e) => e.channel === "x");
         const yEnc = this.spec.encoding.find((e) => e.channel === "y");
+        // force 节点 id：名称 + 度数（布局在 compile 物化，度在 channels）。
+        if (id.startsWith("force:")) {
+            const name = id.slice("force:".length);
+            const mark = plan.marks.find((m) => m.key === name);
+            const deg = mark ? mark.channels.get("degree") : undefined;
+            return typeof deg === "number" ? `${name} · 度 ${deg}` : name;
+        }
+        // geo 区域 id：按名匹配的行以行键命名，iso 匹配与未匹配特性以特性名
+        // 命名。先按行键解，再按特性名解；标签恒取 channels.feature 的特性名。
+        if (id.startsWith("geo:")) {
+            const suffix = id.slice("geo:".length);
+            const mark = plan.marks.find((m) => m.key === suffix) ?? plan.marks.find((m) => m.channels.get("feature") === suffix);
+            if (mark) {
+                const feature = mark.channels.get("feature");
+                const label = typeof feature === "string" ? feature : suffix;
+                const cEnc = this.spec.encoding.find((e) => e.channel === "color");
+                if (cEnc) {
+                    const v = readCell(plan.resolvedData, cEnc.field, mark.rowIndex);
+                    if (v !== null && v !== undefined) return `${label} · ${cEnc.field}: ${formatCell(v)}`;
+                }
+                return label;
+            }
+            return suffix;
+        }
         // sankey / chord 的派生节点 id：名称 + 总流量（从原始行现算）。
         if (id.startsWith("chord-group:")) {
             const name = id.slice("chord-group:".length);
@@ -2052,7 +2076,36 @@ export default class Chart {
     }
 
     public _tooltipStyle(): string {
-        return `left:${this._tooltip.x}px;top:${this._tooltip.y}px`;
+        const raw = `left:${this._tooltip.x}px;top:${this._tooltip.y}px`;
+        const root = (this as any).__vmzDomRoot as HTMLElement | undefined;
+        if (!root || typeof root.getBoundingClientRect !== "function") return raw;
+        const rect = root.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return raw;
+        // 视口夹取：tooltip 盒子含 CSS 偏移 translate(10px, 10px)，必须留在宿主内。
+        // 已挂载时测真实尺寸；首帧无元素可测，用按字符宽的高估兜底（宁紧勿溢）。
+        const el = root.querySelector(".vmz-ui-charts__tooltip") as HTMLElement | null;
+        let w = 0;
+        let h = 0;
+        if (el && el.offsetWidth > 0 && el.offsetHeight > 0) {
+            w = el.offsetWidth;
+            h = el.offsetHeight;
+        } else {
+            let est = 0;
+            const text = this._tooltip.text;
+            for (let i = 0; i < text.length; i++) {
+                const wide = text.charCodeAt(i) > 255;
+                est = est + (wide ? 13 : 7);
+            }
+            w = Math.min(est + 18, Math.max(rect.width - 8, 0));
+            h = 30;
+        }
+        const minX = -6;
+        const minY = -6;
+        const maxX = Math.max(minX, rect.width - 14 - w);
+        const maxY = Math.max(minY, rect.height - 14 - h);
+        const x = Math.min(Math.max(this._tooltip.x, minX), maxX);
+        const y = Math.min(Math.max(this._tooltip.y, minY), maxY);
+        return `left:${x}px;top:${y}px`;
     }
 
     // ---- Click → select dispatch + emit ----

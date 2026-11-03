@@ -210,5 +210,38 @@ async function shotCard(page, selector, name) {
     await page.close();
 }
 
+// 11. six ruled types, desktop + mobile.
+{
+    const page = await openPage();
+    for (const id of ['force-deps', 'parallel-cars', 'hexbin-density', 'contour-density', 'chord-regions', 'geo-world']) {
+        await page.evaluate((cid) => document.getElementById(cid).scrollIntoView({ block: 'center' }), id);
+        await new Promise((r) => setTimeout(r, 300));
+        await page.screenshot({ path: `${OUT}/six-${id}-desktop.png` });
+    }
+    console.log('shot six types desktop');
+    await page.close();
+}
+{
+    const page = await openPage({ width: 390, height: 844, touch: true });
+    for (const id of ['force-deps', 'parallel-cars', 'hexbin-density', 'contour-density', 'chord-regions', 'geo-world']) {
+        await page.evaluate((cid) => document.getElementById(cid).scrollIntoView({ block: 'center' }), id);
+        await new Promise((r) => setTimeout(r, 300));
+        await page.screenshot({ path: `${OUT}/six-${id}-mobile.png` });
+    }
+    console.log('shot six types mobile');
+    // clamp evidence: tap the rightmost bar, tooltip must sit inside the host.
+    const pt = await page.evaluate(() => {
+        const bars = [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')];
+        const last = bars[bars.length - 1];
+        last.scrollIntoView({ block: 'center' });
+        const b = last.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    });
+    await page.touchscreen.tap(pt.x, pt.y);
+    await new Promise((r) => setTimeout(r, 500));
+    await shotCard(page, '#bar-quarter', '12-tooltip-clamp-mobile');
+    await page.close();
+}
+
 await browser.close();
 console.log(`done → ${OUT}`);

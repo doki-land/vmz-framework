@@ -6,7 +6,13 @@
  * fetches, no mocked endpoints.
  */
 import type { ChartSpec } from "@doki-land/davinci/chart";
+import { registerGeoMap } from "@doki-land/davinci/chart";
 import type { DiagramSpec } from "@doki-land/davinci/diagram";
+import type { GeoFeatureCollection } from "@doki-land/davinci-geo-assets";
+import ne110mLite from "@doki-land/davinci-geo-assets/ne-110m-lite.json";
+
+// geo 底图在宿主侧注册（引擎零地理数据）；模块在构建期与客户端都会求值。
+registerGeoMap("ne-110m-lite", ne110mLite as GeoFeatureCollection);
 
 export interface GalleryExample {
     readonly id: string;
@@ -322,6 +328,162 @@ const CJK_LABELS: GalleryExample = {
         { 类别: "第二季度销售额", 数值: 150 },
         { 类别: "第三季度销售额", 数值: 98 },
         { 类别: "第四季度销售额", 数值: 187 },
+    ],
+};
+
+const FORCE_DEPS: GalleryExample = {
+    id: "force-deps",
+    title: "力导向 · 服务依赖",
+    note: "确定性种子布局,固定迭代轮数,同输入同坐标。",
+    spec: {
+        mark: "force",
+        encoding: [
+            { field: "src", channel: "source" },
+            { field: "dst", channel: "target" },
+        ],
+    },
+    rows: [
+        { src: "网关", dst: "认证" },
+        { src: "网关", dst: "订单" },
+        { src: "网关", dst: "商品" },
+        { src: "订单", dst: "支付" },
+        { src: "订单", dst: "库存" },
+        { src: "商品", dst: "库存" },
+        { src: "商品", dst: "评价" },
+        { src: "支付", dst: "账务" },
+        { src: "支付", dst: "风控" },
+        { src: "风控", dst: "认证" },
+        { src: "评价", dst: "搜索" },
+        { src: "商品", dst: "搜索" },
+        { src: "账务", dst: "报表" },
+        { src: "库存", dst: "报表" },
+    ],
+};
+
+const PARALLEL_CARS: GalleryExample = {
+    id: "parallel-cars",
+    title: "平行坐标 · 车型指标",
+    note: "k 个独立数值轴,每行一条折线,键盘逐顶点可达。",
+    spec: {
+        mark: "parallel",
+        dimensions: ["power", "weight", "price", "range"],
+        encoding: [{ field: "brand", channel: "color" }],
+    },
+    rows: [
+        { brand: "Alpha", power: 150, weight: 1420, price: 24, range: 520 },
+        { brand: "Alpha", power: 180, weight: 1580, price: 31, range: 480 },
+        { brand: "Beta", power: 110, weight: 1180, price: 16, range: 610 },
+        { brand: "Beta", power: 130, weight: 1260, price: 19, range: 590 },
+        { brand: "Core", power: 220, weight: 1710, price: 42, range: 450 },
+        { brand: "Core", power: 260, weight: 1890, price: 55, range: 410 },
+        { brand: "Delta", power: 95, weight: 1050, price: 13, range: 660 },
+    ],
+};
+
+const HEXBIN_DENSITY: GalleryExample = {
+    id: "hexbin-density",
+    title: "蜂巢 · 价量密度",
+    note: "六边形聚合网格,色阶是真实计数。",
+    spec: {
+        mark: "hexbin",
+        encoding: [
+            { field: "price", channel: "x" },
+            { field: "volume", channel: "y" },
+        ],
+    },
+    rows: (() => {
+        let seed = 21;
+        const rand = () => {
+            seed = (seed * 1103515245 + 12345) % 2147483648;
+            return seed / 2147483648;
+        };
+        return Array.from({ length: 260 }, () => ({
+            price: Math.round(30 + rand() * 120 + (rand() > 0.8 ? 60 : 0)),
+            volume: Math.round(50 + rand() * 300),
+        }));
+    })(),
+};
+
+const CONTOUR_DENSITY: GalleryExample = {
+    id: "contour-density",
+    title: "等值线 · 价量密度",
+    note: "2D KDE + marching squares,等级取自动 nice levels。",
+    spec: {
+        mark: "contour",
+        encoding: [
+            { field: "price", channel: "x" },
+            { field: "volume", channel: "y" },
+        ],
+    },
+    rows: (() => {
+        let seed = 33;
+        const rand = () => {
+            seed = (seed * 1103515245 + 12345) % 2147483648;
+            return seed / 2147483648;
+        };
+        return Array.from({ length: 320 }, () => {
+            const u = rand();
+            const v = rand();
+            return {
+                price: 90 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.cos(2 * Math.PI * v) * 30,
+                volume: 200 + Math.sqrt(-2 * Math.log(Math.max(u, 1e-9))) * Math.sin(2 * Math.PI * v) * 90,
+            };
+        });
+    })(),
+};
+
+const CHORD_REGIONS: GalleryExample = {
+    id: "chord-regions",
+    title: "和弦 · 区域互访流量",
+    note: "组弧按流入加流出,二次曲线流带,自连诊断丢弃。",
+    spec: {
+        mark: "chord",
+        encoding: [
+            { field: "src", channel: "source" },
+            { field: "dst", channel: "target" },
+            { field: "gb", channel: "value" },
+        ],
+    },
+    rows: [
+        { src: "华东", dst: "华南", gb: 120 },
+        { src: "华南", dst: "华东", gb: 90 },
+        { src: "华东", dst: "华北", gb: 80 },
+        { src: "华北", dst: "华东", gb: 60 },
+        { src: "华南", dst: "西部", gb: 45 },
+        { src: "西部", dst: "华南", gb: 30 },
+        { src: "华北", dst: "西部", gb: 25 },
+        { src: "西部", dst: "华东", gb: 20 },
+    ],
+};
+
+const GEO_WORLD: GalleryExample = {
+    id: "geo-world",
+    title: "世界 choropleth · GDP 总量",
+    note: "Natural Earth 公共域底图(独立资源包),name/iso_a3 双匹配。",
+    spec: {
+        mark: "geo",
+        geo: { map: "ne-110m-lite", projection: "mercator" },
+        encoding: [
+            { field: "region", channel: "region" },
+            { field: "gdp", channel: "color" },
+        ],
+    },
+    rows: [
+        { region: "United States of America", gdp: 27360 },
+        { region: "China", gdp: 17795 },
+        { region: "Germany", gdp: 4526 },
+        { region: "Japan", gdp: 3970 },
+        { region: "India", gdp: 3890 },
+        { region: "United Kingdom", gdp: 3495 },
+        { region: "France", gdp: 3130 },
+        { region: "Italy", gdp: 2300 },
+        { region: "Brazil", gdp: 2180 },
+        { region: "Canada", gdp: 2170 },
+        { region: "RUS", gdp: 2020 },
+        { region: "South Korea", gdp: 1760 },
+        { region: "Australia", gdp: 1720 },
+        { region: "Mexico", gdp: 1790 },
+        { region: "Spain", gdp: 1620 },
     ],
 };
 
@@ -787,6 +949,12 @@ export const GALLERY_EXAMPLES: ReadonlyArray<GalleryExample> = [
     BUBBLE_PRODUCTS,
     ERROR_BAR_GROUPS,
     SPARKLINE_TRAFFIC,
+    FORCE_DEPS,
+    PARALLEL_CARS,
+    HEXBIN_DENSITY,
+    CONTOUR_DENSITY,
+    CHORD_REGIONS,
+    GEO_WORLD,
     BAD_SPEC,
 ];
 

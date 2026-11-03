@@ -11,12 +11,13 @@
  */
 import type { ChartSpec } from '@doki-land/davinci/chart';
 import { registerGeoMap } from '@doki-land/davinci/chart';
-import { NE_110M_LITE } from '@doki-land/davinci-geo-assets';
+import type { GeoFeatureCollection } from '@doki-land/davinci-geo-assets';
+import ne110mLite from '@doki-land/davinci-geo-assets/ne-110m-lite.json';
 import type { DiagramSpec } from '@doki-land/davinci/diagram';
 
 // 底图注册：资产来自独立资源包 `@doki-land/davinci-geo-assets`(Natural
 // Earth 公共域,坐标降精度),引擎主包不携带任何地理数据。
-registerGeoMap('ne-110m-lite', NE_110M_LITE);
+registerGeoMap('ne-110m-lite', ne110mLite as GeoFeatureCollection);
 
 /** 一个图表示例：渲染输入与同源文本。 */
 export interface ChartGalleryExample {

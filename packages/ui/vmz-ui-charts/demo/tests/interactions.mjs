@@ -286,6 +286,157 @@ const tooltipText = (page) =>
     await page.close();
 }
 
+// ─── 9. tooltip viewport clamp on 390px (right-edge points must not overflow) ─
+{
+    const page = await openPage({ width: 390, height: 844, touch: true });
+    // Hover the rightmost bar of the first chart; tooltip must stay inside host.
+    const pt = await page.evaluate(() => {
+        const bars = [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')];
+        const last = bars[bars.length - 1];
+        last.scrollIntoView({ block: 'center' });
+        const b = last.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    });
+    await page.touchscreen.tap(pt.x, pt.y);
+    await new Promise((r) => setTimeout(r, 500));
+    const clamp = await page.evaluate(() => {
+        const host = document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]');
+        const tip = host.querySelector('.vmz-ui-charts__tooltip');
+        if (!tip) return { visible: false };
+        const h = host.getBoundingClientRect();
+        const t = tip.getBoundingClientRect();
+        return {
+            visible: true,
+            left: t.left - h.left,
+            right: h.right - t.right,
+            top: t.top - h.top,
+            bottom: h.bottom - t.bottom,
+        };
+    });
+    check(
+        'tooltip.clamp stays inside host on 390px',
+        clamp.visible && clamp.left >= -1 && clamp.top >= -1 && clamp.right >= -1 && clamp.bottom >= -1,
+        JSON.stringify(clamp),
+    );
+    await page.close();
+}
+
+// ─── 10. six ruled types: hover tooltip + keyboard + hidden data table ───
+{
+    const page = await openPage();
+    const typeCards = ['force-deps', 'parallel-cars', 'hexbin-density', 'contour-density', 'chord-regions', 'geo-world'];
+    for (const cardId of typeCards) {
+        // Hover the first nav target at its true geometry anchor (sector
+        // mid-angle, polygon centroid, rect center — the component's own
+        // anchor contract), converted to client coordinates.
+        const pt = await page.evaluate((cid) => {
+            const card = document.getElementById(cid);
+            if (!card) return { err: 'no card' };
+            const host = card.querySelector('[data-vmz-ui-charts="chart"]');
+            // Collect every chart instance on the page, then match by dom root —
+            // layout instance lists are page-global, never trust first-hit order.
+            const all = new Set();
+            for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+                let cur = h;
+                while (cur && cur !== document.body) {
+                    if (cur.__vmzInst) all.add(cur.__vmzInst);
+                    if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                    cur = cur.parentElement;
+                }
+            }
+            const inst = [...all].find((m) => m && m.__vmzDomRoot === host && typeof m._navTargets === 'function');
+            if (!inst) return { err: 'no instance' };
+            const targets = inst._navTargets();
+            if (!targets || targets.length === 0) return { err: 'no nav targets' };
+            const t0 = targets[0];
+            const anchor = t0.point ?? inst._nodeAnchor(t0.id);
+            if (!anchor) return { err: 'no anchor' };
+            host.scrollIntoView({ block: 'center' });
+            const rect = host.getBoundingClientRect();
+            const sx = rect.width / inst._effWidth();
+            const sy = rect.height / inst._effHeight();
+            return { x: rect.left + anchor.x * sx, y: rect.top + anchor.y * sy };
+        }, cardId);
+        if (pt.err) {
+            check(`six.${cardId} hover tooltip`, false, pt.err);
+        } else {
+            await page.mouse.move(pt.x, pt.y, { steps: 4 });
+            await new Promise((r) => setTimeout(r, 400));
+            // Tooltip must belong to THIS card — a stale one from another chart
+            // would be a false positive.
+            const tip = await page.evaluate((cid2) => {
+                const t = document.getElementById(cid2).querySelector('.vmz-ui-charts__tooltip');
+                return t && t.textContent.trim() !== '' ? t.textContent.trim() : null;
+            }, cardId);
+            check(`six.${cardId} hover tooltip`, tip !== null, tip ?? 'null');
+        }
+        await page.mouse.move(8, 8, { steps: 2 });
+        await new Promise((r) => setTimeout(r, 250));
+
+        // Keyboard: focus host, ArrowRight focuses a target, aria-live speaks.
+        const kbd = await page.evaluate((cid) => {
+            const card = document.getElementById(cid);
+            const host = card.querySelector('[data-vmz-ui-charts="chart"]');
+            host.focus();
+            return null;
+        }, cardId);
+        void kbd;
+        await page.keyboard.press('ArrowRight');
+        await new Promise((r) => setTimeout(r, 300));
+        const live = await page.evaluate((cid) => {
+            const card = document.getElementById(cid);
+            const liveEl = [...card.querySelectorAll('[aria-live="polite"]')].find((n) => n.classList.contains('vmz-ui-charts__sr'));
+            return liveEl ? liveEl.textContent.trim() : '';
+        }, cardId);
+        check(`six.${cardId} keyboard aria-live`, live !== '', live.slice(0, 60));
+
+        // Hidden data table stays in sync (rows rendered for screen readers).
+        const rows = await page.evaluate((cid) => {
+            const card = document.getElementById(cid);
+            const table = card.querySelector('.vmz-ui-charts__sr table');
+            return table ? table.querySelectorAll('tr').length : 0;
+        }, cardId);
+        check(`six.${cardId} hidden data table`, rows > 1, `rows=${rows}`);
+    }
+    // geo value path: a region with a matched data row reports field and value.
+    const gpt = await page.evaluate(() => {
+        const card = document.getElementById('geo-world');
+        const host = card.querySelector('[data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        const inst = [...all].find((m) => m && m.__vmzDomRoot === host);
+        if (!inst || !inst._plan) return null;
+        // Matched regions are keyed by row key, unmatched by feature name —
+        // resolve China's scene id through the compiled channel, never guess.
+        const mark = inst._plan.marks.find((m) => m.channels.get('feature') === 'China' || m.key === 'China');
+        if (!mark) return null;
+        const anchor = inst._nodeAnchor(`geo:${mark.key}`);
+        if (!anchor) return null;
+        host.scrollIntoView({ block: 'center' });
+        const rect = host.getBoundingClientRect();
+        return { x: rect.left + (anchor.x * rect.width) / inst._effWidth(), y: rect.top + (anchor.y * rect.height) / inst._effHeight() };
+    });
+    if (gpt) {
+        await page.mouse.move(gpt.x, gpt.y, { steps: 4 });
+        await new Promise((r) => setTimeout(r, 400));
+        const gtip = await page.evaluate(() => {
+            const t = document.getElementById('geo-world').querySelector('.vmz-ui-charts__tooltip');
+            return t ? t.textContent.trim() : null;
+        });
+        check('six.geo-world tooltip carries matched value', gtip !== null && gtip.includes('China') && gtip.includes('17795'), gtip ?? 'null');
+    } else {
+        check('six.geo-world tooltip carries matched value', false, 'no anchor for geo:China');
+    }
+    await page.close();
+}
+
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);
