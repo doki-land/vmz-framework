@@ -10,11 +10,14 @@
  * `execution: 'full'` + `exports: { kind: 'all' }` (script-tag load,
  * whole-module execution).
  *
- * SSR/Node is a separate graph: every deployment unit's `clientEntry` is a
- * Node entry (logical = `chunkId`), packed under `_vmz/pack-node/` and indexed
- * by `_vmz/pack-node-manifest.json`. Node consumers never fall back to the
- * unpacked root `${chunkId}.client.js`; browser bootstrap modules are not Node
- * entries because they bind `dom.browser` / `document`.
+ * SSR/Node is a separate graph: Node entries are the deployment units
+ * reachable from the page / application roots through `dependsOn` (logical =
+ * `chunkId`), packed under `_vmz/pack-node/` and indexed by
+ * `_vmz/pack-node-manifest.json`. Components have no Node consumer unless a
+ * page or layout reaches them, so orphan units are not packed. Node consumers
+ * never fall back to the unpacked root `${chunkId}.client.js`; browser
+ * bootstrap modules are not Node entries because they bind `dom.browser` /
+ * `document`.
  *
  * No vendor materialization, no specifier lowering, and no second hashing
  * pass happen here: `packWrite` emits the final browser JS set under
@@ -231,17 +234,54 @@ interface PackSsrFromDeploymentIrOpts {
 }
 
 /**
+ * Node graph roots and their `dependsOn` closure — the only chunk ids a Node
+ * consumer can request. Pages and the application shell are roots; layouts and
+ * components enter through `dependsOn` (pages merge their `layoutChain` into
+ * it). Units outside the closure have no Node consumer: the SSR registry imports
+ * a component entry only when some root reaches it, and `loadCtor` only asks for
+ * page / layout chunk ids.
+ */
+function nodeReachableChunkIds(ir: DeploymentIr): Set<string> {
+    const dependsOn = new Map<string, string[]>();
+    const roots: string[] = [];
+    for (const unit of ir.units || []) {
+        const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
+        if (!chunkId) continue;
+        const deps = dependsOn.get(chunkId) ?? [];
+        for (const dep of unit.dependsOn || []) {
+            const id = String(dep).replace(/\\/g, '/');
+            if (id) deps.push(id);
+        }
+        dependsOn.set(chunkId, deps);
+        if (unit.kind === 'page' || unit.kind === 'application') roots.push(chunkId);
+    }
+    const reachable = new Set<string>();
+    const queue = roots.slice();
+    while (queue.length) {
+        const id = queue.pop() as string;
+        if (reachable.has(id)) continue;
+        reachable.add(id);
+        for (const dep of dependsOn.get(id) ?? []) if (!reachable.has(dep)) queue.push(dep);
+    }
+    return reachable;
+}
+
+/**
  * Pack the SSR/Node graph via the Rust `vmz-pack` binding and write
- * `_vmz/pack-node-manifest.json` (v0). Entries are the deployment units'
- * compiled client modules (`clientEntry`, empty → mirrors `vmz-artifacts`
- * `component_entries`: `${chunkId}.client.js`). Node consumers only read
- * `default`, but the import itself is evaluated, hence `side-effects` +
- * named default rather than `all` / `full` / `unconsumed`.
+ * `_vmz/pack-node-manifest.json` (v0). Entries are the node-reachable
+ * deployment units' compiled client modules (`clientEntry`, empty → mirrors
+ * `vmz-artifacts` `component_entries`: `${chunkId}.client.js`). Node consumers
+ * only read `default`, but the import itself is evaluated, hence
+ * `side-effects` + named default rather than `all` / `full` / `unconsumed`.
  */
 export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploymentIrOpts = {}) {
     const absOut = path.resolve(outDir);
     const root = opts.projectRoot ? path.resolve(opts.projectRoot) : path.dirname(absOut);
     const ir = loadDeploymentIr(absOut);
+    if (!(ir.units || []).length) {
+        throw new Error(`packSsrFromDeploymentIr: deployment IR has no units in ${absOut}`);
+    }
+    const nodeReachable = nodeReachableChunkIds(ir);
 
     const entries: Record<string, string> = {};
     const uses: PackRequestUse[] = [];
@@ -253,6 +293,7 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
     for (const unit of ir.units || []) {
         const chunkId = String(unit.chunkId || '').replace(/\\/g, '/');
         if (!chunkId) throw new Error(`packSsrFromDeploymentIr: deployment unit has an empty chunkId in ${absOut}`);
+        if (!nodeReachable.has(chunkId)) continue;
         // `vmz-artifacts` derives the component entry as `${chunkId}.client.js`
         // when `clientEntry` is empty. Decide it here so the pack request stays
         // explicit, then require the file — a missing entry is never skipped.
@@ -275,7 +316,7 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
         uses.push({ logical: chunkId, execution: 'side-effects', exports: { kind: 'named', names: ['default'] } });
     }
     if (!Object.keys(entries).length) {
-        throw new Error(`packSsrFromDeploymentIr: deployment IR has no units in ${absOut}`);
+        throw new Error(`packSsrFromDeploymentIr: deployment IR has no node-reachable units in ${absOut}`);
     }
     const origins = deploymentUnitOrigins(absOut, ir);
     const requestJson = buildPackRequest({ entries, target: 'node', root, uses, publicBase: PACK_PUBLIC_BASE, origins });

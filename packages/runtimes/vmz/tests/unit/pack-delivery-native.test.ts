@@ -233,9 +233,14 @@ function makeDistWithUnits(name: string, units: unknown[], files: Record<string,
 }
 
 const nodeUnits = [
-    { chunkId: 'Application', kind: 'application', clientEntry: 'Application.client.js' },
-    { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/Greeting.client.js' },
-    { chunkId: 'pages/index', kind: 'page', clientEntry: 'pages/index.client.js' },
+    { chunkId: 'Application', kind: 'application', clientEntry: 'Application.client.js', dependsOn: [] },
+    {
+        chunkId: 'components/Greeting',
+        kind: 'component',
+        clientEntry: 'components/Greeting.client.js',
+        dependsOn: [],
+    },
+    { chunkId: 'pages/index', kind: 'page', clientEntry: 'pages/index.client.js', dependsOn: ['components/Greeting'] },
 ];
 
 const nodeClientFiles = {
@@ -376,10 +381,39 @@ describe('packSsrFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.equal(request.uses.length, 3);
     });
 
+    it('packs only node-reachable units and leaves orphan components out', () => {
+        // `components/Orphan` is never reached by a page or the application
+        // shell: no Node consumer imports it, so it must not become an entry.
+        const orphan = {
+            chunkId: 'components/Orphan',
+            kind: 'component',
+            clientEntry: 'components/Orphan.client.js',
+            dependsOn: [],
+        };
+        const units = [...nodeUnits, orphan];
+        const distDir = makeDistWithUnits('node-orphan', units, {
+            ...nodeClientFiles,
+            'components/Orphan.client.js': 'export default class Orphan {}',
+        });
+        const binding = fakeBinding(nodePlanResponse);
+        const { manifest } = packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
+
+        const request = JSON.parse(binding.calls[0].requestJson);
+        const logicals = request.entries.map((e: { logical: string }) => e.logical).sort();
+        assert.deepEqual(logicals, ['Application', 'components/Greeting', 'pages/index']);
+        assert.ok(!logicals.includes('components/Orphan'));
+
+        const entryRows = (manifest.entries as Array<{ logical: string; file: string }>).map((e) => e.logical).sort();
+        assert.deepEqual(entryRows, ['Application', 'components/Greeting', 'pages/index']);
+        const chunkIds = (manifest.chunks as Array<{ chunkId: string }>).map((c) => c.chunkId).sort();
+        assert.ok(!chunkIds.includes('components/Orphan'), `orphan chunk leaked into the node pack: ${chunkIds.join(', ')}`);
+    });
+
     it('rejects one chunkId mapping to conflicting client entries', () => {
         const conflicting = [
             { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/Greeting.client.js' },
             { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/GreetingCopy.client.js' },
+            { chunkId: 'pages/index', kind: 'page', clientEntry: 'pages/index.client.js', dependsOn: ['components/Greeting'] },
         ];
         const distDir = makeDistWithUnits('node-conflict', conflicting, {
             ...nodeClientFiles,
@@ -392,22 +426,36 @@ describe('packSsrFromDeploymentIr on the vmz-pack binding (v0)', () => {
     });
 
     it('falls back to ${chunkId}.client.js only for an empty clientEntry, and requires the file', () => {
+        const legacyPage = {
+            chunkId: 'pages/index',
+            kind: 'page',
+            clientEntry: 'pages/index.client.js',
+            dependsOn: ['components/Legacy'],
+        };
         const distDir = makeDistWithUnits(
             'node-empty-entry',
-            [{ chunkId: 'components/Legacy', kind: 'component', clientEntry: '' }],
-            { 'components/Legacy.client.js': 'export default class Legacy {}' },
+            [{ chunkId: 'components/Legacy', kind: 'component', clientEntry: '' }, legacyPage],
+            {
+                'components/Legacy.client.js': 'export default class Legacy {}',
+                'pages/index.client.js': 'export default class IndexPage {}',
+            },
         );
         const binding = fakeBinding(nodePlanResponse);
         packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
         const request = JSON.parse(binding.calls[0].requestJson);
-        assert.deepEqual(request.entries, [
-            { logical: 'components/Legacy', path: path.join(distDir, 'components', 'Legacy.client.js') },
-        ]);
+        assert.deepEqual(
+            request.entries.map((entry: { logical: string }) => entry.logical).sort(),
+            ['components/Legacy', 'pages/index'],
+        );
+        assert.equal(
+            request.entries.find((entry: { logical: string }) => entry.logical === 'components/Legacy').path,
+            path.join(distDir, 'components', 'Legacy.client.js'),
+        );
 
         const missing = makeDistWithUnits(
             'node-empty-entry-missing',
-            [{ chunkId: 'components/Legacy', kind: 'component', clientEntry: '' }],
-            {},
+            [{ chunkId: 'components/Legacy', kind: 'component', clientEntry: '' }, legacyPage],
+            { 'pages/index.client.js': 'export default class IndexPage {}' },
         );
         assert.throws(
             () => packSsrFromDeploymentIr(missing, { projectRoot: root, binding: fakeBinding(nodePlanResponse) }),
