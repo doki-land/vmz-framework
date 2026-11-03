@@ -23,7 +23,7 @@
  */
 
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr } from './bundler-adapter.js';
 import type { DeploymentIr } from './bundler-adapter.js';
@@ -126,6 +126,9 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
     const requestJson = buildPackRequest({ entries, target: 'browser', root, uses, publicBase: PACK_PUBLIC_BASE, origins });
 
     const packOutDir = path.join(absOut, ...PACK_OUTPUT_DIR_REL.split('/'));
+    // 重建不得残留上一轮 pack 的过期 chunk：manifest/磁盘闭包是交付合同，
+    // 写盘前整体清空旧输出目录（`packWrite` 只增不删）。
+    rmSync(packOutDir, { recursive: true, force: true });
     const { plan } = runPackWrite(requestJson, packOutDir, opts.binding ? { binding: opts.binding } : {});
 
     const ir = loadDeploymentIr(absOut);
@@ -278,6 +281,8 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
     const requestJson = buildPackRequest({ entries, target: 'node', root, uses, publicBase: PACK_PUBLIC_BASE, origins });
 
     const packOutDir = path.join(absOut, ...PACK_NODE_OUTPUT_DIR_REL.split('/'));
+    // 与浏览器 pack 同口径：写盘前清空旧 Node chunk 目录，闭包合同不接受残留。
+    rmSync(packOutDir, { recursive: true, force: true });
     const { plan } = runPackWrite(requestJson, packOutDir, opts.binding ? { binding: opts.binding } : {});
 
     let nativeManifest: unknown;
