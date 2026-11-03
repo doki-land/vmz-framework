@@ -1012,7 +1012,6 @@ fn reason_label(reason: ScopeIncompleteReason) -> &'static str {
         ScopeIncompleteReason::TemplateInterpolation => "template-interpolation",
         ScopeIncompleteReason::Jsx => "jsx",
         ScopeIncompleteReason::AmbiguousMemberKey => "ambiguous-member-key",
-        ScopeIncompleteReason::InterfaceBody => "interface-body",
         ScopeIncompleteReason::Namespace => "namespace",
         ScopeIncompleteReason::EmptyBindingName => "empty-binding-name",
         ScopeIncompleteReason::ZeroWidthDeclarationSpan => "zero-width-declaration-span",

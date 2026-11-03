@@ -840,9 +840,8 @@ fn gate_cjs_esm_mix_binds_commonjs_globals_in_interop_shell() {
 }
 
 /// 门禁 9：TS 语法零残留——类型导入、接口、类型别名、注解、泛型参数与
-/// `as` 断言全部擦除，运行时代码原样保留。（保留模块内写 `interface`
-/// 会触发 scope 事实缺口 `interface-body` 的模块级隔离，属已知缺口 D4，
-/// 不在本门禁钉住；类型模块因 type-only 不建边，整棵类型语法树随剪枝消失。）
+/// `as` 断言全部擦除，运行时代码原样保留。类型模块因 type-only 不建边，
+/// 整棵类型语法树随剪枝消失。
 #[test]
 fn gate_ts_syntax_leaves_zero_type_residue() {
     let root = temp_tree(
@@ -883,6 +882,47 @@ fn gate_ts_syntax_leaves_zero_type_residue() {
     for residue in
         ["import type", "export type", "interface ", ": number", ": string", "<T", " as "]
     {
+        assert!(!all.contains(residue), "residue `{residue}` in:\n{all}");
+    }
+}
+
+/// 门禁 9b：可达模块里的 `interface` 声明不再触发整文件隔离——成员与
+/// `extends` 进入 scope 事实后，运行时代码仍按导出需求逐绑定发射。
+#[test]
+fn gate_interface_members_do_not_force_module_isolation() {
+    let root = temp_tree(
+        "interface-members",
+        &[
+            ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "app/src/entry.js",
+                "import { pick } from './models.js';\nexport const run = (value) => pick(value);\n",
+            ),
+            (
+                "app/src/models.js",
+                "export interface Options extends Record<string, unknown> {\n  readonly id?: string\n  label: string\n  render(count: number): string\n}\nexport function pick(options) { return options.label }\n",
+            ),
+        ],
+    );
+    let app = root.join("app");
+    let (graph, _link, plan) = run_pipeline(
+        &app,
+        &[("main".to_string(), app.join("src/entry.js"))],
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+
+    assert!(
+        graph.nodes.iter().any(|node| node.resolved.path.ends_with("models.js")),
+        "the interface module is reachable and must stay in the graph"
+    );
+    let all = plan.artifacts.iter().map(|artifact| artifact.code.as_str()).collect::<Vec<_>>().join("\n");
+    assert!(all.contains("function pick"), "{all}");
+    assert!(all.contains("options.label"), "the runtime body survives isolation:\n{all}");
+    for residue in ["interface ", "readonly", ": number", ": string"] {
         assert!(!all.contains(residue), "residue `{residue}` in:\n{all}");
     }
 }

@@ -109,9 +109,6 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
             oak_typescript::scope::ScopeIncompleteReason::AmbiguousMemberKey => {
                 ScopeIncompleteReason::AmbiguousMemberKey
             }
-            oak_typescript::scope::ScopeIncompleteReason::InterfaceBody => {
-                ScopeIncompleteReason::InterfaceBody
-            }
             oak_typescript::scope::ScopeIncompleteReason::Namespace => {
                 ScopeIncompleteReason::Namespace
             }

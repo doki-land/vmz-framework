@@ -51,8 +51,6 @@ pub enum ScopeIncompleteReason {
     Jsx,
     /// 与绑定名同拼写的成员键：AST 分不清 `foo:` 与 `[foo]:`。
     AmbiguousMemberKey,
-    /// `interface` 声明：parser 不记录成员，体内引用不可见。
-    InterfaceBody,
     /// `namespace` 声明：成员不被遍历。
     Namespace,
     /// 空绑定名 token。
