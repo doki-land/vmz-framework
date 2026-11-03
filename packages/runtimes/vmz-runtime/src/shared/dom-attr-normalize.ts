@@ -122,10 +122,45 @@ function pushStyleValues(out: string[], key: string, value: unknown): void {
     if (text != null) out.push(text);
 }
 
+/**
+ * Split a style fragment on top-level `;`. Semicolons inside `url(...)` /
+ * nested parens and inside quotes (e.g. `content: 'a;b'`, data URIs with
+ * `;base64,`) do not split — a naive split would truncate those values.
+ */
+function splitStyleDeclarations(text: string): string[] {
+    const chunks: string[] = [];
+    let depth = 0;
+    let quote: string | null = null;
+    let start = 0;
+    let i = 0;
+    while (i < text.length) {
+        const ch = text[i];
+        if (quote != null) {
+            if (ch === '\\') {
+                i += 2;
+                continue;
+            }
+            if (ch === quote) quote = null;
+        } else if (ch === '"' || ch === "'") {
+            quote = ch;
+        } else if (ch === '(') {
+            depth += 1;
+        } else if (ch === ')') {
+            if (depth > 0) depth -= 1;
+        } else if (ch === ';' && depth === 0) {
+            chunks.push(text.slice(start, i));
+            start = i + 1;
+        }
+        i += 1;
+    }
+    chunks.push(text.slice(start));
+    return chunks;
+}
+
 function collectStyleDeclarations(merged: Map<string, string[]>, value: unknown): void {
     if (value == null || value === false) return;
     if (typeof value === 'string') {
-        for (const chunk of value.split(';')) {
+        for (const chunk of splitStyleDeclarations(value)) {
             const idx = chunk.indexOf(':');
             if (idx < 0) continue;
             const key = normalizeStyleKey(chunk.slice(0, idx));

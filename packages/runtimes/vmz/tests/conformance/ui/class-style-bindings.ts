@@ -113,6 +113,22 @@ const styleCases: Array<[unknown[], string]> = [
     [['grid-template-columns: 1fr', { gridTemplateColumns: '2fr' }], 'grid-template-columns: 2fr'],
     // illegal property names are dropped like the browser drops invalid declarations
     [[{ 'bad key': 'x', 'semi;colon': 'y', '1digit': 'z', width: '2px' }], 'width: 2px'],
+    // string fragments: keys normalize the same way
+    [['gridTemplateColumns: 1fr'], 'grid-template-columns: 1fr'],
+    // string fragments split on top-level `;` only: data URIs with `;base64,` survive
+    [
+        ['background-image: url("data:image/gif;base64,R0lGODlhAQABAAAAACw="); border-color: red'],
+        'background-image: url("data:image/gif;base64,R0lGODlhAQABAAAAACw="); border-color: red',
+    ],
+    // semicolons inside quotes do not split either
+    [[`content: 'a;b'; color: red`], `content: 'a;b'; color: red`],
+    // multiple declarations mixing url(), quoted text and plain values
+    [
+        ['color: red; background: url(data:x;base64,AA==) center; margin: 1px'],
+        'color: red; background: url(data:x;base64,AA==) center; margin: 1px',
+    ],
+    // nested quotes with escaped quote and semicolon inside
+    [[`font-family: "It\\'s; Fine", serif`], `font-family: "It\\'s; Fine", serif`],
 ];
 for (const [input, expected] of styleCases) {
     const actual = mergeStyleParts(...input);
