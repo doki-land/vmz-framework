@@ -219,6 +219,54 @@ fn json_entry_is_rejected() {
     assert!(graph.nodes.is_empty());
 }
 
+/// 根绝对 URL 动态 import（`import('/dom.browser.js')`）是站点运行时 URL：
+/// 边保留专用外部诊断（发射层原样保留），不是 `not_found` 文件解析失败。
+#[test]
+fn root_absolute_dynamic_import_is_external_url_edge() {
+    let root = temp_tree(
+        "dynamicurl",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "const face = () => import(/* @vite-ignore */ '/dom.browser.js');\nexport const load = face;\n",
+            ),
+        ],
+    );
+    let entry = root.join("src/entry.js");
+    let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    assert_eq!(graph.nodes.len(), 1);
+    let node = &graph.nodes[graph.index_of(&entry).unwrap()];
+    assert_eq!(node.dynamic_edges.len(), 1);
+    let edge = &node.dynamic_edges[0];
+    assert_eq!(edge.specifier, "/dom.browser.js");
+    let diagnostic = edge.target.as_ref().expect_err("URL 边不解析为文件");
+    assert_eq!(diagnostic.code, "vmz::pack::resolve::dynamic_url_external");
+    assert!(diagnostic.message.contains("/dom.browser.js"), "{diagnostic:?}");
+}
+
+/// 对照：静态根绝对说明符仍是文件解析语义，缺失目标是 `not_found`。
+#[test]
+fn root_absolute_static_import_still_resolves_as_file() {
+    let root = temp_tree(
+        "staticurl",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            ("src/entry.js", "import { missing } from '/ghost.js';\nexport const x = missing;\n"),
+        ],
+    );
+    let entry = root.join("src/entry.js");
+    let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let node = &graph.nodes[graph.index_of(&entry).unwrap()];
+    let edge = &node.static_edges[0];
+    let diagnostic = edge.target.as_ref().expect_err("缺失文件不得解析");
+    assert_eq!(diagnostic.code, "vmz::pack::resolve::not_found");
+}
+
 #[test]
 fn parse_failure_keeps_node_with_diagnostics() {
     let root = temp_tree(

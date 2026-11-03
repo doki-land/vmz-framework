@@ -21,8 +21,9 @@
 //! `ok: false` instead of silently producing a partial plan. Link-level
 //! diagnostics split the same way: `vmz::pack::link::unknown_export` and
 //! failed-resolution edges (`vmz::pack::resolve::*`, except the supported
-//! `node_builtin_external` form) are `ok: false` — silently shipping them
-//! would defer the failure to a browser SyntaxError or a runtime 404.
+//! `node_builtin_external` and `dynamic_url_external` forms) are `ok: false`
+//! — silently shipping them would defer the failure to a browser SyntaxError
+//! or a runtime 404.
 
 use std::path::{Path, PathBuf};
 
@@ -390,15 +391,17 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
     let link_plan = vmz_pack::link::link(&graph, &entry_uses);
     // 链接诊断里的两类必须升级构建失败，不静默放行：未知导出（否则浏览器
     // 实例化时 SyntaxError）与解析失败边（否则产物留下悬空 import，运行时
-    // 404 / ReferenceError）。`node:` 内建外部模块维持原文保留的支持形态；
-    // 事实不完整模块维持保守隔离路径，两者都不是本层拦截对象。
+    // 404 / ReferenceError）。`node:` 内建外部模块与根绝对 URL 动态 import
+    // 维持原文保留的支持形态；事实不完整模块维持保守隔离路径，都不是本层
+    // 拦截对象。
     let fatal: Vec<PackDiagnostic> = link_plan
         .diagnostics
         .iter()
         .filter(|diagnostic| {
             diagnostic.code == "vmz::pack::link::unknown_export"
                 || (diagnostic.code.starts_with("vmz::pack::resolve::")
-                    && diagnostic.code != vmz_pack::resolve::CODE_NODE_BUILTIN)
+                    && diagnostic.code != vmz_pack::resolve::CODE_NODE_BUILTIN
+                    && diagnostic.code != vmz_pack::resolve::CODE_DYNAMIC_URL_EXTERNAL)
         })
         .cloned()
         .collect();

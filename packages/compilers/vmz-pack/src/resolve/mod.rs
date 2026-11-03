@@ -74,6 +74,10 @@ const CODE_BAD_EXPORTS: &str = "vmz::pack::resolve::bad_exports";
 const CODE_BAD_MANIFEST: &str = "vmz::pack::resolve::bad_manifest";
 /// Node.js 内建模块说明符（`node:` 前缀）：运行时提供的外部模块，无物理文件身份。
 pub const CODE_NODE_BUILTIN: &str = "vmz::pack::resolve::node_builtin_external";
+/// 根绝对 URL 动态 import（`/...`，含协议相对 `//...`）：浏览器运行时按站点
+/// URL 求值（可携带查询/哈希缓存后缀），发射层按合同原样保留
+/// （`vmz::pack::emit::dynamic_url_kept`），不参与文件解析，也不是构建失败。
+pub const CODE_DYNAMIC_URL_EXTERNAL: &str = "vmz::pack::resolve::dynamic_url_external";
 
 /// `node:` 前缀说明符是 Node.js 内建模块：打包层不解析为文件、不改写，
 /// 发射时说明符文本原样保留，由运行时解析（`import('node:fs/promises')` 等
@@ -139,6 +143,16 @@ pub fn node_builtin_diagnostic(specifier: &str, importer: &Path) -> PackDiagnost
     diag(
         CODE_NODE_BUILTIN,
         format!("`{specifier}` 是 Node.js 内建模块，由运行时提供，打包层保留原文"),
+        importer,
+    )
+}
+
+/// 为根绝对 URL 动态 import 构造统一诊断：身份为「站点运行时 URL」，
+/// 不参与文件解析，发射层原样保留（见 `CODE_DYNAMIC_URL_EXTERNAL`）。
+pub fn dynamic_url_external_diagnostic(specifier: &str, importer: &Path) -> PackDiagnostic {
+    diag(
+        CODE_DYNAMIC_URL_EXTERNAL,
+        format!("`{specifier}` 是根绝对 URL 动态 import，发射层保留原文"),
         importer,
     )
 }

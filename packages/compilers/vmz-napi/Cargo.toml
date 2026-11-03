@@ -9,7 +9,7 @@ description = "N-API bridge: Node host ↔ Rust workspace session (N1)"
 publish = false
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 napi.workspace = true

@@ -467,6 +467,12 @@ fn edge_target(
     {
         return Err(crate::resolve::node_builtin_diagnostic(specifier, importer));
     }
+    // 根绝对 URL 动态 import（`import('/dom.browser.js')`，可带 `?t=` 缓存破坏
+    // 后缀）是站点运行时 URL：发射层按合同原样保留（`dynamic_url_kept`），
+    // 不进入文件解析。静态根绝对说明符仍保留文件解析语义，不走本分支。
+    if dynamic && specifier.starts_with('/') {
+        return Err(crate::resolve::dynamic_url_external_diagnostic(specifier, importer));
+    }
     match resolve(&request) {
         Ok(resolved) => {
             // 相对解析不附带包身份（见 resolve 层口径）；图节点身份需要包归属，
