@@ -86,14 +86,19 @@ try {
     const about = await get(`${host.baseUrl}/about/`);
     const alias = await get(`${host.baseUrl}/home`);
     const missing = await get(`${host.baseUrl}/no-such-route`);
-    const assetsManifestPath = path.join(dist, '_vmz', 'content-addressed-assets.json');
-    if (!fs.existsSync(assetsManifestPath)) fail('cdn-policy expects content-addressed-assets.json from static');
-    const assetsManifest = JSON.parse(fs.readFileSync(assetsManifestPath, 'utf8'));
-    const entryObj = (assetsManifest.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'entry-client.js');
-    if (!entryObj?.assetPath) fail('missing hashed entry-client.js');
-    const asset = await get(`${host.baseUrl}/${entryObj.assetPath}`);
+    // Browser JS is final-named by `vmz-pack`, so the pack manifest entryFiles
+    // is the publish URL. `content-addressed-assets.json` only covers non-packed
+    // static bytes.
+    const packManifestPath = path.join(dist, '_vmz', 'pack-manifest.json');
+    if (!fs.existsSync(packManifestPath)) fail('cdn-policy expects pack-manifest.json from static');
+    const packManifest = JSON.parse(fs.readFileSync(packManifestPath, 'utf8'));
+    const entryFile = (packManifest.entryFiles || []).find((entry: { logical?: string }) => entry.logical === 'entry-client.js')?.file;
+    if (!entryFile) fail('missing packed entry-client.js');
+    if (!/-\w{8}\.js$/.test(entryFile)) fail(`packed entry-client.js has no content hash: ${entryFile}`);
+    const entryPath = `/_vmz/pack/${entryFile}`;
+    const asset = await get(`${host.baseUrl}${entryPath}`);
     const logicalStill = await get(`${host.baseUrl}/entry-client.js`);
-    const dom = await get(`${host.baseUrl}/vmz-dom.js`);
+    const dom = await get(`${host.baseUrl}/dom.browser.js`);
 
     if (home.status !== 200 || !home.body.includes('route-home')) {
         errors.push(`GET / want home HTML, got ${home.status}`);
@@ -161,10 +166,10 @@ try {
     }
 
     if (asset.status !== 200 || !asset.body) errors.push('hashed entry-client missing (static-resume)');
-    // Split DOM runtime: barrel vmz-dom.js + companions (dom-ssr.js carries renderToStream).
+    // Split DOM runtime: browser face `dom.browser.js` (never re-exports Node SSR) plus `dom-ssr.js`.
     const domSsr = await get(`${host.baseUrl}/dom-ssr.js`);
-    if (dom.status !== 200 || !/dom-ssr\.js/.test(dom.body)) {
-        errors.push('vmz-dom.js missing/corrupt barrel (static-resume)');
+    if (dom.status !== 200 || !/dom-core\.js/.test(dom.body)) {
+        errors.push('dom.browser.js missing/corrupt browser face (static-resume)');
     }
     if (domSsr.status !== 200 || !domSsr.body.includes('renderToStream')) {
         errors.push('dom-ssr.js missing/corrupt (static-resume)');
@@ -172,15 +177,16 @@ try {
     if (String(asset.headers['cache-control'] || '') !== CACHE_ASSET_IMMUTABLE) {
         errors.push(`asset cache want immutable, got ${asset.headers['cache-control']}`);
     }
-    if (!home.body.includes(entryObj.assetPath)) {
-        errors.push('static HTML must reference hashed assets/<hash> entry for resume');
+    if (!home.body.includes(entryPath)) {
+        errors.push('static HTML must reference the packed content-hashed entry for resume');
     }
     if (home.body.includes('src="/entry-client.js"')) {
         errors.push('static HTML must not keep logical /entry-client.js after content-address rewrite');
     }
-    // Logical path may remain for serve/dev coexistence; hashed path is the publish URL.
-    if (logicalStill.status !== 200) {
-        errors.push('logical entry-client.js should remain for non-static serve coexistence');
+    // Browser JS is only published through `_vmz/pack/`: the logical root module
+    // must not be served from static delivery.
+    if (logicalStill.status === 200) {
+        errors.push('logical entry-client.js must not be served by static delivery');
     }
 
     console.log('cdn-policy: static-rollback via release pointers…');
