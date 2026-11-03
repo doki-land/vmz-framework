@@ -2,15 +2,9 @@
 //! 不做模块身份解析、链接与分包，也不引入任何正则模块语义识别。
 //!
 //! Oak 已实测的结构事实（决定下面的判定方式）：
-//! - 语句头 `import(…)` 被解析为空 `ImportDeclaration` 加后随表达式语句，
-//!   形成可配对的指纹；`require(…)` 不产生该指纹。
-//! - 表达式位置 `import(…)` 的 `import` 关键字是 leaf，builder 丢弃后
-//!   CallExpression 的 span 仍从 `import` 起算，与 callee 的 span 之间
-//!   留下至少 `import(` 长度的间隙。
-//! - 两类 span 形状启发都必须由起点处的 `import` 原文佐证（词边界校验），
-//!   防止注释前缀调用等残缺形状被误判成动态 import。
-//! - `import.meta` 是正式 `MetaProperty` 节点；语句头 `import.meta` 解析为
-//!   表达式语句，不再产生空指纹。
+//! - 动态 `import(…)` 是正式 `ImportExpression` 节点，说明符是唯一子表达式，
+//!   不再靠空 `ImportDeclaration` 指纹或 span 间隙猜测。
+//! - `import.meta` 是正式 `MetaProperty` 节点，语句头同样按表达式语句给出。
 //! - 静态 import/export 的说明符在 AST 中带原文与含引号的字面量 span。
 //! - `await` 是独立 `AwaitExpression` 节点；顶层 await 由 root 级
 //!   `top_level_await_spans` 事实给出（见 `ModuleFlags::has_tla`）。一元
@@ -53,21 +47,6 @@ const IMPORT_WITHOUT_SPECIFIER: &str = "vmz::pack::module::import_without_specif
 /// Oak 无法给出完整语句事实（绑定名缺失、误解析形态等），
 /// 链接层必须按副作用保守保留。
 const STATEMENT_FACT_INCOMPLETE: &str = "vmz::pack::module::statement_fact_incomplete";
-/// 表达式位置动态 import 的最小 span 间隙：`import(` 的字节数。
-const DYNAMIC_CALL_GAP: usize = "import(".len();
-
-/// 校验 `start` 处的源码原文以 `import` 关键字起头且带词边界。
-/// span 形状启发（空指纹配对、`import(` 前缀间隙）必须由原文佐证，
-/// 否则注释前缀调用等残缺形状会被误判成动态 import。
-fn is_import_keyword_at(source: &str, start: usize) -> bool {
-    let Some(rest) = source.as_bytes().get(start..) else {
-        return false;
-    };
-    let Some(after) = rest.strip_prefix(b"import") else {
-        return false;
-    };
-    !matches!(after.first(), Some(c) if c.is_ascii_alphanumeric() || *c == b'_' || *c == b'$')
-}
 
 /// 解析源码并收集模块事实。
 ///
@@ -177,41 +156,6 @@ fn parse_failure(path: Option<&str>, diagnostics: &[OakFrontendDiagnostic]) -> V
 /// Oak span → 字节区间。
 fn range(span: core::range::Range<usize>) -> (usize, usize) {
     (span.start, span.end)
-}
-
-/// 语句头 `import(…)` / `import.meta…` 空指纹：说明符与绑定全空。
-fn is_empty_import(statement: &Statement) -> bool {
-    matches!(statement, Statement::ImportDeclaration(d) if d.specifiers.is_empty() && d.module_specifier.value.is_empty())
-}
-
-/// 单语句体位置的空指纹（`if`/`while`/`for` 的无花括号体）。
-fn hole_in_single_body(statement: &Statement) -> Option<(usize, usize)> {
-    match statement {
-        Statement::ImportDeclaration(d)
-            if d.specifiers.is_empty() && d.module_specifier.value.is_empty() =>
-        {
-            Some(range(d.span.clone()))
-        }
-        _ => None,
-    }
-}
-
-/// 语句列表中承载「空 import 指纹」的语句：其说明符出现在后一条语句里。
-fn fingerprint_hole(statement: &Statement) -> Option<(usize, usize)> {
-    match statement {
-        Statement::ImportDeclaration(d)
-            if d.specifiers.is_empty() && d.module_specifier.value.is_empty() =>
-        {
-            Some(range(d.span.clone()))
-        }
-        Statement::ExportDeclaration(e) => e.declaration.as_deref().and_then(hole_in_single_body),
-        Statement::IfStatement(s) => hole_in_single_body(&s.consequent),
-        Statement::WhileStatement(s) => hole_in_single_body(&s.body),
-        Statement::ForStatement(s) => hole_in_single_body(&s.body),
-        Statement::ForInStatement(s) => hole_in_single_body(&s.body),
-        Statement::ForOfStatement(s) => hole_in_single_body(&s.body),
-        _ => None,
-    }
 }
 
 /// 声明语句引入的全部绑定名：多 declarator 与解构都按 Oak 的
@@ -346,25 +290,9 @@ impl<'a> Collector<'a> {
         }
     }
 
-    /// 遍历语句列表；空 import 指纹先与后一条表达式语句配对成动态 import
-    /// 事实或诊断，再正常下钻（配对消费的表达式语句本身不含其它事实）。
+    /// 遍历语句列表并下钻；动态 import 已由正式 `ImportExpression` 节点承载。
     fn walk_stmts(&mut self, statements: &[Statement]) {
-        for (index, statement) in statements.iter().enumerate() {
-            if let Some(hole) = fingerprint_hole(statement) {
-                match statements.get(index + 1) {
-                    Some(Statement::ExpressionStatement(next))
-                        if is_import_keyword_at(self.source, hole.0) =>
-                    {
-                        let span = (hole.0, next.span.end);
-                        self.push_dynamic(span, &next.expression);
-                    }
-                    _ => self.diagnostic(
-                        IMPORT_WITHOUT_SPECIFIER,
-                        "import 语句无法提取模块说明符",
-                        hole,
-                    ),
-                }
-            }
+        for statement in statements {
             self.walk_stmt(statement);
         }
     }
@@ -396,16 +324,8 @@ impl<'a> Collector<'a> {
     }
 
     /// 顶层语句 → [`StatementFact`]：只记模块顶层，嵌套声明并入所在顶层语句。
-    /// 与动态 import 空指纹配对的表达式语句不成事实（其效果由动态边承载）。
     fn record_top(&mut self, statements: &[Statement]) {
-        for (index, statement) in statements.iter().enumerate() {
-            if index > 0
-                && matches!(statement, Statement::ExpressionStatement(_))
-                && fingerprint_hole(&statements[index - 1])
-                    .is_some_and(|hole| is_import_keyword_at(self.source, hole.0))
-            {
-                continue;
-            }
+        for statement in statements {
             self.detect_cjs_named_exports(statement);
             match statement {
                 Statement::ImportDeclaration(_) => {}
@@ -646,8 +566,14 @@ impl<'a> Collector<'a> {
             }
             Statement::ExpressionStatement(s) => self.walk_expr(&s.expression),
             Statement::ImportDeclaration(d) => {
-                // 空指纹残片：列表配对已产出事实或诊断，其余位置不重复处理。
-                if is_empty_import(statement) {
+                // 动态 `import(…)` 已是 `ImportExpression`，静态 import 必须有说明符。
+                // 无绑定且无说明符的残片无法装填，显式诊断而不静默丢弃。
+                if d.specifiers.is_empty() && d.module_specifier.value.is_empty() {
+                    self.diagnostic(
+                        IMPORT_WITHOUT_SPECIFIER,
+                        "import 语句无法提取模块说明符",
+                        range(statement.span()),
+                    );
                     return;
                 }
                 let kind = if d.specifiers.is_empty() {
@@ -870,27 +796,9 @@ impl<'a> Collector<'a> {
     fn walk_expr(&mut self, expression: &Expression) {
         match &*expression.kind {
             ExpressionKind::CallExpression { func, args } => {
-                // `() => import('…')`：builder 把箭头函数体停在 `import` 上，
-                // 实参被重挂为对箭头函数的调用，箭头体内保留空指纹。
-                if let ExpressionKind::ArrowFunction { body, .. } = &*func.kind {
-                    if is_empty_import(body) {
-                        if let Some(argument) = args.first() {
-                            self.push_dynamic(range(expression.span.clone()), argument);
-                        }
-                    }
-                }
-                // 表达式位置 `import('…')` / `import(v)`：callee 与语句起点之间
-                // 留有被丢弃的 `import(` 前缀间隙；间隙形状必须由起点处的
-                // `import` 原文佐证，`require('…')` 与注释前缀调用等形状据此排除。
-                else if args.is_empty()
-                    && func.span.start >= expression.span.start + DYNAMIC_CALL_GAP
-                    && is_import_keyword_at(self.source, expression.span.start)
-                {
-                    self.push_dynamic(range(expression.span.clone()), func);
-                }
                 // CJS `require('<lit>')`：自由 `require` 标识符 + 单实参。
                 // 说明符事实供图层建边；非字面量在 CJS 模块上必须显式拒绝。
-                else if args.len() == 1
+                if args.len() == 1
                     && matches!(&*func.kind, ExpressionKind::Identifier(name) if name == "require")
                 {
                     let span = range(expression.span.clone());
@@ -938,7 +846,6 @@ impl<'a> Collector<'a> {
                     self.walk_expr(argument);
                 }
             }
-            // 死变体兜底：若 Oak 未来构造出 `ImportExpression`，按动态 import 语义取事实。
             ExpressionKind::ImportExpression { module_specifier } => {
                 self.push_dynamic(range(expression.span.clone()), module_specifier);
             }

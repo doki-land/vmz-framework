@@ -219,6 +219,32 @@ fn json_entry_is_rejected() {
     assert!(graph.nodes.is_empty());
 }
 
+/// 箭头常量 `const load = () => import('./lazy.js')` 的箭头体是正式
+/// `ImportExpression`，建一条动态边。对照：把普通箭头调用得出来的字符串
+/// 传入，不产生动态边，避免以「箭头函数 + 实参」猜测 import 语义。
+#[test]
+fn arrow_const_dynamic_edge_is_built_from_the_import_expression() {
+    let root = temp_tree(
+        "arrowconst",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/entry.js",
+                "const load = () => import('./lazy.js');\nconst run = (() => {})('./lazy.js');\nconst same = important('./lazy.js');\nexport { load, run, same };\n",
+            ),
+            ("src/lazy.js", "export default 3;\n"),
+        ],
+    );
+    let entry = root.join("src/entry.js");
+    let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let node = &graph.nodes[graph.index_of(&entry).unwrap()];
+    assert_eq!(node.dynamic_edges.len(), 1, "{:?}", node.dynamic_edges);
+    assert_eq!(node.dynamic_edges[0].specifier, "./lazy.js");
+    assert!(node.dynamic_edges[0].target.is_ok());
+}
+
 /// 根绝对 URL 动态 import（`import('/dom.browser.js')`）是站点运行时 URL：
 /// 边保留专用外部诊断（发射层原样保留），不是 `not_found` 文件解析失败。
 #[test]
