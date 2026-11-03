@@ -24,6 +24,7 @@ import {
 } from '../browser/dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../browser/unknown-component.js';
 import { ensureSsrDocument } from './document.js';
+import { awaitSsrOnMount, ssrComponentName, ssrOnMountContext } from './onmount.js';
 import { flattenSerializeNode, runDirectSerializeTreeWithMounts, streamSerializeChunks } from './serialize.js';
 
 export async function renderToString(Component, props: any = {}, opts: any = {}) {
@@ -31,15 +32,14 @@ export async function renderToString(Component, props: any = {}, opts: any = {})
     const signal = opts && opts.signal;
     if (signal && signal.aborted) return '';
     const inst = createInstance(Component, props);
-    if (typeof inst.onMount === 'function') {
-        await inst.onMount();
-    }
+    const onMountCtx = ssrOnMountContext(opts);
+    await awaitSsrOnMount(inst, ssrComponentName(Component, inst), onMountCtx);
     if (signal && signal.aborted) return '';
     // production Direct emit: SSR only via Direct serialize schedule ??never `render`.
     if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
         throw new Error(`vmz:dom renderToString() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
     }
-    const root = await runDirectSerializeTreeWithMounts(Component, inst);
+    const root = await runDirectSerializeTreeWithMounts(Component, inst, onMountCtx);
     if (opts && opts.slotHtml != null) injectDefaultSlotHtml(root, opts.slotHtml);
     return flattenSerializeNode(root);
 }
@@ -51,14 +51,13 @@ export async function* renderToStream(Component, props: any = {}, opts: any = {}
     if (aborted()) return;
     const inst = createInstance(Component, props);
     try {
-        if (typeof inst.onMount === 'function') {
-            await inst.onMount();
-        }
+        const onMountCtx = ssrOnMountContext(opts);
+        await awaitSsrOnMount(inst, ssrComponentName(Component, inst), onMountCtx);
         if (aborted()) return;
         if (!(Component && Component.__vmzDirect && typeof Component.__vmzCreate === 'function')) {
             throw new Error(`vmz:dom renderToStream() requires __vmzCreate (Direct); blueprint render() removed (production Direct emit)`);
         }
-        const root = await runDirectSerializeTreeWithMounts(Component, inst);
+        const root = await runDirectSerializeTreeWithMounts(Component, inst, onMountCtx);
         if (opts && opts.slotHtml != null) injectDefaultSlotHtml(root, opts.slotHtml);
         if (aborted()) return;
         for (const chunk of streamSerializeChunks(root)) {

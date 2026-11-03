@@ -33,6 +33,7 @@
         { "src": "browser/resume/resume.js", "out": "browser/resume/resume.js" },
         { "src": "ssr/render.js", "out": "ssr/render.js" },
         { "src": "ssr/serialize.js", "out": "ssr/serialize.js" },
+        { "src": "ssr/onmount.js", "out": "ssr/onmount.js" },
         { "src": "ssr/document.js", "out": "ssr/document.js" }
     ]
 }

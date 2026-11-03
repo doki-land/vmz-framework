@@ -37,6 +37,10 @@ export type EmitWebStaticOpts = {
     projectRoot?: string;
     /** Assembly recorded in the manifest (`local-static` overrides the static default). */
     deliveryProfile?: string;
+    /** Build cancellation signal, forwarded into the SSR `onMount` budget race. */
+    signal?: AbortSignal;
+    /** Per-instance SSR `onMount` budget in ms (runtime default applies when unset). */
+    onMountBudgetMs?: number;
 };
 
 type PageMeta = {
@@ -97,6 +101,9 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
     const publicAssets = emitPublicStaticAssets(distDir, { projectRoot: opts.projectRoot });
     const host = await createRenderHost(distDir, { strictDeployment: true, preload: 'none' });
     const { renderToString, renderToStream } = host;
+    // One budget/signal pair for every SSR render of this build: a hung or
+    // aborted `onMount` fails the page build instead of stalling it.
+    const renderOpts = { signal: opts.signal ?? undefined, onMountBudgetMs: opts.onMountBudgetMs };
 
     const pageCatalog = listPageClientFiles(distDir);
     const generations: RouteGeneration[] = [];
@@ -179,13 +186,21 @@ export async function emitWebStatic(distDir: string, opts: EmitWebStaticOpts = {
         const layoutChain = resolveRouteLayoutChain(distDir, page.chunkId);
         await host.ensureComponents([page.chunkId, ...layoutChain]);
         let bodyHtml = '';
-        for await (const chunk of renderToStream(Page, props, {})) {
-            bodyHtml += chunk;
+        try {
+            for await (const chunk of renderToStream(Page, props, renderOpts)) {
+                bodyHtml += chunk;
+            }
+            for (let i = layoutChain.length - 1; i >= 0; i--) {
+                const Layout = await loadCtor(distDir, layoutChain[i]);
+                if (!Layout) continue;
+                bodyHtml = await renderToString(Layout, {}, { ...renderOpts, slotHtml: bodyHtml });
+            }
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            throw new Error(`emitWebStatic: SSR render failed for route ${pattern} (${page.chunkId}): ${detail}`, { cause: err });
         }
-        for (let i = layoutChain.length - 1; i >= 0; i--) {
-            const Layout = await loadCtor(distDir, layoutChain[i]);
-            if (!Layout) continue;
-            bodyHtml = await renderToString(Layout, {}, { slotHtml: bodyHtml });
+        if (opts.signal?.aborted) {
+            throw new Error(`emitWebStatic: build aborted during SSR render for route ${pattern} (${page.chunkId})`);
         }
 
         const localeWrites = expandLocaleStaticGenerations({

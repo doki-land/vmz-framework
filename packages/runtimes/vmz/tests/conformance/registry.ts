@@ -320,6 +320,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'runtime/ssr-host-lifecycle.ts',
         description: 'I-07: SSR host provides document but no browser window/location',
     },
+    'ssr-onmount-budget': {
+        file: 'runtime/ssr-onmount-budget.ts',
+        description: 'SSR onMount budget: bounded await, abort/timeout failure with component/budget/elapsed',
+    },
     'ssr-unknown-component-error-node': {
         file: 'ui/ssr-unknown-component-error-node.ts',
         description: 'Unknown Direct leaf → data-vmz-error node; document SSR does not throw',
@@ -721,6 +725,7 @@ export const CHECK_ALL = [
     'ui-nav-button',
     'ui-author-surface',
     'ssr-host-lifecycle',
+    'ssr-onmount-budget',
     'ssr-unknown-component-error-node',
     'ui-data-grid',
     'ui-icons',

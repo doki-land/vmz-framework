@@ -24,6 +24,7 @@ import {
 } from '../browser/dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../browser/unknown-component.js';
 import { _ssrDocumentLastError, ensureSsrDocument } from './document.js';
+import { awaitSsrOnMount, ssrComponentName, ssrOnMountContext } from './onmount.js';
 
 function runDirectSerializeTree(Component, inst) {
     serializeApi._inst = inst;
@@ -34,7 +35,8 @@ function runDirectSerializeTree(Component, inst) {
     }
 }
 
-export async function runDirectSerializeTreeWithMounts(Component, inst) {
+export async function runDirectSerializeTreeWithMounts(Component, inst, onMountCtx?: any) {
+    const ctx = onMountCtx || ssrOnMountContext(null);
     let preMounted = [];
 
     let tree = null;
@@ -51,9 +53,7 @@ export async function runDirectSerializeTreeWithMounts(Component, inst) {
         serializeApi._ssrCollected = null;
         if (!collected.length) return tree;
         for (const child of collected) {
-            if (typeof child.onMount === 'function') {
-                await child.onMount();
-            }
+            await awaitSsrOnMount(child, ssrComponentName(null, child), ctx);
         }
         preMounted = preMounted.concat(collected);
     }
