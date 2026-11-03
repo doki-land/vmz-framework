@@ -12,127 +12,38 @@ fn skip_dir(entry: &boost_fs::walk::Entry) -> Filter {
     Filter::Continue
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct DiscoverOptions {
-    pub includes: Option<Vec<String>>,
-    pub excludes: Option<Vec<String>>,
-}
-
-pub fn discover_format_targets(
-    root: &Path,
-    options: &DiscoverOptions,
-) -> Result<Vec<PathBuf>, String> {
-    let mut paths =
-        if let Some(includes) = options.includes.as_ref().filter(|items| !items.is_empty()) {
-            expand_includes(root, includes)?
-        } else if let Some(includes) = read_biome_includes(root)? {
-            expand_includes(root, &includes)?
-        } else {
-            discover_default_targets(root)?
-        };
-
-    if let Some(excludes) = options.excludes.as_ref().filter(|items| !items.is_empty()) {
-        paths.retain(|path| !is_excluded(root, path, excludes));
-    }
-
+/// JS/TS files under one explicit directory target.
+///
+/// The walk never escapes `root`: scope comes from the CLI path, not from
+/// config `includes`.
+pub fn discover_js_targets_under(root: &Path, excludes: &[String]) -> Result<Vec<PathBuf>, String> {
+    let mut paths = Vec::new();
+    collect_tree(root, &mut paths);
+    paths.retain(|path| !is_excluded(root, path, excludes));
     paths.sort();
     paths.dedup();
     Ok(paths)
 }
 
-fn read_biome_includes(root: &Path) -> Result<Option<Vec<String>>, String> {
-    let biome_path = root.join("biome.json");
-    if !biome_path.is_file() {
-        return Ok(None);
-    }
-    let raw = std::fs::read_to_string(&biome_path)
-        .map_err(|err| format!("{}: {err}", biome_path.display()))?;
-    let value: serde_json::Value =
-        serde_json::from_str(&raw).map_err(|err| format!("{}: {err}", biome_path.display()))?;
-    let includes = value
-        .pointer("/files/includes")
-        .and_then(|v| v.as_array())
-        .map(|items| {
-            items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect::<Vec<_>>()
-        })
-        .filter(|items| !items.is_empty());
-    Ok(includes)
-}
-
-fn expand_includes(root: &Path, includes: &[String]) -> Result<Vec<PathBuf>, String> {
+/// `.rs` files under one explicit directory target (only with `rust` opt-in).
+pub fn discover_rust_targets_under(
+    root: &Path,
+    excludes: &[String],
+) -> Result<Vec<PathBuf>, String> {
     let mut paths = Vec::new();
-    for pattern in includes {
-        if pattern.ends_with("/**") {
-            let dir = root.join(pattern.trim_end_matches("/**"));
-            if dir.is_dir() {
-                collect_tree(&dir, &mut paths);
-            }
-            continue;
-        }
-        if pattern.contains("**/metadata.json") {
-            continue;
-        }
-        let candidate = root.join(pattern);
-        if candidate.is_file() && is_format_target(&candidate) {
-            paths.push(candidate);
-        }
-    }
-    Ok(paths)
-}
-
-fn discover_default_targets(root: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut paths = Vec::new();
-
-    for segment in [
-        "scripts",
-        "packages/runtimes",
-        "packages/examples",
-        "packages/editors",
-        "packages/ui",
-        "packages/plugins",
-        "packages/content",
-        "packages/homepage",
-    ] {
-        let dir = root.join(segment);
-        if dir.is_dir() {
-            collect_tree(&dir, &mut paths);
-        }
-    }
-
-    collect_root_sources(root, &mut paths);
-
-    for name in ["package.json", "biome.json", "vmz.config.ts", "nifty.config.ts"] {
-        let candidate = root.join(name);
-        if candidate.is_file() && is_format_target(&candidate) {
-            paths.push(candidate);
-        }
-    }
-
-    if paths.is_empty() {
-        collect_full_repo(root, &mut paths);
-    }
-
-    Ok(paths)
-}
-
-fn collect_root_sources(root: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(root) else {
-        return;
-    };
-    for entry in entries.filter_map(Result::ok) {
-        let path = entry.path();
-        if path.is_file() && is_format_target(&path) {
-            out.push(path);
-        }
-    }
-}
-
-fn collect_full_repo(root: &Path, out: &mut Vec<PathBuf>) {
     for entry in Walker::new(root).filter(skip_dir).into_iter().filter_map(Result::ok) {
-        if entry.is_file() && is_format_target(entry.path()) {
-            out.push(entry.path().to_path_buf());
+        if !entry.is_file() {
+            continue;
+        }
+        let path = entry.path().to_path_buf();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+            paths.push(path);
         }
     }
+    paths.retain(|path| !is_excluded(root, path, excludes));
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
 }
 
 fn collect_tree(root: &Path, out: &mut Vec<PathBuf>) {
@@ -152,12 +63,6 @@ fn is_format_target(path: &Path) -> bool {
         Some("ts" | "mts" | "cts" | "js" | "mjs" | "cjs" | "jsx" | "tsx") => true,
         _ => false,
     }
-}
-
-pub fn layout_has_js_targets(root: &Path) -> bool {
-    discover_format_targets(root, &DiscoverOptions::default())
-        .map(|paths| !paths.is_empty())
-        .unwrap_or(false)
 }
 
 fn is_excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {

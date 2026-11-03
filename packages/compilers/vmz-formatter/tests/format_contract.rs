@@ -3,8 +3,7 @@
 use std::path::Path;
 
 use vmz_formatter::{
-    WorkspaceFormatOptions, default_format_options, format_source_with_options,
-    run_workspace_format,
+    TargetFormatOptions, default_format_options, format_source_with_options, run_target_format,
 };
 
 fn format_sample(path: &str, input: &str) -> String {
@@ -132,19 +131,19 @@ fn jsx_cases_format_and_idempotent() {
 }
 
 #[test]
-fn workspace_reports_each_failed_file_with_its_path() {
+fn target_reports_each_failed_file_with_its_path() {
     let root = std::env::temp_dir().join(format!("vmz-format-per-file-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).expect("temp root");
     std::fs::write(root.join("broken.ts"), "function f() {").expect("write broken");
     std::fs::write(root.join("ok.ts"), "const x = 1\n").expect("write ok");
 
-    let report = run_workspace_format(WorkspaceFormatOptions {
-        cwd: Some(root.clone()),
+    let report = run_target_format(&TargetFormatOptions {
+        targets: vec![root.clone()],
         check: true,
         rust: Some(false),
         javascript: Some(true),
-        ..WorkspaceFormatOptions::default()
+        ..TargetFormatOptions::default()
     });
     let _ = std::fs::remove_dir_all(&root);
     let report = report.expect("a single unparsable file must not abort the scan");

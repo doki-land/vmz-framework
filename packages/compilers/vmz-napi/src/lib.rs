@@ -1613,58 +1613,65 @@ pub fn generate_json(json_text: String) -> Result<String> {
     vmz_generator::to_json(&value).map_err(|e| Error::from_reason(format!("generateJson: {e}")))
 }
 
-/// Options for [`format_workspace_run`] (JS/TS + optional `cargo fmt`).
+/// Options for [`format_targets_run`].
+///
+/// Scope contract: only the explicit `targets` (files or directories) are
+/// formatted. Rust runs per-file `rustfmt` — `Some(true)` opts directory
+/// targets in, `Some(false)` rejects `.rs` targets, and an explicit `.rs`
+/// file path is itself an opt-in. There is no `cargo fmt --all` path.
 #[napi(object)]
 #[derive(Default)]
-pub struct FormatWorkspaceRunOptions {
-    /// Project root (default: cwd).
-    pub cwd: Option<String>,
+pub struct FormatTargetsRunOptions {
+    /// Explicit file / directory targets (required, non-empty).
+    pub targets: Vec<String>,
     /// Check-only mode.
     pub check: Option<bool>,
-    /// Include globs under `cwd`.
-    pub includes: Option<Vec<String>>,
-    /// Exclude globs after includes expand.
-    pub excludes: Option<Vec<String>>,
-    /// Run `cargo fmt` when a Cargo workspace is present.
+    /// Rust opt-in for directory targets / veto for `.rs` targets.
     pub rust: Option<bool>,
     /// Run the Oak CST formatter on JS/TS targets.
     pub javascript: Option<bool>,
-    /// Style config path relative to `cwd` (default: `biome.json`).
+    /// Run the `.vmz` authoring formatter.
+    pub vmz: Option<bool>,
+    /// Exclude globs applied under directory targets.
+    pub excludes: Option<Vec<String>>,
+    /// Style config path (default: `biome.json` next to the target).
     pub style_config: Option<String>,
 }
 
-/// Summary from [`format_workspace_run`].
+/// Summary from [`format_targets_run`].
 #[napi(object)]
-pub struct FormatWorkspaceReportNapi {
+pub struct FormatTargetsReportNapi {
     /// Files rewritten on disk (zero in check mode).
     pub formatted: u32,
     /// Files already matching formatter output.
     pub unchanged: u32,
-    /// Human-readable failures.
+    /// Files that would change under `check`.
+    pub need_write: u32,
+    /// Human-readable failures (including rejected / unsupported targets).
     pub errors: Vec<String>,
+    /// `.vmz` formatter diagnostics.
+    pub diagnostics: Vec<JsDiagnostic>,
 }
 
-/// Format hybrid workspace surfaces (JS/TS + Rust). `.vmz` uses [`JsWorkspace::format`].
+/// Format exactly the explicit targets (JS/TS + `.vmz` + opt-in Rust). Never a workspace.
 #[napi]
-pub fn format_workspace_run(
-    options: FormatWorkspaceRunOptions,
-) -> Result<FormatWorkspaceReportNapi> {
-    let cwd = options.cwd.map(PathBuf::from).or_else(|| std::env::current_dir().ok());
-    let style_config = options.style_config.map(PathBuf::from);
-    let report = vmz_formatter::run_workspace_format(vmz_formatter::WorkspaceFormatOptions {
-        cwd,
+pub fn format_targets_run(options: FormatTargetsRunOptions) -> Result<FormatTargetsReportNapi> {
+    let report = vmz_formatter::run_target_format(&vmz_formatter::TargetFormatOptions {
+        targets: options.targets.into_iter().map(PathBuf::from).collect(),
         check: options.check.unwrap_or(false),
-        includes: options.includes,
-        excludes: options.excludes,
         rust: options.rust,
         javascript: options.javascript,
-        style_config,
+        vmz: options.vmz,
+        excludes: options.excludes,
+        style_config: options.style_config.map(PathBuf::from),
     })
     .map_err(Error::from_reason)?;
-    Ok(FormatWorkspaceReportNapi {
+    Ok(FormatTargetsReportNapi {
         formatted: report.formatted as u32,
         unchanged: report.unchanged as u32,
+        need_write: report.need_write as u32,
         errors: report.errors,
+        diagnostics: report.diagnostics.iter().map(map_diag).collect(),
     })
 }
 

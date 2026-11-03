@@ -7,13 +7,13 @@ Authoring formatter for `.vmz` SFCs: **Oak CST formatting** plus **EditorConfig*
 | **Crate**      | `vmz-formatter`                                          |
 | **Kind**       | library                                                  |
 | **Publish**    | `false` (workspace-internal)                             |
-| **CLI surface**| `vmz format` / `vmz format --check` (`vmz.config` `format`) |
+| **CLI surface**| `vmz format <path>` / `vmz format <path> --check` (`vmz.config` `format`) |
 | **Depends on** | [`vmz-compiler`](../vmz-compiler/) (parse / discover only) |
 
 ## Features
 
 - Discover / format a file or project tree (`format_path`)
-- Hybrid monorepo JS/TS + `cargo fmt` (`run_workspace_format`; read `vmz.config` `format` from CLI)
+- Explicit-target JS/TS + per-file `rustfmt` (`run_target_format`; scope is the CLI path, never `cargo fmt --all`)
 - Default **write**; `--check` only reports drift (cargo-fmt style — no `--write`)
 - `<script lang=ts>` → Oak `format` (text-in IR)
 - `<style>` → VMZ CSS formatter (`css` / `scss` / `sass`)
@@ -35,7 +35,7 @@ Authoring formatter for `.vmz` SFCs: **Oak CST formatting** plus **EditorConfig*
 ## Integration
 
 ```text
-`@vmz/vmz`  `vmz format`  →  vmz-napi  →  vmz_formatter::format_path
+`@vmz/vmz`  `vmz format <path>`  →  vmz-napi `formatTargetsRun`  →  vmz_formatter::run_target_format
 ```
 
 JavaScript and TypeScript source formatting is delegated to Oak.
