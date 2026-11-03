@@ -193,6 +193,9 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
         | ExpressionKind::JsxElement(_)
         | ExpressionKind::JsxFragment(_)
         | ExpressionKind::JsxSelfClosingElement(_) => None,
+        // Variants beyond the pinned Oak rev print as unsupported; handle them
+        // explicitly when the pinned rev exposes them.
+        _ => None,
     }
 }
 

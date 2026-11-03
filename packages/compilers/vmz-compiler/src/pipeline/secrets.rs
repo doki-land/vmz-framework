@@ -558,6 +558,9 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
         | ExpressionKind::JsxElement(_)
         | ExpressionKind::JsxFragment(_)
         | ExpressionKind::JsxSelfClosingElement(_) => {}
+        // Variants beyond the pinned Oak rev contribute no sub-expressions;
+        // walk them explicitly when the pinned rev exposes them.
+        _ => {}
     }
 }
 

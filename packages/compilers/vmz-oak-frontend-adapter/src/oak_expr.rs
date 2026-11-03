@@ -469,6 +469,9 @@ fn shift_expression_spans(expr: &mut Expression, delta: isize) {
                 }
             }
         }
+        // Variants beyond the pinned Oak rev are left unshifted; handle them
+        // explicitly when the pinned rev exposes them.
+        _ => {}
     }
 }
 
