@@ -131,6 +131,7 @@ pub(crate) fn assemble_chunk(
     let mut import_locals: Vec<(String, usize, String)> = Vec::new();
     let mut same_chunk_locals: BTreeSet<(String, String)> = BTreeSet::new();
     let mut export_names: Vec<(String, String)> = Vec::new();
+    let mut star_export_names: Vec<(String, String)> = Vec::new();
     let mut merged: BTreeMap<usize, Bindings> = BTreeMap::new();
     let mut side_effects: BTreeSet<usize> = BTreeSet::new();
     // 已被本 chunk 文本引用的目标 chunk（合成 import、副作用 import 与
@@ -787,8 +788,9 @@ pub(crate) fn assemble_chunk(
                         json_string(&placeholder(target_chunk))
                     ));
                     referenced_chunks.insert(target_chunk);
-                    // (c) 收集目标模块直接非类型导出名（不递归星号链）。
-                    collect_direct_exports(context, target, &mut export_names);
+                    // (c) 收集目标模块直接非类型导出名（不递归星号链）：
+                    // 星号登记名可被本 chunk 显式导出遮蔽，单独走星号表。
+                    collect_direct_exports(context, target, &mut star_export_names);
                 }
                 ExportFact::ReexportNamespace { source, namespace, type_only, .. } => {
                     if *type_only || !used_reexport(linked, export_index, is_namespace) {
@@ -1222,7 +1224,7 @@ pub(crate) fn assemble_chunk(
         }
     }
 
-    check_names(chunk, &declared, &import_locals, &export_names, errors);
+    check_names(chunk, &declared, &import_locals, &export_names, &star_export_names, errors);
 
     if errors.len() > errors_before {
         return None;
@@ -2522,12 +2524,15 @@ pub(crate) fn map_replaced_offset(
 }
 
 /// (a) 声明名 + (b) import 绑定两两不相交（同模块内重复忽略——源本身非法），
-/// (b) 同名绑定必须指向同一目标 chunk，(c) 对外导出名不得重复。
+/// (b) 同名绑定必须指向同一目标 chunk，(c) 对外导出名不得重复；跨 chunk
+/// `export *` 登记的星号导出名可被显式导出遮蔽（ESM 星号遮蔽语义），
+/// 未被遮蔽且来自不同来源模块时才拒绝。
 fn check_names(
     chunk: &Chunk,
     declared: &[(String, String)],
     import_locals: &[(String, usize, String)],
     export_names: &[(String, String)],
+    star_export_names: &[(String, String)],
     errors: &mut Vec<PackDiagnostic>,
 ) {
     let conflict = |name: &str, first: &str, second: &str| {
@@ -2570,6 +2575,22 @@ fn check_names(
         export_modules.entry(name).or_default().insert(module);
     }
     for (name, modules) in &export_modules {
+        if modules.len() > 1 {
+            let list: Vec<&&str> = modules.iter().collect();
+            errors.push(conflict(name, list[0], list[1]));
+        }
+    }
+    // 跨 chunk `export *` 登记的星号导出名：被本 chunk 任一显式导出遮蔽
+    // （ESM 星号遮蔽语义，显式导出优先）；未被遮蔽且来自不同来源模块时
+    // 保持显式拒绝。
+    let mut star_modules: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for (name, module) in star_export_names {
+        star_modules.entry(name).or_default().insert(module);
+    }
+    for (name, modules) in &star_modules {
+        if export_modules.contains_key(name) {
+            continue;
+        }
         if modules.len() > 1 {
             let list: Vec<&&str> = modules.iter().collect();
             errors.push(conflict(name, list[0], list[1]));

@@ -344,3 +344,73 @@ fn destructured_singleton_shorthand_face_split_resolves() {
     // 未冲突的 `codeToHtml` 不改名。
     assert!(!shared.code.contains("codeToHtml__vmz"), "{}", shared.code);
 }
+
+/// homepage shiki 消费形态的隔离侧：`dep.js` 含模板插值（scope 不完整 →
+/// 隔离 chunk），`index.mjs` 与 `bundle.js` 都 `export * from './dep.js'`
+/// （跨 chunk 星号），同时 `bundle.js` 用解构声明显式导出同名 `value`。
+/// ESM 星号遮蔽：显式导出优先，跨 chunk 星号登记的 `value` 不构成
+/// `name_conflict`；未被遮蔽的 `make` 单来源登记保持合法。
+#[test]
+fn cross_chunk_star_export_shadowed_by_explicit_export_resolves() {
+    let root = temp_tree(
+        "starshadow",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0","type":"module"}"#),
+            (
+                "src/pages/a.client.js",
+                "export default class A {\n    async h() {\n        const m = await import('../vendor/index.mjs');\n        return m.value();\n    }\n}\n",
+            ),
+            (
+                "src/vendor/index.mjs",
+                "export { value } from './bundle.js';\nexport * from './dep.js';\n",
+            ),
+            (
+                "src/vendor/bundle.js",
+                "import { make } from './dep.js';\nexport * from './dep.js';\nconst { value } = make();\nexport { value };\n",
+            ),
+            (
+                "src/vendor/dep.js",
+                "export function make() { return { value: () => 'v' }; }\nexport function value() { return `${marker()}`; }\nfunction marker() { return 'm'; }\n",
+            ),
+        ],
+    );
+    let graph = build_graph(
+        &[("pages/a".to_string(), root.join("src/pages/a.client.js"))],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "pages/a".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["default".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    // dep.js 的模板插值使其成为 isolated 单模块 chunk。
+    assert!(
+        chunks.chunks.iter().any(|c| c.id.starts_with("isolated/") && c.modules.len() == 1),
+        "template-interpolation module must be isolated"
+    );
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options())
+        .unwrap_or_else(|errors| panic!("star shadow shape rejected: {errors:?}"));
+    assert!(
+        !plan.diagnostics.iter().any(|d| d.code == "vmz::pack::emit::name_conflict"),
+        "{:?}",
+        plan.diagnostics
+    );
+    let shared = plan
+        .artifacts
+        .iter()
+        .find(|a| {
+            a.modules.iter().any(|m| m.ends_with("src/vendor/index.mjs"))
+                && a.modules.iter().any(|m| m.ends_with("src/vendor/bundle.js"))
+        })
+        .expect("shared chunk with index.mjs and bundle.js");
+    // 显式导出保持原名发射，跨 chunk 星号登记被其遮蔽。
+    assert!(shared.code.contains("export { value }"), "{}", shared.code);
+    // 跨 chunk 星号边原样发射到隔离 chunk 产物。
+    assert!(shared.code.contains("export * from"), "{}", shared.code);
+}
