@@ -449,6 +449,12 @@ impl<'g> Linker<'g> {
                     if !self.activate_declared(node, &local)
                         && !self.propagate_import_binding(node, &local)
                     {
+                        // scope 事实不完整时导出面仍是语法事实：名字确实导出，
+                        // 只是语句级激活定位不到；整模块保留兜底，不报假未知导出。
+                        if self.graph.nodes[node].record.is_scope_incomplete() {
+                            self.demand(Demand::Execute(node));
+                            return;
+                        }
                         self.unknown_export(node, name);
                         return;
                     }
@@ -466,6 +472,10 @@ impl<'g> Linker<'g> {
                         None => self.activate_span(node, span),
                     };
                     if !resolved {
+                        if self.graph.nodes[node].record.is_scope_incomplete() {
+                            self.demand(Demand::Execute(node));
+                            return;
+                        }
                         self.unknown_export(node, name);
                         return;
                     }

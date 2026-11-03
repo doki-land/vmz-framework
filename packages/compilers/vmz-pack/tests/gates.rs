@@ -942,3 +942,100 @@ fn gate_unknown_named_export_is_a_structured_build_failure() {
         link_plan.diagnostics
     );
 }
+
+/// 负向门禁 13（回归）：opaque 模块（scope 事实不完整，如含模板插值的
+/// vendor 文件）的匿名默认导出——导出面是语法事实、名字真实存在，语句级
+/// 激活定位不到时必须整模块保留兜底，不得报假 `unknown_export`（真实案例：
+/// `linkify-it/lib/re.mjs` 的 `export default function (opts)`）。
+#[test]
+fn gate_opaque_module_default_export_is_not_a_false_positive() {
+    let root = temp_tree(
+        "opaque-default",
+        &[
+            ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "app/src/entry.js",
+                "import make from './lib.js';\nexport const run = make;\n",
+            ),
+            (
+                "app/src/lib.js",
+                "export default function (opts) { const mark = `v${opts ? 1 : 0}`; return mark; }\n",
+            ),
+        ],
+    );
+    let app = root.join("app");
+    let graph = build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    // 夹具前提：lib 是 opaque（模板插值使 scope 事实不完整）。
+    let lib = graph
+        .nodes
+        .iter()
+        .find(|n| n.resolved.path.ends_with("lib.js"))
+        .expect("lib node");
+    assert!(lib.record.is_scope_incomplete(), "{:?}", lib.record.scope_incomplete_reasons);
+
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    assert!(
+        !codes(&link_plan.diagnostics).contains(&"vmz::pack::link::unknown_export".to_string()),
+        "{:?}",
+        link_plan.diagnostics
+    );
+    // 模块整棵保留并隔离发射，`export default` 原文留存在产物中。
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    let isolated = plan
+        .artifacts
+        .iter()
+        .find(|a| a.modules.iter().any(|m| m.ends_with("lib.js")))
+        .expect("lib chunk");
+    assert!(isolated.code.contains("export default"), "{}", isolated.code);
+    let out = root.join("dist");
+    write_emit(&plan, &out).unwrap();
+    assert_eq!(reference_integrity_violations(&out), Vec::<String>::new());
+}
+
+/// 负向门禁 14：opaque 模块上真实不存在的导出名——兜底只赦免「面里有、
+/// 定位不到」，名字缺席仍必须 `unknown_export`，防止假阴性掩盖真缺口。
+#[test]
+fn gate_opaque_module_missing_export_still_fails() {
+    let root = temp_tree(
+        "opaque-missing",
+        &[
+            ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "app/src/entry.js",
+                "import { nope } from './lib.js';\nexport const run = nope;\n",
+            ),
+            (
+                "app/src/lib.js",
+                "const mark = `v${1}`;\nexport const known = mark;\n",
+            ),
+        ],
+    );
+    let app = root.join("app");
+    let graph = build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let lib = graph
+        .nodes
+        .iter()
+        .find(|n| n.resolved.path.ends_with("lib.js"))
+        .expect("lib node");
+    assert!(lib.record.is_scope_incomplete(), "{:?}", lib.record.scope_incomplete_reasons);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let codes = codes(&link_plan.diagnostics);
+    assert!(codes.contains(&"vmz::pack::link::unknown_export".to_string()), "{codes:?}");
+}
