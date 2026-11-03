@@ -43,11 +43,23 @@ export const DOCUMENT_BASE_CSS = `/* vmz document layer — canonical document s
     border-right: 1px solid var(--vmz-line-default, #e5e6eb);
 }
 
+/* Density activation lives in this framework layer: sites only ship tokens. */
+
+:where([data-density="compact"]) .doc-sidebar {
+    padding-top: var(--vmz-density-compact-padding-y, 1.5rem);
+    padding-bottom: 2rem;
+}
+
+:where([data-density="dense"]) .doc-sidebar {
+    padding-top: var(--vmz-density-dense-padding-y, 1rem);
+    padding-bottom: 1.5rem;
+}
+
 .doc-sidebar__label {
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--vmz-text-muted, #6b7178);
-    margin: 0 0 0.75rem;
+    margin: 0 0 var(--vmz-density-control-padding-y, 0.75rem);
 }
 
 .doc-subnav ul {

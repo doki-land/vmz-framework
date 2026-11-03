@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { ensureDavinciFacade } from '../_lib/ensure-davinci-facade.ts';
 import { serveHostChildEnv, serveHostProjectEnv } from '../_lib/serve-host-env.ts';
+import { DOCUMENT_BASE_CSS } from '../../../src/document/document-base-css.ts';
 
 const root = repoRoot(import.meta.url);
 const uiRoot = path.join(root, 'packages', 'ui', 'vmz-ui');
@@ -3350,7 +3351,7 @@ async function proveDocumentsPanelDensity(page) {
             fail(`documents-fixture must materialize density.${tier}.padding-y`);
         }
     }
-    const docCss = fs.readFileSync(path.join(docsFixture, 'designs', 'styles', 'document.css'), 'utf8');
+    const docCss = DOCUMENT_BASE_CSS;
     if (
         !docCss.includes('var(--vmz-density-control-padding-y') ||
         (!docCss.includes("data-density='dense'") && !docCss.includes('data-density="dense"'))

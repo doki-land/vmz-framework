@@ -14,6 +14,7 @@
         { "src": "host/serve/hmr-dev.js", "out": "_vmz/host/serve/hmr-dev.js", "rewriteVmzRuntimeImport": true },
         { "src": "host/serve/page-render.js", "out": "_vmz/host/serve/page-render.js", "rewriteVmzRuntimeImport": true },
         { "src": "host/serve/page-catalog.js", "out": "_vmz/host/serve/page-catalog.js" },
+        { "src": "host/serve/pack-entry.js", "out": "_vmz/host/serve/pack-entry.js" },
         { "src": "host/serve/locale-theme.js", "out": "_vmz/host/serve/locale-theme.js" },
         { "src": "host/serve/constants.js", "out": "_vmz/host/serve/constants.js" },
         { "src": "host/serve/route-catalog.js", "out": "_vmz/host/serve/route-catalog.js" },

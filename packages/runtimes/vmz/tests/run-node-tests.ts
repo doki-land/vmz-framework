@@ -36,6 +36,7 @@ const files = [
     'diag-locale-catalog.test.ts',
     'pack-native-contract.test.ts',
     'pack-delivery-native.test.ts',
+    'serve-pack-entry.test.ts',
     'format-scope.test.ts',
 ].map((f) => path.join(here, 'unit', f));
 

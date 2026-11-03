@@ -557,13 +557,20 @@ let docsDetail = '';
                 docsOk = false;
                 docsDetail = 'documents build missing vmz-designs.css asset';
             } else {
-                const css = fs.readFileSync(cssPath, 'utf8');
+                const tokensCss = fs.readFileSync(cssPath, 'utf8');
+                const baseCandidates = [
+                    path.join(docProject, 'dist/documents/assets/vmz-document.css'),
+                    path.join(docProject, 'dist/documents/vmz-document.css'),
+                ];
+                const basePath = baseCandidates.find((p) => fs.existsSync(p));
+                const baseCss = basePath ? fs.readFileSync(basePath, 'utf8') : '';
+                // 站点只发 token（`assets/vmz-designs.css`），密度激活归框架文档层。
                 const hasDense =
-                    css.includes('data-density="dense"') ||
-                    css.includes("data-density='dense'") ||
-                    css.includes('[data-density="dense"]') ||
-                    css.includes("[data-density='dense']");
-                if (!css.includes('--vmz-density-control-padding-y') || !css.includes('--vmz-density-dense-padding-y') || !hasDense) {
+                    baseCss.includes('data-density="dense"') ||
+                    baseCss.includes("data-density='dense'") ||
+                    baseCss.includes('[data-density="dense"]') ||
+                    baseCss.includes("[data-density='dense']");
+                if (!tokensCss.includes('--vmz-density-control-padding-y') || !tokensCss.includes('--vmz-density-dense-padding-y') || !hasDense) {
                     docsOk = false;
                     docsDetail = 'documents CSS missing density token emit / dense activation';
                 } else {

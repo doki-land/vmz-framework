@@ -16,6 +16,7 @@ import {
     themeBootstrapScript,
 } from './locale-theme.js';
 import { isEventOnlyShell, loadPageCtor, loadPageResumeEntries, runRouteGate } from './page-catalog.js';
+import { packEntryHref } from './pack-entry.js';
 import { serveState } from './state.js';
 
 export async function renderPage(pathname: string, opts: HostRequestOpts = {}) {
@@ -424,7 +425,12 @@ async function* emitPageHtml(
     if (typeof native.generatePageShell !== 'function') {
         throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
     }
-    const entrySrc = `/${eventOnlyShell ? 'entry-event.js' : 'entry-client.js'}?t=${serveState.reloadToken}`;
+    // 生产 serve 必须注入打包条目：原始 `entry-client.js` 及其拉取的客户端模块保留
+    // 裸包说明符，浏览器无法解析。dev 仍走带 token 的原始 bootstrap。
+    const entryLogical = eventOnlyShell ? 'entry-event.js' : 'entry-client.js';
+    const entrySrc = serveState.isDev
+        ? `/${entryLogical}?t=${serveState.reloadToken}`
+        : packEntryHref(serveState.distDir, entryLogical);
     const cssHref = cssEntryWithBust(serveState.cssEntry);
     yield native.generatePageShell({
         bodyHtml,
