@@ -11,11 +11,13 @@ import { CACHE_ASSET_IMMUTABLE, CACHE_HTML, assertSharedAssetPath, listenLocalSt
 import { repoRoot, vmzBin } from '../_lib/repo-root.ts';
 import { serveHostChildEnv } from '../_lib/serve-host-env.ts';
 import { assertHashedCssImportsHttp } from '../_lib/assert-hashed-css-imports.ts';
-import { assertHashedEntryImportsHttp } from '../_lib/assert-hashed-entry-imports.ts';
+import { assertPackedEntryImportsHttp } from '../_lib/assert-packed-entry-imports.ts';
 import { addLimitation, readProof, upsertCheck, writeProof } from '../_lib/production-proof.ts';
 
 const root = repoRoot(import.meta.url);
-const EXAMPLE = 'packages/examples/production-router';
+// Content addressing covers non-packed static bytes, so the fixture must ship
+// design CSS: homepage emits vmz.css, vmz-designs.css and vmz-style.css.
+const EXAMPLE = 'packages/homepage';
 const ORIGIN = 'https://assets.example.test';
 
 function fail(msg: string): never {
@@ -71,9 +73,19 @@ if (!assetsManifest?.objectCount || assetsManifest.objectCount < 1) {
     errors.push('expected hashed objects');
 }
 
-const entry = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'entry-client.js');
+// Browser JS is final-named by `vmz-pack`: the entry lives under `_vmz/pack/`
+// with its content hash in the file name. This layer only covers non-packed
+// static bytes, so `vmz.css` is the representative hashed object here.
+const packManifest = JSON.parse(fs.readFileSync(path.join(dist, '_vmz', 'pack-manifest.json'), 'utf8'));
+const packEntry = (packManifest?.entryFiles || []).find((item: { logical?: string }) => item.logical === 'entry-client.js');
+const packEntryPath = packEntry?.file ? `/_vmz/pack/${packEntry.file}` : null;
+if (!packEntryPath || !/-\w{8}\.js$/.test(String(packEntry.file))) {
+    errors.push('packed entry-client.js missing content hash');
+}
+
+const entry = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'vmz.css');
 if (!entry?.assetPath?.startsWith('assets/') || !entry.digest) {
-    errors.push('entry-client.js not content-addressed');
+    errors.push('vmz.css not content-addressed');
 } else if (!fs.existsSync(path.join(dist, ...String(entry.assetPath).split('/')))) {
     errors.push(`missing hashed file ${entry.assetPath}`);
 }
@@ -82,11 +94,14 @@ const home = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
 if (home.includes('/entry-client.js"') || home.includes("'/entry-client.js'")) {
     errors.push('index.html still references /entry-client.js');
 }
+if (packEntryPath && !home.includes(packEntryPath)) {
+    errors.push(`index.html missing packed entry ${packEntryPath}`);
+}
 if (entry && !home.includes(`/${entry.assetPath}`)) {
-    errors.push(`index.html missing hashed entry ${entry.assetPath}`);
+    errors.push(`index.html missing hashed CSS ${entry.assetPath}`);
 }
 
-const vmzCssObj = (assetsManifest?.objects || []).find((o: { logicalPath: string }) => o.logicalPath === 'vmz.css');
+const vmzCssObj = entry;
 if (vmzCssObj?.assetPath) {
     const hashedCss = fs.readFileSync(path.join(dist, ...String(vmzCssObj.assetPath).split('/')), 'utf8');
     if (hashedCss.includes('vmz-designs.css') || hashedCss.includes('vmz-style.css')) {
@@ -134,10 +149,17 @@ try {
             errors.push(`hashed asset cache want immutable, got ${asset.headers['cache-control']}`);
         }
     }
+    if (packEntryPath) {
+        const packed = await get(`${host.baseUrl}${packEntryPath}`);
+        if (packed.status !== 200) errors.push(`GET ${packEntryPath} status ${packed.status}`);
+        if (String(packed.headers['cache-control'] || '') !== CACHE_ASSET_IMMUTABLE) {
+            errors.push(`packed entry cache want immutable, got ${packed.headers['cache-control']}`);
+        }
+    }
     console.log('content-addressed-assets: hashed CSS @import HTTP…');
     errors.push(...(await assertHashedCssImportsHttp(dist, host.baseUrl, get)));
-    console.log('content-addressed-assets: hashed entry-client ESM import HTTP…');
-    errors.push(...(await assertHashedEntryImportsHttp(dist, host.baseUrl, get)));
+    console.log('content-addressed-assets: packed entry ESM import HTTP…');
+    errors.push(...(await assertPackedEntryImportsHttp(dist, host.baseUrl, get)));
 } finally {
     await host.close();
 }
@@ -146,7 +168,7 @@ upsertCheck(proof, {
     id: 'content-addressed-assets',
     status: errors.length ? 'failed' : 'passed',
     detail: entry
-        ? `layout=assets/<sha256>.* objects=${assetsManifest.objectCount} entry=${String(entry.digest).slice(0, 12)}`
+        ? `layout=assets/<sha256>.* objects=${assetsManifest.objectCount} css=${String(entry.digest).slice(0, 12)} entry=${packEntry?.file || 'missing'}`
         : errors.join('; '),
 });
 upsertCheck(proof, {
@@ -166,8 +188,8 @@ upsertCheck(proof, {
 });
 upsertCheck(proof, {
     id: 'content-addressed-assets.entry-import-http',
-    status: errors.some((e) => e.includes('entry-client') || e.includes('entry import') || e.includes('./ relative')) ? 'failed' : 'passed',
-    detail: 'hashed entry-client ESM imports resolve 200 from /assets/',
+    status: errors.some((e) => e.includes('entry-client') || e.includes('pack entry') || e.includes('bare')) ? 'failed' : 'passed',
+    detail: 'packed entry-client ESM imports resolve 200 from /_vmz/pack/',
 });
 
 const gaps = ['A3: second real CDN provider adapter beyond netlify projection not covered'];
@@ -183,5 +205,5 @@ proof.knownLimitations = proof.knownLimitations.filter(
 writeProof(proof, root);
 if (errors.length) fail(errors.join('\n'));
 
-console.log(`content-addressed-assets PASS: objects=${assetsManifest.objectCount} entry=${String(entry?.digest || '').slice(0, 12)}`);
+console.log(`content-addressed-assets PASS: objects=${assetsManifest.objectCount} css=${String(entry?.digest || '').slice(0, 12)} entry=${packEntry?.file || ''}`);
 console.log('content-addressed-assets NOTE: second CDN provider adapter still open');
