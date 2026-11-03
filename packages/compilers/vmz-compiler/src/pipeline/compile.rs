@@ -367,8 +367,8 @@ pub fn compile_project_with_dirty(
     if plan.rebuild_server_tree {
         emit_server_tree(&src_root, options, &mut report)?;
     }
-    // Plain `src/**/*.{ts,js}` helpers (not `#server`, not `.vmz`) → `dist/**/*.js`.
-    emit_client_modules(&src_root, options, &mut report, dirty, plan.full)?;
+    // Plain `src/**/*.{ts,js}` helpers reachable from unit client scripts → `dist/**/*.js`.
+    emit_client_modules(root, &src_root, options, &mut report, dirty, plan.full)?;
 
     // Full RouteTable from all pages (Link resolve must not depend on dirty set / filesystem probes).
     let route_table = match build_project_route_table(root, &src_root, &mut report) {
@@ -972,8 +972,13 @@ fn emit_server_tree(
     Ok(())
 }
 
-/// Mirror plain client helpers: `src/lib/foo.ts` → `dist/lib/foo.js` (skip `src/server/**`).
+/// Mirror the client helper closure: modules reachable from the client scripts
+/// of discovered `.vmz` units through relative specifiers (`src/lib/foo.ts` →
+/// `dist/lib/foo.js`). Modules outside the closure (host entries, tooling,
+/// unreferenced generated output) are not compiled, not emitted and cannot
+/// fail the pages build.
 fn emit_client_modules(
+    root: &Path,
     src_root: &Path,
     options: &CompileOptions,
     report: &mut CompileReport,
@@ -983,39 +988,31 @@ fn emit_client_modules(
     if !src_root.is_dir() {
         return Ok(());
     }
+    // Canonical root: the closure holds canonical paths, so the strip below
+    // must compare against the canonical root (Windows `canonicalize` yields
+    // `\\?\`-prefixed paths that never strip a plain prefix).
+    let src_root_canonical =
+        std::fs::canonicalize(src_root).unwrap_or_else(|_| src_root.to_path_buf());
+    let closure = client_module_closure(root, &src_root_canonical, report);
     let dirty_set: std::collections::BTreeSet<PathBuf> =
         dirty.iter().map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.clone())).collect();
-    let server_root = src_root.join("server");
-    for entry in Walker::new(src_root).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        if path.strip_prefix(&server_root).is_ok() {
-            continue;
-        }
-        if !full {
-            let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-            if !dirty_set.contains(&canonical) {
-                continue;
-            }
-        }
+    for path in closure {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if ext != "ts" && ext != "js" && ext != "mjs" {
-            continue;
-        }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if name.ends_with(".d.ts") {
-            continue;
-        }
-        let Ok(rel) = path.strip_prefix(src_root) else {
+        let Ok(rel) = path.strip_prefix(&src_root_canonical) else {
             continue;
         };
         let out = options.out_dir.join(rel).with_extension("js");
+        if !full && !dirty_set.contains(&path) && out.exists() {
+            // Up-to-date helper outside the dirty set: keep the existing emit.
+            // A closure member whose output is missing is always re-emitted —
+            // a page may start importing a pre-existing helper without the
+            // helper itself becoming dirty.
+            continue;
+        }
         if let Some(parent) = out.parent() {
             fs::create_dir_all(parent)?;
         }
-        let source = fs::read_to_string(path)?;
+        let source = fs::read_to_string(&path)?;
         let js = if ext == "ts" {
             match vmz_generator::transpile_ts_printed(
                 &source,
@@ -1072,6 +1069,138 @@ fn emit_client_modules(
         report.emitted.push(out);
     }
     Ok(())
+}
+
+/// Compute the client helper closure: `.vmz` client scripts plus every `src/`
+/// module reachable from them through relative specifiers, transitively.
+///
+/// Bare specifiers (`pkg`, `@scope/pkg`, aliases) belong to the delivery layer,
+/// not the mirror. A relative specifier that names a module but cannot be
+/// resolved under `src/` warns — the emitted import would 404 at runtime.
+fn client_module_closure(
+    root: &Path,
+    src_root: &Path,
+    report: &mut CompileReport,
+) -> std::collections::BTreeSet<PathBuf> {
+    let mut closure = std::collections::BTreeSet::new();
+    let mut queue: Vec<PathBuf> = Vec::new();
+
+    for (unit, _kind) in crate::project::discover_vmz_files(root) {
+        let Ok(source) = fs::read_to_string(&unit) else {
+            continue;
+        };
+        let Ok(parsed) = parse_vmz(&unit, source) else {
+            continue;
+        };
+        collect_relative_helper_specs(&parsed.client.content, &unit, src_root, &mut queue, report);
+    }
+
+    // Every pop removes one queued path and `closure` admits each canonical
+    // path at most once, so the walk always makes progress and terminates.
+    while let Some(file) = queue.pop() {
+        let canonical = std::fs::canonicalize(&file).unwrap_or_else(|_| file.clone());
+        if !closure.insert(canonical.clone()) {
+            continue;
+        }
+        let Ok(source) = fs::read_to_string(&canonical) else {
+            closure.remove(&canonical);
+            report.diagnostics.push(
+                ReportedDiagnostic::warning(&file, "vmz::emit::client_module_unresolved")
+                    .with_arg("detail", "cannot read module".to_string()),
+            );
+            continue;
+        };
+        collect_relative_helper_specs(&source, &canonical, src_root, &mut queue, report);
+    }
+
+    closure
+}
+
+/// Enqueue `src/` modules referenced from `source` through relative specifiers.
+fn collect_relative_helper_specs(
+    source: &str,
+    importer: &Path,
+    src_root: &Path,
+    queue: &mut Vec<PathBuf>,
+    report: &mut CompileReport,
+) {
+    let Some(specs) = vmz_generator::collect_module_specifiers(source) else {
+        return;
+    };
+    for spec in specs {
+        match resolve_helper_specifier(importer, &spec, src_root) {
+            Some(path) => queue.push(path),
+            None => {
+                if is_module_specifier(&spec) {
+                    report.diagnostics.push(
+                        ReportedDiagnostic::warning(importer, "vmz::emit::client_module_unresolved")
+                            .with_arg("detail", format!("cannot resolve `{spec}` under src/")),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Extensions mirrored by the client-helper pipeline. Parity with the
+/// historical whole-tree walk filter (`ts` / `js` / `mjs`): declaration files
+/// and other module kinds never enter the closure.
+const HELPER_EXTENSIONS: [&str; 3] = ["ts", "js", "mjs"];
+
+/// True when a specifier could name a mirrorable module (relative, no asset
+/// extension like `.css` / `.svg` / `.json`, not a `.d.ts` declaration).
+fn is_module_specifier(spec: &str) -> bool {
+    if !spec.starts_with("./") && !spec.starts_with("../") {
+        return false;
+    }
+    let bare = spec.split(['?', '#']).next().unwrap_or(spec);
+    if bare.ends_with(".d.ts") {
+        return false;
+    }
+    match Path::new(bare).extension().and_then(|e| e.to_str()) {
+        None => true,
+        Some(ext) => HELPER_EXTENSIONS.contains(&ext),
+    }
+}
+
+/// Resolve a relative module specifier to a canonical file under `src_root`.
+fn resolve_helper_specifier(importer: &Path, spec: &str, src_root: &Path) -> Option<PathBuf> {
+    if !is_module_specifier(spec) {
+        return None;
+    }
+    let bare = spec.split(['?', '#']).next().unwrap_or(spec);
+    let base = importer.parent()?.join(bare);
+    let canonical_existing = |path: PathBuf| -> Option<PathBuf> {
+        if !path.is_file() {
+            return None;
+        }
+        // Canonicalize to collapse `..` segments, then enforce the `src/`
+        // boundary: an escaping specifier must not pull outside modules into
+        // the client graph.
+        let canonical = std::fs::canonicalize(path).ok()?;
+        canonical.strip_prefix(src_root).is_ok().then_some(canonical)
+    };
+    if Path::new(bare).extension().is_some() {
+        if let Some(found) = canonical_existing(base.clone()) {
+            return Some(found);
+        }
+        // TS authors reference a `.ts` source through its emitted `.js` name.
+        if matches!(Path::new(bare).extension().and_then(|e| e.to_str()), Some("js" | "mjs")) {
+            return canonical_existing(base.with_extension("ts"));
+        }
+        return None;
+    }
+    for ext in HELPER_EXTENSIONS {
+        if let Some(found) = canonical_existing(base.with_extension(ext)) {
+            return Some(found);
+        }
+    }
+    for ext in HELPER_EXTENSIONS {
+        if let Some(found) = canonical_existing(base.join(format!("index.{ext}"))) {
+            return Some(found);
+        }
+    }
+    None
 }
 
 fn finalize_output_revision(

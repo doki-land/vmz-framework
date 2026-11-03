@@ -34,7 +34,7 @@ pub use locale::{
     LocaleExport, LocaleTypedExport, LocaleTypedParam, emit_locale_runtime_module,
     emit_locale_typed_module,
 };
-pub use module_rewrite::{rewrite_module_specifiers, rewrite_module_specifiers_required};
+pub use module_rewrite::{collect_module_specifiers, rewrite_module_specifiers, rewrite_module_specifiers_required};
 pub use oak_expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_oak};
 pub use print::{
     EmittedJs, JsPrintOptions, SourceLines, SourceMapSegment, map_erased_offset, print_js_source,

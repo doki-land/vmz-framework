@@ -23,7 +23,7 @@ pub use css::{
     emit_style_bundle, emit_style_bundle_opts, emit_theme_css, format_css, minify_css, print_css,
     print_wxss, theme_attr_selector, validate_css,
 };
-pub use js::{JsPrintOptions, print_js_source, transpile_ts_printed};
+pub use js::{JsPrintOptions, collect_module_specifiers, print_js_source, transpile_ts_printed};
 pub use js::{
     SnippetSpan, print_template_expr, template_expr_root_span, template_expr_snippet_error,
 };

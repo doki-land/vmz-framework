@@ -15,6 +15,20 @@ pub fn rewrite_module_specifiers(
     rewrite_module_specifiers_via_oak(source, &mut map)
 }
 
+/// Collect import, export-from, and dynamic-import module specifiers without rewriting.
+///
+/// Same Oak walk as [`rewrite_module_specifiers`], so the collected set always
+/// matches what a rewrite could reach. Returns None when Oak cannot safely
+/// parse the module.
+pub fn collect_module_specifiers(source: &str) -> Option<Vec<String>> {
+    let mut out = Vec::new();
+    rewrite_module_specifiers_via_oak(source, &mut |spec| {
+        out.push(spec.to_string());
+        None
+    })?;
+    Some(out)
+}
+
 /// Like [`rewrite_module_specifiers`], panicking when Oak cannot parse the module.
 pub fn rewrite_module_specifiers_required(
     source: &str,
