@@ -227,8 +227,22 @@ fn arrow_expression_root_span_covers_the_snippet() {
 #[test]
 fn contextual_keyword_identifiers_parse_as_expressions() {
     for snippet in [
-        "as", "of", "from", "async", "get", "set", "type", "readonly", "keyof", "infer",
-        "unique", "asserts", "abstract", "declare", "namespace", "is",
+        "as",
+        "of",
+        "from",
+        "async",
+        "get",
+        "set",
+        "type",
+        "readonly",
+        "keyof",
+        "infer",
+        "unique",
+        "asserts",
+        "abstract",
+        "declare",
+        "namespace",
+        "is",
     ] {
         let parsed = parse_expression_snippet(snippet);
         assert!(parsed.ok, "{snippet}: {:?}", parsed.diagnostics);

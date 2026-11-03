@@ -157,7 +157,9 @@ fn walk_nodes(
                         None => {
                             let span =
                                 locate_attr_value_span(template, template_start, "style:tw", raw)
-                                    .unwrap_or_else(|| template_start as u32..template_start as u32);
+                                    .unwrap_or_else(|| {
+                                        template_start as u32..template_start as u32
+                                    });
                             let tokens = split_tokens(raw, &span);
                             sites.push(TwSite {
                                 kind: TwTokenKind::StyleTw,
@@ -170,14 +172,7 @@ fn walk_nodes(
                         }
                     },
                     AttrValue::Interp(expr) => {
-                        push_dynamic_site(
-                            path,
-                            template,
-                            template_start,
-                            expr,
-                            sites,
-                            diagnostics,
-                        );
+                        push_dynamic_site(path, template, template_start, expr, sites, diagnostics);
                     }
                 }
             }

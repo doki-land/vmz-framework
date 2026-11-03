@@ -919,7 +919,8 @@ fn gate_interface_members_do_not_force_module_isolation() {
         graph.nodes.iter().any(|node| node.resolved.path.ends_with("models.js")),
         "the interface module is reachable and must stay in the graph"
     );
-    let all = plan.artifacts.iter().map(|artifact| artifact.code.as_str()).collect::<Vec<_>>().join("\n");
+    let all =
+        plan.artifacts.iter().map(|artifact| artifact.code.as_str()).collect::<Vec<_>>().join("\n");
     assert!(all.contains("function pick"), "{all}");
     assert!(all.contains("options.label"), "the runtime body survives isolation:\n{all}");
     for residue in ["interface ", "readonly", ": number", ": string"] {
