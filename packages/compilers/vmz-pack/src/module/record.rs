@@ -82,9 +82,10 @@ pub struct ScopeBindingFact {
     pub references: Vec<(usize, usize)>,
     /// 名字出现在类型位置（span 不记录）。
     pub has_type_references: bool,
-    /// 声明 token 处于解构模式（模式 token 同时充当属性键，
-    /// 改写全部记录 span 仍会改变语义）。
-    /// 绑定改名必须拒绝本标志置位的绑定。
+    /// 声明 token 兼任对象模式属性键（`const { value } = obj` 的
+    /// `value`）：该 span 用裸新名替换会改变属性键。改名时把声明
+    /// span 重写为 `<旧名>: <新名>` 保住键（数组模式元素与
+    /// `{ x: renamed }` 的值目标不置位本标志）。
     pub rename_unsafe: bool,
     /// `references` 中属于对象字面量简写属性 token 的 span（`{ x }`：
     /// token 同时充当属性键，改名重写该 span 时必须发 `x: <新名>`

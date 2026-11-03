@@ -568,10 +568,11 @@ fn face_split_keeps_distinct_pinned_claimants() {
     assert!(entry_b.code.contains("const runB = value + auxA"), "{}", entry_b.code);
 }
 
-/// 面名分裂的保守边界：任一被钉声明认领者不可改名（解构声明 token 兼任
-/// 属性键，`rename_unsafe`）时不分裂，冲突维持 `name_conflict` 显式拒绝。
+/// 面名分裂对解构简写认领者同样成立：声明 token 兼任属性键（上游
+/// `rename_unsafe`），改名时声明 span 按 `<旧名>: <新名>` 重写保住键，
+/// 面分裂按通常合同发射。
 #[test]
-fn face_split_unrenamable_claimant_stays_rejected() {
+fn face_split_renames_destructured_shorthand_claimant() {
     let root = temp_tree(
         "facesplitreject",
         &[
@@ -616,10 +617,41 @@ fn face_split_unrenamable_claimant_stays_rejected() {
         ],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let Err(errors) = plan_emit(&graph, &link_plan, &chunks, &options()) else {
-        panic!("unrenamable pinned claimant must keep the explicit name_conflict rejection")
-    };
-    assert!(codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()), "{:?}", errors);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    // 共享 chunk：canonical 以原名发射，简写认领者保键改名后以 fresh 名
+    // 自身为面发射。
+    let shared = plan
+        .artifacts
+        .iter()
+        .find(|a| {
+            a.modules.iter().any(|m| m.ends_with("src/a.js"))
+                && a.modules.iter().any(|m| m.ends_with("src/b.js"))
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected a shared chunk containing a.js and b.js: {:?}",
+                plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+            )
+        });
+    assert!(shared.code.contains("const value__vmz2 = 'a'"), "{}", shared.code);
+    assert!(shared.code.contains("const { value: value__vmz3 } = pair"), "{}", shared.code);
+    assert!(shared.code.contains("export { value__vmz2 as value }"), "{}", shared.code);
+    assert!(shared.code.contains("export { value__vmz3 }"), "{}", shared.code);
+    assert!(!shared.code.contains("export { value__vmz3 as value }"), "{}", shared.code);
+    assert_eq!(shared.code.matches(" as value }").count(), 1, "{}", shared.code);
+
+    // 消费方：entryA 钉 canonical（原名导入），entryB 钉简写认领者
+    // （fresh 名导入、本地名不变）。
+    let entry_a = plan.artifacts.iter().find(|a| a.chunk_id == "entry/entryA").unwrap();
+    let entry_b = plan.artifacts.iter().find(|a| a.chunk_id == "entry/entryB").unwrap();
+    assert!(entry_a.code.contains("value } from \""), "{}", entry_a.code);
+    assert!(!entry_a.code.contains("as value"), "{}", entry_a.code);
+    assert!(entry_a.code.contains("const runA = value + auxB"), "{}", entry_a.code);
+    assert!(entry_b.code.contains("value__vmz3 as value"), "{}", entry_b.code);
+    assert!(entry_b.code.contains("const runB = value + auxA"), "{}", entry_b.code);
 }
 /// 隔离模块（scope 事实不完整）整文件独立发射、剪枝只到模块级：文件内
 /// 语句文本全部存活，包括未被消费的函数体内的引用。链接层必须把这类模块
@@ -1213,10 +1245,11 @@ fn conflicting_unexported_declaration_is_renamed() {
     assert!(!code.contains("console.log(value)"), "{code}");
 }
 
-/// 冲突声明的解构模式 token 同时充当属性键（上游 `rename_unsafe`），
-/// 改名会改变语义：不改名，冲突维持 `name_conflict` 显式拒绝。
+/// 冲突声明的解构模式 token 兼任属性键（上游 `rename_unsafe`）：声明
+/// span 按 `<旧名>: <新名>` 重写保住键，与其引用一并改名，被导出侧
+/// 原样保留。
 #[test]
-fn destructuring_conflict_stays_rejected() {
+fn destructuring_conflict_renames_via_key_preserving_rewrite() {
     let root = temp_tree(
         "declconflict",
         &[
@@ -1237,8 +1270,19 @@ fn destructuring_conflict_stays_rejected() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let errors = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap_err();
-    assert!(codes(&errors).contains(&"vmz::pack::emit::name_conflict".to_string()), "{errors:?}");
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+    assert_eq!(plan.artifacts.len(), 1);
+    let code = &plan.artifacts[0].code;
+    // 被导出的一侧原样保留，导出面不变。
+    assert!(code.contains("const value = 1"), "{code}");
+    assert!(code.contains("export { value }"), "{code}");
+    assert!(code.contains("const main = value"), "{code}");
+    // 未导出的一侧简写键保键重写，引用一起改名。
+    assert!(code.contains("const { value: value__vmz"), "{code}");
+    assert!(code.contains("console.log(value__vmz"), "{code}");
+    assert!(!code.contains("const { value } = obj"), "{code}");
+    assert!(!code.contains("console.log(value)"), "{code}");
 }
 
 /// 同 chunk 的 `import { value as v }`：scope 事实给出全部值引用，消费者

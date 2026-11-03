@@ -259,3 +259,88 @@ fn from_code_point_double_pinned_face_split_resolves() {
     let face_exports = shared.code.matches("as fromCodePoint").count();
     assert!(face_exports >= 1, "{}", shared.code);
 }
+
+/// homepage shiki singleton 形态：同 chunk 内 core 的 `function codeToHast`
+/// 普通声明导出与 bundle 的 `const { codeToHast, codeToHtml } =
+/// createSingletonShorthands()` 解构简写声明导出同名冲突。简写声明 token
+/// 兼任属性键（上游 `rename_unsafe`），改名时声明 span 按
+/// `<旧名>: <新名>` 重写保住键，面分裂按通常合同发射，不产出
+/// `name_conflict`；未冲突的 `codeToHtml` 不受影响。
+#[test]
+fn destructured_singleton_shorthand_face_split_resolves() {
+    let root = temp_tree(
+        "shikisingleton",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0","type":"module"}"#),
+            (
+                "src/pages/a.client.js",
+                "import { codeToHast } from '../vendor/index.js';\nexport default class A { m() { return codeToHast('x'); } }\n",
+            ),
+            (
+                "src/vendor/index.js",
+                "export { codeToHast } from './bundle.js';\nexport * from './core.js';\n",
+            ),
+            (
+                "src/vendor/core.js",
+                // 工厂体用成员赋值构造单例对象：对象字面量键名与模块绑定
+                // 同名会触发 `AmbiguousMemberKey` 不完备守卫，与本案无关。
+                "export function createSingletonShorthands() {\n\
+                 const shorthands = {};\n\
+                 shorthands.codeToHast = (c) => c;\n\
+                 shorthands.codeToHtml = (c) => c;\n\
+                 return shorthands;\n\
+                 }\n\
+                 function codeToHast(code) { return code; }\n\
+                 export { codeToHast };\n",
+            ),
+            (
+                "src/vendor/bundle.js",
+                "import { createSingletonShorthands } from './core.js';\n\
+                 const { codeToHast, codeToHtml } = createSingletonShorthands();\n\
+                 export { codeToHast, codeToHtml };\n",
+            ),
+        ],
+    );
+    let graph = build_graph(
+        &[("pages/a".to_string(), root.join("src/pages/a.client.js"))],
+        Target::Browser,
+        &root,
+    );
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "pages/a".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["default".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options())
+        .unwrap_or_else(|errors| panic!("shiki singleton shape rejected: {errors:?}"));
+    assert!(
+        !plan.diagnostics.iter().any(|d| d.code == "vmz::pack::emit::name_conflict"),
+        "{:?}",
+        plan.diagnostics
+    );
+    let shared = plan
+        .artifacts
+        .iter()
+        .find(|a| {
+            a.modules.iter().any(|m| m.ends_with("src/vendor/core.js"))
+                && a.modules.iter().any(|m| m.ends_with("src/vendor/bundle.js"))
+        })
+        .expect("shared chunk with core.js and bundle.js");
+    // 简写声明 token 兼任属性键：声明 span 保键重写。
+    assert!(shared.code.contains("codeToHast: codeToHast__vmz"), "{}", shared.code);
+    // 面分裂：canonical 面恰好一条原名别名导出。
+    assert_eq!(shared.code.matches(" as codeToHast }").count(), 1, "{}", shared.code);
+    // fresh 名自身面导出存在。
+    assert!(
+        shared.code.lines().any(|line| line.contains("export { codeToHast__vmz") && !line.contains(" as ")),
+        "{}",
+        shared.code
+    );
+    // 未冲突的 `codeToHtml` 不改名。
+    assert!(!shared.code.contains("codeToHtml__vmz"), "{}", shared.code);
+}

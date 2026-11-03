@@ -22,6 +22,7 @@
 //! Namespace，名字集按 chunk 加宽，与既有加宽合同同构）。
 //! 同 chunk `declared × declared` 冲突中，未被任何非类型导出事实消费的
 //! 声明改名 `{name}__vmz{node_index}`（声明 token 与活跃值引用一并改写，
+//! 声明 token 兼任对象模式属性键时该 span 按 `<旧名>: <新名>` 重写保住键，
 //! chunk 对外名字集不变）；守卫任一不成立不改名，冲突维持 `name_conflict`
 //! 显式拒绝。
 //! 同 chunk 具名重导出沿目标模块的导出事实解析为 chunk 内绑定名，与
@@ -1846,9 +1847,9 @@ fn chunk_scans<'ctx>(
 /// `check_names` 发 `name_conflict` 显式拒绝（保守方向只多拒绝不漏引用）：
 /// - `scope_incomplete` 置位或绑定无 scope 事实：引用清单不可信/给不全；
 /// - `has_type_references`：类型位置引用无 span，无法一并改写；
-/// - `rename_unsafe`：声明 token 在解构模式内，改写会连带改变属性键语义
-///   （值引用是对象简写属性 token 不构成拒绝：该 span 改写为
-///   `<旧名>: <新名>`，属性键保持不变）；
+/// - 声明 token 兼任对象模式属性键（`rename_unsafe`）不构成拒绝：声明
+///   span 按 `<旧名>: <新名>` 重写保住键（值引用是对象简写属性 token
+///   同理：该 span 改写为 `<旧名>: <新名>`，属性键保持不变）；
 /// - 声明/引用 span 切片回原文不是本名（事实与源码漂移），或引用发射
 ///   归属不可判定（既不在活跃语句、也不在被剪除语句与 import/export 子句）；
 /// - fresh 名与 chunk 内任何活跃声明名相同，或按词边界出现在任一模块的
@@ -2337,20 +2338,28 @@ fn plan_face_renames(
                 }
             }
             for export in node.record.exports.iter() {
-                let (source, face) = match export {
+                let (source, face, edge_kind) = match export {
                     ExportFact::ReexportNamed { source, exported, type_only, .. } => {
                         if *type_only || exported != name {
                             continue;
                         }
-                        (source, name.as_str())
+                        (source, name.as_str(), EdgeKind::ReexportNamed)
                     }
-                    ExportFact::ReexportAll { source, .. } => (source, name.as_str()),
+                    ExportFact::ReexportAll { source, .. } => {
+                        (source, name.as_str(), EdgeKind::ReexportAll)
+                    }
                     _ => continue,
                 };
+                // 重导出事实的边按事实自身 kind 建在 `static_edges` 上
+                // （`EdgeKind::ReexportNamed` / `EdgeKind::ReexportAll`），
+                // 只认 `Static` 会让具名重导出与星号边永远钉不到认领者。
                 let Some(edge) = node
                     .static_edges
                     .iter()
-                    .find(|edge| edge.kind == EdgeKind::Static && edge.specifier == *source)
+                    .find(|edge| {
+                        (edge.kind == EdgeKind::Static || edge.kind == edge_kind)
+                            && edge.specifier == *source
+                    })
                 else {
                     continue;
                 };
@@ -2401,6 +2410,8 @@ fn plan_face_renames(
 /// （不改名，冲突留给 `check_names` 显式拒绝）。`allow_exported` 为
 /// 落点改名兜底放开被导出绑定的排除——面名由 deferred 导出的
 /// `export { <fresh> as <原名> }` 别名保持，chunk 对外名字集不变。
+/// 声明 token 兼任对象模式属性键（`rename_unsafe`）时声明 span 进
+/// `shorthand_spans`，应用点按 `<旧名>: <新名>` 重写保住键。
 fn try_plan_declaration_rename(
     context: &EmitContext<'_>,
     node_index: usize,
@@ -2431,7 +2442,7 @@ fn try_plan_declaration_rename(
         }
     }
     let binding = record.scope_bindings.iter().find(|item| item.name == name)?;
-    if binding.has_type_references || binding.rename_unsafe {
+    if binding.has_type_references {
         return None;
     }
     if !scan.active_spans.iter().any(|outer| contains(*outer, binding.declaration)) {
@@ -2442,6 +2453,11 @@ fn try_plan_declaration_rename(
     }
     let mut spans = vec![binding.declaration];
     let mut shorthand_spans: Vec<(usize, usize)> = Vec::new();
+    // 解构简写属性键的声明 token 兼任属性键：按 `<旧名>: <新名>` 重写
+    // 保住键（应用点已支持 `shorthand_spans`，见切片内替换）。
+    if binding.rename_unsafe {
+        shorthand_spans.push(binding.declaration);
+    }
     for span in &binding.references {
         if scan.source.get(span.0..span.1) != Some(name) {
             return None;
