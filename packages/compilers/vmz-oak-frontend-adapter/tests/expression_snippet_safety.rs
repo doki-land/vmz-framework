@@ -219,3 +219,25 @@ fn arrow_expression_root_span_covers_the_snippet() {
     let span = parsed.root_span.expect("root span");
     assert_eq!(&snippet[span.start..span.end], snippet);
 }
+
+/// Vue resolves any identifier in a template scope, including names that are
+/// contextual keywords in JavaScript / TypeScript (`as`, `of`, `from`, `async`,
+/// `satisfies`, ...). Those are legal `IdentifierReference`s, not reserved
+/// words, so a template interpolation that is exactly such a name must parse.
+#[test]
+fn contextual_keyword_identifiers_parse_as_expressions() {
+    for snippet in [
+        "as", "of", "from", "async", "get", "set", "type", "readonly", "keyof", "infer",
+        "unique", "asserts", "abstract", "declare", "namespace", "is",
+    ] {
+        let parsed = parse_expression_snippet(snippet);
+        assert!(parsed.ok, "{snippet}: {:?}", parsed.diagnostics);
+        let expression = parsed.expression.expect(snippet);
+        let ExpressionKind::Identifier(name) = expression.kind.as_ref() else {
+            panic!("{snippet}: expected an identifier, got {:?}", expression.kind);
+        };
+        assert_eq!(name, snippet);
+        let span = parsed.root_span.expect(snippet);
+        assert_eq!(&snippet[span.start..span.end], snippet);
+    }
+}

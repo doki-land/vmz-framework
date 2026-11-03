@@ -46,18 +46,6 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
     }
     let base = expr.len() - expr.trim_start().len();
 
-    if is_vue_contextual_identifier(trimmed) {
-        return ExpressionSnippetParse {
-            expression: Some(Expression::new(
-                ExpressionKind::Identifier(trimmed.to_string()),
-                (0..trimmed.len()).into(),
-            )),
-            root_span: Some(ByteSpan { start: base, end: base + trimmed.len() }),
-            diagnostics: Vec::new(),
-            ok: true,
-        };
-    }
-
     let source = SourceText::new(trimmed);
     // VMZ template expressions are plain TypeScript and VMZ forbids JSX, so a
     // leading `<` must read as a generic arrow or a type parameter list.
@@ -172,10 +160,6 @@ pub fn parse_expression_snippet(expr: &str) -> ExpressionSnippetParse {
     ExpressionSnippetParse { expression: None, root_span: None, diagnostics, ok: false }
 }
 
-fn is_vue_contextual_identifier(value: &str) -> bool {
-    matches!(value, "type" | "readonly" | "default" | "static" | "get" | "set")
-}
-
 /// How a built root statement list consumes the trimmed snippet.
 enum SnippetShape {
     /// Exactly one expression statement spanning the whole snippet.
@@ -189,6 +173,11 @@ enum SnippetShape {
 }
 
 fn classify_snippet(root: &TypeScriptRoot, trimmed: &str) -> SnippetShape {
+    if root.statements.is_empty() {
+        // 语句起点无法表达的片段（例如 `as` / `of` 这类上下文字
+        // 关键字标识符）会被解析成空根，交给表达式包装重试。
+        return SnippetShape::NotExpression;
+    }
     if root.statements.len() != 1 {
         return SnippetShape::MultipleStatements(root.statements.len());
     }
