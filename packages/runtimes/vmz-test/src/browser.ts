@@ -19,6 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { resolveComponentEntries } from '@vmz/core/component-registry';
 import { resolveChunkArtifacts } from './compile.js';
+import { packHarnessComponents } from './browser-pack.js';
 import { createArtifactsDir, writeFailureEvidence, writeTimingOnly, type BrowserTiming, type StepTiming } from './browser-evidence.js';
 import { isServeHostManifest, resolveRoutePath, startServeHost, type ServeHostHandle } from './browser-serve.js';
 import { resolveDeliveryServeRoot } from './delivery-serve-root.js';
@@ -385,13 +386,37 @@ export async function runBrowserManifest(
                 closureRoots: [chunkId.replace(/\\/g, '/')],
             });
 
+            // Raw compiler artifacts keep bare package imports (e.g. `@vmz/ui-icons/registry`
+            // inside `@vmz/ui` components) that the browser cannot resolve — the vendor
+            // lowering that used to rewrite them is retired. Pack the harness component
+            // chain for the browser target and load the packed entry chunks instead.
+            const registryChunkId = (e: { name: string; chunkId?: string }) => (e.chunkId || `components/${e.name}`).replace(/\\/g, '/');
+            const packChunkIds = [...new Set([chunkId.replace(/\\/g, '/'), ...registryEntries.map(registryChunkId)])];
+            let packEntryFiles: Map<string, string>;
+            try {
+                packEntryFiles = packHarnessComponents(outDir, packChunkIds);
+            } catch (e) {
+                fail(`browser pack: ${e instanceof Error ? e.message : String(e)}`);
+                return {
+                    status: 'error',
+                    diagnostics,
+                    planId: null,
+                    programId,
+                };
+            }
+            const packedHref = (logical: string): string => {
+                const file = packEntryFiles.get(logical);
+                if (!file) throw new Error(`browser pack: no packed entry for "${logical}"`);
+                return `${origin}/_vmz/pack-test/${file}`;
+            };
+
             const boot = await page.evaluate(
-                async (cfg: { origin: string; chunkPath: string; registry: Array<{ name: string; entry: string }> }) => {
+                async (cfg: { origin: string; chunkUrl: string; registry: Array<{ name: string; url: string }> }) => {
                     const dom = await import(/* @vite-ignore */ `${cfg.origin}/vmz-dom.js`);
-                    const Comp = (await import(/* @vite-ignore */ `${cfg.origin}/${cfg.chunkPath}.client.js`)).default;
+                    const Comp = (await import(/* @vite-ignore */ cfg.chunkUrl)).default;
                     const map: Record<string, unknown> = {};
-                    for (const { name, entry } of cfg.registry) {
-                        map[name] = (await import(/* @vite-ignore */ `${cfg.origin}/${entry}`)).default;
+                    for (const { name, url } of cfg.registry) {
+                        map[name] = (await import(/* @vite-ignore */ url)).default;
                     }
                     if (Object.keys(map).length && typeof dom.registerComponents === 'function') {
                         dom.registerComponents(map);
@@ -414,8 +439,8 @@ export async function runBrowserManifest(
                 },
                 {
                     origin,
-                    chunkPath: chunkId.replace(/\\/g, '/'),
-                    registry: registryEntries,
+                    chunkUrl: packedHref(chunkId.replace(/\\/g, '/')),
+                    registry: registryEntries.map((e) => ({ name: e.name, url: packedHref(registryChunkId(e)) })),
                 },
             );
 
