@@ -166,13 +166,14 @@ try {
     }
 
     if (asset.status !== 200 || !asset.body) errors.push('hashed entry-client missing (static-resume)');
-    // Split DOM runtime: browser face `dom.browser.js` (never re-exports Node SSR) plus `dom-ssr.js`.
+    // Browser resume lives in `dom.browser.js`. The static profile prunes the
+    // unreachable SSR barrel, so server rendering must not ship in browser bytes.
     const domSsr = await get(`${host.baseUrl}/dom-ssr.js`);
     if (dom.status !== 200 || !/dom-core\.js/.test(dom.body)) {
         errors.push('dom.browser.js missing/corrupt browser face (static-resume)');
     }
-    if (domSsr.status !== 200 || !domSsr.body.includes('renderToStream')) {
-        errors.push('dom-ssr.js missing/corrupt (static-resume)');
+    if (domSsr.status !== 404) {
+        errors.push(`dom-ssr.js must not ship in static delivery, got ${domSsr.status}`);
     }
     if (String(asset.headers['cache-control'] || '') !== CACHE_ASSET_IMMUTABLE) {
         errors.push(`asset cache want immutable, got ${asset.headers['cache-control']}`);

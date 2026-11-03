@@ -7,7 +7,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { BROWSER_FORBIDDEN_BASENAMES, buildBrowserImportClosure } from './runtime-inventory.ts';
+import { BROWSER_FORBIDDEN_BASENAMES, buildBrowserImportClosure, packedEntryRel } from './runtime-inventory.ts';
 import { runVmzBuild } from './production-proof.ts';
 import { repoRoot } from './repo-root.ts';
 import { recordBrowserArtifactBoundary } from './browser-artifact-boundary.ts';
@@ -39,8 +39,11 @@ export function buildThinHostFixture(root = repoRoot(import.meta.url)): ThinHost
 
     const serveDist = serveBuild.dist;
     const staticDist = staticBuild.dist;
-    const entryPath = path.join(staticDist, 'entry-client.js');
-    const entryClient = fs.existsSync(entryPath) ? fs.readFileSync(entryPath, 'utf8') : '';
+    // Static delivery publishes browser JS only through `_vmz/pack/`.
+    const entryRel = fs.existsSync(path.join(staticDist, 'entry-client.js'))
+        ? 'entry-client.js'
+        : packedEntryRel(staticDist);
+    const entryClient = entryRel ? fs.readFileSync(path.join(staticDist, ...entryRel.split('/')), 'utf8') : '';
 
     const rootForbidden: string[] = [];
     for (const name of BROWSER_FORBIDDEN_BASENAMES) {
@@ -88,10 +91,10 @@ export function assertThinRuntimeImports(scan: ThinHostScan): string[] {
         errors.push('missing entry-client.js (static profile)');
         return errors;
     }
-    if (!/from\s+["']\.\/dom\.browser\.js/.test(scan.entryClient)) {
-        errors.push('entry-client must import hydrate face from ./dom.browser.js');
+    if (!/from\s+["'][^"']*dom\.browser\.js/.test(scan.entryClient)) {
+        errors.push('entry-client must import hydrate face from dom.browser.js');
     }
-    if (/from\s+["']\.\/vmz-dom\.js/.test(scan.entryClient)) {
+    if (/from\s+["'][^"']*vmz-dom\.js/.test(scan.entryClient)) {
         errors.push('entry-client must not import full ./vmz-dom.js barrel');
     }
     // Prefer component samples from serve fixture (specialized Direct emit).

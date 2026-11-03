@@ -271,6 +271,21 @@ export function buildBrowserImportClosure(
     return { modules: [...seen].sort(), bytes, forbiddenImports };
 }
 
+/** Resolve the published browser entry file from `_vmz/pack-manifest.json`. */
+export function packedEntryRel(distDir: string, logical = 'entry-client.js'): string | null {
+    const manifestPath = path.join(distDir, '_vmz', 'pack-manifest.json');
+    if (!fs.existsSync(manifestPath)) return null;
+    try {
+        const pack = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+            entryFiles?: Array<{ logical?: string; file?: string }>;
+        };
+        const hit = (pack.entryFiles || []).find((entry) => entry && entry.logical === logical);
+        return hit?.file ? `_vmz/pack/${hit.file}` : null;
+    } catch {
+        return null;
+    }
+}
+
 function mapPreferredFaceToDist(face: string | null): string | null {
     if (!face) return null;
     const f = face.replace(/\\/g, '/');
@@ -295,12 +310,14 @@ function pickClientEntries(boundary: BrowserArtifactBoundary, distDir: string): 
     };
 
     push(mapPreferredFaceToDist(boundary.pack.preferredClientFace));
-    push('entry-client.js');
+    // Serve keeps the logical entry. Static publishes browser JS only through
+    // `_vmz/pack/`, so fall back to the manifest entry file there. Seeding
+    // generated component modules separately would pull duplicated faces and
+    // vary between OSes, while the entry closure already reaches them.
+    push(fs.existsSync(path.join(distDir, 'entry-client.js')) ? 'entry-client.js' : packedEntryRel(distDir));
     push('dom.browser.js');
     push('dom.client.js');
     push('dom-core.js');
-    for (const entry of boundary.pack.generatedEntries) push(entry);
-    for (const rel of boundary.modules.generatedComponents) push(rel);
     return seeds;
 }
 

@@ -10,6 +10,9 @@ import { repoRoot } from './repo-root.ts';
 
 export const BROWSER_ARTIFACT_BOUNDARY_SCHEMA = 'vmz.browser-artifact-boundary.v0' as const;
 
+/** Runtime-owned face subtrees vendored into the delivery dist (browser + SSR). */
+const RUNTIME_SHARED_PREFIXES = ['browser/', 'ssr/'] as const;
+
 /** Shared runtime / DOM copies typically vendored into delivery dist. */
 const RUNTIME_SHARED_NAMES = new Set([
     'vmz-runtime.js',
@@ -139,10 +142,16 @@ function readPack(distDir: string): {
             packDigest?: string;
             chunks?: Array<{ modules?: string[] }>;
         };
-        // Chunk `modules` are the absolute module paths linked into the browser graph.
+        // Chunk `modules` are the module paths linked into the browser graph.
+        // Windows pack reports verbatim `//?/E:/…` paths, so normalize before
+        // making them dist-relative to keep CI and local classification equal.
         const generatedEntries = (pack.chunks || [])
             .flatMap((c) => c.modules || [])
-            .map((m) => path.relative(distDir, m.replace(/\\/g, '/')).replace(/\\/g, '/'))
+            .map((m) => {
+                let abs = m.replace(/\\/g, '/');
+                if (abs.startsWith('//?/')) abs = abs.slice(4);
+                return path.relative(distDir, abs).replace(/\\/g, '/');
+            })
             .filter((rel) => rel && !rel.startsWith('..'))
             .sort();
         return {
@@ -161,9 +170,9 @@ function classifyRel(rel: string, generatedSet: Set<string>): 'generated' | 'run
     const norm = rel.replace(/\\/g, '/');
     const base = path.posix.basename(norm);
     if (RUNTIME_SHARED_NAMES.has(base)) return 'runtime';
+    if (RUNTIME_SHARED_PREFIXES.some((prefix) => norm.startsWith(prefix))) return 'runtime';
     if (generatedSet.has(norm)) return 'generated';
     if (/\.client\.js$/.test(norm)) return 'generated';
-    if (RUNTIME_SHARED_NAMES.has(base)) return 'runtime';
     if (HOST_OR_NODE_SUSPECT_NAMES.has(base)) return 'host';
     return 'unclassified';
 }

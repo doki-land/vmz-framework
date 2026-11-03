@@ -428,7 +428,7 @@ export const directApi = {
                     host.replaceWith(err);
                     return;
                 }
-                const { resume } = await import('../../ssr/dom-ssr.js');
+                const { resume } = await import('../resume/resume.js');
                 await resume(Ctor, host, { props: resolved, state: {} });
             });
             return host;

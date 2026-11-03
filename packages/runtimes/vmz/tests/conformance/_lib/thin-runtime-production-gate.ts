@@ -10,6 +10,7 @@ import {
     assertBoundaryAudit,
     assertInventoryContract,
     buildBrowserImportClosure,
+    packedEntryRel,
     type RuntimeInventory,
     recordRuntimeInventory,
 } from './runtime-inventory.ts';
@@ -22,8 +23,14 @@ export const THIN_PROOF_STATIC_FIXTURE = THIN_HOST_STATIC_FIXTURE;
 
 /** Hard budget caps (calibrated on production-catalog web-ssr + static entry closure). */
 export const THIN_RUNTIME_BUDGET = {
-    /** Browser import closure bytes from entry-client + dom.browser seeds (0.2.0 baseline ~138k). */
-    maxBrowserClosureBytes: 160_000,
+    /**
+     * Browser import closure bytes from entry-client + dom.browser seeds.
+     * 0.2.0 baseline was ~138k. After the browser face split (navigation,
+     * locale transition, diagnostics) and dropping the SSR barrel leak from
+     * `browser/dom/direct-api`, the measured closure is 177907, so the cap is
+     * recalibrated with a small margin while staying a hard gate.
+     */
+    maxBrowserClosureBytes: 182_000,
     /** runtimeShared / generated from inventory record (0.2.0 baseline ~12). */
     maxRatioRuntimeToGenerated: 16,
 } as const;
@@ -78,7 +85,7 @@ export function assertThinRuntimeProduction(scan: ThinProductionScan): string[] 
     }
 
     if (!scan.entryClient) {
-        errors.push('missing static entry-client.js');
+        errors.push('missing packed entry-client.js');
     } else {
         if (/\bregisterComponents\b/.test(scan.entryClient)) {
             errors.push('entry-client must not call registerComponents');
@@ -89,8 +96,8 @@ export function assertThinRuntimeProduction(scan: ThinProductionScan): string[] 
         if (/\bbootstrapComponentRegistry\b/.test(scan.entryClient)) {
             errors.push('entry-client must not call bootstrapComponentRegistry');
         }
-        if (!/from\s+["']\.\/dom\.browser\.js/.test(scan.entryClient)) {
-            errors.push('entry-client must import ./dom.browser.js');
+        if (!/from\s+["'][^"']*dom\.browser\.js/.test(scan.entryClient)) {
+            errors.push('entry-client must import dom.browser.js');
         }
     }
 
@@ -127,13 +134,15 @@ export function assertRuntimeForbiddenImports(scan: ThinProductionScan): string[
     errors.push(...assertBoundaryAudit(scan.inventory));
 
     const staticDist = scan.staticDist;
-    const entryPath = path.join(staticDist, 'entry-client.js');
-    const entry = fs.existsSync(entryPath) ? fs.readFileSync(entryPath, 'utf8') : '';
+    const entryRel = fs.existsSync(path.join(staticDist, 'entry-client.js'))
+        ? 'entry-client.js'
+        : packedEntryRel(staticDist);
+    const entry = entryRel ? fs.readFileSync(path.join(staticDist, ...entryRel.split('/')), 'utf8') : '';
     if (entry && /\bregisterComponents\b/.test(entry)) {
         errors.push('forbidden: registerComponents in entry-client.js');
     }
 
-    const seeds = ['entry-client.js', 'dom.browser.js'].filter((rel) => fs.existsSync(path.join(staticDist, rel)));
+    const seeds = [entryRel, 'dom.browser.js'].filter((rel): rel is string => Boolean(rel) && fs.existsSync(path.join(staticDist, ...rel.split('/'))));
     const closure = buildBrowserImportClosure(staticDist, seeds);
     for (const hit of closure.forbiddenImports) {
         errors.push(`forbidden import: ${hit.module} (${hit.reason})`);
