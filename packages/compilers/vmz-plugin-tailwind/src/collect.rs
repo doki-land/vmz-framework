@@ -143,43 +143,85 @@ fn walk_nodes(
                     continue;
                 }
                 match &attr.value {
-                    AttrValue::Static(raw) => {
-                        let span =
-                            locate_attr_value_span(template, template_start, "style:tw", raw)
-                                .unwrap_or_else(|| template_start as u32..template_start as u32);
-                        let tokens = split_tokens(raw, &span);
-                        sites.push(TwSite {
-                            kind: TwTokenKind::StyleTw,
-                            path: path.to_path_buf(),
-                            span,
-                            tokens,
-                            dynamic: false,
-                            raw: raw.clone(),
-                        });
-                    }
+                    // `style:tw={expr}` arrives as a static string with the braces
+                    // intact: it is a dynamic class site, not a token list.
+                    AttrValue::Static(raw) => match brace_expression_body(raw) {
+                        Some(expr) => push_dynamic_site(
+                            path,
+                            template,
+                            template_start,
+                            expr,
+                            sites,
+                            diagnostics,
+                        ),
+                        None => {
+                            let span =
+                                locate_attr_value_span(template, template_start, "style:tw", raw)
+                                    .unwrap_or_else(|| template_start as u32..template_start as u32);
+                            let tokens = split_tokens(raw, &span);
+                            sites.push(TwSite {
+                                kind: TwTokenKind::StyleTw,
+                                path: path.to_path_buf(),
+                                span,
+                                tokens,
+                                dynamic: false,
+                                raw: raw.clone(),
+                            });
+                        }
+                    },
                     AttrValue::Interp(expr) => {
-                        let span = locate_attr_name_span(template, template_start, "style:tw")
-                            .unwrap_or_else(|| template_start as u32..template_start as u32);
-                        diagnostics.push(
-                            ReportedDiagnostic::advice(path, "vmz::tw::dynamic_style_tw")
-                                .with_arg("expr", expr.clone()),
+                        push_dynamic_site(
+                            path,
+                            template,
+                            template_start,
+                            expr,
+                            sites,
+                            diagnostics,
                         );
-                        // Attach span via error_at-style advice isn't available — use warning_at pattern:
-                        // ReportedDiagnostic::advice has no span; upgrade to warning with label.
-                        sites.push(TwSite {
-                            kind: TwTokenKind::StyleTw,
-                            path: path.to_path_buf(),
-                            span,
-                            tokens: Vec::new(),
-                            dynamic: true,
-                            raw: format!("{{{expr}}}"),
-                        });
                     }
                 }
             }
             walk_nodes(children, path, template, template_start, sites, diagnostics);
         }
     }
+}
+
+/// Body of a brace-wrapped attribute value: `{expr}` → `expr`.
+///
+/// The concrete template classifier keeps brace values verbatim in static
+/// attributes (`style:tw={expr}` stays a string), so this is the only reliable
+/// way to tell an expression site from a class list.
+fn brace_expression_body(raw: &str) -> Option<&str> {
+    let trimmed = raw.trim();
+    let body = trimmed.strip_prefix('{')?.strip_suffix('}')?.trim();
+    (!body.is_empty()).then_some(body)
+}
+
+/// Record a `style:tw` site whose classes are computed at runtime.
+fn push_dynamic_site(
+    path: &Path,
+    template: &str,
+    template_start: usize,
+    expr: &str,
+    sites: &mut Vec<TwSite>,
+    diagnostics: &mut Vec<ReportedDiagnostic>,
+) {
+    let span = locate_attr_name_span(template, template_start, "style:tw")
+        .unwrap_or_else(|| template_start as u32..template_start as u32);
+    diagnostics.push(
+        ReportedDiagnostic::advice(path, "vmz::tw::dynamic_style_tw")
+            .with_arg("expr", expr.to_string()),
+    );
+    // Attach span via error_at-style advice isn't available — use warning_at pattern:
+    // ReportedDiagnostic::advice has no span; upgrade to warning with label.
+    sites.push(TwSite {
+        kind: TwTokenKind::StyleTw,
+        path: path.to_path_buf(),
+        span,
+        tokens: Vec::new(),
+        dynamic: true,
+        raw: format!("{{{expr}}}"),
+    });
 }
 
 fn collect_at_tailwind(

@@ -83,6 +83,11 @@ fn register_style_tw_nodes(nodes: &[TemplateNode], path: &Path, out: &mut Vec<Tw
                 for a in attrs {
                     if a.name == "style:tw" {
                         if let AttrValue::Static(s) = &a.value {
+                            // `style:tw={expr}` keeps its braces in a static value: the
+                            // class list is runtime-computed, so nothing can be registered.
+                            if is_brace_expression(s) {
+                                continue;
+                            }
                             for t in s.split_whitespace() {
                                 if !t.is_empty() {
                                     out.push(TwRegistration {
@@ -100,6 +105,16 @@ fn register_style_tw_nodes(nodes: &[TemplateNode], path: &Path, out: &mut Vec<Tw
             TemplateNode::Text(_) | TemplateNode::Interp(_) => {}
         }
     }
+}
+
+/// `style:tw={expr}` — the concrete template classifier keeps the braces in the
+/// static value, so a brace-wrapped value is a runtime expression, not classes.
+fn is_brace_expression(raw: &str) -> bool {
+    let trimmed = raw.trim();
+    let Some(body) = trimmed.strip_prefix('{').and_then(|s| s.strip_suffix('}')) else {
+        return false;
+    };
+    !body.trim().is_empty()
 }
 
 fn register_at_tailwind(path: &Path, style: &str, out: &mut Vec<TwRegistration>) {
