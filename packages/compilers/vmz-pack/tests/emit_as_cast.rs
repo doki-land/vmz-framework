@@ -24,6 +24,17 @@ fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
 }
 
 #[test]
+fn debug_angle_assertion_module_facts() {
+    let source = "export const forced = <FractalWasm>resolved;\nexport const plain = resolved;\n";
+    let record = vmz_pack::module::parse_module(Some("x.js"), source).unwrap();
+    for (index, statement) in record.statements.iter().enumerate() {
+        let (start, end) = statement.span;
+        eprintln!("stmt {index}: span=({start},{end}) text={:?}", &source[start..end]);
+    }
+    eprintln!("diags: {:?}", record.diagnostics);
+}
+
+#[test]
 fn as_cast_after_keyword_member_never_reaches_chunk_text() {
     let root = temp_tree(
         "keyword-member",
@@ -31,7 +42,7 @@ fn as_cast_after_keyword_member_never_reaches_chunk_text() {
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             (
                 "src/entry.js",
-                "let resolved = null;\nexport function load() {\n  return import('./impl.js').then((mod) => {\n    resolved = mod.default as FractalWasm;\n  });\n}\nexport const picked = resolved as FractalWasm | null;\n",
+                "let resolved = null;\nexport function load() {\n  return import('./impl.js').then((mod) => {\n    resolved = mod.default as FractalWasm;\n  });\n}\nexport const picked = resolved as FractalWasm | null;\nexport const checked = resolved satisfies FractalWasm | null;\nexport const forced = <FractalWasm>resolved;\n",
             ),
             ("src/impl.js", "export default { init() {} };\n"),
         ],
@@ -44,7 +55,12 @@ fn as_cast_after_keyword_member_never_reaches_chunk_text() {
         &[EntryUse {
             entry_logical: "main".to_string(),
             execution: EntryExecution::SideEffects,
-            exports: EntryExports::Named(vec!["load".into(), "picked".into()]),
+            exports: EntryExports::Named(vec![
+                "load".into(),
+                "picked".into(),
+                "checked".into(),
+                "forced".into(),
+            ]),
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
@@ -57,7 +73,11 @@ fn as_cast_after_keyword_member_never_reaches_chunk_text() {
         plan.artifacts.iter().map(|artifact| artifact.code.as_str()).collect::<Vec<_>>().join("\n");
     assert!(!all.contains("as FractalWasm"), "{all}");
     assert!(!all.contains("resolved as"), "{all}");
+    assert!(!all.contains("satisfies"), "{all}");
+    assert!(!all.contains("<FractalWasm>"), "{all}");
     assert!(all.contains("mod.default"), "{all}");
+    assert!(all.contains("const checked = resolved;"), "{all}");
+    assert!(all.contains("const forced = resolved;"), "{all}");
     // 合法 ESM 别名 `export { x as default }` 不是类型断言，必须原样保留。
     assert!(all.contains("as default"), "{all}");
 }

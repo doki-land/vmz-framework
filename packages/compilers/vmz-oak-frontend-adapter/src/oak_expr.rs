@@ -375,6 +375,7 @@ fn shift_expression_spans(expr: &mut Expression, delta: isize) {
         | ExpressionKind::SpreadElement(argument)
         | ExpressionKind::NonNullExpression(argument)
         | ExpressionKind::AsExpression { expression: argument, .. }
+        | ExpressionKind::SatisfiesExpression { expression: argument, .. }
         | ExpressionKind::TypeAssertionExpression { expression: argument, .. } => {
             shift_expression_spans(argument, delta);
         }

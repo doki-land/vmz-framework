@@ -158,6 +158,7 @@ fn collect_bind_rewrites(
         | ExpressionKind::SpreadElement(argument)
         | ExpressionKind::NonNullExpression(argument)
         | ExpressionKind::AsExpression { expression: argument, .. }
+        | ExpressionKind::SatisfiesExpression { expression: argument, .. }
         | ExpressionKind::TypeAssertionExpression { expression: argument, .. } => {
             collect_bind_rewrites(argument, fields, methods, scope, aliases, out);
         }
@@ -360,6 +361,7 @@ impl DepCollector<'_> {
             | ExpressionKind::SpreadElement(argument)
             | ExpressionKind::NonNullExpression(argument)
             | ExpressionKind::AsExpression { expression: argument, .. }
+            | ExpressionKind::SatisfiesExpression { expression: argument, .. }
             | ExpressionKind::TypeAssertionExpression { expression: argument, .. } => {
                 self.visit_expr(argument);
             }
@@ -474,6 +476,7 @@ impl AliasPathCollector<'_> {
             | ExpressionKind::SpreadElement(argument)
             | ExpressionKind::NonNullExpression(argument)
             | ExpressionKind::AsExpression { expression: argument, .. }
+            | ExpressionKind::SatisfiesExpression { expression: argument, .. }
             | ExpressionKind::TypeAssertionExpression { expression: argument, .. } => {
                 self.visit_expr(argument);
             }

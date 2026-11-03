@@ -176,9 +176,10 @@ fn print_expr(expr: &Expression, min_prec: Prec) -> Option<String> {
             wrap_prec(format!("{prefix}{params_s} => {body_s}"), Prec::Assign, min_prec)
         }
         ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::SatisfiesExpression { expression, .. }
         | ExpressionKind::TypeAssertionExpression { expression, .. } => {
-            // `as T` / `<T>` 是 TS 断言，运行时就是内层表达式：打印时剥离断言，
-            // 按 `as` 的结合强度（一元档）保留内层分组括号，不进产物 JS。
+            // `as T` / `satisfies T` / `<T>` 是 TS 断言，运行时就是内层表达式：
+            // 打印时剥离断言，按断言结合强度（一元档）保留内层分组括号。
             let expr_s = print_expr(expression, Prec::Unary)?;
             wrap_prec(expr_s, Prec::Unary, min_prec)
         }
@@ -411,6 +412,19 @@ mod tests {
         assert_eq!(
             print_template_expr_via_oak("flag ? a as T : b").as_deref(),
             Some("flag ? a : b")
+        );
+    }
+
+    #[test]
+    fn strips_satisfies_and_angle_assertions_from_output() {
+        assert_eq!(print_template_expr_via_oak("value satisfies Config").as_deref(), Some("value"));
+        assert_eq!(
+            print_template_expr_via_oak("mod.default satisfies FractalWasm").as_deref(),
+            Some("mod.default")
+        );
+        assert_eq!(
+            print_template_expr_via_oak("<FractalWasm>mod.default").as_deref(),
+            Some("mod.default")
         );
     }
 

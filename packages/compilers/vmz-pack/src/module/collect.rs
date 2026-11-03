@@ -1006,6 +1006,7 @@ impl<'a> Collector<'a> {
             | ExpressionKind::AwaitExpression(inner)
             | ExpressionKind::NonNullExpression(inner)
             | ExpressionKind::TypeAssertionExpression { expression: inner, .. }
+            | ExpressionKind::SatisfiesExpression { expression: inner, .. }
             | ExpressionKind::AsExpression { expression: inner, .. } => self.walk_expr(inner),
             ExpressionKind::YieldExpression(value) => {
                 if let Some(value) = value {
@@ -1075,6 +1076,7 @@ fn expr_pure(expression: &Expression) -> bool {
             expr_pure(inner)
         }
         ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::SatisfiesExpression { expression, .. }
         | ExpressionKind::TypeAssertionExpression { expression, .. } => expr_pure(expression),
         // 闭包创建本身纯；体内引用与调用只在执行时发生。
         ExpressionKind::ArrowFunction { .. } | ExpressionKind::FunctionExpression { .. } => true,
@@ -1269,6 +1271,7 @@ fn collect_refs_expression(expression: &Expression, names: &mut Vec<String>) {
             collect_refs_expression(alternate, names);
         }
         ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::SatisfiesExpression { expression, .. }
         | ExpressionKind::TypeAssertionExpression { expression, .. } => {
             collect_refs_expression(expression, names);
         }

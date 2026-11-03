@@ -204,3 +204,102 @@ fn keeps_as_used_as_plain_identifier() {
     assert!(js.contains("import { a as b } from './x';"), "{js}");
     assert!(js.contains("export { b as c };"), "{js}");
 }
+
+#[test]
+fn erases_satisfies_in_expression_positions() {
+    // `satisfies` 词法上是普通标识符，按上下文识别为 TS 断言并剥离。
+    let js = erase_types(
+        "const cfg = value satisfies Config;\nregister(name satisfies string, opts satisfies Options);\nconst pick = (m) => m.default satisfies FractalWasm;\npromise.then((m) => { resolved = m.default satisfies FractalWasm; });\nconst viaOpt = mod?.default satisfies FractalWasm;\n",
+    )
+    .unwrap();
+    assert!(!js.contains("satisfies"), "{js}");
+    assert!(js.contains("const cfg = value;"), "{js}");
+    assert!(js.contains("register(name, opts);"), "{js}");
+    assert!(js.contains("(m) => m.default;"), "{js}");
+    assert!(js.contains("resolved = m.default;"), "{js}");
+    assert!(js.contains("mod?.default;"), "{js}");
+}
+
+#[test]
+fn keeps_satisfies_used_as_plain_identifier() {
+    let js = erase_types("const satisfies = 1;\nf(satisfies);\nconst y = satisfies;\nmod.satisfies;\nconst o = { satisfies: 2 };\n").unwrap();
+    assert!(js.contains("const satisfies = 1;"), "{js}");
+    assert!(js.contains("f(satisfies);"), "{js}");
+    assert!(js.contains("const y = satisfies;"), "{js}");
+    assert!(js.contains("mod.satisfies;"), "{js}");
+    assert!(js.contains("{ satisfies: 2 }"), "{js}");
+}
+
+#[test]
+fn rejects_dangling_satisfies() {
+    assert!(erase_types("const x = foo satisfies;\n").is_err());
+    assert!(erase_types("const x = foo satisfies\n").is_err());
+}
+
+#[test]
+fn erases_angle_bracket_assertions_at_expression_start() {
+    // `<T>expr` 前缀断言（JSX 已禁，表达式起点的 `<` 只能是断言或泛型箭头）。
+    let js = erase_types(
+        "const el = <HTMLElement>document.body;\nresolve(<FractalWasm>mod.default);\nconst label = <string>cfg.name;\nfunction pick(m) {\n  return <FractalWasm>m.default;\n}\nconst arrow = () => <FractalWasm>mod.default;\nconst nested = <FractalWasm>(mod.default as unknown);\n",
+    )
+    .unwrap();
+    assert!(!js.contains("<HTMLElement>"), "{js}");
+    assert!(!js.contains("<FractalWasm>"), "{js}");
+    assert!(!js.contains("<string>"), "{js}");
+    assert!(js.contains("const el = document.body;"), "{js}");
+    assert!(js.contains("resolve(mod.default);"), "{js}");
+    assert!(js.contains("const label = cfg.name;"), "{js}");
+    assert!(js.contains("return m.default;"), "{js}");
+    assert!(js.contains("() => mod.default;"), "{js}");
+    assert!(js.contains("(mod.default);"), "{js}");
+}
+
+#[test]
+fn erases_angle_bracket_assertions_with_complex_types() {
+    let js = erase_types(
+        "const m = <Map<string, number>>cache.map;\nconst u = <A | B>value;\nconst g = <T>(x: T) => x;\nconst n = pick<Map<string, number>>(input);\n",
+    )
+    .unwrap();
+    assert!(js.contains("const m = cache.map;"), "{js}");
+    assert!(js.contains("const u = value;"), "{js}");
+    // 泛型箭头函数的类型参数同样擦除，参数标注由既有路径处理。
+    assert!(js.contains("const g = (x) => x;"), "{js}");
+    // 嵌套泛型调用的 `>>` 闭合也要整体擦除。
+    assert!(js.contains("const n = pick(input);"), "{js}");
+}
+
+#[test]
+fn erases_assertions_in_export_declarations() {
+    // 裸 `export`（default/const 等声明）不是说明符子句，其中的断言照常剥离。
+    let js = erase_types(
+        "export const picked = resolved as FractalWasm | null;\nexport const checked = resolved satisfies Config;\nexport default foo as Bar;\nexport const forced = <FractalWasm>resolved;\n",
+    )
+    .unwrap();
+    assert!(!js.contains(" as "), "{js}");
+    assert!(!js.contains("satisfies"), "{js}");
+    assert!(!js.contains("<FractalWasm>"), "{js}");
+    assert!(js.contains("export const picked = resolved;"), "{js}");
+    assert!(js.contains("export const checked = resolved;"), "{js}");
+    assert!(js.contains("export default foo;"), "{js}");
+    assert!(js.contains("export const forced = resolved;"), "{js}");
+    // 命名空间重导出里的 `as` 是合法面名，必须保留。
+    let kept = erase_types("export * as ns from './x';\n").unwrap();
+    assert!(kept.contains("export * as ns from './x';"), "{kept}");
+}
+
+#[test]
+fn keeps_comparisons_and_generic_calls() {
+    // 比较表达式与泛型调用不得误伤。
+    let js = erase_types(
+        "const c = a < b;\nconst d = a < b && b > 0;\nconst v = identity<string>('x');\nf(a < b);\nfor (let i = 0; i < n; i++) { step(i); }\nconst t = x < y ? 1 : 2;\nconst s = f<string>() as string;\n",
+    )
+    .unwrap();
+    assert!(js.contains("a < b"), "{js}");
+    assert!(js.contains("b > 0"), "{js}");
+    assert!(js.contains("identity('x')"), "{js}");
+    assert!(!js.contains("<string>"), "{js}");
+    assert!(js.contains("f(a < b);"), "{js}");
+    assert!(js.contains("i < n"), "{js}");
+    assert!(js.contains("x < y ? 1 : 2"), "{js}");
+    assert!(js.contains("const s = f();"), "{js}");
+}

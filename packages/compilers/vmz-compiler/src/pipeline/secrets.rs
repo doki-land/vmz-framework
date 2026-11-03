@@ -462,6 +462,7 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
         ExpressionKind::UnaryExpression { argument, .. }
         | ExpressionKind::UpdateExpression { argument, .. }
         | ExpressionKind::AsExpression { expression: argument, .. }
+        | ExpressionKind::SatisfiesExpression { expression: argument, .. }
         | ExpressionKind::TypeAssertionExpression { expression: argument, .. }
         | ExpressionKind::NonNullExpression(argument)
         | ExpressionKind::SpreadElement(argument)

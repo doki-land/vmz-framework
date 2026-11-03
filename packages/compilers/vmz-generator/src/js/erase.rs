@@ -391,6 +391,23 @@ impl<'a> Eraser<'a> {
                         i = close + 1;
                         continue;
                     }
+                    // `<T>expr` 前缀断言 / 泛型箭头：表达式起点位置的 `<` 不可能是
+                    // 比较（比较左侧必为已结束的表达式），JSX 在 VMZ 禁用。
+                    if !adjacent && !self.ends_expression_at(i) {
+                        match self.kind(close + 1) {
+                            Some(kind) if can_start_expression(kind) => {
+                                self.delete(token.start, self.tokens[close].end);
+                                i = close + 1;
+                                continue;
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "type erasure cannot find an expression after a `<…>` assertion at byte {}",
+                                    token.start
+                                ));
+                            }
+                        }
+                    }
                     i += 1;
                 }
                 T::Colon => {
@@ -504,6 +521,26 @@ impl<'a> Eraser<'a> {
                 }
                 T::Const | T::Let | T::Var => {
                     var_decl_depth = Some(frames.len());
+                    i += 1;
+                }
+                T::IdentifierName => {
+                    // `satisfies` 词法上是普通标识符：仅在已结束表达式之后、
+                    // 且后随类型起点时才是 TS 断言，按 `as` 同规则剥离。
+                    let is_satisfies = self.text(i) == Some("satisfies");
+                    if is_satisfies && self.ends_expression_at(i) && !self.in_import_clause(i) {
+                        let start = i + 1;
+                        if start >= self.tokens.len() || !can_start_type(self.tokens[start].kind) {
+                            return Err(format!(
+                                "type erasure cannot find a type after `satisfies` at byte {}",
+                                token.start
+                            ));
+                        }
+                        if let Some(span) = self.type_end(start, true) {
+                            self.delete(self.space_trimmed_start(i), span.end);
+                            i = span.next;
+                            continue;
+                        }
+                    }
                     i += 1;
                 }
                 _ => i += 1,
@@ -643,7 +680,12 @@ impl<'a> Eraser<'a> {
                         return Some(index);
                     }
                 }
-                T::RightShift if depth >= 2 => depth -= 2,
+                T::RightShift if depth >= 2 => {
+                    depth -= 2;
+                    if depth == 0 {
+                        return Some(index);
+                    }
+                }
                 T::RightShift if depth == 1 => return Some(index),
                 T::Semicolon | T::RightBrace => return None,
                 _ => {}
@@ -858,13 +900,19 @@ impl<'a> Eraser<'a> {
                     return type_clause;
                 }
                 T::Semicolon | T::RightBrace => return false,
-                T::Import | T::Export => {
+                T::Import => {
                     let statement_start = index == 0
                         || matches!(
                             self.tokens[index - 1].kind,
                             T::Semicolon | T::LeftBrace | T::RightBrace
                         );
                     return statement_start;
+                }
+                T::Export => {
+                    // `export { a as b }` 由上面的 LeftBrace 臂识别；扫到裸
+                    // `export` 说明是 `export default` / `export const` 等声明，
+                    // 其中的 `as` 是表达式断言，不在说明符子句内。
+                    return false;
                 }
                 _ => {}
             }
@@ -1042,6 +1090,43 @@ fn can_start_type(kind: T) -> bool {
             | T::True
             | T::False
             | T::This
+    )
+}
+
+/// Tokens that can begin the operand of a `<T>…` prefix assertion.
+fn can_start_expression(kind: T) -> bool {
+    matches!(
+        kind,
+        T::IdentifierName
+            | T::StringLiteral
+            | T::NumericLiteral
+            | T::BigIntLiteral
+            | T::BooleanLiteral
+            | T::TemplateString
+            | T::RegexLiteral
+            | T::LeftParen
+            | T::LeftBracket
+            | T::LeftBrace
+            // Nested assertion.
+            | T::Less
+            | T::Plus
+            | T::Minus
+            | T::Exclamation
+            | T::Tilde
+            | T::New
+            | T::This
+            | T::Super
+            | T::True
+            | T::False
+            | T::Null
+            | T::Undefined
+            | T::Await
+            | T::Async
+            | T::Typeof
+            | T::Void
+            | T::Delete
+            | T::Function
+            | T::Class
     )
 }
 
