@@ -1,9 +1,17 @@
 <template>
     <main>
-        <h1>vendor</h1>
-        <p>{{ combined }}</p>
-        <button type="button" @click="loadCjs">load cjs</button>
-        <p>{{ cjsResult }}</p>
+        <h1>
+            vendor
+        </h1>
+        <p>
+            {{ combined }}
+        </p>
+        <button type="button" @click="loadCjs">
+            load cjs
+        </button>
+        <p>
+            {{ cjsResult }}
+        </p>
     </main>
 </template>
 <script client>

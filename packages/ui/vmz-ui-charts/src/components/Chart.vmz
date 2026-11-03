@@ -8,7 +8,7 @@
                 Chart compile failed — see diagnostics below.
             </div>
             <div v-if="tableView" v-html="_tableHtml()" class="vmz-ui-charts__table-view" />
-            <div v-if="!tableView" v-html="markup()" class="vmz-ui-charts__svg" :data-anim="_animMode()" />
+            <div v-if="!tableView" v-html="markup()" :data-anim="_animMode()" class="vmz-ui-charts__svg" />
             <canvas v-if="_useCanvas() && !tableView" class="vmz-ui-charts__canvas" />
         </div>
         <div v-if="diagnostics.length > 0" class="vmz-ui-charts__diag">
@@ -24,7 +24,7 @@
         <div v-if="_tooltip.visible" aria-live="polite" class="vmz-ui-charts__tooltip" :style="_tooltipStyle()">
             {{ _tooltip.text }}
         </div>
-        <button v-if="_zoomResetVisible()" type="button" @click="_resetZoom" class="vmz-ui-charts__zoom-reset" aria-label="重置缩放">
+        <button v-if="_zoomResetVisible()" type="button" @click="_resetZoom" aria-label="重置缩放" class="vmz-ui-charts__zoom-reset">
             重置缩放
         </button>
         <div :id="_liveId()" aria-live="polite" class="vmz-ui-charts__sr">

@@ -1,8 +1,14 @@
 <template>
     <main>
-        <h1>lazy</h1>
-        <button type="button" @click="loadHeavy">load heavy</button>
-        <p>{{ result }}</p>
+        <h1>
+            lazy
+        </h1>
+        <button type="button" @click="loadHeavy">
+            load heavy
+        </button>
+        <p>
+            {{ result }}
+        </p>
     </main>
 </template>
 <script client>

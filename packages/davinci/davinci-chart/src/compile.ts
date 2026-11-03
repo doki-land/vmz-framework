@@ -1474,7 +1474,7 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             let kept = [...nodeRow.keys()];
             if (kept.length > FORCE_MAX_NODES) {
                 const order = new Map(kept.map((k, i) => [k, i]));
-                kept.sort((a, b) => (degree.get(b)! - degree.get(a)!) || (order.get(a)! - order.get(b)!));
+                kept.sort((a, b) => (degree.get(b)! -degree.get(a)!) || (order.get(a)! -order.get(b)!));
                 const dropped = kept.length - FORCE_MAX_NODES;
                 kept = kept.slice(0, FORCE_MAX_NODES);
                 diagnostics.push(

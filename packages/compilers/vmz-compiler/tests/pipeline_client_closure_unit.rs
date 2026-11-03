@@ -5,7 +5,9 @@
 use std::fs;
 use std::path::Path;
 
-use vmz_compiler::pipeline::compile::{CompileOptions, compile_project, compile_project_with_dirty};
+use vmz_compiler::pipeline::compile::{
+    CompileOptions, compile_project, compile_project_with_dirty,
+};
 
 fn scaffold(dir: &Path) {
     let _ = fs::remove_dir_all(dir);

@@ -670,8 +670,8 @@ mod tests {
     /// 失败推迟到浏览器实例化时的 SyntaxError。
     #[test]
     fn pack_plan_unknown_named_export_fails_loudly() {
-        let root =
-            std::env::temp_dir().join(format!("vmz-napi-pack-unknown-export-{}", std::process::id()));
+        let root = std::env::temp_dir()
+            .join(format!("vmz-napi-pack-unknown-export-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(root.join("src/real.js"), "export const known = 1;\n").unwrap();
@@ -700,8 +700,8 @@ mod tests {
     /// 会在产物里留下悬空 import（运行时 404 / ReferenceError）。
     #[test]
     fn pack_plan_missing_import_target_fails_loudly() {
-        let root =
-            std::env::temp_dir().join(format!("vmz-napi-pack-missing-import-{}", std::process::id()));
+        let root = std::env::temp_dir()
+            .join(format!("vmz-napi-pack-missing-import-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(

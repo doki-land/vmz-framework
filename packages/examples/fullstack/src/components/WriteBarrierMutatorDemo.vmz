@@ -1,13 +1,27 @@
 <template>
     <section>
-        <strong>{{ cells.length }}</strong>
-        <em>{{ meta.note.count }}</em>
-        <button type="button" id="insert" @click="insertInput">insert</button>
-        <button type="button" id="push" @click="pushPlain">push</button>
-        <button type="button" id="patch" @click="patchFirst">patch</button>
-        <button type="button" id="count" @click="bumpNote">count</button>
+        <strong>
+            {{ cells.length }}
+        </strong>
+        <em>
+            {{ meta.note.count }}
+        </em>
+        <button type="button" id="insert" @click="insertInput">
+            insert
+        </button>
+        <button type="button" id="push" @click="pushPlain">
+            push
+        </button>
+        <button type="button" id="patch" @click="patchFirst">
+            patch
+        </button>
+        <button type="button" id="count" @click="bumpNote">
+            count
+        </button>
         <ul>
-            <li v-for="cell in cells" :key="cell.id">{{ cell.text }}</li>
+            <li v-for="cell in cells" :key="cell.id">
+                {{ cell.text }}
+            </li>
         </ul>
     </section>
 </template>

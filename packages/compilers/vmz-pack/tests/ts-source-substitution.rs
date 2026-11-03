@@ -40,11 +40,7 @@ fn js_specifier_substitutes_sibling_ts_source() {
     assert_eq!(graph.nodes.len(), 2, "client.ts 必须作为真实节点入图");
     let node = &graph.nodes[graph.index_of(&entry).unwrap()];
     let target = node.static_edges[0].target.as_ref().expect("`.js`→`.ts` 替换必须命中");
-    assert!(
-        target.ends_with("src/client.ts"),
-        "解析应落在同源 `.ts` 文件：{}",
-        target.display()
-    );
+    assert!(target.ends_with("src/client.ts"), "解析应落在同源 `.ts` 文件：{}", target.display());
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -66,10 +62,6 @@ fn existing_js_file_wins_over_ts_substitution() {
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     let node = &graph.nodes[graph.index_of(&entry).unwrap()];
     let target = node.static_edges[0].target.as_ref().expect("真实 `.js` 必须命中");
-    assert!(
-        target.ends_with("src/client.js"),
-        "原 `.js` 文件优先：{}",
-        target.display()
-    );
+    assert!(target.ends_with("src/client.js"), "原 `.js` 文件优先：{}", target.display());
     let _ = fs::remove_dir_all(&root);
 }

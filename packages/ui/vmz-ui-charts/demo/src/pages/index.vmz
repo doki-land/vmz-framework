@@ -93,7 +93,7 @@
                 <Diagram :spec="diagramSpec" :theme="dark ? 'dark' : 'light'" label="ChartSpec to Display Scene pipeline" />
             </div>
         </section>
-        <section class="card" id="ix-axis">
+        <section id="ix-axis" class="card">
             <header class="card__head">
                 <h2>
                     交互 · axis 合并 tooltip
@@ -122,7 +122,7 @@
                 <Chart :spec="ixLinkBSpec" :data="ixLinkBRows" :height="240" linkId="bench-link" :theme="dark ? 'dark' : 'light'" label="linked line B" />
             </div>
         </section>
-        <section class="card" id="ix-degrade">
+        <section id="ix-degrade" class="card">
             <header class="card__head">
                 <h2>
                     交互 · 退化态

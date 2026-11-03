@@ -125,7 +125,7 @@ const MAX_TICK_DECIMALS = 6;
 export function niceLinearTicks(domain: [number, number]): { values: number[]; decimals: number } {
     let [lo, hi] = domain;
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { values: [], decimals: 0 };
-    if (lo > hi) [lo, hi] = [hi, lo];
+    if (lo > hi)[lo, hi] = [hi, lo];
     if (lo === hi) {
         const single = normalizeTickNumber(lo);
         return { values: [single], decimals: decimalsForStep(Math.abs(single) || 1) };

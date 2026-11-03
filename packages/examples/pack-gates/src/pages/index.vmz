@@ -1,12 +1,22 @@
 <template>
     <main>
-        <h1>pack gates home</h1>
+        <h1>
+            pack gates home
+        </h1>
         <SharedCard title="home" />
-        <p>{{ message }}</p>
+        <p>
+            {{ message }}
+        </p>
         <nav>
-            <Link to="AboutPage">About</Link>
-            <Link to="VendorPage">Vendor</Link>
-            <Link to="LazyPage">Lazy</Link>
+            <Link to="AboutPage">
+                About
+            </Link>
+            <Link to="VendorPage">
+                Vendor
+            </Link>
+            <Link to="LazyPage">
+                Lazy
+            </Link>
         </nav>
     </main>
 </template>

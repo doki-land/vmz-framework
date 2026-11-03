@@ -55,7 +55,7 @@ function inferSemantic(values: ReadonlyArray<unknown>): FieldSemantic {
         else string++;
     }
     if (nonNull === 0) return "unknown";
-    if (numeric / nonNull > 0.9) return "quantitative";
-    if (boolean / nonNull > 0.9) return "nominal";
+    if (numeric / nonNull> 0.9) return "quantitative";
+    if (boolean / nonNull> 0.9) return "nominal";
     return "nominal";
 }

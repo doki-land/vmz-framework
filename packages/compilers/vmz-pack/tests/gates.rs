@@ -198,7 +198,9 @@ fn reference_integrity_violations(out: &Path) -> Vec<String> {
             let normalized = resolved.replace("/./", "/");
             let normalized = normalized.strip_prefix("./").unwrap_or(&normalized).to_string();
             if !files.contains_key(&normalized) {
-                violations.push(format!("{rel}: import `{specifier}` resolves to missing `{normalized}`"));
+                violations.push(format!(
+                    "{rel}: import `{specifier}` resolves to missing `{normalized}`"
+                ));
             }
         }
     }
@@ -233,10 +235,7 @@ fn gate_emitted_files_match_manifest_and_pruned_modules_are_absent() {
     let app = root.join("app");
     let (graph, _link, plan) = run_pipeline(
         &app,
-        &[
-            ("one".to_string(), app.join("src/one.js")),
-            ("two".to_string(), app.join("src/two.js")),
-        ],
+        &[("one".to_string(), app.join("src/one.js")), ("two".to_string(), app.join("src/two.js"))],
         &[
             EntryUse {
                 entry_logical: "one".to_string(),
@@ -257,7 +256,12 @@ fn gate_emitted_files_match_manifest_and_pruned_modules_are_absent() {
     assert!(paths.iter().any(|p| p.ends_with("src/dropped.js")), "{paths:?}");
     assert!(!paths.iter().any(|p| p.ends_with("src/ghost.js")), "{paths:?}");
     // 夹具前提：三个 chunk（one、two、shared），dropped 不在任何成员清单。
-    assert_eq!(plan.artifacts.len(), 3, "{:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+    assert_eq!(
+        plan.artifacts.len(),
+        3,
+        "{:?}",
+        plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
     let members: Vec<&str> =
         plan.artifacts.iter().flat_map(|a| a.modules.iter().map(String::as_str)).collect();
     assert!(!members.iter().any(|m| m.ends_with("src/dropped.js")), "{members:?}");
@@ -324,10 +328,7 @@ fn gate_every_emitted_specifier_resolves_on_disk() {
     let app = root.join("app");
     let (_graph, _link, plan) = run_pipeline(
         &app,
-        &[
-            ("one".to_string(), app.join("src/one.js")),
-            ("two".to_string(), app.join("src/two.js")),
-        ],
+        &[("one".to_string(), app.join("src/one.js")), ("two".to_string(), app.join("src/two.js"))],
         &[
             EntryUse {
                 entry_logical: "one".to_string(),
@@ -428,7 +429,12 @@ fn gate_route_privates_never_cross_contaminate() {
     );
 
     // 夹具前提：恰好两个入口 chunk + 一个共享 chunk。
-    assert_eq!(plan.artifacts.len(), 3, "{:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+    assert_eq!(
+        plan.artifacts.len(),
+        3,
+        "{:?}",
+        plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
     let chunk_of = |prefix: &str| {
         plan.artifacts
             .iter()
@@ -486,7 +492,12 @@ fn gate_dynamic_chunk_is_lazy_and_not_statically_inlined() {
             exports: EntryExports::Named(vec!["loader".into(), "eager".into()]),
         }],
     );
-    assert_eq!(plan.artifacts.len(), 2, "{:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+    assert_eq!(
+        plan.artifacts.len(),
+        2,
+        "{:?}",
+        plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
     let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/app").unwrap();
     let lazy = plan.artifacts.iter().find(|a| a.chunk_id.starts_with("async/")).unwrap();
     // 懒模块不是入口成员、入口不静态 import 懒 chunk，只有动态 import。
@@ -514,14 +525,23 @@ fn gate_dynamic_chunk_is_lazy_and_not_statically_inlined() {
             exports: EntryExports::Named(vec!["eager".into()]),
         }],
     );
-    assert_eq!(dead.artifacts.len(), 1, "{:?}", dead.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+    assert_eq!(
+        dead.artifacts.len(),
+        1,
+        "{:?}",
+        dead.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
     assert_eq!(dead.artifacts[0].chunk_id, "entry/app");
     assert!(!dead.artifacts[0].code.contains("LAZY_MARKER"), "{}", dead.artifacts[0].code);
     assert!(!dead.artifacts[0].code.contains("lazy"), "{}", dead.artifacts[0].code);
     let out_dead = root.join("dist-dead");
     write_emit(&dead, &out_dead).unwrap();
     let tree = read_tree(&out_dead);
-    assert!(!tree.keys().any(|name| name.contains("async")), "{:?}", tree.keys().collect::<Vec<_>>());
+    assert!(
+        !tree.keys().any(|name| name.contains("async")),
+        "{:?}",
+        tree.keys().collect::<Vec<_>>()
+    );
 }
 
 /// 门禁 4b：存活动态边的另一种常见作者形态——`export const load = () =>
@@ -550,7 +570,12 @@ fn gate_arrow_export_dynamic_import_splits_when_consumed() {
             exports: EntryExports::Named(vec!["load".into(), "eager".into()]),
         }],
     );
-    assert_eq!(plan.artifacts.len(), 2, "{:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+    assert_eq!(
+        plan.artifacts.len(),
+        2,
+        "{:?}",
+        plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
     let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/app").unwrap();
     let lazy = plan.artifacts.iter().find(|a| a.chunk_id.starts_with("async/")).unwrap();
     assert!(entry.code.contains(&format!("import(\"./{}\")", lazy.file_name)), "{}", entry.code);
@@ -565,17 +590,21 @@ fn gate_same_input_rebuild_is_byte_identical() {
         "rebuild",
         &[
             ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            ("app/src/one.js", "import { shared } from './shared.js';\nexport const a1 = shared;\nexport const load = () => import('./lazy.js');\n"),
-            ("app/src/two.js", "import { shared } from './shared.js';\nexport const a2 = shared;\n"),
+            (
+                "app/src/one.js",
+                "import { shared } from './shared.js';\nexport const a1 = shared;\nexport const load = () => import('./lazy.js');\n",
+            ),
+            (
+                "app/src/two.js",
+                "import { shared } from './shared.js';\nexport const a2 = shared;\n",
+            ),
             ("app/src/shared.js", "export const shared = 7;\n"),
             ("app/src/lazy.js", "export const later = 1;\n"),
         ],
     );
     let app = root.join("app");
-    let entries = [
-        ("one".to_string(), app.join("src/one.js")),
-        ("two".to_string(), app.join("src/two.js")),
-    ];
+    let entries =
+        [("one".to_string(), app.join("src/one.js")), ("two".to_string(), app.join("src/two.js"))];
     let uses = [
         EntryUse {
             entry_logical: "one".to_string(),
@@ -625,7 +654,10 @@ fn gate_vendor_multifile_package_follows_relative_and_subpath_imports() {
                 r#"{"name":"acme","version":"1.0.0","type":"module","exports":{".":"./index.js","./sub":"./sub.js"}}"#,
             ),
             ("app/node_modules/acme/index.js", "export { core as main } from './lib/core.js';\n"),
-            ("app/node_modules/acme/lib/core.js", "import { util } from './util.js';\nexport const core = 'ACME_CORE:' + util;\n"),
+            (
+                "app/node_modules/acme/lib/core.js",
+                "import { util } from './util.js';\nexport const core = 'ACME_CORE:' + util;\n",
+            ),
             ("app/node_modules/acme/lib/util.js", "export const util = 'ACME_UTIL';\n"),
             ("app/node_modules/acme/sub.js", "export const sub = 'ACME_SUB';\n"),
             // 包内未被引用的文件：应随剪枝消失。
@@ -682,10 +714,7 @@ fn gate_vendor_package_lands_once_across_entries() {
     let app = root.join("app");
     let (_graph, _link, plan) = run_pipeline(
         &app,
-        &[
-            ("one".to_string(), app.join("src/one.js")),
-            ("two".to_string(), app.join("src/two.js")),
-        ],
+        &[("one".to_string(), app.join("src/one.js")), ("two".to_string(), app.join("src/two.js"))],
         &[
             EntryUse {
                 entry_logical: "one".to_string(),
@@ -711,8 +740,12 @@ fn gate_vendor_package_lands_once_across_entries() {
     assert!(holders[0].starts_with("shared/"), "{holders:?}");
     // 包内两个模块同属一个 chunk（不出现一半在共享一半在入口）。
     let shared_chunk = plan.artifacts.iter().find(|a| a.chunk_id == holders[0]).unwrap();
-    let package_modules: Vec<&str> =
-        shared_chunk.modules.iter().filter(|m| m.contains("node_modules/acme")).map(String::as_str).collect();
+    let package_modules: Vec<&str> = shared_chunk
+        .modules
+        .iter()
+        .filter(|m| m.contains("node_modules/acme"))
+        .map(String::as_str)
+        .collect();
     assert_eq!(package_modules.len(), 2, "{package_modules:?}");
     // 两个入口都经合成 import 引用共享 chunk。
     for logical in ["entry/one", "entry/two"] {
@@ -744,8 +777,14 @@ fn gate_cjs_esm_mix_binds_commonjs_globals_in_interop_shell() {
                 "app/node_modules/acme-cjs/package.json",
                 r#"{"name":"acme-cjs","version":"1.0.0","main":"./lib/index.js"}"#,
             ),
-            ("app/node_modules/acme-cjs/lib/index.js", "const util = require('./util')\nexports.twice = function (n) { return util.double(n) }\n"),
-            ("app/node_modules/acme-cjs/lib/util.js", "function double(n) { return n * 2 }\nmodule.exports = exports = { double };\n"),
+            (
+                "app/node_modules/acme-cjs/lib/index.js",
+                "const util = require('./util')\nexports.twice = function (n) { return util.double(n) }\n",
+            ),
+            (
+                "app/node_modules/acme-cjs/lib/util.js",
+                "function double(n) { return n * 2 }\nmodule.exports = exports = { double };\n",
+            ),
         ],
     );
     let app = root.join("app");
@@ -765,15 +804,30 @@ fn gate_cjs_esm_mix_binds_commonjs_globals_in_interop_shell() {
         .iter()
         .filter(|a| a.modules.iter().any(|m| m.contains("node_modules/acme-cjs")))
         .collect();
-    assert_eq!(cjs_chunks.len(), 2, "{:?}", plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>());
+    assert_eq!(
+        cjs_chunks.len(),
+        2,
+        "{:?}",
+        plan.artifacts.iter().map(|a| &a.chunk_id).collect::<Vec<_>>()
+    );
     // 凡出现 CommonJS 全局引用的 chunk 必须先装填壳；纯 ESM chunk 一个都没有。
     for artifact in &plan.artifacts {
         let touches_commonjs = artifact.code.contains("module.exports")
             || artifact.code.contains("exports.")
             || artifact.code.contains("require(");
         if touches_commonjs {
-            assert!(artifact.code.contains("let module = { exports: {} };"), "shell missing in {}:\n{}", artifact.chunk_id, artifact.code);
-            assert!(artifact.code.contains("function require(id)"), "shell missing in {}:\n{}", artifact.chunk_id, artifact.code);
+            assert!(
+                artifact.code.contains("let module = { exports: {} };"),
+                "shell missing in {}:\n{}",
+                artifact.chunk_id,
+                artifact.code
+            );
+            assert!(
+                artifact.code.contains("function require(id)"),
+                "shell missing in {}:\n{}",
+                artifact.chunk_id,
+                artifact.code
+            );
         }
     }
     // ESM 入口 chunk 自身不携带任何 CommonJS 全局自由引用。
@@ -803,7 +857,10 @@ fn gate_ts_syntax_leaves_zero_type_residue() {
                 "app/src/lib.js",
                 "export function pick<T>(cfg: T): T { return cfg }\nexport const marker: string = 'RUNTIME_MARKER';\n",
             ),
-            ("app/src/types.js", "export type Config = { value: number };\nexport interface Unused { n: number }\n"),
+            (
+                "app/src/types.js",
+                "export type Config = { value: number };\nexport interface Unused { n: number }\n",
+            ),
         ],
     );
     let app = root.join("app");
@@ -823,7 +880,9 @@ fn gate_ts_syntax_leaves_zero_type_residue() {
     assert!(all.contains("RUNTIME_MARKER"), "{all}");
     assert!(all.contains("function pick"), "{all}");
     assert!(all.contains("function run"), "{all}");
-    for residue in ["import type", "export type", "interface ", ": number", ": string", "<T", " as "] {
+    for residue in
+        ["import type", "export type", "interface ", ": number", ": string", "<T", " as "]
+    {
         assert!(!all.contains(residue), "residue `{residue}` in:\n{all}");
     }
 }
@@ -878,7 +937,8 @@ fn gate_missing_static_import_target_is_a_structured_build_failure() {
         ],
     );
     let app = root.join("app");
-    let graph = build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
+    let graph =
+        build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
     let link_plan = link(
         &graph,
         &[EntryUse {
@@ -890,7 +950,10 @@ fn gate_missing_static_import_target_is_a_structured_build_failure() {
     // 结构化诊断必须存在且指明 `./ghost.js`；不允许无声静默。
     assert!(!link_plan.diagnostics.is_empty(), "missing import must be diagnosed");
     assert!(
-        link_plan.diagnostics.iter().any(|d| d.message.contains("./ghost.js") || d.message.contains("ghost.js")),
+        link_plan
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("./ghost.js") || d.message.contains("ghost.js")),
         "{:?}",
         link_plan.diagnostics
     );
@@ -905,7 +968,10 @@ fn gate_missing_static_import_target_is_a_structured_build_failure() {
             let out = root.join("dist");
             write_emit(&plan, &out).unwrap();
             let violations = reference_integrity_violations(&out);
-            assert!(violations.is_empty(), "dangling references escaped diagnostics: {violations:?}");
+            assert!(
+                violations.is_empty(),
+                "dangling references escaped diagnostics: {violations:?}"
+            );
         }
     }
 }
@@ -924,7 +990,8 @@ fn gate_unknown_named_export_is_a_structured_build_failure() {
         ],
     );
     let app = root.join("app");
-    let graph = build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
+    let graph =
+        build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     let link_plan = link(
         &graph,
@@ -953,10 +1020,7 @@ fn gate_opaque_module_default_export_is_not_a_false_positive() {
         "opaque-default",
         &[
             ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            (
-                "app/src/entry.js",
-                "import make from './lib.js';\nexport const run = make;\n",
-            ),
+            ("app/src/entry.js", "import make from './lib.js';\nexport const run = make;\n"),
             (
                 "app/src/lib.js",
                 "export default function (opts) { const mark = `v${opts ? 1 : 0}`; return mark; }\n",
@@ -964,14 +1028,11 @@ fn gate_opaque_module_default_export_is_not_a_false_positive() {
         ],
     );
     let app = root.join("app");
-    let graph = build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
+    let graph =
+        build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
     // 夹具前提：lib 是 opaque（模板插值使 scope 事实不完整）。
-    let lib = graph
-        .nodes
-        .iter()
-        .find(|n| n.resolved.path.ends_with("lib.js"))
-        .expect("lib node");
+    let lib = graph.nodes.iter().find(|n| n.resolved.path.ends_with("lib.js")).expect("lib node");
     assert!(lib.record.is_scope_incomplete(), "{:?}", lib.record.scope_incomplete_reasons);
 
     let link_plan = link(
@@ -1009,24 +1070,15 @@ fn gate_opaque_module_missing_export_still_fails() {
         "opaque-missing",
         &[
             ("app/package.json", r#"{"name":"app","version":"0.0.0"}"#),
-            (
-                "app/src/entry.js",
-                "import { nope } from './lib.js';\nexport const run = nope;\n",
-            ),
-            (
-                "app/src/lib.js",
-                "const mark = `v${1}`;\nexport const known = mark;\n",
-            ),
+            ("app/src/entry.js", "import { nope } from './lib.js';\nexport const run = nope;\n"),
+            ("app/src/lib.js", "const mark = `v${1}`;\nexport const known = mark;\n"),
         ],
     );
     let app = root.join("app");
-    let graph = build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
+    let graph =
+        build_graph(&[("main".to_string(), app.join("src/entry.js"))], Target::Browser, &app);
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
-    let lib = graph
-        .nodes
-        .iter()
-        .find(|n| n.resolved.path.ends_with("lib.js"))
-        .expect("lib node");
+    let lib = graph.nodes.iter().find(|n| n.resolved.path.ends_with("lib.js")).expect("lib node");
     assert!(lib.record.is_scope_incomplete(), "{:?}", lib.record.scope_incomplete_reasons);
     let link_plan = link(
         &graph,

@@ -1,9 +1,13 @@
 <template>
     <main>
-        <h1>about</h1>
+        <h1>
+            about
+        </h1>
         <SharedCard title="about" />
         <AboutOnly />
-        <Link to="IndexPage">Home</Link>
+        <Link to="IndexPage">
+            Home
+        </Link>
     </main>
 </template>
 <script client>

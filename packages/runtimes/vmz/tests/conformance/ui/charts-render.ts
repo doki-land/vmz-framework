@@ -584,7 +584,7 @@ console.log('charts-render: overflow truncates labels into their slot…');
     for (const child of legendGroup.children) {
         const w = child.kind === 'rect' ? child.w : estimateTextSize(child.text, 12).width;
         const cx = child.kind === 'rect' ? child.x + child.w / 2 : child.anchor.x;
-        if (cx + w / 2 > narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
+        if (cx + w / 2> narrow.width + 1e-9) fail(`legend must stay inside the viewport: ${JSON.stringify(child)}`);
         const cy = child.kind === 'rect' ? child.y + child.h / 2 : child.anchor.y;
         if (cy >= narrowPlotTop) fail('legend strip must stay above the plot');
     }

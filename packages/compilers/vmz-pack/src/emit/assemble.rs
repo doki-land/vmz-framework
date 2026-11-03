@@ -2355,14 +2355,10 @@ fn plan_face_renames(
                 // 重导出事实的边按事实自身 kind 建在 `static_edges` 上
                 // （`EdgeKind::ReexportNamed` / `EdgeKind::ReexportAll`），
                 // 只认 `Static` 会让具名重导出与星号边永远钉不到认领者。
-                let Some(edge) = node
-                    .static_edges
-                    .iter()
-                    .find(|edge| {
-                        (edge.kind == EdgeKind::Static || edge.kind == edge_kind)
-                            && edge.specifier == *source
-                    })
-                else {
+                let Some(edge) = node.static_edges.iter().find(|edge| {
+                    (edge.kind == EdgeKind::Static || edge.kind == edge_kind)
+                        && edge.specifier == *source
+                }) else {
                     continue;
                 };
                 let Ok(id) = edge.target.as_ref() else { continue };

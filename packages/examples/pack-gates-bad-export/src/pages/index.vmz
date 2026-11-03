@@ -1,6 +1,8 @@
 <template>
     <main>
-        <h1>bad export</h1>
+        <h1>
+            bad export
+        </h1>
     </main>
 </template>
 <script client>

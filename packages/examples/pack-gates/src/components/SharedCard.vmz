@@ -1,7 +1,11 @@
 <template>
     <section class="shared-card">
-        <h2>{{ title }}</h2>
-        <p>SHARED_CARD_MARKER</p>
+        <h2>
+            {{ title }}
+        </h2>
+        <p>
+            SHARED_CARD_MARKER
+        </p>
     </section>
 </template>
 <script client>

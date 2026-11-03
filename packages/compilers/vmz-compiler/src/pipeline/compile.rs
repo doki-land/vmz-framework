@@ -1133,8 +1133,11 @@ fn collect_relative_helper_specs(
             None => {
                 if is_module_specifier(&spec) {
                     report.diagnostics.push(
-                        ReportedDiagnostic::warning(importer, "vmz::emit::client_module_unresolved")
-                            .with_arg("detail", format!("cannot resolve `{spec}` under src/")),
+                        ReportedDiagnostic::warning(
+                            importer,
+                            "vmz::emit::client_module_unresolved",
+                        )
+                        .with_arg("detail", format!("cannot resolve `{spec}` under src/")),
                     );
                 }
             }

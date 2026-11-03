@@ -38,42 +38,42 @@
                     </p>
                 </header>
                 <section v-for="item in section.examples" :key="item.id" class="chart-card">
-                <header class="chart-card__head">
-                    <div class="chart-card__titles">
-                        <h2>
-                            {{ item.title }}
-                        </h2>
-                        <p>
-                            {{ item.note }}
-                        </p>
+                    <header class="chart-card__head">
+                        <div class="chart-card__titles">
+                            <h2>
+                                {{ item.title }}
+                            </h2>
+                            <p>
+                                {{ item.note }}
+                            </p>
+                        </div>
+                        <button type="button" :aria-expanded="activeDetail === item.id ? 'true' : 'false'" @click="() => toggleDetail(item.id)" class="chart-card__toggle">
+                            {{ getToggleLabel(item.id) }}
+                        </button>
+                    </header>
+                    <div class="chart-card__body">
+                        <div class="chart-card__canvas">
+                            <Chart :spec="item.spec" :data="item.rows" :height="280" :theme="dark ? 'dark' : 'light'" :label="item.title" />
+                        </div>
+                        <div v-if="activeDetail === item.id" class="chart-card__detail">
+                            <h3>
+                                {{ specTitleLabel }}
+                            </h3>
+                            <pre class="chart-card__code">
+                                <code>
+                                    {{ item.specText }}
+                                </code>
+                            </pre>
+                            <h3>
+                                {{ dataTitleLabel }}
+                            </h3>
+                            <pre class="chart-card__code">
+                                <code>
+                                    {{ item.dataText }}
+                                </code>
+                            </pre>
+                        </div>
                     </div>
-                    <button type="button" :aria-expanded="activeDetail === item.id ? 'true' : 'false'" @click="() => toggleDetail(item.id)" class="chart-card__toggle">
-                        {{ getToggleLabel(item.id) }}
-                    </button>
-                </header>
-                <div class="chart-card__body">
-                    <div class="chart-card__canvas">
-                        <Chart :spec="item.spec" :data="item.rows" :height="280" :theme="dark ? 'dark' : 'light'" :label="item.title" />
-                    </div>
-                    <div v-if="activeDetail === item.id" class="chart-card__detail">
-                        <h3>
-                            {{ specTitleLabel }}
-                        </h3>
-                        <pre class="chart-card__code">
-                            <code>
-                                {{ item.specText }}
-                            </code>
-                        </pre>
-                        <h3>
-                            {{ dataTitleLabel }}
-                        </h3>
-                        <pre class="chart-card__code">
-                            <code>
-                                {{ item.dataText }}
-                            </code>
-                        </pre>
-                    </div>
-                </div>
                 </section>
             </section>
             <section class="chart-card">

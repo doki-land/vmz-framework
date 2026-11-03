@@ -80,7 +80,7 @@ export function binValues(values: ReadonlyArray<number | string | boolean | null
     let width = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
     if (!Number.isFinite(width) || width <= 0) width = (hi - lo) / 10;
     // Cap the bin count so pathological widths never flood the scene.
-    while ((hi - lo) / width > maxBins) width *= 2;
+    while ((hi - lo) / width> maxBins) width *= 2;
 
     const start = Math.floor(lo / width) * width;
     const binCount = Math.max(1, Math.ceil((hi - start) / width));

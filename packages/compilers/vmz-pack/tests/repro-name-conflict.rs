@@ -337,7 +337,10 @@ fn destructured_singleton_shorthand_face_split_resolves() {
     assert_eq!(shared.code.matches(" as codeToHast }").count(), 1, "{}", shared.code);
     // fresh 名自身面导出存在。
     assert!(
-        shared.code.lines().any(|line| line.contains("export { codeToHast__vmz") && !line.contains(" as ")),
+        shared
+            .code
+            .lines()
+            .any(|line| line.contains("export { codeToHast__vmz") && !line.contains(" as ")),
         "{}",
         shared.code
     );

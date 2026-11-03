@@ -8,7 +8,7 @@ export interface GeoFeature {
     readonly properties: { readonly name: string; readonly iso_a3: string };
     readonly geometry:
         | { readonly type: "Polygon"; readonly coordinates: ReadonlyArray<ReadonlyArray<ReadonlyArray<number>>> }
-        | { readonly type: "MultiPolygon"; readonly coordinates: ReadonlyArray<ReadonlyArray<ReadonlyArray<ReadonlyArray<number>>>> };
+        | { readonly type: "MultiPolygon"; readonly coordinates: ReadonlyArray<ReadonlyArray < ReadonlyArray < ReadonlyArray < number >>> > };
 }
 
 export interface GeoFeatureCollection {

@@ -121,7 +121,7 @@ const tooltipText = (page) =>
     check('kbd.Home jumps to first', tHome === t1, tHome);
     // aria-live matches the tooltip text.
     const live = await page.evaluate(() => document.querySelector('#bar-quarter [aria-live="polite"]:not(.vmz-ui-charts__tooltip)')?.textContent?.trim() ?? '');
-    check('a11y.aria-live announces point', live !== '' && tHome !== null && live.includes('quarter') , live.slice(0, 60));
+    check('a11y.aria-live announces point', live !== '' && tHome !== null && live.includes('quarter'), live.slice(0, 60));
     // Enter pins; mouse leaves; tooltip stays.
     await page.keyboard.press('Enter');
     await new Promise((r) => setTimeout(r, 200));

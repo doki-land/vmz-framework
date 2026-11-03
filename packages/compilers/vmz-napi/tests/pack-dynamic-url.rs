@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use serde_json::{Value, json};
 
 fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
-    let root = std::env::temp_dir().join(format!("vmz-napi-pack-url-{name}-{}", std::process::id()));
+    let root =
+        std::env::temp_dir().join(format!("vmz-napi-pack-url-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();
     for (path, content) in files {
@@ -63,10 +64,7 @@ fn root_absolute_dynamic_import_kept_verbatim_on_the_wire() {
         .iter()
         .map(|d| d["code"].as_str().unwrap())
         .collect();
-    assert!(
-        codes.iter().any(|code| *code == "vmz::pack::emit::dynamic_url_kept"),
-        "{codes:?}"
-    );
+    assert!(codes.iter().any(|code| *code == "vmz::pack::emit::dynamic_url_kept"), "{codes:?}");
     assert!(
         !codes.iter().any(|code| code.starts_with("vmz::pack::resolve::not_found")),
         "{codes:?}"
