@@ -1,26 +1,6 @@
 // VMZ project configuration for the vmz-framework hybrid monorepo.
+// Format scope is the explicit CLI path (`vmz format <path>`); only `excludes`
+// and `style` remain configurable and both match the defaults here.
 import { defineConfig } from 'vmz';
 
-export default defineConfig({
-    format: {
-        includes: [
-            'scripts/**',
-            'packages/runtimes/**',
-            'packages/examples/**',
-            'packages/editors/**',
-            'packages/ui/**',
-            'packages/plugins/**',
-            'packages/content/**',
-            'packages/homepage/**',
-            'package.json',
-            'biome.json',
-            'vmz.config.ts',
-            'nifty.config.ts',
-        ],
-        excludes: ['**/fixtures/**', '**/dist/**', '**/node_modules/**', '**/target/**'],
-        rust: true,
-        javascript: true,
-        vmz: true,
-        style: 'biome.json',
-    },
-});
+export default defineConfig({});

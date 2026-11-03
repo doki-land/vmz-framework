@@ -128,7 +128,7 @@ jobs:
           test -f packages/runtimes/vmz/dist/cli/cli.js
           ls packages/runtimes/vmz-linux-x64/vmz.*.node
 
-      - name: Check format (`vmz format --check` via `vmz.config` `format`; same as `pnpm fmt:check`)
+      - name: Check format (`vmz format --check --rust .` on the explicit repo root; same as `pnpm fmt:check`)
         run: pnpm fmt:check
 
   build-test:
