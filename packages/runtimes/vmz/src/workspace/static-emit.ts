@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { listClientComponentsSync } from '@vmz/core/component-registry';
+import { collectDependsOnClosure, listClientComponentsSync, readDeploymentDocument } from '@vmz/core/component-registry';
 import { createRenderHost } from '@vmz/core/render-host';
 import { resolveRouteLayoutChain } from '@vmz/core/route-layout-chain';
 import { emitCdnPolicy } from './cdn-policy.js';
@@ -709,8 +709,6 @@ function emitStaticClientEntries(distDir, pageCatalog) {
             .map((e) => e.component)
             .filter(Boolean),
     );
-    const eagerComponents = componentEntries.filter((e) => !lazySet.has(e.name));
-    const lazyComponents = componentEntries.filter((e) => lazySet.has(e.name));
 
     // Pages/layouts resolve `<chunkId>.client.js` at the dist root (SSR loadCtor
     // uses the same path); they must be in the table or hydration throws.
@@ -720,6 +718,15 @@ function emitStaticClientEntries(distDir, pageCatalog) {
         for (const id of resolveRouteLayoutChain(distDir, page.chunkId)) layoutNames.add(String(id));
     }
     const layoutEntries = [...layoutNames].sort().map((id) => ({ name: id, entry: `${id}.client.js` }));
+
+    // 引导表只登记从页面/布局可达的组件：部署 IR 的 `dependsOn` 闭包之外的
+    // 组件没有任何模板引用，进入表只会变成 pack 死字节；不登记后 pack 图
+    // 不可达，prune 同时清掉未打包的散落模块。
+    const deployment = readDeploymentDocument(distDir, { strict: true });
+    const closure = collectDependsOnClosure(deployment, [...pageCatalog.map((p) => p.chunkId), ...layoutNames]);
+    const reachableComponents = componentEntries.filter((e) => closure.has(e.chunkId));
+    const eagerComponents = reachableComponents.filter((e) => !lazySet.has(e.name));
+    const lazyComponents = reachableComponents.filter((e) => lazySet.has(e.name));
     const eager = [...eagerComponents, ...pageEntries, ...layoutEntries];
 
     const native = requireNativeAddon();
