@@ -48,7 +48,13 @@ jobs:
         run: pnpm install
 
       - name: Build runtimes (native + JS)
-        run: pnpm build:runtimes
+        # 门禁必须跑发布同款 native：`publish-npm.yml` 用 `--release` 构建 `.node`，
+        # 而 `pack`（graph/link/emit）在 debug 下比 release 慢一个数量级，会把
+        # ui-browser 的构建推到 30 分钟上限之外。native 先按发布口径构建，
+        # 其余 JS dist 用 `VMZ_SKIP_NAPI=1` 跳过重复编译。
+        run: |
+          node scripts/build/napi.mjs --release
+          VMZ_SKIP_NAPI=1 pnpm build:runtimes
 
       - name: Test vmz-pack artifact gates
         run: cargo test -p vmz-pack -p vmz-napi
