@@ -50,6 +50,9 @@ jobs:
       - name: Build runtimes (native + JS)
         run: pnpm build:runtimes
 
+      - name: Test vmz-pack artifact gates
+        run: cargo test -p vmz-pack -p vmz-napi
+
       - name: Assert @vmz/vmz dist pack contract
         run: node scripts/ci/assert-vmz-pack.mjs
 

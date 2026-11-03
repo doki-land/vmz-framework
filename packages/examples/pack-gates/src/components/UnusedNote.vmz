@@ -1,0 +1,8 @@
+<template>
+    <aside class="unused-note">
+        <p>UNUSED_NOTE_MARKER</p>
+    </aside>
+</template>
+<script client>
+export default class UnusedNote {}
+</script>

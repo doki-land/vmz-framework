@@ -142,14 +142,15 @@ export function runVmzTest(
 export function runVmzBuild(
     exampleRel: string,
     root = repoRoot(),
-    opts: { profile?: string; outDir?: string; extraArgs?: string[] } = {},
+    opts: { profile?: string; outDir?: string; artifactName?: string; extraArgs?: string[] } = {},
 ): { status: number; stdout: string; stderr: string; dist: string } {
     // Absolute paths (temp fixtures) must not be joined onto repo root.
     const example = path.isAbsolute(exampleRel) ? exampleRel : path.join(root, ...exampleRel.split('/'));
     // Always pass --profile so artifact dir matches `<out-dir>/<name>` (name defaults to profile id).
     const profileId = String(opts.profile || 'web-ssr').trim() || 'web-ssr';
     const outDirRoot = opts.outDir ? path.resolve(example, opts.outDir) : path.join(example, 'dist');
-    const dist = path.join(outDirRoot, profileId);
+    // Sites may pin `profiles.*.name` away from the id (vmz-official `static` → `pages`).
+    const dist = path.join(outDirRoot, opts.artifactName || profileId);
     const args = [vmzBin(root), 'build', example, '--out-dir', outDirRoot, '--profile', profileId, ...(opts.extraArgs || [])];
     const run = spawnSync(process.execPath, args, {
         cwd: root,

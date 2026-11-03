@@ -1,0 +1,8 @@
+<template>
+    <div class="pack-gates-shell">
+        <slot />
+    </div>
+</template>
+<script client>
+export default class Application {}
+</script>

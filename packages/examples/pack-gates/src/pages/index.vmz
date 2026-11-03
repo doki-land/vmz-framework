@@ -1,0 +1,22 @@
+<template>
+    <main>
+        <h1>pack gates home</h1>
+        <SharedCard title="home" />
+        <p>{{ message }}</p>
+        <nav>
+            <Link to="AboutPage">About</Link>
+            <Link to="VendorPage">Vendor</Link>
+            <Link to="LazyPage">Lazy</Link>
+        </nav>
+    </main>
+</template>
+<script client>
+import { usedFmt } from "../lib/format.ts";
+
+export default class IndexPage {
+    static meta() {
+        return { title: "Home · Pack Gates", description: "pack gates home" };
+    }
+    message = usedFmt("home");
+}
+</script>

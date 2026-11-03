@@ -1,0 +1,12 @@
+{
+    "name": "@vmz-examples/pack-gates-bad-server",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@vmz/core": "workspace:*"
+    },
+    "devDependencies": {
+        "vmz": "workspace:*"
+    }
+}

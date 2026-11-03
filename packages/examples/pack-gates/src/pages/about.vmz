@@ -1,0 +1,15 @@
+<template>
+    <main>
+        <h1>about</h1>
+        <SharedCard title="about" />
+        <AboutOnly />
+        <Link to="IndexPage">Home</Link>
+    </main>
+</template>
+<script client>
+export default class AboutPage {
+    static meta() {
+        return { title: "About · Pack Gates", description: "pack gates about" };
+    }
+}
+</script>

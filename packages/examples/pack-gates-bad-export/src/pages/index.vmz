@@ -1,0 +1,15 @@
+<template>
+    <main>
+        <h1>bad export</h1>
+    </main>
+</template>
+<script client>
+import { ghost } from "../lib/real.ts";
+
+export default class IndexPage {
+    static meta() {
+        return { title: "Bad Export · Pack Gates", description: "client imports a name that does not exist" };
+    }
+    leak = ghost;
+}
+</script>

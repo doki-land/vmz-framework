@@ -1,0 +1,15 @@
+<template>
+    <main>
+        <h1>bad server</h1>
+    </main>
+</template>
+<script client>
+import { readFileSync } from "node:fs";
+
+export default class IndexPage {
+    static meta() {
+        return { title: "Bad Server · Pack Gates", description: "client imports a server-only builtin" };
+    }
+    leak = readFileSync;
+}
+</script>

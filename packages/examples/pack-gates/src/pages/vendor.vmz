@@ -1,0 +1,24 @@
+<template>
+    <main>
+        <h1>vendor</h1>
+        <p>{{ combined }}</p>
+        <button type="button" @click="loadCjs">load cjs</button>
+        <p>{{ cjsResult }}</p>
+    </main>
+</template>
+<script client>
+import { utilMain } from "acme-util";
+import { subMarker } from "acme-util/sub";
+
+export default class VendorPage {
+    static meta() {
+        return { title: "Vendor · Pack Gates", description: "vendor route" };
+    }
+    combined = utilMain + "|" + subMarker;
+    cjsResult = "";
+    async loadCjs() {
+        const mod = await import("acme-cjs");
+        this.cjsResult = String(mod.default.twice(21));
+    }
+}
+</script>

@@ -470,6 +470,7 @@ export const CHECKS: Record<string, CheckEntry> = {
             'runtime-forbidden-imports',
             'production-observability',
             'official-homepage',
+            'pack-artifact-gates',
         ],
     },
     'no-type-check-suppression': {
@@ -591,6 +592,14 @@ export const CHECKS: Record<string, CheckEntry> = {
     'delivery-closure': {
         file: 'production/delivery-closure.ts',
         description: 'Deployment dependsOn + static-delivery + content-addressed assets parity',
+    },
+    'pack-artifact-gates': {
+        file: 'production/pack-artifact-gates.ts',
+        description: 'Pack artifact contract: hermetic fixture closure, integrity, route isolation, negatives',
+    },
+    'pack-consumer-evidence': {
+        file: 'production/pack-consumer-evidence.ts',
+        description: 'Pack consumer evidence: official homepage static + web-hybrid pack proof',
     },
     // M-PR0: public semantic ids as composites over existing evidence (no parallel fake gates).
     'resume-lazy': {
@@ -745,4 +754,7 @@ export const CHECK_ALL = [
     'thin-runtime-production-proof',
     // 0.2.0 Runtime Quality Baseline + Package Layout Hygiene (tag gate)
     'runtime-quality-baseline',
+    // Pack artifact contract + real consumer evidence (production pack path)
+    'pack-artifact-gates',
+    'pack-consumer-evidence',
 ];
