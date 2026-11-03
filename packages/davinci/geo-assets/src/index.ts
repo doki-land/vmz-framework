@@ -1,7 +1,7 @@
 // Basemap assets — plain data, no engine coupling. Hosts register maps with
 // `registerGeoMap` from `@doki-land/davinci/chart` when they want them.
 
-import lite from "./ne-110m-lite.js";
+import lite from "./ne-110m-lite.json";
 
 /** GeoJSON Feature shape the geo registry consumes. */
 export interface GeoFeature {

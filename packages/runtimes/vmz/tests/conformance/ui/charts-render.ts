@@ -3705,4 +3705,144 @@ console.log('charts-render: streamgraph without a series channel is refused…')
     }
 }
 
+console.log('charts-render: the six ruled marks keep hit regions, dark theme and canvas parity…');
+{
+    // 与本文件 canvas 节同口径的记录器（局部重复定义，避免跨节耦合）。
+    function recCtx() {
+        return {
+            calls: [] as any[],
+            fillStyle: null as any,
+            strokeStyle: null as any,
+            lineWidth: 1,
+            font: '',
+            textAlign: '',
+            textBaseline: '',
+            save() {},
+            restore() {},
+            transform(a: number, b: number, c: number, d: number, e: number, f: number) {
+                this.calls.push(['transform', a, b, c, d, e, f]);
+            },
+            beginPath() {
+                this.calls.push(['beginPath']);
+            },
+            closePath() {
+                this.calls.push(['closePath']);
+            },
+            moveTo(x: number, y: number) {
+                this.calls.push(['moveTo', x, y]);
+            },
+            lineTo(x: number, y: number) {
+                this.calls.push(['lineTo', x, y]);
+            },
+            quadraticCurveTo() {
+                this.calls.push(['quadratic']);
+            },
+            bezierCurveTo() {
+                this.calls.push(['cubic']);
+            },
+            ellipse(cx: number, cy: number, rx: number, ry: number, rot: number, start: number, end: number, ccw: boolean) {
+                this.calls.push(['ellipse', cx, cy, rx, ry, rot, start, end, ccw]);
+            },
+            rect(x: number, y: number, w: number, h: number) {
+                this.calls.push(['rect', x, y, w, h]);
+            },
+            clip() {
+                this.calls.push(['clip']);
+            },
+            fill() {
+                this.calls.push(['fill', String(this.fillStyle)]);
+            },
+            fillRect(x: number, y: number, w: number, h: number) {
+                this.calls.push(['fillRect', x, y, w, h, String(this.fillStyle)]);
+            },
+            stroke() {
+                this.calls.push(['stroke', String(this.strokeStyle), this.lineWidth]);
+            },
+            fillText(text: string, x: number, y: number) {
+                this.calls.push(['fillText', text, x, y, this.font, this.textAlign]);
+            },
+            setLineDash(segments: unknown[]) {
+                this.calls.push(['dash', segments.length]);
+            },
+        };
+    }
+    // 与 canvas 节同一合同：形状叶 = fill?1:0 + stroke?1:0，文本 = 1，图像 = 0。
+    function leafOps(node: any): number {
+        if (node.kind === 'group') return node.children.reduce((a: number, c: any) => a + leafOps(c), 0);
+        if (node.kind === 'text') return 1;
+        if (node.kind === 'image') return 0;
+        return (node.fill ? 1 : 0) + (node.stroke ? 1 : 0);
+    }
+
+    const hexbinRows = Array.from({ length: 60 }, (_, i) => ({ x: (i * 37) % 100, y: (i * 53) % 80 }));
+    const sixCases: ReadonlyArray<{ name: string; spec: any; rows: ReadonlyArray<Record<string, unknown>> }> = [
+        {
+            name: 'force',
+            spec: { mark: 'force', encoding: [{ field: 's', channel: 'source' }, { field: 't', channel: 'target' }] },
+            rows: [
+                { s: 'a', t: 'b' },
+                { s: 'b', t: 'c' },
+                { s: 'a', t: 'c' },
+                { s: 'c', t: 'd' },
+            ],
+        },
+        {
+            name: 'parallel',
+            spec: { mark: 'parallel', dimensions: ['u', 'v'], encoding: [{ field: 'g', channel: 'color' }] },
+            rows: [
+                { g: 'p', u: 1, v: 5 },
+                { g: 'q', u: 3, v: 2 },
+            ],
+        },
+        {
+            name: 'hexbin',
+            spec: { mark: 'hexbin', encoding: [{ field: 'x', channel: 'x' }, { field: 'y', channel: 'y' }] },
+            rows: hexbinRows,
+        },
+        {
+            name: 'contour',
+            spec: { mark: 'contour', encoding: [{ field: 'x', channel: 'x' }, { field: 'y', channel: 'y' }] },
+            rows: hexbinRows,
+        },
+        {
+            name: 'chord',
+            spec: { mark: 'chord', encoding: [{ field: 's', channel: 'source' }, { field: 't', channel: 'target' }, { field: 'v', channel: 'value' }] },
+            rows: [
+                { s: 'a', t: 'b', v: 3 },
+                { s: 'b', t: 'a', v: 2 },
+                { s: 'a', t: 'c', v: 1 },
+            ],
+        },
+        {
+            name: 'geo',
+            spec: { mark: 'geo', geo: { map: 'ne-110m-lite', projection: 'mercator' }, encoding: [{ field: 'r', channel: 'region' }, { field: 'v', channel: 'color' }] },
+            rows: [
+                { r: 'China', v: 5 },
+                { r: 'France', v: 2 },
+            ],
+        },
+    ];
+    for (const c of sixCases) {
+        const { plan, semantic } = pipeline(c.spec, c.rows);
+        // 每个可视 mark 必须带命中区（tooltip/键盘可达的引擎级前提）。
+        const marks = semantic.root.children.filter((n) => n.role === 'chart.mark');
+        if (marks.length === 0) fail(`${c.name}: no chart.mark nodes`);
+        for (const m of marks) {
+            if (!m.hitRegion) fail(`${c.name}: mark ${m.id} must carry a hit region`);
+        }
+        // 暗色：暗标签色必须出现，亮主题铬色不得泄漏。
+        const darkSemantic = buildScene(plan, { width: WIDTH, height: HEIGHT }, { theme: DARK_CHART_THEME });
+        const darkSvg = renderSvg(resolve(darkSemantic, { width: WIDTH, height: HEIGHT }));
+        if (!darkSvg.includes('#d1d5db')) fail(`${c.name}: dark build must use the dark label token`);
+        if (darkSvg.includes('#4b5563')) fail(`${c.name}: dark build must not leak the light label token`);
+        // Canvas：绘制操作数与 display 叶节点一一对应。
+        const display = resolve(semantic, { width: WIDTH, height: HEIGHT });
+        const rec = recCtx();
+        renderCanvas(display, rec);
+        const paintOps = rec.calls.filter((k: any[]) => k[0] === 'fill' || k[0] === 'stroke' || k[0] === 'fillText').length;
+        const wantOps = leafOps(display.root);
+        if (paintOps !== wantOps) fail(`${c.name}: canvas paint ops ${paintOps} must equal display leaf ops ${wantOps}`);
+    }
+}
+
 console.log('charts-render PASS: chart pipeline + diagnostics + zero baseline + series + diagram SVG');

@@ -3935,6 +3935,8 @@ function buildForce(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, i
             rx: r,
             ry: r,
             fill: { color: theme.markFill },
+            // 圆点取外接矩形命中区（HitRegion 联合类型内最贴近的既有形状）。
+            hitRegion: { rect: { x: p.x - r, y: p.y - r, w: r * 2, h: r * 2 } },
             ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: POINT_STROKE_WIDTH } } : {}),
         });
         if (showLabels) {
