@@ -3,7 +3,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import type { Cli, Command, CommandDiagnostic, ParsedOptions } from '@vmz/commander';
 import { createCli } from '@vmz/commander';
@@ -38,7 +38,7 @@ import { loadVmzConfig } from '../workspace/plugin-host.js';
 import { findAvailablePort } from '../workspace/port.js';
 import { registerRefactorCommands } from './refactor-cmd.js';
 import { registerArtifactCommands } from './release-cmd.js';
-import { readPackageMeta, resolveWorkspaceDirs } from '../workspace/resolve.js';
+import { findPackageJson, readPackageMeta, resolveWorkspaceDirs } from '../workspace/resolve.js';
 import { emitRouteCatalog } from '../workspace/route-catalog-emit.js';
 import { resolveCoreRuntimeDist } from '../workspace/runtime-dist.js';
 import { registerTestCommand } from './test-cmd.js';
@@ -99,6 +99,7 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
     withServeExtras(withCoreOpts(cli.command('serve', 'cli.cmd.serve'))).action((options) => cmdServe(options));
     withServeExtras(withCoreOpts(cli.command('dev', 'cli.cmd.dev'))).action((options) => cmdDev(options));
     withCoreOpts(cli.command('format', 'cli.cmd.format'))
+        .option('--rust', 'cli.opt.format-rust')
         .option('--no-javascript', 'cli.opt.format-no-javascript')
         .option('--no-rust', 'cli.opt.format-no-rust')
         .option('--no-vmz', 'cli.opt.format-no-vmz')
@@ -572,24 +573,35 @@ async function cmdDev(args: ParsedOptions): Promise<number> {
 }
 
 async function cmdFormat(args: ParsedOptions): Promise<number> {
-    const pathArg = args._[0] ?? '.';
-    const { project, outDir } = resolveWorkspaceDirs({
-        path: pathArg,
-        outDir: typeof args['out-dir'] === 'string' ? args['out-dir'] : undefined,
-    });
+    const rawPath = args._[0];
+    if (typeof rawPath !== 'string' || rawPath.trim() === '') {
+        log.error('format: explicit <file|dir> path required — no implicit workspace scope (pass `.` for the current directory)');
+        return 1;
+    }
+    const target = path.resolve(process.cwd(), rawPath);
+    if (!existsSync(target)) {
+        log.error(`format: path does not exist: ${target}`);
+        return 1;
+    }
+    if (args.rust && args['no-rust']) {
+        log.error('format: conflicting `--rust` and `--no-rust`');
+        return 1;
+    }
+    const startDir = statSync(target).isDirectory() ? target : path.dirname(target);
+    const pkg = findPackageJson(startDir);
+    const configRoot = pkg ? path.dirname(pkg) : startDir;
     const checkOnly = Boolean(args.check);
-    log.info(`format ${project}${checkOnly ? ' --check' : ''}`);
+    log.info(`format ${target}${checkOnly ? ' --check' : ''}`);
     const { runFormatCommand } = await import('./format-cmd.js');
     return runFormatCommand({
-        project,
-        outDir,
+        target,
+        configRoot,
         check: checkOnly,
         overrides: {
             javascript: args['no-javascript'] ? false : undefined,
-            rust: args['no-rust'] ? false : undefined,
+            rust: args.rust ? true : args['no-rust'] ? false : undefined,
             vmz: args['no-vmz'] ? false : undefined,
         },
-        createWorkspace,
     });
 }
 

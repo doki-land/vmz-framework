@@ -1,82 +1,66 @@
 /**
- * `vmz format` — workspace surfaces (JS/TS + Rust) + `.vmz` authoring formatter.
+ * `vmz format` — explicit-path formatter.
+ *
+ * Scope contract: the positional path is the whole scope. A file formats only
+ * itself; a directory is walked locally. Nothing ever falls back to a
+ * workspace-wide pass, and Rust runs per-file `rustfmt` — never `cargo fmt`.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadNative } from '../workspace/public-api.js';
 import { loadVmzConfig } from '../workspace/plugin-host.js';
 import { log } from '../workspace/log.js';
 import { resolveFormatConfig } from './format-config.js';
 
 export type FormatCommandOptions = {
-    project: string;
-    outDir: string;
+    /** Absolute explicit file or directory (already validated to exist). */
+    target: string;
+    /** Project root used to load `vmz.config` and the style config. */
+    configRoot: string;
     check: boolean;
     overrides?: {
         javascript?: boolean;
         rust?: boolean;
         vmz?: boolean;
     };
-    createWorkspace: (opts: { root: string; outDir: string }) => {
-        format: (checkOnly?: boolean) => {
-            filesChecked: number;
-            filesWritten: number;
-            filesNeedWrite: number;
-            diagnostics?: Array<{ severity?: string }>;
-        };
-        dispose: () => void;
-    };
 };
 
 export async function runFormatCommand(opts: FormatCommandOptions): Promise<number> {
-    const { project, outDir, check, createWorkspace } = opts;
-    const { format: formatConfig } = await loadVmzConfig(project);
-    const resolved = resolveFormatConfig(project, formatConfig);
-    if (opts.overrides?.javascript !== undefined) resolved.javascript = opts.overrides.javascript;
-    if (opts.overrides?.rust !== undefined) resolved.rust = opts.overrides.rust;
-    if (opts.overrides?.vmz !== undefined) resolved.vmz = opts.overrides.vmz;
+    const { target, configRoot, check } = opts;
+    const { format: formatConfig } = await loadVmzConfig(configRoot);
+    const resolved = resolveFormatConfig(formatConfig);
+
     const native = loadNative();
-    let exit = 0;
-
-    if (resolved.javascript || resolved.rust) {
-        const report = native.formatWorkspaceRun({
-            cwd: project,
+    let report;
+    try {
+        report = native.formatTargetsRun({
+            targets: [target],
             check,
-            includes: resolved.includes,
+            rust: opts.overrides?.rust,
+            javascript: opts.overrides?.javascript,
+            vmz: opts.overrides?.vmz,
             excludes: resolved.excludes,
-            rust: resolved.rust,
-            javascript: resolved.javascript,
-            styleConfig: resolved.style,
+            styleConfig: path.resolve(configRoot, resolved.style),
         });
-
-        if (report.errors.length > 0) {
-            for (const message of report.errors) {
-                log.error(message);
-            }
-            exit = 1;
-        } else if (check && report.formatted === 0 && report.unchanged > 0) {
-            log.info(`workspace format: no changes needed (${report.unchanged} file(s) checked)`);
-        } else if (!check) {
-            log.info(`workspace format: ${report.formatted} file(s) updated, ${report.unchanged} unchanged`);
-        }
+    } catch (err) {
+        log.error(err instanceof Error ? err.message : String(err));
+        return 1;
     }
 
-    if (resolved.vmz) {
-        log.info(`format .vmz ${project}${check ? ' --check' : ''}`);
-        const ws = createWorkspace({ root: project, outDir });
-        try {
-            const report = ws.format(check);
-            const errors = log.diagnostics(report.diagnostics ?? []);
-            if (check) {
-                log.info(`checked ${report.filesChecked} .vmz file(s); ${report.filesNeedWrite} need write`);
-                if (report.filesNeedWrite > 0) exit = 1;
-            } else {
-                log.info(`formatted ${report.filesWritten}/${report.filesChecked} .vmz file(s)`);
-            }
-            if (errors) exit = 1;
-        } finally {
-            ws.dispose();
-        }
+    let exit = 0;
+    for (const message of report.errors) {
+        log.error(message);
     }
+    if (report.errors.length > 0) exit = 1;
+    if (log.diagnostics(report.diagnostics ?? [])) exit = 1;
 
+    const scope = fs.statSync(target).isDirectory() ? `${target}${path.sep}` : target;
+    if (check) {
+        log.info(`format ${scope}: ${report.needWrite} file(s) would change, ${report.unchanged} unchanged`);
+        if (report.needWrite > 0) exit = 1;
+    } else {
+        log.info(`format ${scope}: ${report.formatted} file(s) updated, ${report.unchanged} unchanged`);
+    }
     return exit;
 }

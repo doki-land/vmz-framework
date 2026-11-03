@@ -9,18 +9,16 @@
 
 import type { VmzEngines, VmzPlugin } from '@vmz/plugin';
 
-/** Workspace format options (`vmz format` reads `vmz.config` `format`). */
+/**
+ * Format options (`vmz format` reads `vmz.config` `format`).
+ *
+ * Scope is always the explicit CLI path; config can only narrow it. There is
+ * no `includes` / language toggle here — `vmz format <path>` formats the
+ * given file or directory and nothing else.
+ */
 export interface VmzFormatConfig {
-    /** Include globs under the project root. */
-    includes?: string[];
-    /** Skip paths under these globs after includes expand. */
+    /** Skip paths under these globs inside an explicit directory target. */
     excludes?: string[];
-    /** Run `cargo fmt` when a Cargo workspace is present. */
-    rust?: boolean;
-    /** Run the Oak CST formatter on JS/TS targets. */
-    javascript?: boolean;
-    /** Format `.vmz` author files via `vmz-formatter`. */
-    vmz?: boolean;
     /** Biome-style formatter config (default: `biome.json` at project root). */
     style?: string;
 }
@@ -28,7 +26,7 @@ export interface VmzFormatConfig {
 export interface VmzUserConfig {
     plugins?: Array<string | VmzPlugin | Promise<VmzPlugin>>;
     engines?: VmzEngines;
-    /** Workspace format targets and engines (`vmz format`). */
+    /** Format excludes / style (`vmz format` scope is the explicit CLI path). */
     format?: VmzFormatConfig;
     /** Application identity (optional authoring). */
     application?: { id?: string; [key: string]: unknown };
