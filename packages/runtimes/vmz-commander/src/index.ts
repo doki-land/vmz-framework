@@ -807,6 +807,10 @@ function parseArgvCore(
     /** Options explicitly supplied on the command line (defaults are not "used"). */
     const used = new Set<OptionDef>();
 
+    // 裸 `-` 是 stdout/stdin 约定值，不是选项标记：`--out -` 与 `--out=-` 等价。
+    // `--out --other` / `--out -x` 仍按缺值处理，后续真实选项不会被吞成值。
+    const isOptionToken = (token: string) => token.length > 1 && token.startsWith('-');
+
     const handleMissing = (flagName: string) => {
         if (strict) {
             throw CliError.parseError('commander::missing_option_value', { option: flagName });
@@ -846,7 +850,7 @@ function parseArgvCore(
                     assignOption(options, def, used, a.slice(eq + 1));
                 } else {
                     const next = argv[i + 1];
-                    if (next != null && !next.startsWith('-')) {
+                    if (next != null && !isOptionToken(next)) {
                         assignOption(options, def, used, next);
                         i += 1;
                     } else if (def.optionalValue) {
@@ -871,7 +875,7 @@ function parseArgvCore(
             }
             if (def.takesValue) {
                 const next = argv[i + 1];
-                if (next != null && !next.startsWith('-')) {
+                if (next != null && !isOptionToken(next)) {
                     assignOption(options, def, used, next);
                     i += 1;
                 } else if (def.optionalValue) {

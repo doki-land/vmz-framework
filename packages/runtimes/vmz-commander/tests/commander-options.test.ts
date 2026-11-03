@@ -250,6 +250,75 @@ test('deprecated option emits a warning diagnostic without blocking the action',
     assert.deepEqual(warning!.args, { option: 'old' });
 });
 
+test('bare `-` is a value for long and short value options', () => {
+    const defs = [
+        {
+            rawName: '--output <path>',
+            helpId: 'opt.output',
+            key: 'output',
+            aliases: ['output'],
+            takesValue: true,
+            optionalValue: false,
+            repeatable: false,
+            config: {},
+        },
+        {
+            rawName: '-o <path>',
+            helpId: 'opt.output',
+            key: 'shortOutput',
+            aliases: ['o'],
+            takesValue: true,
+            optionalValue: false,
+            repeatable: false,
+            config: {},
+        },
+        {
+            rawName: '--verbose',
+            helpId: 'opt.verbose',
+            key: 'verbose',
+            aliases: ['verbose'],
+            takesValue: false,
+            optionalValue: false,
+            repeatable: false,
+            config: {},
+        },
+    ];
+
+    assert.deepEqual(parseOptions(['--output', '-'], defs), { _: [], output: '-' });
+    assert.deepEqual(parseOptions(['--output=-'], defs), { _: [], output: '-' });
+    assert.deepEqual(parseOptions(['-o', '-'], defs), { _: [], shortOutput: '-' });
+    // `-` 只取一个 token：后续真实选项不被吞成值。
+    assert.deepEqual(parseOptions(['--output', '-', '--verbose'], defs), { _: [], output: '-', verbose: true });
+});
+
+test('an option token after a value option still reports a missing value', () => {
+    const defs = [
+        {
+            rawName: '--output <path>',
+            helpId: 'opt.output',
+            key: 'output',
+            aliases: ['output'],
+            takesValue: true,
+            optionalValue: false,
+            repeatable: false,
+            config: {},
+        },
+        {
+            rawName: '--verbose',
+            helpId: 'opt.verbose',
+            key: 'verbose',
+            aliases: ['verbose'],
+            takesValue: false,
+            optionalValue: false,
+            repeatable: false,
+            config: {},
+        },
+    ];
+
+    assert.throws(() => parseOptions(['--output', '--verbose'], defs), /commander::missing_option_value/);
+    assert.throws(() => parseOptions(['--output', '-v'], defs), /commander::missing_option_value/);
+});
+
 test('grouped options render under their own section with the default section kept', async () => {
     const cli = createCli('tester').locales(fixturesRoot);
     cli.command('run', 'cli.cmd.build')
