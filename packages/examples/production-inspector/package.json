@@ -11,6 +11,7 @@
     },
     "dependencies": {
         "@vmz/ui": "workspace:*",
+        "@vmz/ui-icons": "workspace:*",
         "@vmz/core": "workspace:*"
     },
     "devDependencies": {
