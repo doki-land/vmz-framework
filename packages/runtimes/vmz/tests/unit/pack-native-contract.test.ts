@@ -74,6 +74,7 @@ describe('pack-native buildPackRequest (v0)', () => {
             entries: { main: `${ABS}/src/entry.js` },
             target: 'browser',
             root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
             uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
             publicBase: '/_vmz/',
         });
@@ -81,6 +82,7 @@ describe('pack-native buildPackRequest (v0)', () => {
             entries: [{ logical: 'main', path: `${ABS}/src/entry.js` }],
             target: 'browser',
             root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
             uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
             publicBase: '/_vmz/',
         });
@@ -91,6 +93,7 @@ describe('pack-native buildPackRequest (v0)', () => {
             entries: { main: `${ABS}/src/entry.js` },
             target: 'node',
             root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
             uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
         });
@@ -107,6 +110,7 @@ describe('pack-native buildPackRequest (v0)', () => {
             entries: { main: `${ABS}/dist/entry.js` },
             target: 'browser',
             root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
             uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
             origins: good,
@@ -118,6 +122,7 @@ describe('pack-native buildPackRequest (v0)', () => {
             entries: { main: `${ABS}/dist/entry.js` },
             target: 'browser',
             root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
             uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
             publicBase: '/_vmz/',
             origins: {},
@@ -135,6 +140,8 @@ describe('pack-native buildPackRequest (v0)', () => {
                         entries: { main: `${ABS}/dist/entry.js` },
                         target: 'browser',
                         root: `${ABS}/project`,
+                        outRoot: `${ABS}/dist`,
+            outRoot: `${ABS}/dist`,
                         uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                         publicBase: '/_vmz/',
                         origins,
@@ -155,6 +162,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: `${ABS}/src/entry.js` },
                     target: 'browser',
                     root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'ghost' } } as never],
                     publicBase: '/_vmz/',
                 }),
@@ -170,6 +178,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: `${ABS}/src/entry.js` },
                     target: 'browser',
                     root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
                     uses: [{ logical: 'main', execution: 'partial', exports: { kind: 'all' } } as never],
                     publicBase: '/_vmz/',
                 }),
@@ -188,6 +197,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: `${ABS}/src/entry.js`, island: `${ABS}/src/island.js` },
                     target: 'browser',
                     root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
@@ -207,6 +217,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: `${ABS}/src/entry.js` },
                     target: 'deno' as 'node',
                     root: `${ABS}/project`,
+            outRoot: `${ABS}/dist`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
@@ -225,6 +236,7 @@ describe('pack-native buildPackRequest (v0)', () => {
                     entries: { main: 'src/entry.js' },
                     target: 'browser',
                     root: `${ABS}/project`,
+                    outRoot: `${ABS}/dist`,
                     uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
                     publicBase: '/_vmz/',
                 }),
@@ -235,6 +247,27 @@ describe('pack-native buildPackRequest (v0)', () => {
             },
         );
     });
+
+    it('requires an absolute outRoot: chunk ids must not depend on output location', () => {
+        for (const outRoot of [undefined, '', 'dist/static']) {
+            assert.throws(
+                () =>
+                    buildPackRequest({
+                        entries: { main: `${ABS}/dist/entry.js` },
+                        target: 'browser',
+                        root: `${ABS}/project`,
+                        outRoot: outRoot as unknown as string,
+                        uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
+                        publicBase: '/_vmz/',
+                    }),
+                (error: unknown) => {
+                    assert.ok(error instanceof PackNativeError);
+                    assert.equal(error.code, 'pack.native.request-invalid');
+                    return true;
+                },
+            );
+        }
+    });
 });
 
 describe('pack-native runPackPlan / runPackWrite (v0)', () => {
@@ -242,6 +275,7 @@ describe('pack-native runPackPlan / runPackWrite (v0)', () => {
         entries: { main: `${ABS}/src/entry.js` },
         target: 'browser',
         root: `${ABS}/project`,
+        outRoot: `${ABS}/dist`,
         uses: [{ logical: 'main', execution: 'side-effects', exports: { kind: 'named', names: ['a', 'b'] } }],
         publicBase: '/_vmz/',
     });

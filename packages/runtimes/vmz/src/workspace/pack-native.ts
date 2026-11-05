@@ -44,6 +44,12 @@ export interface PackRequest {
     entries: PackRequestEntry[];
     target: PackTarget;
     root: string;
+    /**
+     * Output tree root (absolute). Modules under it are labelled relative to it,
+     * so chunk ids stay identical when `--out-dir` moves or the project is built
+     * on another machine. Source-tree modules stay relative to `root`.
+     */
+    outRoot: string;
     uses: PackRequestUse[];
     publicBase: string;
     /**
@@ -299,6 +305,8 @@ export interface BuildPackRequestInput {
     entries: Record<string, string>;
     target: PackTarget;
     root: string;
+    /** Output tree root: chunk id label base for emitted modules. */
+    outRoot: string;
     uses: PackRequestUse[];
     publicBase: string;
     /** Emitted absolute path → source absolute path (projection provenance). */
@@ -328,6 +336,10 @@ export function buildPackRequest(input: BuildPackRequestInput): string {
     }
     if (typeof input.root !== 'string' || !input.root) throw requestInvalid('root must be a non-empty string');
     if (!path.isAbsolute(input.root)) throw requestInvalid(`root must be an absolute path: ${input.root}`);
+    if (typeof input.outRoot !== 'string' || !input.outRoot) {
+        throw requestInvalid('outRoot must be a non-empty string');
+    }
+    if (!path.isAbsolute(input.outRoot)) throw requestInvalid(`outRoot must be an absolute path: ${input.outRoot}`);
     if (typeof input.publicBase !== 'string' || !input.publicBase) {
         throw requestInvalid('publicBase must be a non-empty string');
     }
@@ -392,7 +404,7 @@ export function buildPackRequest(input: BuildPackRequestInput): string {
         if (!Object.keys(origins).length) origins = undefined;
     }
 
-    const request: PackRequest = { entries, target: input.target, root: input.root, uses, publicBase: input.publicBase, ...(origins ? { origins } : {}) };
+    const request: PackRequest = { entries, target: input.target, root: input.root, outRoot: input.outRoot, uses, publicBase: input.publicBase, ...(origins ? { origins } : {}) };
     return JSON.stringify(request);
 }
 

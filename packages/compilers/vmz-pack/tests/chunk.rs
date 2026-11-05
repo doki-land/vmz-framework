@@ -50,6 +50,7 @@ fn graph(entries: &[(&str, &str)], nodes: Vec<ModuleNode>) -> ModuleGraph {
     ModuleGraph {
         target: Target::Browser,
         root: PathBuf::from("/"),
+        out_root: None,
         entries: entries
             .iter()
             .map(|(logical, path)| GraphEntry {
@@ -61,6 +62,19 @@ fn graph(entries: &[(&str, &str)], nodes: Vec<ModuleNode>) -> ModuleGraph {
         node_index,
         diagnostics: Vec::new(),
     }
+}
+
+/// 带项目根与输出树根变体：产物模块按其输出根相对命名。
+fn graph_with_out_root(
+    project: &str,
+    out_root: &str,
+    entries: &[(&str, &str)],
+    nodes: Vec<ModuleNode>,
+) -> ModuleGraph {
+    let mut built = graph(entries, nodes);
+    built.root = PathBuf::from(project);
+    built.out_root = Some(PathBuf::from(out_root));
+    built
 }
 
 /// 构造链接计划：`retained` 为保留节点索引，`live_dynamic` 给出各节点的
@@ -154,6 +168,47 @@ fn dynamic_import_becomes_async_chunk() {
         out.entry_chunks,
         vec![("app".to_string(), out.chunks.iter().position(|c| c.id == "entry/app").unwrap())]
     );
+}
+
+/// chunk id 可移植性：编译产物按输出树根相对命名，换输出目录或机器不改 id；
+/// 源树模块仍按项目根相对命名。绝对路径（含 Windows verbatim 前缀）不进入 id。
+#[test]
+fn chunk_ids_are_portable_across_output_roots() {
+    fn ids_for_out_root(out_root: &str) -> Vec<String> {
+        let entry_path = format!("{out_root}/entry-client.js");
+        let page_path = format!("{out_root}/pages/index.client.js");
+        let mut entry = node(&entry_path);
+        entry.dynamic_edges.push(dynamic_edge("./pages/index.client.js", &page_path));
+        entry.static_edges.push(static_edge("pkg", "/proj/node_modules/pkg/dist/index.js"));
+        let page = node(&page_path);
+        // 依赖包按 CJS 强制隔离：标签走项目根基准，确保输出目录不进入 id。
+        let mut pkg = node("/proj/node_modules/pkg/dist/index.js");
+        pkg.kind = NodeKind::Cjs;
+        let graph = graph_with_out_root(
+            "/proj",
+            out_root,
+            &[("entry-client.js", entry_path.as_str())],
+            vec![entry, page, pkg],
+        );
+        let mut link = plan(&[0, 1, 2], &[(0, vec![0])]);
+        // 入口确实消费依赖包的符号：否则静态边按活跃性剪枝，标签无从验证。
+        link.modules[0].used_targets.push(2);
+        plan_chunks(&graph, &link).chunks.iter().map(|chunk| chunk.id.clone()).collect()
+    }
+
+    let inside = ids_for_out_root("/proj/dist/static");
+    let outside = ids_for_out_root("/elsewhere/out/static");
+    assert_eq!(inside, outside, "输出目录位置不得进入 chunk id");
+    assert!(inside.iter().any(|id| id == "async/pages/index.client.js"), "{inside:?}");
+    assert!(
+        inside.iter().any(|id| id == "isolated/node_modules/pkg/dist/index.js"),
+        "{inside:?}"
+    );
+    for id in &inside {
+        assert!(!id.contains("//?/"), "verbatim 前缀进入 chunk id: {id}");
+        assert!(!id.contains("dist/static"), "输出目录进入 chunk id: {id}");
+        assert!(!id.contains("/proj"), "绝对路径进入 chunk id: {id}");
+    }
 }
 
 /// 循环模块收缩为同一单元，落在同一 chunk 且整体先于导入者。

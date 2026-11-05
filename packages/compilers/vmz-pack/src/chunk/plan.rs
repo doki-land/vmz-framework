@@ -418,28 +418,94 @@ fn chunk_id(graph: &ModuleGraph, origin: &ChunkOrigin) -> String {
     }
 }
 
-/// 相对 `graph.root` 的规范化路径标签：同内容跨机器产出相同 chunk id。
-/// 与项目根不同树（跨盘）时退回规范化绝对路径——同机稳定，不假装跨机可重现。
+/// 相对命名基准派生的可移植路径标签。
+///
+/// 命名基准按优先级取：输出树根（`graph.out_root`，编译产物一律按其相对
+/// 路径命名，换 `--out-dir`、换机器或换绝对位置都产出同一 chunk id）→
+/// 项目根（源树与依赖包，允许 `../` 前缀表达跨仓兄弟目录）→ 路径摘要
+/// `external/<hex8>`（跨卷等无法相对化的情况，不把机器相关绝对路径写进
+/// chunk id）。
 fn relative_label(graph: &ModuleGraph, path: &Path) -> String {
-    let root: Vec<std::path::Component<'_>> = graph.root.components().collect();
-    let target: Vec<std::path::Component<'_>> = path.components().collect();
-    let common = root.iter().zip(target.iter()).take_while(|(a, b)| a == b).count();
-    if target[common..]
-        .iter()
-        .any(|c| matches!(c, std::path::Component::Prefix(_) | std::path::Component::RootDir))
-    {
-        return normalize_path(path);
+    let target = label_components(path);
+    if let Some(out_root) = &graph.out_root {
+        if let Some(label) = relative_under(&label_components(out_root), &target, false) {
+            return label;
+        }
+    }
+    if let Some(label) = relative_under(&label_components(&graph.root), &target, true) {
+        return label;
+    }
+    format!("external/{}", digest_label(&target))
+}
+
+/// 路径 → 可比较的组件序列：Windows 的 verbatim 前缀（`\\\\?\\C:`）与普通
+/// 盘符前缀归一为同一键，`canonicalize` 与否不再改变比较结果。
+fn label_components(path: &Path) -> Vec<String> {
+    use std::path::Component;
+    let mut out = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => out.push(prefix_key(&prefix.kind())),
+            Component::RootDir => out.push(String::new()),
+            Component::CurDir => {}
+            Component::ParentDir => out.push("..".to_string()),
+            Component::Normal(name) => out.push(name.to_string_lossy().into_owned()),
+        }
+    }
+    out
+}
+
+fn prefix_key(prefix: &std::path::Prefix<'_>) -> String {
+    use std::path::Prefix;
+    match prefix {
+        Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
+            format!("{}:", char::from(*letter).to_ascii_lowercase())
+        }
+        Prefix::UNC(server, share) | Prefix::VerbatimUNC(server, share) => {
+            format!("//{}/{}", server.to_string_lossy(), share.to_string_lossy())
+        }
+        Prefix::DeviceNS(name) => format!("//?/{}", name.to_string_lossy()),
+        Prefix::Verbatim(name) => name.to_string_lossy().into_owned(),
+    }
+}
+
+/// `target` 相对 `base` 的标签；`allow_parent` 为真时允许目标不在 base 之下
+/// （同卷源树兄弟目录）并用 `../` 前缀表达，为假时要求严格包含（输出树根）。
+/// 目标仍在不同卷 / 不同根标记之下时返回 `None`，由调用方降级。
+fn relative_under(base: &[String], target: &[String], allow_parent: bool) -> Option<String> {
+    let common = base.iter().zip(target.iter()).take_while(|(a, b)| a == b).count();
+    if !allow_parent && common < base.len() {
+        return None;
+    }
+    let rest = &target[common..];
+    if rest.iter().any(|component| is_root_marker(component)) {
+        return None;
     }
     let mut out = String::new();
-    for component in &root[common..] {
-        if matches!(component, std::path::Component::Normal(_)) {
+    if allow_parent {
+        for _ in &base[common..] {
             out.push_str("../");
         }
     }
-    let rest: Vec<String> =
-        target[common..].iter().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
     out.push_str(&rest.join("/"));
-    if out.is_empty() { normalize_path(path) } else { out }
+    (!out.is_empty()).then_some(out)
+}
+
+/// 组件是否为卷根 / 根目录标记（空串是 `RootDir`，带冒号是盘符前缀）。
+fn is_root_marker(component: &str) -> bool {
+    component.is_empty() || component.ends_with(':') || component.starts_with("//")
+}
+
+/// 无法相对化时的稳定短标签：路径组件摘要，不含机器相关绝对路径。
+fn digest_label(components: &[String]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(components.join("/").as_bytes());
+    let mut out = String::with_capacity(8);
+    for byte in digest.iter().take(4) {
+        out.push(char::from_digit(u32::from(byte >> 4), 16).unwrap_or('0'));
+        out.push(char::from_digit(u32::from(byte & 0x0F), 16).unwrap_or('0'));
+    }
+    out
 }
 
 /// 路径规范化：分隔符统一为 `/`，保证跨平台稳定 id。

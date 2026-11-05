@@ -105,6 +105,9 @@ pub struct ModuleGraph {
     pub target: Target,
     /// 项目根：chunk id 的相对命名基准，保证同内容跨机器产出稳定 id。
     pub root: PathBuf,
+    /// 输出树根（本次 `--out-dir` 下的产物目录）：落在其下的节点按输出根
+    /// 相对路径命名，使 chunk id 不随输出目录位置变化。
+    pub out_root: Option<PathBuf>,
     /// 入口映射（保序）。
     pub entries: Vec<GraphEntry>,
     /// 节点表，索引即节点号。
@@ -128,11 +131,11 @@ impl ModuleGraph {
 /// 入口本身解析失败（读文件/parse）记入图级诊断并跳过该入口；
 /// 依赖边解析失败保留为 `Err` 诊断边，遍历不因单点失败中断。
 pub fn build_graph(entries: &[(String, PathBuf)], target: Target, root: &Path) -> ModuleGraph {
-    build_graph_with_origins(entries, target, root, &HashMap::new())
+    build_graph_with_roots(entries, target, root, None, &HashMap::new())
 }
 
-/// [`build_graph`] 的 provenance 变体：`origins` 把 canonical 产物路径映射回
-/// 其源文件（编译投影关系，如 `dist/components/Icon.client.js` →
+/// [`build_graph`] 的 provenance 变体（无输出树根）：`origins` 把 canonical
+/// 产物路径映射回其源文件（编译投影关系，如 `dist/components/Icon.client.js` →
 /// `node_modules/@vmz/ui/src/components/Icon.vmz`）。裸说明符与 `#imports`
 /// 的包发现以来源位置为上溯起点，使产物图表现得像模块仍住在源包里。
 pub fn build_graph_with_origins(
@@ -141,10 +144,24 @@ pub fn build_graph_with_origins(
     root: &Path,
     origins: &HashMap<PathBuf, PathBuf>,
 ) -> ModuleGraph {
+    build_graph_with_roots(entries, target, root, None, origins)
+}
+
+/// 带输出树根的完整变体：`out_root` 是本次产物的输出目录。落在其下的
+/// 节点（编译产物）按输出根相对路径命名，换 `--out-dir` 或换机器不改
+/// chunk id；其余节点（源树 / 依赖包）仍按项目根相对命名。
+pub fn build_graph_with_roots(
+    entries: &[(String, PathBuf)],
+    target: Target,
+    root: &Path,
+    out_root: Option<&Path>,
+    origins: &HashMap<PathBuf, PathBuf>,
+) -> ModuleGraph {
     let mut graph = ModuleGraph {
         target,
         // 与节点路径同口径 canonicalize，否则 `\\?\` 前缀差异使相对标签退化为绝对路径。
         root: root.canonicalize().unwrap_or_else(|_| root.to_path_buf()),
+        out_root: out_root.map(|path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf())),
         entries: Vec::new(),
         nodes: Vec::new(),
         node_index: HashMap::new(),

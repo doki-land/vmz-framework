@@ -63,6 +63,7 @@ function request(target) {
         entries: [{ logical: 'main', path: entryPath }],
         target,
         root,
+        outRoot: root,
         uses: [{ logical: 'main', execution: 'full', exports: { kind: 'all' } }],
         publicBase: '/_vmz/',
     });

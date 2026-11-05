@@ -147,6 +147,7 @@ const requestJson = packNative.buildPackRequest({
     entries: { 'entry-client.js': path.resolve(dist, 'entry-client.js') },
     target: 'browser',
     root: ROOT,
+    outRoot: dist,
     uses: [{ logical: 'entry-client.js', execution: 'full', exports: { kind: 'all' } }],
     publicBase: '/',
 });
@@ -158,6 +159,9 @@ if (
     request.uses[0].exports?.kind !== 'all'
 ) {
     fail('buildPackRequest must pass target/publicBase/execution/exports through without guessing');
+}
+if (request.outRoot !== path.resolve(dist)) {
+    fail('buildPackRequest must pass outRoot through: chunk ids are labelled against the output tree');
 }
 
 const packMod = await import(pathToFileURL(path.join(dist, 'workspace/pack.js')).href);

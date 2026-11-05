@@ -126,7 +126,15 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
     // Browser graph entries are the bootstrap modules; page/island units join
     // through the bootstrap dynamic-import tables and need projection provenance.
     const origins = deploymentUnitOrigins(absOut, loadDeploymentIr(absOut));
-    const requestJson = buildPackRequest({ entries, target: 'browser', root, uses, publicBase: PACK_PUBLIC_BASE, origins });
+    const requestJson = buildPackRequest({
+        entries,
+        target: 'browser',
+        root,
+        outRoot: absOut,
+        uses,
+        publicBase: PACK_PUBLIC_BASE,
+        origins,
+    });
 
     const packOutDir = path.join(absOut, ...PACK_OUTPUT_DIR_REL.split('/'));
     // 重建不得残留上一轮 pack 的过期 chunk：manifest/磁盘闭包是交付合同，
@@ -320,7 +328,15 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
         throw new Error(`packSsrFromDeploymentIr: deployment IR has no node-reachable units in ${absOut}`);
     }
     const origins = deploymentUnitOrigins(absOut, ir);
-    const requestJson = buildPackRequest({ entries, target: 'node', root, uses, publicBase: PACK_PUBLIC_BASE, origins });
+    const requestJson = buildPackRequest({
+        entries,
+        target: 'node',
+        root,
+        outRoot: absOut,
+        uses,
+        publicBase: PACK_PUBLIC_BASE,
+        origins,
+    });
 
     const packOutDir = path.join(absOut, ...PACK_NODE_OUTPUT_DIR_REL.split('/'));
     // 与浏览器 pack 同口径：写盘前清空旧 Node chunk 目录，闭包合同不接受残留。

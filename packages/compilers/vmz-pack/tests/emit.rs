@@ -2939,6 +2939,7 @@ fn incomplete_facts_member_is_rejected() {
     let graph = ModuleGraph {
         target: Target::Browser,
         root: root.clone(),
+        out_root: None,
         entries: vec![GraphEntry { logical: "main".to_string(), id: app.clone() }],
         nodes,
         node_index,
@@ -2993,6 +2994,7 @@ fn missing_source_file_is_rejected() {
     let graph = ModuleGraph {
         target: Target::Browser,
         root: root.clone(),
+        out_root: None,
         entries: vec![GraphEntry { logical: "main".to_string(), id: gone.clone() }],
         nodes: vec![node],
         node_index: std::collections::HashMap::from([(node_path, 0usize)]),

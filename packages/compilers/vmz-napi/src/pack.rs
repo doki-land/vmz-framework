@@ -45,6 +45,8 @@ const INVALID_REQUEST: &str = "vmz::napi::pack::invalid_request";
 /// `origins`（可缺省 = 空）把 canonical 产物路径映射回 canonical 源文件路径：
 /// 编译投影（`dist/**.client.js` ← `src/**.vmz`，含依赖包组件）的裸说明符
 /// 包发现以源位置上溯，语义等同 Node 对符号链接包取 realpath。
+/// `outRoot`（可缺省）是本轮产物输出目录：落在其下的模块按输出根相对
+/// 路径命名 chunk id，使 id 不随 `--out-dir` 位置或机器变化。
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RequestWire {
@@ -55,6 +57,8 @@ struct RequestWire {
     public_base: String,
     #[serde(default)]
     origins: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    out_root: Option<String>,
 }
 
 /// One logical entry with its absolute file path.
@@ -379,10 +383,20 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
         Ok(origins) => origins,
         Err(response) => return Err(response),
     };
-    let graph = vmz_pack::graph::build_graph_with_origins(
+    let out_root = match request.out_root.as_deref() {
+        None => None,
+        Some(raw) => {
+            if !Path::new(raw).is_absolute() {
+                return Err(invalid_request(format!("outRoot must be an absolute path: {raw}")));
+            }
+            Some(Path::new(raw))
+        }
+    };
+    let graph = vmz_pack::graph::build_graph_with_roots(
         &entries,
         target,
         Path::new(&request.root),
+        out_root,
         &origins,
     );
     if !graph.diagnostics.is_empty() {
