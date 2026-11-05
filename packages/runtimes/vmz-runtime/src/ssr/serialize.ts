@@ -82,11 +82,58 @@ function isVoidTag(tag) {
     return VOID_TAGS.has(String(tag).toLowerCase());
 }
 
+/**
+ * `textarea` carries its initial value as text content and `select` carries it
+ * as a selected option, so neither can travel as a `value` attribute. `input`
+ * keeps the attribute, which browsers honor for the default value.
+ */
+function controlValue(node, tag) {
+    if (tag !== 'textarea' && tag !== 'select') return null;
+    const v = node.attrs ? node.attrs.value : null;
+    return v == null || v === false ? null : String(v);
+}
+
+function nodeText(node) {
+    if (!node || typeof node !== 'object') return '';
+    if (node.__kind === 'text') return String(node.value ?? '');
+    if (node.__kind === 'el' || node.__kind === 'frag') {
+        return (node.children || []).map(nodeText).join('');
+    }
+    return '';
+}
+
+/** Mark the `<option>` whose value (or text) equals the model value. */
+function markSelectSelection(node, wanted) {
+    const visit = (n) => {
+        if (!n || typeof n !== 'object') return;
+        if (n.__kind === 'el') {
+            const tag = String(n.tag || '').toLowerCase();
+            if (tag === 'option') {
+                const raw =
+                    n.attrs && n.attrs.value != null ? String(n.attrs.value) : nodeText(n).trim();
+                if (raw === wanted) {
+                    if (!n.attrs) n.attrs = {};
+                    n.attrs.selected = '';
+                } else if (n.attrs && Object.prototype.hasOwnProperty.call(n.attrs, 'selected')) {
+                    delete n.attrs.selected;
+                }
+                return;
+            }
+        }
+        for (const c of n.children || []) visit(c);
+    };
+    for (const c of node.children || []) visit(c);
+}
+
 function serializeOpenTag(node) {
     const tag = node.tag || 'div';
+    const lowerTag = String(tag).toLowerCase();
     let attrs = '';
     for (const [k, v] of Object.entries(node.attrs || {})) {
         if (v == null || v === false) continue;
+        // `textarea` value renders as text content and `select` value as a
+        // selected option, so the raw attribute must not be emitted.
+        if (k === 'value' && (lowerTag === 'textarea' || lowerTag === 'select')) continue;
         if (k === 'className') attrs += ` class="${escapeHtml(v)}"`;
         else attrs += ` ${k}="${escapeHtml(v)}"`;
     }
@@ -114,6 +161,12 @@ export function flattenSerializeNode(node) {
         if (node.__rawHtml != null) {
             return isVoidTag(tag) ? `${open}${String(node.__rawHtml)}` : `${open}${String(node.__rawHtml)}</${tag}>`;
         }
+        const lowerTag = String(tag).toLowerCase();
+        const control = controlValue(node, lowerTag);
+        if (lowerTag === 'textarea' && control != null) {
+            return `${open}${escapeHtml(control)}</${tag}>`;
+        }
+        if (lowerTag === 'select' && control != null) markSelectSelection(node, control);
         const inner = (node.children || []).map(flattenSerializeNode).join('');
         return isVoidTag(tag) ? `${open}${inner}` : `${open}${inner}</${tag}>`;
     }
@@ -155,9 +208,14 @@ export function* streamSerializeChunks(node) {
         }
         const { open } = serializeOpenTag(node);
         yield open;
+        const lowerTag = String(tag).toLowerCase();
+        const control = controlValue(node, lowerTag);
         if (node.__rawHtml != null) {
             yield String(node.__rawHtml);
+        } else if (lowerTag === 'textarea' && control != null) {
+            yield escapeHtml(control);
         } else {
+            if (lowerTag === 'select' && control != null) markSelectSelection(node, control);
             for (const c of node.children || []) yield* streamSerializeChunks(c);
         }
         if (!isVoidTag(tag)) yield `</${tag}>`;

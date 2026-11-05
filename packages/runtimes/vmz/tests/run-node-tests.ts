@@ -12,6 +12,7 @@ const files = [
     'workspace.test.ts',
     'affected.test.ts',
     'html-binding.test.ts',
+    'ssr-control-value.test.ts',
     'each-shared-binding-flush.test.ts',
     'write-barrier-root-guard.test.ts',
     'write-barrier-path-args.test.ts',
