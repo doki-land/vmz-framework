@@ -73,6 +73,8 @@ const planResponse = {
         ],
         dynamicFiles: [{ from: 'entry-client-aa11.js', to: 'pages-index-bb22.js' }],
         manifestJson: JSON.stringify({ version: 'v0', entries: { 'entry-client.js': 'entry-client-aa11.js' } }),
+        inputDigest: 'a'.repeat(64),
+        graphDigest: 'b'.repeat(64),
     },
     diagnostics: [],
 };
@@ -343,6 +345,8 @@ const nodePlanResponse = {
         ],
         dynamicFiles: [],
         manifestJson: JSON.stringify({ version: 'v0', target: 'node', entries: { Application: 'Application-node-11aa.js' } }),
+        inputDigest: 'c'.repeat(64),
+        graphDigest: 'd'.repeat(64),
     },
     diagnostics: [],
 };

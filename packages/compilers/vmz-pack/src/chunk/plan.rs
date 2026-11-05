@@ -425,7 +425,7 @@ fn chunk_id(graph: &ModuleGraph, origin: &ChunkOrigin) -> String {
 /// 项目根（源树与依赖包，允许 `../` 前缀表达跨仓兄弟目录）→ 路径摘要
 /// `external/<hex8>`（跨卷等无法相对化的情况，不把机器相关绝对路径写进
 /// chunk id）。
-fn relative_label(graph: &ModuleGraph, path: &Path) -> String {
+pub(crate) fn relative_label(graph: &ModuleGraph, path: &Path) -> String {
     let target = label_components(path);
     if let Some(out_root) = &graph.out_root {
         if let Some(label) = relative_under(&label_components(out_root), &target, false) {

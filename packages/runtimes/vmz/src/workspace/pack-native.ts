@@ -106,6 +106,10 @@ export interface PackPlan {
     entryFiles: PackEntryFile[];
     dynamicFiles: PackDynamicFile[];
     manifestJson: string;
+    /** Content digest of this pack input (graph structure + source bytes + emit options). */
+    inputDigest: string;
+    /** Graph-structure digest; any change invalidates every cached chunk. */
+    graphDigest: string;
 }
 
 export interface PackDiagnostic {
@@ -256,7 +260,7 @@ function parseDynamicFile(value: unknown, where: string): PackDynamicFile {
 
 function parsePackPlan(value: unknown): PackPlan {
     if (!isPlainObject(value)) throw responseShape('response.plan must be an object');
-    rejectUnknownKeys(value, ['artifacts', 'styles', 'assets', 'entryFiles', 'dynamicFiles', 'manifestJson'], 'response.plan');
+    rejectUnknownKeys(value, ['artifacts', 'styles', 'assets', 'entryFiles', 'dynamicFiles', 'manifestJson', 'inputDigest', 'graphDigest'], 'response.plan');
     if (!Array.isArray(value.artifacts)) throw responseShape('response.plan.artifacts must be an array');
     if (!Array.isArray(value.styles)) throw responseShape('response.plan.styles must be an array');
     if (!Array.isArray(value.assets)) throw responseShape('response.plan.assets must be an array');
@@ -269,6 +273,8 @@ function parsePackPlan(value: unknown): PackPlan {
         entryFiles: value.entryFiles.map((e, i) => parseEntryFile(e, `response.plan.entryFiles[${i}]`)),
         dynamicFiles: value.dynamicFiles.map((d, i) => parseDynamicFile(d, `response.plan.dynamicFiles[${i}]`)),
         manifestJson: requireString(value.manifestJson, 'response.plan.manifestJson'),
+        inputDigest: requireString(value.inputDigest, 'response.plan.inputDigest'),
+        graphDigest: requireString(value.graphDigest, 'response.plan.graphDigest'),
     };
 }
 

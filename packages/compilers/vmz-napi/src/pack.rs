@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use napi_derive::napi;
 use serde::{Deserialize, Serialize};
 use vmz_pack::diag::PackDiagnostic;
-use vmz_pack::emit::{EmitOptions, EmitPlan};
+use vmz_pack::emit::{EmitCache, EmitOptions, EmitPlan};
 use vmz_pack::link::{EntryExecution, EntryExports, EntryUse};
 use vmz_pack::resolve::Target;
 
@@ -122,6 +122,10 @@ struct PlanWire {
     entry_files: Vec<EntryFileWire>,
     dynamic_files: Vec<DynamicFileWire>,
     manifest_json: String,
+    /// 本次输入的摘要（图结构 + 源字节 + emit 选项）。
+    input_digest: String,
+    /// 图结构摘要：变化即整体失效，不允许部分 chunk 复用。
+    graph_digest: String,
 }
 
 /// One chunk artifact (`ChunkArtifact`). The source map JSON itself stays
@@ -253,6 +257,8 @@ fn plan_to_wire(plan: &EmitPlan) -> PlanWire {
             .map(|(from, to)| DynamicFileWire { from: from.clone(), to: to.clone() })
             .collect(),
         manifest_json: plan.manifest_json.clone(),
+        input_digest: plan.input_digest.clone(),
+        graph_digest: plan.graph_digest.clone(),
     }
 }
 
@@ -308,8 +314,9 @@ fn serialize(response: &ResponseWire) -> String {
 enum Chain {
     /// Request rejected before the chain (or graph-level entry failure).
     Failed(Vec<PackDiagnostic>),
-    /// `plan_emit` produced a complete plan.
-    Planned(EmitPlan),
+    /// `plan_emit` produced a complete plan plus whether the graph structure
+    /// changed relative to the previous build (any change forbids reuse).
+    Planned(EmitPlan, bool),
 }
 
 /// `origins` wire map → canonical 路径对。两端都 canonicalize（pnpm 符号链接
@@ -333,7 +340,7 @@ fn canonicalize_origins(
 
 /// Parse + validate the request, then run graph → link → chunks → plan_emit.
 /// Never panics; every failure is a diagnostic vector for the response.
-fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
+fn run_chain(request_json: &str, cache: &mut EmitCache) -> Result<Chain, ResponseWire> {
     let request: RequestWire = match serde_json::from_str(request_json) {
         Ok(request) => request,
         Err(err) => return Err(invalid_request(err.to_string())),
@@ -423,32 +430,49 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
         return Ok(Chain::Failed(fatal));
     }
     let chunk_plan = vmz_pack::chunk::plan_chunks(&graph, &link_plan);
-    let options =
-        EmitOptions { public_base: request.public_base.clone(), minify: true };
-    match vmz_pack::emit::plan_emit(&graph, &link_plan, &chunk_plan, &options) {
+    let options = EmitOptions { public_base: request.public_base.clone(), minify: true };
+    match vmz_pack::emit::plan_emit_with_cache(&graph, &link_plan, &chunk_plan, &options, cache) {
         Err(diagnostics) => Ok(Chain::Failed(diagnostics)),
-        Ok(plan) => Ok(Chain::Planned(plan)),
+        Ok(plan) => {
+            let graph_changed = cache.graph_changed();
+            Ok(Chain::Planned(plan, graph_changed))
+        }
     }
 }
 
 /// `packPlan` core: request JSON in, response JSON out.
 fn pack_plan_core(request_json: &str) -> String {
-    match run_chain(request_json) {
+    let mut cache = EmitCache::disabled();
+    match run_chain(request_json, &mut cache) {
         Err(response) => serialize(&response),
         Ok(Chain::Failed(diagnostics)) => serialize(&failed(diagnostics)),
-        Ok(Chain::Planned(plan)) => serialize(&succeeded(&plan)),
+        Ok(Chain::Planned(plan, _)) => serialize(&succeeded(&plan)),
     }
 }
 
-/// `packWrite` core: same chain, then `write_emit` into `out_dir`.
+/// `packWrite` core: same chain, then the incremental writer into `out_dir`.
 fn pack_write_core(request_json: &str, out_dir: &str) -> String {
-    match run_chain(request_json) {
+    let mut cache = EmitCache::load(Path::new(out_dir));
+    match run_chain(request_json, &mut cache) {
         Err(response) => serialize(&response),
         Ok(Chain::Failed(diagnostics)) => serialize(&failed(diagnostics)),
-        Ok(Chain::Planned(plan)) => match vmz_pack::emit::write_emit(&plan, Path::new(out_dir)) {
-            Ok(()) => serialize(&succeeded(&plan)),
-            Err(diagnostics) => serialize(&failed(diagnostics)),
-        },
+        Ok(Chain::Planned(plan, graph_changed)) => {
+            let result =
+                vmz_pack::emit::write_emit_incremental(&plan, Path::new(out_dir), !graph_changed);
+            match result {
+                Ok(()) => {
+                    // 写盘成功后才回写缓存：失败的产物集不允许污染下一次复用。
+                    if let Err(error) = cache.store() {
+                        return serialize(&failed(vec![PackDiagnostic::new(
+                            "vmz::pack::emit::cache_failed",
+                            format!("cannot store pack cache: {error}"),
+                        )]));
+                    }
+                    serialize(&succeeded(&plan))
+                }
+                Err(diagnostics) => serialize(&failed(diagnostics)),
+            }
+        }
     }
 }
 

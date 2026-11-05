@@ -59,6 +59,7 @@
 //! 拒绝。
 
 mod assemble;
+mod cache;
 mod isolated;
 mod manifest;
 mod style;
@@ -72,7 +73,8 @@ use crate::diag::PackDiagnostic;
 use crate::graph::ModuleGraph;
 use crate::link::{LinkPlan, LinkedModule, effectful_modules};
 
-pub use write::write_emit;
+pub use cache::EmitCache;
+pub use write::{write_emit, write_emit_incremental};
 
 /// 模块事实不完整诊断在 `module` 层的稳定码，emit 前置拒绝据此判定。
 const STATEMENT_FACT_INCOMPLETE: &str = "vmz::pack::module::statement_fact_incomplete";
@@ -180,6 +182,10 @@ pub struct EmitPlan {
     /// 非致命诊断（保留的非字面量动态 import、保留的根绝对 URL 动态 import、
     /// 命名空间加宽、同 chunk 动态边界加宽）。
     pub diagnostics: Vec<PackDiagnostic>,
+    /// 本次输入的摘要（图结构 + 源字节 + emit 选项）。
+    pub input_digest: String,
+    /// 图结构摘要：变化即整体失效，不允许部分 chunk 复用。
+    pub graph_digest: String,
 }
 
 /// assemble 与 manifest 共享的只读上下文。
@@ -213,14 +219,34 @@ pub(crate) struct EmitContext<'a> {
 /// 任何前置拒绝或装配失败（事实不完整、名字冲突、未实现语义、读取
 /// 失败、类型擦除失败、占位符碰撞、资源不可解析）都返回 `Err`，
 /// 诊断携带相关文件路径；不产出部分结果。
+///
+/// 本入口不启用增量缓存，等价 [`plan_emit_with_cache`] + [`EmitCache::disabled`]。
 pub fn plan_emit(
     graph: &ModuleGraph,
     link: &LinkPlan,
     chunks: &ChunkPlan,
     options: &EmitOptions,
 ) -> Result<EmitPlan, Vec<PackDiagnostic>> {
+    let mut cache = EmitCache::disabled();
+    plan_emit_with_cache(graph, link, chunks, options, &mut cache)
+}
+
+/// 带增量缓存的产物计划入口。
+///
+/// 调用方负责缓存 IO（[`EmitCache::load`] / [`EmitCache::store`]），本函数
+/// 只做纯计算：先绑定本次 `graphDigest` / `inputDigest`，图结构变化即丢弃
+/// 全部旧条目；随后逐 chunk 以内容摘要键复用压缩文本与 source map。
+pub fn plan_emit_with_cache(
+    graph: &ModuleGraph,
+    link: &LinkPlan,
+    chunks: &ChunkPlan,
+    options: &EmitOptions,
+    cache: &mut EmitCache,
+) -> Result<EmitPlan, Vec<PackDiagnostic>> {
     let mut errors: Vec<PackDiagnostic> = Vec::new();
     let mut warnings: Vec<PackDiagnostic> = Vec::new();
+    let digests = cache::pack_digests(graph, link, chunks, options);
+    cache.rebind(&digests);
 
     // 输入一致性：节点归属与依赖索引。
     let node_count = graph.nodes.len();
@@ -426,7 +452,7 @@ pub fn plan_emit(
     }
 
     // 第二/三遍：指纹定名、占位符替换、压缩、source map 复合映射、manifest 序列化。
-    manifest::finalize(&context, options, codes, segments, styles, warnings)
+    manifest::finalize(&context, options, codes, segments, styles, warnings, cache, &digests)
 }
 
 /// 解析并指纹化**活跃**的 [`crate::module::AssetFact`]：资产只能从

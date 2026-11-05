@@ -47,6 +47,8 @@ const validPlan = {
     entryFiles: [{ logical: 'main', file: 'entry-main-ab12cd34.js' }],
     dynamicFiles: [{ from: 'entry-main-ab12cd34.js', to: 'shared-9f8e7d6c.js' }],
     manifestJson: JSON.stringify({ version: 'v0', entries: { main: 'entry-main-ab12cd34.js' } }),
+    inputDigest: 'a'.repeat(64),
+    graphDigest: 'b'.repeat(64),
 };
 
 function okResponseJson(plan: unknown = validPlan): string {

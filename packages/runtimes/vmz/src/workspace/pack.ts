@@ -26,7 +26,7 @@
  */
 
 import crypto from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadDeploymentIr } from './bundler-adapter.js';
 import type { DeploymentIr } from './bundler-adapter.js';
@@ -194,9 +194,8 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
     });
 
     const packOutDir = path.join(absOut, ...PACK_OUTPUT_DIR_REL.split('/'));
-    // 重建不得残留上一轮 pack 的过期 chunk：manifest/磁盘闭包是交付合同，
-    // 写盘前整体清空旧输出目录（`packWrite` 只增不删）。
-    rmSync(packOutDir, { recursive: true, force: true });
+    // 不再整体清空输出目录：`packWrite` 按内容摘要复用未变 chunk，并在写盘后
+    // 逐文件清理不再属于产物闭包的旧 chunk / map / css / assets（不留孤儿）。
     const { plan } = runPackWrite(requestJson, packOutDir, opts.binding ? { binding: opts.binding } : {});
 
     const ir = loadDeploymentIr(absOut);
@@ -241,6 +240,8 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         minify: string;
         treeShake: string;
         sourceMaps: string;
+        packInputDigest: string;
+        packGraphDigest: string;
         nativeManifest: unknown;
         packDigest?: string;
     } = {
@@ -278,6 +279,11 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         // `sourceMapFileName` on the wire). Generated columns are token columns,
         // source columns stay at the assembled slice start; `names` is unused.
         sourceMaps: 'chunk-v3-token-mappings',
+        // `packInputDigest` 是本次 pack 输入（图结构 + 各模块源字节 + emit 选项）
+        // 的内容摘要；`packGraphDigest` 只看图结构，任一边界/模块/边变化即整体
+        // 失效，不允许部分 chunk 复用。两者都来自 Rust 侧，不使用 mtime/时间戳。
+        packInputDigest: plan.inputDigest,
+        packGraphDigest: plan.graphDigest,
         nativeManifest,
     };
     body.packDigest = sha256Hex(stableStringify({ ...body }));
@@ -401,8 +407,7 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
     });
 
     const packOutDir = path.join(absOut, ...PACK_NODE_OUTPUT_DIR_REL.split('/'));
-    // 与浏览器 pack 同口径：写盘前清空旧 Node chunk 目录，闭包合同不接受残留。
-    rmSync(packOutDir, { recursive: true, force: true });
+    // 与浏览器 pack 同口径：不清空目录，由 `packWrite` 复用未变 chunk 并清理孤儿。
     const { plan } = runPackWrite(requestJson, packOutDir, opts.binding ? { binding: opts.binding } : {});
 
     let nativeManifest: unknown;
@@ -441,6 +446,8 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
         chunks: unknown[];
         chunkCount: number;
         entryCount: number;
+        packInputDigest: string;
+        packGraphDigest: string;
         nativeManifest: unknown;
         packDigest?: string;
     } = {
@@ -455,6 +462,9 @@ export function packSsrFromDeploymentIr(outDir: string, opts: PackSsrFromDeploym
         chunks,
         chunkCount: chunks.length,
         entryCount: plan.entryFiles.length,
+        // 同浏览器 pack：输入/图结构摘要来自 Rust 侧内容摘要判定。
+        packInputDigest: plan.inputDigest,
+        packGraphDigest: plan.graphDigest,
         nativeManifest,
     };
     body.packDigest = sha256Hex(stableStringify({ ...body }));

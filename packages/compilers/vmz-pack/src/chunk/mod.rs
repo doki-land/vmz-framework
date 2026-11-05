@@ -45,4 +45,5 @@
 
 mod plan;
 
+pub(crate) use plan::relative_label;
 pub use plan::{Chunk, ChunkOrigin, ChunkPlan, plan_chunks};

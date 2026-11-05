@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256};
 use vmz_generator::js::{SourceMapSegment, source_map_json};
 
 use super::assemble::ChunkSegment;
+use super::cache::{EmitCache, PackDigests};
 use super::{
     AssetArtifact, ChunkArtifact, EmitContext, EmitOptions, EmitPlan, StyleArtifact,
     normalize_path, placeholder,
@@ -31,7 +32,7 @@ pub(crate) fn hex(bytes: &[u8], digits: usize) -> String {
 }
 
 /// chunk id → 文件名 slug：非 `[A-Za-z0-9._-]` 一律换 `-`，超 80 截断。
-fn slug(chunk_id: &str) -> String {
+pub(crate) fn slug(chunk_id: &str) -> String {
     let mut out: String = chunk_id
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '-' })
@@ -40,9 +41,60 @@ fn slug(chunk_id: &str) -> String {
     out
 }
 
+/// 单 chunk 的缓存键：覆盖决定最终文本与 map 的全部输入。
+///
+/// 键相同的充要条件是两个 chunk 在压缩与 source map 阶段会产出相同字节：
+/// 替换后文本（含跨 chunk 引用文件名）、自身文件名、压缩选项、装配段与
+/// 成员源文本摘要。不含时间戳、mtime 或运行序号。
+fn chunk_key(
+    chunk_id: &str,
+    file_name: &str,
+    options: &EmitOptions,
+    text: &str,
+    segments: &[ChunkSegment],
+    sources: &[String],
+    sources_content: &[String],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"vmz-pack-chunk-v1\0");
+    hasher.update(chunk_id.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(file_name.as_bytes());
+    hasher.update(format!("\0minify={}\0", options.minify).as_bytes());
+    hasher.update(text.as_bytes());
+    hasher.update([0u8]);
+    for segment in segments {
+        hasher.update(
+            format!(
+                "{}|{}|{}|{}\0",
+                segment.gen_line, segment.source, segment.src_line, segment.src_col
+            )
+            .as_bytes(),
+        );
+    }
+    for source in sources {
+        hasher.update(source.as_bytes());
+        hasher.update([0u8]);
+    }
+    for content in sources_content {
+        hasher.update(hex(content.as_bytes(), 64).as_bytes());
+        hasher.update([0u8]);
+    }
+    let digest = hasher.finalize();
+    digest
+        .iter()
+        .flat_map(|byte| [byte >> 4, byte & 0x0F])
+        .map(|nibble| char::from_digit(u32::from(nibble), 16).unwrap_or('0'))
+        .collect()
+}
+
 /// 第二遍：按第一遍文本定指纹与文件名；第三遍：占位符整串替换为
 /// `./<目标文件名>`；随后按行级映射段组装每 chunk 的 source map v3、
 /// 追加 `sourceMappingURL` 注释行，并组装产物、入口映射、动态映射与 manifest。
+///
+/// 每 chunk 的最终文本与 map 由内容摘要键决定：键命中缓存即逐字节复用，
+/// 未命中才做压缩与复合映射。键覆盖替换后文本、文件名、装配段、成员源
+/// 文本与 emit 选项，因此复用与全量重建的结果必然一致。
 pub(crate) fn finalize(
     context: &EmitContext<'_>,
     options: &EmitOptions,
@@ -50,6 +102,8 @@ pub(crate) fn finalize(
     segments: Vec<Vec<ChunkSegment>>,
     styles: Vec<StyleArtifact>,
     warnings: Vec<PackDiagnostic>,
+    cache: &mut EmitCache,
+    digests: &PackDigests,
 ) -> Result<EmitPlan, Vec<PackDiagnostic>> {
     let file_names: Vec<String> = codes
         .iter()
@@ -86,64 +140,85 @@ pub(crate) fn finalize(
             .collect();
         let sources_content: Vec<String> =
             chunk.modules.iter().map(|&node| context.sources[&node].clone()).collect();
-        let src_index_of: BTreeMap<&str, u32> =
-            sources.iter().enumerate().map(|(i, path)| (path.as_str(), i as u32)).collect();
-        let mut line_map: BTreeMap<u32, (u32, u32, u32)> = BTreeMap::new();
-        for segment in &segments[index] {
-            line_map.insert(
-                segment.gen_line,
-                (
-                    src_index_of.get(segment.source.as_str()).copied().unwrap_or(0),
-                    segment.src_line,
-                    segment.src_col,
-                ),
-            );
-        }
-        let mut text = codes[index].clone();
-        let mut mapped: Vec<SourceMapSegment> = if options.minify {
-            let (minified, tokens) =
-                vmz_generator::js::minify_source(&codes[index]).map_err(|error| {
-                    vec![
-                        PackDiagnostic::new("vmz::pack::emit::minify_failed", error)
-                            .with_path(&file_names[index]),
-                    ]
-                })?;
-            // 压缩段把压缩文本 token 位置映射回 chunk 文本行，再经装配行映射
-            // 复合到原模块：生成侧列精确到 token，源侧列仍是行级切片起点列。
-            text = minified;
-            tokens
-                .iter()
-                .filter_map(|token| {
-                    let &(src_index, src_line, src_col) =
-                        line_map.range(..=token.src_line).next_back()?.1;
-                    Some(SourceMapSegment {
-                        gen_line: token.gen_line,
-                        gen_col: token.gen_col,
-                        src_index,
-                        src_line,
-                        src_col,
-                    })
-                })
-                .collect()
-        } else {
-            segments[index]
-                .iter()
-                .map(|segment| SourceMapSegment {
-                    gen_line: segment.gen_line,
-                    gen_col: 0,
-                    src_index: src_index_of.get(segment.source.as_str()).copied().unwrap_or(0),
-                    src_line: segment.src_line,
-                    src_col: segment.src_col,
-                })
-                .collect()
+        let key = chunk_key(
+            &chunk.id,
+            &file_names[index],
+            options,
+            &codes[index],
+            &segments[index],
+            &sources,
+            &sources_content,
+        );
+        let (text, map_json) = match cache.lookup(&chunk.id, &key) {
+            Some(hit) => hit,
+            None => {
+                let src_index_of: BTreeMap<&str, u32> =
+                    sources.iter().enumerate().map(|(i, path)| (path.as_str(), i as u32)).collect();
+                let mut line_map: BTreeMap<u32, (u32, u32, u32)> = BTreeMap::new();
+                for segment in &segments[index] {
+                    line_map.insert(
+                        segment.gen_line,
+                        (
+                            src_index_of.get(segment.source.as_str()).copied().unwrap_or(0),
+                            segment.src_line,
+                            segment.src_col,
+                        ),
+                    );
+                }
+                let mut text = codes[index].clone();
+                let mut mapped: Vec<SourceMapSegment> = if options.minify {
+                    let (minified, tokens) = vmz_generator::js::minify_source(&codes[index])
+                        .map_err(|error| {
+                            vec![
+                                PackDiagnostic::new("vmz::pack::emit::minify_failed", error)
+                                    .with_path(&file_names[index]),
+                            ]
+                        })?;
+                    // 压缩段把压缩文本 token 位置映射回 chunk 文本行，再经装配行映射
+                    // 复合到原模块：生成侧列精确到 token，源侧列仍是行级切片起点列。
+                    text = minified;
+                    tokens
+                        .iter()
+                        .filter_map(|token| {
+                            let &(src_index, src_line, src_col) =
+                                line_map.range(..=token.src_line).next_back()?.1;
+                            Some(SourceMapSegment {
+                                gen_line: token.gen_line,
+                                gen_col: token.gen_col,
+                                src_index,
+                                src_line,
+                                src_col,
+                            })
+                        })
+                        .collect()
+                } else {
+                    segments[index]
+                        .iter()
+                        .map(|segment| SourceMapSegment {
+                            gen_line: segment.gen_line,
+                            gen_col: 0,
+                            src_index: src_index_of
+                                .get(segment.source.as_str())
+                                .copied()
+                                .unwrap_or(0),
+                            src_line: segment.src_line,
+                            src_col: segment.src_col,
+                        })
+                        .collect()
+                };
+                mapped.sort_by_key(|segment| (segment.gen_line, segment.gen_col));
+                let map_json =
+                    source_map_json(&file_names[index], &sources, &sources_content, &mapped);
+                if !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text.push_str(&format!("//# sourceMappingURL={}\n", map_file_names[index]));
+                cache.record(&chunk.id, &key, text.clone(), map_json.clone());
+                (text, map_json)
+            }
         };
-        mapped.sort_by_key(|segment| (segment.gen_line, segment.gen_col));
-        source_maps.push(source_map_json(&file_names[index], &sources, &sources_content, &mapped));
-        if !text.ends_with('\n') {
-            text.push('\n');
-        }
-        text.push_str(&format!("//# sourceMappingURL={}\n", map_file_names[index]));
         final_codes.push(text);
+        source_maps.push(map_json);
     }
 
     // 动态边界 → 每个 chunk 的动态目标文件名 + 全局动态文件映射。
@@ -193,7 +268,8 @@ pub(crate) fn finalize(
 
     let assets: Vec<AssetArtifact> = context.asset_index.values().cloned().collect();
 
-    let manifest_json = render_manifest(&artifacts, &map_file_names, &entry_files, &assets);
+    let manifest_json =
+        render_manifest(&artifacts, &map_file_names, &entry_files, &assets, digests);
     Ok(EmitPlan {
         artifacts,
         styles,
@@ -202,6 +278,8 @@ pub(crate) fn finalize(
         dynamic_files: dynamic_files.into_iter().collect(),
         manifest_json,
         diagnostics: warnings,
+        graph_digest: digests.graph.clone(),
+        input_digest: digests.input.clone(),
     })
 }
 
@@ -237,6 +315,10 @@ struct ManifestAsset<'a> {
 #[serde(rename_all = "camelCase")]
 struct EmitManifest<'a> {
     version: &'a str,
+    /// 本次 pack 输入摘要（图结构 + 源字节 + emit 选项）。
+    input_digest: &'a str,
+    /// 图结构摘要：变化即整体失效，不允许部分 chunk 复用。
+    graph_digest: &'a str,
     chunks: Vec<ManifestChunk<'a>>,
     entries: Vec<ManifestEntry<'a>>,
     assets: Vec<ManifestAsset<'a>>,
@@ -247,9 +329,12 @@ fn render_manifest(
     map_file_names: &[String],
     entry_files: &[(String, String)],
     assets: &[AssetArtifact],
+    digests: &PackDigests,
 ) -> String {
     let manifest = EmitManifest {
         version: "v0",
+        input_digest: &digests.input,
+        graph_digest: &digests.graph,
         chunks: artifacts
             .iter()
             .enumerate()
