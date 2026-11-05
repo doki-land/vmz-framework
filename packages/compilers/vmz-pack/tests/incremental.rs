@@ -243,7 +243,7 @@ fn write_emit_removes_orphan_artifacts() {
         "stale-abcdef12.js",
         "stale-abcdef12.js.map",
         "stale-style-abcdef12.css",
-        "assets/stale-abcdef12.svg",
+        "assets/stale-0123456789abcdef.svg",
     ];
     fs::create_dir_all(out.join("assets")).unwrap();
     for name in stale {
@@ -281,4 +281,50 @@ fn write_emit_removes_orphan_artifacts() {
     assert_eq!(remaining, sorted_expected, "输出目录残留孤儿产物");
     assert_eq!(fs::read_to_string(out.join("package.json")).unwrap(), "{}");
     assert_eq!(fs::read_to_string(out.join("notes.txt")).unwrap(), "keep me");
+}
+
+/// 增量写入不得误删外来文件或缓存目录：`_vmz/pack` 里可能同时躺着宿主放进去
+/// 的文件，清扫只允许动本轮产物形态，且 `.vmz-pack-cache/` 必须原样保留。
+#[test]
+fn incremental_sweep_keeps_foreign_files_and_cache_dir() {
+    let root = temp_tree("foreign", TREE);
+    let (graph, link_plan, chunks) = build(&root);
+
+    let out = root.join("pack");
+    let mut cache = EmitCache::load(&out);
+    let first = plan_emit_with_cache(&graph, &link_plan, &chunks, &options(), &mut cache).unwrap();
+    write_emit_incremental(&first, &out, true).unwrap();
+    cache.store().unwrap();
+
+    let cache_dir = out.join(".vmz-pack-cache");
+    let cache_index = cache_dir.join("index.json");
+    assert!(cache_index.is_file(), "首轮写入应留下缓存索引");
+
+    // 外来文件：根目录非产物形态、`assets/` 非指纹形态、子目录文件。
+    fs::create_dir_all(out.join("assets")).unwrap();
+    fs::create_dir_all(out.join("host")).unwrap();
+    fs::write(out.join("package.json"), "{\"type\":\"module\"}").unwrap();
+    fs::write(out.join("host-notes.txt"), "keep me").unwrap();
+    fs::write(out.join("assets/host-logo.png"), "host asset").unwrap();
+    fs::write(out.join("assets/README"), "host readme").unwrap();
+    fs::write(out.join("host/extra.json"), "{}").unwrap();
+    // 同时留一个旧资源指纹文件，确认孤儿清理仍然生效。
+    fs::write(out.join("assets/stale-0123456789abcdef.svg"), "stale").unwrap();
+
+    let mut cache = EmitCache::load(&out);
+    let again = plan_emit_with_cache(&graph, &link_plan, &chunks, &options(), &mut cache).unwrap();
+    write_emit_incremental(&again, &out, true).unwrap();
+    cache.store().unwrap();
+
+    assert!(cache_index.is_file(), "`.vmz-pack-cache/index.json` 不得被清扫");
+    assert!(cache_dir.is_dir(), "`.vmz-pack-cache/` 不得被清扫");
+    assert_eq!(fs::read_to_string(out.join("package.json")).unwrap(), "{\"type\":\"module\"}");
+    assert_eq!(fs::read_to_string(out.join("host-notes.txt")).unwrap(), "keep me");
+    assert_eq!(fs::read_to_string(out.join("assets/host-logo.png")).unwrap(), "host asset");
+    assert_eq!(fs::read_to_string(out.join("assets/README")).unwrap(), "host readme");
+    assert_eq!(fs::read_to_string(out.join("host/extra.json")).unwrap(), "{}");
+    assert!(
+        !out.join("assets/stale-0123456789abcdef.svg").exists(),
+        "闭包外的指纹资源仍必须删除"
+    );
 }
