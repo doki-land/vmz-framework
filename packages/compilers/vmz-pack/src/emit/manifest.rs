@@ -1,11 +1,12 @@
-//! 文件名与内容指纹（占位符两遍法的第二/三遍）、行级 source map v3
-//! 组装以及 manifest 序列化。
+//! 文件名与内容指纹（占位符两遍法的第二/三遍）、chunk 压缩、token 级
+//! source map v3 复合映射以及 manifest 序列化。
 //!
 //! 指纹只覆盖第一遍装配文本（含占位符）：chunk 间引用成环时无法拓扑定名，
 //! 占位符把「引用目标」与「目标最终名」解耦，同输入必同输出，禁止随机或
-//! 时间戳。第三遍占位符替换不增删行且段全在列 0，映射不受影响；
-//! `sourceMappingURL` 注释行在替换完成后追加，不参与指纹。
-//! manifest 合同版本命名空间固定 `v0`。
+//! 时间戳。第三遍占位符替换不增删行且段全在列 0；随后按装配行映射压缩
+//! （`vmz_generator::js::minify_source`，token 级、不重命名标识符）并把压缩
+//! token 位置复合回原模块，`sourceMappingURL` 注释行在压缩完成后追加，
+//! 压缩与注释都不参与指纹。manifest 合同版本命名空间固定 `v0`。
 
 use std::collections::BTreeMap;
 
@@ -15,7 +16,8 @@ use vmz_generator::js::{SourceMapSegment, source_map_json};
 
 use super::assemble::ChunkSegment;
 use super::{
-    AssetArtifact, ChunkArtifact, EmitContext, EmitPlan, StyleArtifact, normalize_path, placeholder,
+    AssetArtifact, ChunkArtifact, EmitContext, EmitOptions, EmitPlan, StyleArtifact,
+    normalize_path, placeholder,
 };
 
 /// sha256 摘要的前 `digits` 位十六进制（小写）。
@@ -43,11 +45,12 @@ fn slug(chunk_id: &str) -> String {
 /// 追加 `sourceMappingURL` 注释行，并组装产物、入口映射、动态映射与 manifest。
 pub(crate) fn finalize(
     context: &EmitContext<'_>,
+    options: &EmitOptions,
     codes: Vec<String>,
     segments: Vec<Vec<ChunkSegment>>,
     styles: Vec<StyleArtifact>,
     warnings: Vec<PackDiagnostic>,
-) -> EmitPlan {
+) -> Result<EmitPlan, Vec<PackDiagnostic>> {
     let file_names: Vec<String> = codes
         .iter()
         .enumerate()
@@ -66,7 +69,10 @@ pub(crate) fn finalize(
         })
         .collect();
 
-    // 行级 source map v3：`sources` 按 chunk 成员节点序（与 manifest
+    // 行级 source map v3 的装配段 → 压缩后的 token 级复合映射：装配段把
+    // chunk 文本行映射回原模块行（列取切片起点），压缩段把压缩文本的
+    // token 位置映射回 chunk 文本行；复合后生成侧列精确到 token，源侧
+    // 列仍是行级的切片起点列。`sources` 按 chunk 成员节点序（与 manifest
     // `modules` 同口径，chunk 内节点不重复），`sourcesContent` 内嵌原模块
     // 文本使 map 自包含；map 文件名恒 `<file_name>.map`，内容不上 wire。
     let map_file_names: Vec<String> = file_names.iter().map(|name| format!("{name}.map")).collect();
@@ -82,19 +88,57 @@ pub(crate) fn finalize(
             chunk.modules.iter().map(|&node| context.sources[&node].clone()).collect();
         let src_index_of: BTreeMap<&str, u32> =
             sources.iter().enumerate().map(|(i, path)| (path.as_str(), i as u32)).collect();
-        let mut mapped: Vec<SourceMapSegment> = segments[index]
-            .iter()
-            .map(|segment| SourceMapSegment {
-                gen_line: segment.gen_line,
-                gen_col: 0,
-                src_index: src_index_of.get(segment.source.as_str()).copied().unwrap_or(0),
-                src_line: segment.src_line,
-                src_col: segment.src_col,
-            })
-            .collect();
+        let mut line_map: BTreeMap<u32, (u32, u32, u32)> = BTreeMap::new();
+        for segment in &segments[index] {
+            line_map.insert(
+                segment.gen_line,
+                (
+                    src_index_of.get(segment.source.as_str()).copied().unwrap_or(0),
+                    segment.src_line,
+                    segment.src_col,
+                ),
+            );
+        }
+        let mut text = codes[index].clone();
+        let mut mapped: Vec<SourceMapSegment> = if options.minify {
+            let (minified, tokens) =
+                vmz_generator::js::minify_source(&codes[index]).map_err(|error| {
+                    vec![
+                        PackDiagnostic::new("vmz::pack::emit::minify_failed", error)
+                            .with_path(&file_names[index]),
+                    ]
+                })?;
+            // 压缩段把压缩文本 token 位置映射回 chunk 文本行，再经装配行映射
+            // 复合到原模块：生成侧列精确到 token，源侧列仍是行级切片起点列。
+            text = minified;
+            tokens
+                .iter()
+                .filter_map(|token| {
+                    let &(src_index, src_line, src_col) =
+                        line_map.range(..=token.src_line).next_back()?.1;
+                    Some(SourceMapSegment {
+                        gen_line: token.gen_line,
+                        gen_col: token.gen_col,
+                        src_index,
+                        src_line,
+                        src_col,
+                    })
+                })
+                .collect()
+        } else {
+            segments[index]
+                .iter()
+                .map(|segment| SourceMapSegment {
+                    gen_line: segment.gen_line,
+                    gen_col: 0,
+                    src_index: src_index_of.get(segment.source.as_str()).copied().unwrap_or(0),
+                    src_line: segment.src_line,
+                    src_col: segment.src_col,
+                })
+                .collect()
+        };
         mapped.sort_by_key(|segment| (segment.gen_line, segment.gen_col));
         source_maps.push(source_map_json(&file_names[index], &sources, &sources_content, &mapped));
-        let mut text = codes[index].clone();
         if !text.ends_with('\n') {
             text.push('\n');
         }
@@ -150,7 +194,7 @@ pub(crate) fn finalize(
     let assets: Vec<AssetArtifact> = context.asset_index.values().cloned().collect();
 
     let manifest_json = render_manifest(&artifacts, &map_file_names, &entry_files, &assets);
-    EmitPlan {
+    Ok(EmitPlan {
         artifacts,
         styles,
         assets,
@@ -158,7 +202,7 @@ pub(crate) fn finalize(
         dynamic_files: dynamic_files.into_iter().collect(),
         manifest_json,
         diagnostics: warnings,
-    }
+    })
 }
 
 /// manifest 形状：Rust 字段名为真相源，serde 只做容器级 camelCase 映射。

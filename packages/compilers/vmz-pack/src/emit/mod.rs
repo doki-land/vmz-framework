@@ -31,10 +31,13 @@
 //! - 根绝对 URL 动态 import（`'/…'`，如运行时 face 加载 `/dom.browser.js`）
 //!   文本原样保留、由站点 origin 运行时解析，给非致命诊断
 //!   `vmz::pack::emit::dynamic_url_kept`；其余未解析动态 import 仍显式拒绝。
-//! - 每个 chunk 产出 source map v3（行级合同，见 `assemble` 模块文档）：
-//!   `code` 末尾追加 `//# sourceMappingURL=<file_name>.map` 注释行，
-//!   map JSON 内容不上 wire、只有 [`write_emit`] 物化；内容指纹仍只覆盖
-//!   第一遍装配文本，map 注释与 map 本身不参与指纹与占位符替换。
+//! - 每个 chunk 产出压缩文本与 source map v3（复合映射合同，见 `manifest`
+//!   模块文档）：装配文本经 `vmz_generator::js::minify_source` 做 token 级
+//!   压缩（不重命名标识符、不做死代码消除与语句折叠），压缩段的 token
+//!   位置再经装配行映射复合回原模块；`code` 末尾追加
+//!   `//# sourceMappingURL=<file_name>.map` 注释行，map JSON 内容不上 wire、
+//!   只有 [`write_emit`] 物化；内容指纹仍只覆盖第一遍装配文本，压缩、map
+//!   注释与 map 本身不参与指纹与占位符替换。
 //! - 未实现的语义（同 chunk 重命名绑定、事实不完整、无法重写的说明符、
 //!   样式/JSON 绑定、重导出与动态导入等）一律显式诊断拒绝，禁止猜测、
 //!   禁止静默产出错误 JS、禁止兼容层。
@@ -98,6 +101,12 @@ pub struct EmitOptions {
     /// 资源 URL 前缀（如 `/_vmz/`），只影响 [`AssetArtifact::url`]
     /// 与产物内联的资源字符串，不影响 chunk 文件互引（相对路径）。
     pub public_base: String,
+    /// chunk 文本压缩：开启后产物经
+    /// [`vmz_generator::js::minify_source`] 做 token 级压缩（不改名标识符、
+    /// 不做死代码消除），source map 也相应切换为压缩后的 token 级复合映射。
+    /// 交付链（N-API `packWrite`）恒开启；关闭时产物为装配文本原文、map
+    /// 为行级映射，仅供调试与合同测试对照。
+    pub minify: bool,
 }
 
 /// 一个 chunk 的最终产物。
@@ -416,8 +425,8 @@ pub fn plan_emit(
         return Err(errors);
     }
 
-    // 第二/三遍：指纹定名、占位符替换、source map 组装、manifest 序列化。
-    Ok(manifest::finalize(&context, codes, segments, styles, warnings))
+    // 第二/三遍：指纹定名、占位符替换、压缩、source map 复合映射、manifest 序列化。
+    manifest::finalize(&context, options, codes, segments, styles, warnings)
 }
 
 /// 解析并指纹化**活跃**的 [`crate::module::AssetFact`]：资产只能从

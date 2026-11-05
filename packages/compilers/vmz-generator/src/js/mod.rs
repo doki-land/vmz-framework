@@ -39,8 +39,8 @@ pub use module_rewrite::{
 };
 pub use oak_expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_oak};
 pub use print::{
-    EmittedJs, JsPrintOptions, SourceLines, SourceMapSegment, map_erased_offset, print_js_source,
-    source_map_json,
+    EmittedJs, JsPrintOptions, SourceLines, SourceMapSegment, map_erased_offset, minify_source,
+    print_js_source, source_map_json,
 };
 pub use row_kernel::try_emit_row_kernel_js;
 pub use transpile::{transpile_ts, transpile_ts_printed, transpile_ts_with_map};

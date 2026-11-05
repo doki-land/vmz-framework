@@ -75,6 +75,46 @@ fn minify_preserves_restricted_line_breaks() {
 }
 
 #[test]
+fn minify_keeps_statements_without_semicolons_apart() {
+    let code = minified(concat!(
+        "import { create } from \"./core.mjs\"\n",
+        "import { xmlns } from \"./property.js\"\n",
+        "const schema = create({ space: \"xmlns\" })\n",
+        "export const value = schema\n",
+    ));
+    assert!(
+        !code.contains("import{create}from\"./core.mjs\"import"),
+        "two import declarations must not merge into one line: {code}"
+    );
+    let shell = vmz_oak_frontend_adapter::ScriptShellInput {
+        content: code.clone(),
+        content_start: 0,
+        role: vmz_oak_frontend_adapter::ScriptRole::Client,
+    };
+    let parsed = vmz_oak_frontend_adapter::parse_script_ast(&shell);
+    assert!(
+        parsed.ok,
+        "semicolon-free statements must stay parseable: {code}\n{:?}",
+        parsed.diagnostics
+    );
+}
+
+#[test]
+fn minify_keeps_newline_between_semicolon_free_assignments() {
+    let code = minified(concat!(
+        "function zwitch(key, options) {\n",
+        "  const settings = options || {}\n",
+        "  function one(value) {}\n",
+        "  one.unknown = settings.unknown\n",
+        "\n",
+        "  // trailing note\n",
+        "  return one\n",
+        "}\n",
+    ));
+    assert!(!code.contains("settings.unknown return"), "missing ASI break: {code}");
+}
+
+#[test]
 fn minified_output_reparses_with_oak() {
     let source = concat!(
         "const state = { count: 0, label: \"a   b\" };\n",

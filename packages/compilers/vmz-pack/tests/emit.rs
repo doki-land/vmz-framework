@@ -25,7 +25,11 @@ fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
 }
 
 fn options() -> EmitOptions {
-    EmitOptions { public_base: "/_vmz/".to_string() }
+    EmitOptions { public_base: "/_vmz/".to_string(), minify: false }
+}
+
+fn minified_options() -> EmitOptions {
+    EmitOptions { public_base: "/_vmz/".to_string(), minify: true }
 }
 
 fn codes(diagnostics: &[PackDiagnostic]) -> Vec<String> {
@@ -271,6 +275,71 @@ fn source_map_line_mappings_decode_to_module_lines() {
     let body_lines: Vec<&str> = artifact.code.lines().collect();
     assert_eq!(body_lines[1].trim(), "return n + 1;", "{}", body_lines[1]);
     assert!(body_lines[4].contains("helper(VALUE)"), "{}", body_lines[4]);
+}
+
+/// 压缩 + 复合映射：产物折叠为紧凑文本，token 位置经压缩段与装配行映射
+/// 复合回原模块行；生成侧列按 token 给出，源侧列仍是行级切片起点列。
+#[test]
+fn minified_output_keeps_token_level_map_to_module_lines() {
+    let root = temp_tree(
+        "smapmin",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/lib.js",
+                "export function helper(n) {\n  const doubled = n * 2;\n  return doubled;\n}\n",
+            ),
+            (
+                "src/entry.js",
+                "import { helper } from './lib.js';\nexport const run = helper(21);\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("main".to_string(), root.join("src/entry.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "main".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &minified_options()).unwrap();
+    let artifact = &plan.artifacts[0];
+    // 压缩：token 级，保留 ASI 需要的换行，但去掉缩进与空白。
+    let body_lines: Vec<&str> = artifact
+        .code
+        .lines()
+        .filter(|line| !line.starts_with("//# sourceMappingURL="))
+        .collect();
+    assert!(body_lines.len() < 8, "{}", artifact.code);
+    assert!(!artifact.code.contains("\n  const doubled"), "{}", artifact.code);
+    assert!(artifact.code.contains("const doubled=n*2;"), "{}", artifact.code);
+
+    let map: serde_json::Value = serde_json::from_str(&artifact.source_map).unwrap();
+    let decoded = decode_mappings(map["mappings"].as_str().unwrap());
+    let segment_at = |needle: &str| {
+        let line = body_lines
+            .iter()
+            .position(|body| body.contains(needle))
+            .unwrap_or_else(|| panic!("no `{needle}` line: {}", artifact.code));
+        let col = body_lines[line].find(needle).expect("needle column");
+        let segment = decoded[line]
+            .iter()
+            .find(|segment| segment.0 as usize == col)
+            .copied()
+            .unwrap_or_else(|| panic!("no token segment at line {line} col {col}: {decoded:?}"));
+        segment
+    };
+    // lib.js 是 sources[0]，`helper` 在切片起点列 7（`export ` 之后）。
+    let helper = segment_at("helper");
+    assert_eq!((helper.1, helper.2, helper.3), (0, 0, 7), "decoded: {decoded:?}");
+    // 映射覆盖到第二个模块：entry 的 `run` token 回指 sources[1] 第 1 行。
+    let run = segment_at("run=helper");
+    assert_eq!((run.1, run.2, run.3), (1, 1, 7), "decoded: {decoded:?}");
 }
 
 /// write_emit 物化 `.map`：每个 chunk 的 `<file_name>.map` 落盘且字节

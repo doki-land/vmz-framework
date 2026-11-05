@@ -76,6 +76,18 @@ pub fn print_js_source(
     Ok(EmittedJs { code, map })
 }
 
+/// Minify an already type-erased JavaScript text (pack stage), returning the
+/// compact text plus token segments mapping generated positions back to
+/// positions in the original text.
+///
+/// Callers that already erased TypeScript syntax pass no deletions. Token
+/// boundaries are the same contract as [`print_js_source`]'s minify path:
+/// identifier renaming, dead-code elimination and statement folding are not
+/// performed.
+pub fn minify_source(source: &str) -> Result<(String, Vec<SourceMapSegment>), String> {
+    minify_tokens(source, &[])
+}
+
 /// Minify from Oak lexer tokens, keeping string, template, regex and comment
 /// semantics intact.
 ///
@@ -185,9 +197,27 @@ fn keeps_newline(prev_kind: T, prev_text: &str, next_text: &str) -> bool {
     if prev_text.ends_with("++") || prev_text.ends_with("--") {
         return true;
     }
-    // Any token that can end a statement keeps its line break, everything else
-    // (operators, braces, separators, infix keywords) continues safely.
-    !is_statement_end(prev_kind)
+    // A token that can end a statement keeps its line break: without one, ASI
+    // no longer applies and two statements would merge into invalid syntax
+    // (the classic case is a semicolon-free `import … from "x"` followed by
+    // another statement). Operators and braces that cannot end a statement
+    // continue safely on the same line.
+    ends_statement(prev_kind, prev_text)
+}
+
+/// Whether the previous token can end a statement.
+///
+/// Contextual keywords (`unknown`, `string`, `from`, …) lex as keyword kinds
+/// but are plain identifiers in expression position, so the token text is the
+/// reliable signal for them.
+fn ends_statement(kind: T, text: &str) -> bool {
+    if is_statement_end(kind) {
+        return true;
+    }
+    matches!(
+        text.chars().last(),
+        Some(ch) if is_identifier_char(ch) || ch == '"' || ch == '\'' || ch == '`'
+    )
 }
 
 fn is_statement_end(kind: T) -> bool {

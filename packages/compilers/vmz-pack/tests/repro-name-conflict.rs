@@ -27,7 +27,7 @@ fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
 }
 
 fn options() -> EmitOptions {
-    EmitOptions { public_base: "/_vmz/".to_string() }
+    EmitOptions { public_base: "/_vmz/".to_string(), minify: false }
 }
 
 /// homepage deploy-planner 形态：page 同 chunk 多绑定导入 locales 的

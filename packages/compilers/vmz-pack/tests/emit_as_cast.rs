@@ -66,7 +66,7 @@ fn as_cast_after_keyword_member_never_reaches_chunk_text() {
     let chunks = plan_chunks(&graph, &link_plan);
     assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
     let plan =
-        plan_emit(&graph, &link_plan, &chunks, &EmitOptions { public_base: "/_vmz/".into() })
+        plan_emit(&graph, &link_plan, &chunks, &EmitOptions { public_base: "/_vmz/".into(), minify: false })
             .unwrap();
 
     let all =

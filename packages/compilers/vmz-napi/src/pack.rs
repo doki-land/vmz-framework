@@ -423,7 +423,8 @@ fn run_chain(request_json: &str) -> Result<Chain, ResponseWire> {
         return Ok(Chain::Failed(fatal));
     }
     let chunk_plan = vmz_pack::chunk::plan_chunks(&graph, &link_plan);
-    let options = EmitOptions { public_base: request.public_base.clone() };
+    let options =
+        EmitOptions { public_base: request.public_base.clone(), minify: true };
     match vmz_pack::emit::plan_emit(&graph, &link_plan, &chunk_plan, &options) {
         Err(diagnostics) => Ok(Chain::Failed(diagnostics)),
         Ok(plan) => Ok(Chain::Planned(plan)),

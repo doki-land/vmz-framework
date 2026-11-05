@@ -29,7 +29,7 @@ fn temp_tree(name: &str, files: &[(&str, &str)]) -> PathBuf {
 }
 
 fn options() -> EmitOptions {
-    EmitOptions { public_base: "/_vmz/".to_string() }
+    EmitOptions { public_base: "/_vmz/".to_string(), minify: false }
 }
 
 fn codes(diagnostics: &[PackDiagnostic]) -> Vec<String> {
