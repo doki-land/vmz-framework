@@ -38,7 +38,10 @@ function formatLocation(path: string, line: number, column: number): string {
 }
 
 function canRenderSnippet(d: DiagnosticInput, opts: FormatOptions & { style?: PrettyStyle }): boolean {
-    return (opts.style ?? 'pretty') === 'pretty' && Boolean(opts.sourceText && opts.position && d.span && d.span.end > d.span.start);
+    return (
+        (opts.style ?? 'pretty') === 'pretty' &&
+        Boolean(opts.sourceText && opts.position && d.span && d.span.end >= d.span.start)
+    );
 }
 
 function renderSnippetLine(

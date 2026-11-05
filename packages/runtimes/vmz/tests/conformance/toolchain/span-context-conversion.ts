@@ -135,6 +135,46 @@ assert.equal(
     'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | 😀x\n  | ^^',
 );
 
+// A zero-width span points at an insertion site and still gets one caret.
+const emptySource = 'ab\ncd';
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: Buffer.byteLength(emptySource, 'utf8'), end: Buffer.byteLength(emptySource, 'utf8') },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(emptySource),
+            sourceText: emptySource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:3\n2 | cd\n  |   ^',
+);
+const wideEmptySource = '中\n文x';
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: 7, end: 7 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(wideEmptySource),
+            sourceText: wideEmptySource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:2\n2 | 文x\n  |   ^',
+);
+
 // A span across lines renders both endpoint lines, with `...` skipping the middle.
 const multiSource = 'aaa\nbbb\nccc\nddd';
 const multiStart = Buffer.from(multiSource, 'utf8').indexOf(Buffer.from('aaa', 'utf8'));
