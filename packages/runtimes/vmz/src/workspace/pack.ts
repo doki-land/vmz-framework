@@ -69,6 +69,63 @@ export function deploymentUnitOrigins(absOut: string, ir: DeploymentIr): Record<
 /** Bootstrap modules that are browser pack entries when present in outDir. */
 const BOOTSTRAP_ENTRIES = ['entry-client.js', 'entry-event.js'];
 
+/** 一个 deployment 逻辑 chunkId 在浏览器图里的落点（未进图时字段为 `null`）。 */
+export interface PackUnitChunk {
+    /** 运行时逻辑 chunk id（`vmz-deployment.json` 的 `units[].chunkId`）。 */
+    logical: string;
+    /** 该单元的产物客户端文件（输出树相对路径）。 */
+    clientEntry: string;
+    /** 承载该文件的 chunk id，未进客户端图时为 `null`。 */
+    chunkId: string | null;
+    /** 承载该文件的 chunk 文件名，未进客户端图时为 `null`。 */
+    fileName: string | null;
+}
+
+/**
+ * 模块路径比较键：去掉 Windows verbatim 前缀（Rust `canonicalize` 给 `//?/E:/…`，
+ * Node `realpathSync` 给 `E:/…`）并统一分隔符，避免同一文件因前缀差异查不到。
+ */
+function moduleKey(filePath: string): string {
+    return filePath.replace(/^(?:\\\\\?\\|\/\/\?\/)/, '').replace(/\\/g, '/');
+}
+
+/**
+ * 逻辑 chunkId → 浏览器 chunk 的精确查表：按部署单元的产物客户端文件与
+ * chunk `modules` 的同路径匹配，不做后缀匹配、不猜命名规则。单元产物未进
+ * 客户端图（无消费者）时显式记 `null`，消费方可据此报错而不是静默取错 chunk。
+ */
+function resolveUnitChunks(
+    absOut: string,
+    deploymentUnits: ReadonlyArray<{ chunkId?: string; clientEntry?: string }>,
+    artifacts: ReadonlyArray<{ chunkId: string; fileName: string; modules: string[] }>,
+): PackUnitChunk[] {
+    const chunkOfModule = new Map<string, { chunkId: string; fileName: string }>();
+    for (const artifact of artifacts) {
+        for (const module of artifact.modules) {
+            chunkOfModule.set(moduleKey(module), { chunkId: artifact.chunkId, fileName: artifact.fileName });
+        }
+    }
+    const out: PackUnitChunk[] = [];
+    for (const unit of deploymentUnits) {
+        const logical = String(unit.chunkId || '').replace(/\\/g, '/');
+        if (!logical) continue;
+        const clientEntry = (unit.clientEntry ? String(unit.clientEntry) : `${logical}.client.js`).replace(
+            /\\/g,
+            '/',
+        );
+        const abs = path.join(absOut, ...clientEntry.split('/'));
+        const hit = chunkOfModule.get(moduleKey(existsSync(abs) ? realpathSync(abs) : abs)) ?? null;
+        out.push({
+            logical,
+            clientEntry,
+            chunkId: hit ? hit.chunkId : null,
+            fileName: hit ? hit.fileName : null,
+        });
+    }
+    out.sort((a, b) => (a.logical < b.logical ? -1 : a.logical > b.logical ? 1 : 0));
+    return out;
+}
+
 /**
  * Ensure dom split companions sit next to vmz-dom.js (barrel imports ./dom-core.js).
  * Always refresh from `@vmz/core` when present so SSR/runtime fixes are not sticky in outDir.
@@ -177,6 +234,7 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         styles: unknown[];
         assets: unknown[];
         chunks: unknown[];
+        unitChunks: PackUnitChunk[];
         chunkCount: number;
         styleCount: number;
         entryCount: number;
@@ -204,6 +262,7 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         styles: plan.styles,
         assets: plan.assets,
         chunks,
+        unitChunks: resolveUnitChunks(absOut, ir.units || [], plan.artifacts),
         chunkCount: chunks.length,
         styleCount: plan.styles.length,
         entryCount: plan.entryFiles.length,

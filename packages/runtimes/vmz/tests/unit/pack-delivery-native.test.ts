@@ -155,6 +155,59 @@ describe('packFromDeploymentIr on the vmz-pack binding (v0)', () => {
         }
     });
 
+    it('maps deployment chunk ids to browser chunks by exact module path (unitChunks)', () => {
+        const distDir = path.join(root, 'units');
+        mkdirSync(path.join(distDir, 'pages'), { recursive: true });
+        writeFileSync(
+            path.join(distDir, 'vmz-deployment.json'),
+            JSON.stringify({
+                schema: 'vmz.deployment.v0',
+                units: [
+                    { kind: 'page', chunkId: 'pages/index', clientEntry: 'pages/index.client.js' },
+                    { kind: 'component', chunkId: 'components/Orphan', clientEntry: '' },
+                ],
+            }),
+        );
+        writeFileSync(path.join(distDir, 'pages', 'index.client.js'), 'export default {};');
+        writeFileSync(path.join(distDir, 'entry-client.js'), 'console.log(1);');
+        const pageModule = path.join(distDir, 'pages', 'index.client.js').replace(/\\/g, '/');
+        const binding = fakeBinding({
+            ok: true,
+            plan: {
+                ...planResponse.plan,
+                artifacts: [
+                    {
+                        chunkId: 'isolated/pages/index.client.js',
+                        fileName: 'pages-index-bb22.js',
+                        code: 'export default class Page {};',
+                        modules: [pageModule],
+                        imports: [],
+                        dynamic: [],
+                        sourceMapFileName: 'pages-index-bb22.js.map',
+                    },
+                ],
+                entryFiles: [{ logical: 'entry-client.js', file: 'entry-client-aa11.js' }],
+                dynamicFiles: [],
+                styles: [],
+                assets: [],
+                manifestJson: JSON.stringify({ version: 'v0', entries: [], chunks: [], assets: [] }),
+            },
+            diagnostics: [],
+        });
+        const { manifest } = packFromDeploymentIr(distDir, { projectRoot: root, binding });
+        assert.deepEqual(manifest.unitChunks, [
+            { logical: 'components/Orphan', clientEntry: 'components/Orphan.client.js', chunkId: null, fileName: null },
+            {
+                logical: 'pages/index',
+                clientEntry: 'pages/index.client.js',
+                chunkId: 'isolated/pages/index.client.js',
+                fileName: 'pages-index-bb22.js',
+            },
+        ]);
+        const raw = JSON.parse(readFileSync(path.join(distDir, '_vmz', 'pack-manifest.json'), 'utf8'));
+        assert.deepEqual(raw.unitChunks, manifest.unitChunks, 'unitChunks 必须落盘并被 packDigest 覆盖');
+    });
+
     it('includes only bootstrap files that exist (entry-event optional)', () => {
         const distDir = makeDist('client-only', { 'entry-client.js': 'console.log(1);' });
         const binding = fakeBinding(planResponse);
