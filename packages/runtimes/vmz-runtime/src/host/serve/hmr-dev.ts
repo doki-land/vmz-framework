@@ -12,6 +12,7 @@ import { setRoutes } from '../../faces/vmz-runtime.js';
 import { LOCALE_LINK_PLAN_REL } from './constants.js';
 import { loadDeploymentStyle } from './locale-theme.js';
 import { bustUrl, isEventOnlyShell, isEventStrategy, listPageClientFiles, loadPageResumeEntries, pageNeedsReload } from './page-catalog.js';
+import { packIslandHrefs, type PackIslandHrefs } from './pack-entry.js';
 import { serveState } from './state.js';
 
 export function installDevImportTokenHooks() {
@@ -127,36 +128,62 @@ function escapeHtml(s: string) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function emitEntryClient(eager: unknown[], lazy: unknown[], token: number) {
-    const q = `?t=${token}`;
+/**
+ * 客户端入口模块由 pack 消费，必须保持内容稳定：每次重建都把 `?t=` 注入
+ * 动态 import 会让打包产物每轮都变，也会让浏览器拿到两个不同 URL 的同一模块。
+ * 缓存破坏由打包文件名（内容哈希）与 SSE 侧的 reload 负责。
+ */
+function emitEntryClient(eager: unknown[], lazy: unknown[]) {
     const native = loadNativeAddon();
     if (typeof native.generateServeEntryClient !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryClient — rebuild with `pnpm napi:build`');
     }
-    return native.generateServeEntryClient(eager, lazy, q);
+    return native.generateServeEntryClient(eager, lazy, '');
 }
 
-function emitEntryEvent(eager: unknown[], lazy: unknown[], token: number) {
-    const q = `?t=${token}`;
+function emitEntryEvent(eager: unknown[], lazy: unknown[]) {
     const native = loadNativeAddon();
     if (typeof native.generateServeEntryEvent !== 'function') {
         throw new Error('vmz native addon missing generateServeEntryEvent — rebuild with `pnpm napi:build`');
     }
-    return native.generateServeEntryEvent(eager, lazy, q);
+    return native.generateServeEntryEvent(eager, lazy, '');
 }
 
-export async function softReload(opts: { quiet?: boolean; payload?: Record<string, unknown> } = {}) {
+interface PreparedReload {
+    info: Record<string, unknown>;
+    sse: Record<string, unknown>;
+    logLine: string | null;
+}
+
+let pendingReload: PreparedReload | null = null;
+let pendingRollback: (() => void) | null = null;
+
+/**
+ * 第一阶段：加载构建产物、写客户端入口模块，但**不**发布 SSE、不置 ready。
+ *
+ * dev 的浏览器交付必须经 `vmz-pack`，而 pack 由 CLI 侧执行（runtime 不反向
+ * 依赖 `@vmz/vmz`）。因此先把入口写到 outDir，让调用方 pack，再 `commitReload`。
+ */
+export async function prepareReload(
+    opts: { quiet?: boolean; payload?: Record<string, unknown> } = {},
+): Promise<Record<string, unknown>> {
     const prevToken = serveState.reloadToken;
     const prevCatalog = serveState.pageCatalog;
     const prevCtors = new Map(serveState.pageCtors);
     const nextToken = Date.now();
     serveState.reloadToken = nextToken;
+    pendingReload = null;
+    pendingRollback = () => {
+        serveState.reloadToken = prevToken;
+        serveState.pageCatalog = prevCatalog;
+        serveState.pageCtors.clear();
+        for (const [k, v] of prevCtors) serveState.pageCtors.set(k, v);
+    };
     const affected = (opts.payload?.affectedChunks as string[]) ?? [];
     const seeds = (opts.payload?.seedChunks as string[]) ?? [];
     const full = opts.payload?.full;
     const islandHmr = Boolean(opts.payload?.islandHmr);
     const rerunLoaders = (opts.payload?.rerunLoaders as string[]) ?? [];
-    const skipEntryRewrite = Boolean(opts.payload?.skipEntryRewrite);
     const buildId = opts.payload?.buildId != null ? String(opts.payload.buildId) : null;
     const sourceRevision = opts.payload?.sourceRevision != null ? String(opts.payload.sourceRevision) : null;
     const bundleRevision = opts.payload?.bundleRevision != null ? String(opts.payload.bundleRevision) : null;
@@ -253,7 +280,7 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
 
         await writeFile(
             path.join(serveState.distDir, 'entry-client.js'),
-            emitEntryClient([...eagerComponents, ...pageEntries, ...layoutEntries], lazyComponents, skipEntryRewrite ? serveState.reloadToken : nextToken),
+            emitEntryClient([...eagerComponents, ...pageEntries, ...layoutEntries], lazyComponents),
             'utf8',
         );
 
@@ -261,38 +288,12 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
         const eventOnlyShell = isEventOnlyShell(strategies);
         await writeFile(
             path.join(serveState.distDir, 'entry-event.js'),
-            emitEntryEvent([], lazyComponents, skipEntryRewrite ? serveState.reloadToken : nextToken),
+            emitEntryEvent([], lazyComponents),
             'utf8',
         );
 
-        serveState.lastDevError = null;
         const mode = islandHmr ? 'island' : eventOnlyShell ? 'event-shell' : 'full';
-        notifySse(
-            JSON.stringify({
-                type: 'hmr',
-                mode,
-                affectedChunks: affected,
-                seedChunks: seeds,
-                token: serveState.reloadToken,
-                buildId: buildId || serveState.lastDevBuildId,
-                sourceRevision,
-                bundleRevision,
-                serveRevision: String(serveState.reloadToken),
-                full: Boolean(full),
-                eventOnlyShell,
-            }),
-        );
-        if (!opts.quiet) {
-            const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
-            const scope = islandHmr ? 'island' : reloadAllPages ? 'all-pages' : `pages=${nextCtors.size}`;
-            const bid = buildId || serveState.lastDevBuildId;
-            const rev =
-                bid || sourceRevision || bundleRevision
-                    ? ` buildId=${bid || '-'} source=${sourceRevision || '-'} bundle=${bundleRevision || '-'} serve=${serveState.reloadToken}`
-                    : ` t=${serveState.reloadToken}`;
-            console.log(`vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${serveState.pageCatalog.length};${rev}${aff})`);
-        }
-        return {
+        const info = {
             affectedChunks: affected,
             seedChunks: seeds,
             full: Boolean(full),
@@ -308,12 +309,80 @@ export async function softReload(opts: { quiet?: boolean; payload?: Record<strin
             serveRevision: String(serveState.reloadToken),
             token: serveState.reloadToken,
         };
+        const sse = {
+            type: 'hmr',
+            mode,
+            affectedChunks: affected,
+            seedChunks: seeds,
+            token: serveState.reloadToken,
+            buildId: buildId || serveState.lastDevBuildId,
+            sourceRevision,
+            bundleRevision,
+            serveRevision: String(serveState.reloadToken),
+            full: Boolean(full),
+            eventOnlyShell,
+        };
+        let logLine: string | null = null;
+        if (!opts.quiet) {
+            const aff = affected.length > 0 ? ` affected=[${affected.join(', ')}]` : full === false ? ' affected=[]' : '';
+            const scope = islandHmr ? 'island' : reloadAllPages ? 'all-pages' : `pages=${nextCtors.size}`;
+            const bid = buildId || serveState.lastDevBuildId;
+            const rev =
+                bid || sourceRevision || bundleRevision
+                    ? ` buildId=${bid || '-'} source=${sourceRevision || '-'} bundle=${bundleRevision || '-'} serve=${serveState.reloadToken}`
+                    : ` t=${serveState.reloadToken}`;
+            logLine = `vmz serve: soft reload ok (mode=${mode}; ${scope}; catalog=${serveState.pageCatalog.length};${rev}${aff})`;
+        }
+        pendingReload = { info, sse, logLine };
+        return info;
     } catch (err) {
-        serveState.reloadToken = prevToken;
-        serveState.pageCatalog = prevCatalog;
-        serveState.pageCtors.clear();
-        for (const [k, v] of prevCtors) serveState.pageCtors.set(k, v);
+        pendingRollback?.();
+        pendingRollback = null;
+        pendingReload = null;
         serveState.lastDevError = normalizeDevError(err);
         throw err;
     }
+}
+
+/**
+ * 第二阶段：发布 SSE 并置 ready。island 热更新的地址表从 pack manifest 精确
+ * 查得（逻辑 `chunkId` → chunk 文件、含 `dom.browser` 的共享 chunk），不做后缀
+ * 猜测；查不到即整页 reload。
+ */
+export function commitReload(): Record<string, unknown> {
+    const prepared = pendingReload;
+    if (!prepared) throw new Error('commitReload: no prepared reload');
+    let island: PackIslandHrefs | null = null;
+    if (serveState.isDev) {
+        try {
+            island = packIslandHrefs(serveState.distDir);
+        } catch (err) {
+            abortReload(err);
+            throw err;
+        }
+    }
+    pendingReload = null;
+    pendingRollback = null;
+    serveState.lastDevError = null;
+    serveState.ready = true;
+    notifySse(JSON.stringify({ ...prepared.sse, island }));
+    if (prepared.logLine) console.log(prepared.logLine);
+    return { ...prepared.info, island };
+}
+
+/** pack 失败：回滚到上一轮已发布状态，并以 SSE error 显式告知浏览器。 */
+export function abortReload(err: unknown) {
+    pendingReload = null;
+    pendingRollback?.();
+    pendingRollback = null;
+    serveState.ready = false;
+    serveState.lastDevError = normalizeDevError(err);
+    notifySse(
+        JSON.stringify({
+            type: 'error',
+            message: serveState.lastDevError.message,
+            stack: serveState.lastDevError.stack,
+            at: serveState.lastDevError.at,
+        }),
+    );
 }

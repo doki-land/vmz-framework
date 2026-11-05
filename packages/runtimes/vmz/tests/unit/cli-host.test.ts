@@ -69,7 +69,7 @@ describe('vmz Node CLI host (N2)', () => {
                 spawned.push(['host']);
                 return /** @type {any} */ (fakeChild);
             },
-            softReloadFn: async () => {},
+            softReloadFn: async () => ({ ok: true }),
         });
 
         const report = session.rebuild([{ path: vmz, kind: 'update' }]);

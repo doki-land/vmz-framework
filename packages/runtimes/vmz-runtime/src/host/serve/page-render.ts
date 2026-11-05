@@ -322,11 +322,15 @@ async function* emitPageHtml(
       hideOverlay();
       if (msg.mode === "island") {
         try {
-          const { hydrate } = await import("/dom.browser.js?t=" + msg.token);
+          // 地址表来自 pack manifest（逻辑名精确匹配），缺失即整页 reload：
+          // 不再单独加载裸 dom.browser.js，避免与 packed bootstrap 形成两份 runtime。
+          const island = msg.island || {};
           const root = document.getElementById("app");
           const pageChunk = root && root.getAttribute("data-vmz-page");
-          if (root && pageChunk) {
-            const pageMod = await import("/" + pageChunk + ".client.js?t=" + msg.token);
+          const pageHref = pageChunk && island.pages ? island.pages[pageChunk] : null;
+          if (root && pageChunk && island.dom && pageHref) {
+            const { hydrate } = await import(island.dom);
+            const pageMod = await import(pageHref);
             let hmrProps = {};
             try {
               const raw = root.getAttribute("data-vmz-props");
@@ -425,12 +429,10 @@ async function* emitPageHtml(
     if (typeof native.generatePageShell !== 'function') {
         throw new Error('vmz native addon missing generatePageShell — rebuild with `pnpm napi:build`');
     }
-    // 生产 serve 必须注入打包条目：原始 `entry-client.js` 及其拉取的客户端模块保留
-    // 裸包说明符，浏览器无法解析。dev 仍走带 token 的原始 bootstrap。
+    // 客户端入口一律经 pack manifest 解析：原始 `entry-client.js` 及其拉取的
+    // 客户端模块保留裸包说明符，浏览器无法解析。dev 与生产因此走同一张表。
     const entryLogical = eventOnlyShell ? 'entry-event.js' : 'entry-client.js';
-    const entrySrc = serveState.isDev
-        ? `/${entryLogical}?t=${serveState.reloadToken}`
-        : packEntryHref(serveState.distDir, entryLogical);
+    const entrySrc = packEntryHref(serveState.distDir, entryLogical);
     const cssHref = cssEntryWithBust(serveState.cssEntry);
     yield native.generatePageShell({
         bodyHtml,

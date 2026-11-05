@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { handleNodeRequest } from '../../faces/vmz-runtime.js';
 import { SHUTDOWN_TIMEOUT_MS } from './constants.js';
-import { normalizeDevError, notifySse, softReload } from './hmr-dev.js';
+import { abortReload, commitReload, normalizeDevError, notifySse, prepareReload } from './hmr-dev.js';
 import { renderPage, renderPageStream } from './page-render.js';
 import { serveState } from './state.js';
 
@@ -74,20 +74,37 @@ export function startServeHttp() {
         if (url.pathname === '/__vmz/reload' && req.method === 'POST') {
             readRequestBody(req)
                 .then((raw) => {
-                    let payload: Record<string, unknown> = {};
+                    let body: Record<string, unknown> = {};
                     try {
-                        payload = raw ? (JSON.parse(String(raw)) as Record<string, unknown>) : {};
+                        body = raw ? (JSON.parse(String(raw)) as Record<string, unknown>) : {};
                     } catch {
-                        payload = {};
+                        body = {};
                     }
-                    return softReload({ payload });
+                    // dev 两阶段：prepare 写入口 → CLI 侧 `vmz-pack` → commit 发布。
+                    // 未带 phase 的请求不属于 v0 合同，直接拒绝而不是猜测阶段。
+                    const phase = body.phase;
+                    if (phase === 'prepare') {
+                        return prepareReload({ payload: body.payload as Record<string, unknown> | undefined }).then((info) => ({
+                            phase,
+                            info,
+                        }));
+                    }
+                    if (phase === 'commit') {
+                        return { phase, info: commitReload() };
+                    }
+                    if (phase === 'abort') {
+                        const rawError = body.error as { message?: string; stack?: string } | undefined;
+                        abortReload(new Error(rawError?.message || 'pack failed'));
+                        return { phase, info: { ok: true } };
+                    }
+                    throw Object.assign(new Error('reload: unknown phase'), { statusCode: 400 });
                 })
-                .then((info) => {
+                .then(({ phase, info }) => {
                     res.writeHead(200, { 'content-type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, token: serveState.reloadToken, ...info }));
+                    res.end(JSON.stringify({ ok: true, phase, ...info }));
                 })
                 .catch((err) => {
-                    console.error('vmz serve: soft reload failed', err);
+                    console.error('vmz serve: reload failed', err);
                     serveState.lastDevError = normalizeDevError(err);
                     notifySse(
                         JSON.stringify({

@@ -39,6 +39,7 @@ import {
     staticRevisionFromArtifact,
 } from './dev-incremental.js';
 import { diffFingerprints, fileFingerprintMap } from '../workspace/watch-diff.js';
+import { packFromDeploymentIr } from '../workspace/pack.js';
 
 /** Track serve-host so a failed/killed launcher cannot leave an orphan port. */
 const DEV_HOST_PID = '.vmz-dev-host.pid';
@@ -55,7 +56,9 @@ interface DevSessionOptions {
     signal?: AbortSignal;
     createWorkspaceFn?: typeof createWorkspace;
     spawnHostFn?: (opts: { project: string; outDir: string; host: string; port: number }) => import('node:child_process').ChildProcess;
-    softReloadFn?: (host: string, port: number, payload?: object) => Promise<void>;
+    softReloadFn?: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    /** Test seam for the browser pack stage (defaults to `packFromDeploymentIr`). */
+    packFn?: typeof packFromDeploymentIr;
     /** Override the detached config build process (tests). */
     configCycleFn?: (opts: { project: string; outDir: string; workerPath?: string }) => ConfigCycle;
     /** Built config cycle worker path (defaults to `dist/dev/config-cycle-worker.js`). */
@@ -78,7 +81,8 @@ export function createDevSession(options: DevSessionOptions) {
     let delivery = options.delivery ?? null;
     const createWs = options.createWorkspaceFn ?? createWorkspace;
     const spawnHost = options.spawnHostFn ?? defaultSpawnHost;
-    const softReload = options.softReloadFn ?? defaultSoftReload;
+    const softReload = options.softReloadFn ?? ((body: Record<string, unknown>) => defaultReloadRequest(host, port, body));
+    const packBrowser = options.packFn ?? packFromDeploymentIr;
     const makeConfigCycle = options.configCycleFn ?? createConfigCycle;
     const configCandidates = configCandidatePaths(project);
     let configCycle: ConfigCycle | null = null;
@@ -117,7 +121,6 @@ export function createDevSession(options: DevSessionOptions) {
 
     async function maybeReloadAfterBuild(report, hmrPlan, opts: { force?: boolean; staticOnly?: boolean } = {}) {
         const rev = report.outputRevision ?? report.output_revision ?? null;
-        const skipEntry = Boolean(rev && rev === lastOutputRevision);
         if (!opts.force && !opts.staticOnly && !shouldSoftReload(report, lastOutputRevision)) {
             log.info('rebuild ok — artifact unchanged, skip soft reload');
             if (rev) lastOutputRevision = rev;
@@ -126,14 +129,12 @@ export function createDevSession(options: DevSessionOptions) {
         }
         const payload = buildReloadPayload(report, hmrPlan, {
             staticRevision: lastStaticRevision ?? undefined,
-            skipEntryRewrite: skipEntry && !opts.force,
         });
         if (opts.staticOnly) {
             payload.full = false;
             payload.islandHmr = false;
-            payload.skipEntryRewrite = true;
         }
-        const kind = await reloadAfterBuild(payload);
+        const kind = await reloadAfterBuild(payload, { staticOnly: Boolean(opts.staticOnly) });
         if (rev) lastOutputRevision = rev;
         registerWrittenOutputsIgnore(report.writtenOutputs ?? report.written_outputs, outDir, project, generationIgnore);
         return kind;
@@ -191,18 +192,18 @@ export function createDevSession(options: DevSessionOptions) {
         return true;
     }
 
-    async function waitHostReady(timeoutMs = 8000) {
+    async function waitHostUp(timeoutMs = 8000) {
         const start = Date.now();
         while (Date.now() - start < timeoutMs) {
             try {
-                const res = await fetch(`http://${host}:${port}/__vmz/ready`);
+                const res = await fetch(`http://${host}:${port}/__vmz/health`);
                 if (res.ok) return;
             } catch {
                 /* not up yet */
             }
             await sleep(50);
         }
-        throw new Error(`serve-host not ready on ${host}:${port}`);
+        throw new Error(`serve-host not up on ${host}:${port}`);
     }
 
     async function waitHostGone(timeoutMs = 3000) {
@@ -217,29 +218,72 @@ export function createDevSession(options: DevSessionOptions) {
         }
     }
 
+    /**
+     * 两阶段重建：host `prepare` 写入口 → CLI 侧 `vmz-pack` → host `commit` 发布。
+     * dev 的浏览器交付必须走 pack，否则逐文件模块保留裸包说明符。
+     * pack 失败显式 SSE error 且不回退到未打包入口。`staticOnly`（仅 public
+     * 资产）不改变客户端图，因此不重打包。
+     */
+    async function reloadWithPack(payload, opts: { staticOnly?: boolean; initial?: boolean } = {}) {
+        try {
+            await softReload({ phase: 'prepare', payload });
+        } catch (err) {
+            if (opts.initial) {
+                log.warn(`initial serve-host load failed (${err}) — host stays up`);
+                return 'error';
+            }
+            log.warn(`soft reload failed (${err}) — auto-respawning serve-host`);
+            await respawnHost('soft-reload-failed');
+            return 'respawn';
+        }
+        if (!opts.staticOnly) {
+            const startedAt = Date.now();
+            try {
+                const { manifest } = packBrowser(outDir, { projectRoot: project });
+                log.info(`dev pack ok (${manifest.chunkCount} chunks, ${Date.now() - startedAt}ms)`);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                log.error(`dev pack failed: ${message}`);
+                try {
+                    await softReload({
+                        phase: 'abort',
+                        error: { message, stack: err instanceof Error ? err.stack : undefined },
+                    });
+                } catch {
+                    /* host may be gone; keep the reported pack error */
+                }
+                return 'error';
+            }
+        }
+        try {
+            await softReload({ phase: 'commit' });
+            return 'soft';
+        } catch (err) {
+            if (opts.initial) {
+                log.warn(`initial serve-host commit failed (${err}) — host stays up`);
+                return 'error';
+            }
+            log.warn(`reload commit failed (${err}) — auto-respawning serve-host`);
+            await respawnHost('commit-failed');
+            return 'respawn';
+        }
+    }
+
     async function respawnHost(reason) {
         log.warn(`respawning serve-host (${reason})…`);
         killChild(child);
         child = null;
         await waitHostGone();
         child = spawnHost({ project, outDir, host, port });
-        await waitHostReady();
-        log.info('serve-host respawned — browser SSE will reconnect and reload');
+        await waitHostUp();
+        const kind = await reloadWithPack({}, { initial: true });
+        if (kind === 'soft') log.info('serve-host respawned — browser SSE will reconnect and reload');
+        else log.warn('serve-host respawned but initial reload failed — fix the error and save');
     }
 
-    /**
-     * Soft reload first; on failure auto-respawn so authors never hand-restart.
-     * @param {object} payload
-     */
-    async function reloadAfterBuild(payload) {
-        try {
-            await softReload(host, port, payload);
-            return 'soft';
-        } catch (err) {
-            log.warn(`soft reload failed (${err}) — auto-respawning serve-host`);
-            await respawnHost('soft-reload-failed');
-            return 'respawn';
-        }
+    /** @param {object} payload */
+    async function reloadAfterBuild(payload, opts: { staticOnly?: boolean } = {}) {
+        return reloadWithPack(payload, opts);
     }
 
     let docEnginesPromise: Promise<{ markdown?: string; code?: string } | undefined> | null = null;
@@ -303,9 +347,14 @@ export function createDevSession(options: DevSessionOptions) {
             }
 
             child = spawnHost({ project, outDir, host, port });
-            await waitHostReady().catch((err) => {
+            await waitHostUp().catch((err) => {
                 log.warn(String(err));
             });
+            const initialKind = await reloadAfterBuild({}, { staticOnly: false }).catch((err) => {
+                log.warn(`initial reload failed: ${err}`);
+                return 'error';
+            });
+            if (initialKind !== 'soft') log.warn('initial serve-host reload failed — fix the error and save');
         }
         const docsRoot = path.join(project, 'documents');
         const localesRoot = path.join(project, 'locales');
@@ -407,8 +456,7 @@ export function createDevSession(options: DevSessionOptions) {
 
                 if (!wechatPreview && child && child.exitCode != null) {
                     log.warn(`serve-host exited (${child.exitCode}) — respawning…`);
-                    child = spawnHost({ project, outDir, host, port });
-                    await waitHostReady().catch(() => {});
+                    await respawnHost('host-exited');
                     continue;
                 }
 
@@ -501,7 +549,7 @@ export function createDevSession(options: DevSessionOptions) {
                     commitFingerprints();
                     if (!wechatPreview) {
                         const kind = await maybeReloadAfterBuild({ reloadRequired: true }, null, { force: true, staticOnly: true });
-                        if (kind !== 'skip') log.info('soft reload ok (public assets)');
+                        if (kind === 'soft' || kind === 'respawn') log.info('soft reload ok (public assets)');
                     }
                     continue;
                 }
@@ -611,7 +659,7 @@ export function createDevSession(options: DevSessionOptions) {
                     }
                     const kind = await maybeReloadAfterBuild(report, hmrPlan, { force: true });
                     commitFingerprints();
-                    if (kind !== 'skip') {
+                    if (kind === 'soft' || kind === 'respawn') {
                         log.info(kind === 'respawn' ? 'reload ok (respawned; deps)' : 'soft reload ok (full page; deps)');
                     }
                     continue;
@@ -648,7 +696,7 @@ export function createDevSession(options: DevSessionOptions) {
                         force: needFullReload,
                     });
                     commitFingerprints();
-                    if (kind !== 'skip') {
+                    if (kind === 'soft' || kind === 'respawn') {
                         log.info(
                             kind === 'respawn'
                                 ? 'reload ok (respawned serve-host)'
@@ -686,7 +734,7 @@ export function createDevSession(options: DevSessionOptions) {
                     }
                     const kind = await maybeReloadAfterBuild(report, hmrPlan, { force: true });
                     commitFingerprints();
-                    if (kind !== 'skip') {
+                    if (kind === 'soft' || kind === 'respawn') {
                         log.info(kind === 'respawn' ? 'reload ok (respawned; designs)' : 'soft reload ok (full page; designs)');
                     }
                     continue;
@@ -706,7 +754,7 @@ export function createDevSession(options: DevSessionOptions) {
                     } else {
                         const kind = await maybeReloadAfterBuild({ reloadRequired: true, full: true }, null, { force: true });
                         commitFingerprints();
-                        if (kind !== 'skip') {
+                        if (kind === 'soft' || kind === 'respawn') {
                             log.info(kind === 'respawn' ? 'reload ok (respawned; locales)' : 'soft reload ok (full page; locales)');
                         }
                         if (!batch.docsDirty) continue;
@@ -727,7 +775,7 @@ export function createDevSession(options: DevSessionOptions) {
                     } else {
                         const kind = await maybeReloadAfterBuild({ reloadRequired: true, full: true }, null, { force: true });
                         commitFingerprints();
-                        if (kind !== 'skip') {
+                        if (kind === 'soft' || kind === 'respawn') {
                             log.info(kind === 'respawn' ? 'reload ok (respawned; docs)' : 'soft reload ok (full page; docs)');
                         }
                     }
@@ -800,21 +848,22 @@ function defaultSpawnHost(opts) {
 }
 
 /**
+ * Host reload request（两阶段协议：`prepare` / `commit` / `abort`）。
  * @param {string} host
  * @param {number} port
- * @param {object} [payload]
+ * @param {Record<string, unknown>} body
  */
-async function defaultSoftReload(host, port, payload = {}) {
+async function defaultReloadRequest(host, port, body) {
     const url = `http://${host}:${port}/__vmz/reload`;
-    const body = JSON.stringify(payload);
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body,
+        body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json().catch(() => ({}));
     if (!json?.ok) throw new Error(JSON.stringify(json));
+    return json;
 }
 
 function killChild(child) {

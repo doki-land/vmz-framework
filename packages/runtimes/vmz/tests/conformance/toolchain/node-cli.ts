@@ -51,7 +51,7 @@ const session = createDevSession({
     spawnHostFn: () => {
         throw new Error('spawnHost should not run in rebuild-only gate');
     },
-    softReloadFn: async () => {},
+    softReloadFn: async () => ({ ok: true }),
     createWorkspaceFn: (opts) => createWorkspace(opts),
 });
 

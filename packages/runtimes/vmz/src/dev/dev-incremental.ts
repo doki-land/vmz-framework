@@ -41,7 +41,6 @@ export interface DevReloadPayload {
     islandHmr?: boolean;
     rerunLoaders?: string[];
     staticRevision?: string;
-    skipEntryRewrite?: boolean;
     outputRevision?: string;
 }
 
@@ -64,7 +63,7 @@ export function hmrRerunLoaders(plan: HmrPlanWire | null | undefined): string[] 
 export function buildReloadPayload(
     report: BuildReportWire,
     hmrPlan: HmrPlanWire | null,
-    opts: { staticRevision?: string; skipEntryRewrite?: boolean } = {},
+    opts: { staticRevision?: string } = {},
 ): DevReloadPayload {
     const rerunLoaders = hmrRerunLoaders(hmrPlan);
     const affectedChunks = report.affectedChunks ?? report.affected_chunks ?? [];
@@ -85,7 +84,6 @@ export function buildReloadPayload(
         islandHmr: islandHmr && !full,
         rerunLoaders,
         staticRevision: opts.staticRevision,
-        skipEntryRewrite: opts.skipEntryRewrite,
         outputRevision: report.outputRevision ?? report.output_revision,
     };
 }
