@@ -45,8 +45,12 @@ fn unresolvable_bare_specifier_fails_loudly() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
-    let plan =
-        plan_emit(&graph, &link_plan, &chunks, &EmitOptions { public_base: "/_vmz/".to_string(), minify: false });
+    let plan = plan_emit(
+        &graph,
+        &link_plan,
+        &chunks,
+        &EmitOptions { public_base: "/_vmz/".to_string(), minify: false },
+    );
     match plan {
         Ok(plan) => {
             let code = &plan.artifacts[0].code;

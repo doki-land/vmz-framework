@@ -200,10 +200,7 @@ fn chunk_ids_are_portable_across_output_roots() {
     let outside = ids_for_out_root("/elsewhere/out/static");
     assert_eq!(inside, outside, "输出目录位置不得进入 chunk id");
     assert!(inside.iter().any(|id| id == "async/pages/index.client.js"), "{inside:?}");
-    assert!(
-        inside.iter().any(|id| id == "isolated/node_modules/pkg/dist/index.js"),
-        "{inside:?}"
-    );
+    assert!(inside.iter().any(|id| id == "isolated/node_modules/pkg/dist/index.js"), "{inside:?}");
     for id in &inside {
         assert!(!id.contains("//?/"), "verbatim 前缀进入 chunk id: {id}");
         assert!(!id.contains("dist/static"), "输出目录进入 chunk id: {id}");

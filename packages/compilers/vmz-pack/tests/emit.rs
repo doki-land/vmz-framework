@@ -310,11 +310,8 @@ fn minified_output_keeps_token_level_map_to_module_lines() {
     let plan = plan_emit(&graph, &link_plan, &chunks, &minified_options()).unwrap();
     let artifact = &plan.artifacts[0];
     // 压缩：token 级，保留 ASI 需要的换行，但去掉缩进与空白。
-    let body_lines: Vec<&str> = artifact
-        .code
-        .lines()
-        .filter(|line| !line.starts_with("//# sourceMappingURL="))
-        .collect();
+    let body_lines: Vec<&str> =
+        artifact.code.lines().filter(|line| !line.starts_with("//# sourceMappingURL=")).collect();
     assert!(body_lines.len() < 8, "{}", artifact.code);
     assert!(!artifact.code.contains("\n  const doubled"), "{}", artifact.code);
     assert!(artifact.code.contains("const doubled=n*2;"), "{}", artifact.code);
@@ -327,11 +324,10 @@ fn minified_output_keeps_token_level_map_to_module_lines() {
             .position(|body| body.contains(needle))
             .unwrap_or_else(|| panic!("no `{needle}` line: {}", artifact.code));
         let col = body_lines[line].find(needle).expect("needle column");
-        let segment = decoded[line]
-            .iter()
-            .find(|segment| segment.0 as usize == col)
-            .copied()
-            .unwrap_or_else(|| panic!("no token segment at line {line} col {col}: {decoded:?}"));
+        let segment =
+            decoded[line].iter().find(|segment| segment.0 as usize == col).copied().unwrap_or_else(
+                || panic!("no token segment at line {line} col {col}: {decoded:?}"),
+            );
         segment
     };
     // lib.js 是 sources[0]，`helper` 在切片起点列 7（`export ` 之后）。
