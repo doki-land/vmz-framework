@@ -151,13 +151,28 @@ pub(crate) fn assemble_isolated(
                         edge.target.as_ref().err(),
                         Some(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN
                     ) {
-                        // 静态 `node:` 导入：与平铺路径同一合同，显式拒绝并指向
-                        // 动态 `import("node:…")` 写法，不产出语义可疑的产物。
+                        // Node target：整文件逐字发射，静态 `node:` import 语句
+                        // 原样留在模块文本里，由 Node 宿主解析，无需重写。
+                        // Browser target：内建模块不存在，维持显式拒绝。
+                        if context.graph.target == crate::resolve::Target::Node {
+                            warnings.push(
+                                PackDiagnostic::new(
+                                    "vmz::pack::emit::node_builtin_static_kept",
+                                    format!(
+                                        "静态导入 `{}` 是 Node.js 内建模块，整文件发射原样保留，由 Node 宿主解析",
+                                        import.specifier
+                                    ),
+                                )
+                                .with_path(module_path.clone())
+                                .with_span(import.span),
+                            );
+                            continue;
+                        }
                         errors.push(
                             PackDiagnostic::new(
                                 "vmz::pack::emit::node_builtin_static_unsupported",
                                 format!(
-                                    "静态导入 `{}` 是 Node.js 内建模块：打包层仅支持动态 `import(\"node:…\")` 延迟加载（仅在 Node 宿主求值的分支内使用），静态外链导入未实现",
+                                    "静态导入 `{}` 是 Node.js 内建模块：浏览器目标不支持内建模块，改用动态 `import(\"node:…\")` 或移除该依赖",
                                     import.specifier
                                 ),
                             )

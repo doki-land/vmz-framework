@@ -449,17 +449,19 @@ fn node_builtin_dynamic_import_is_kept_verbatim() {
     );
 }
 
-/// 静态 `import … from "node:…"` 在拼接模型下未实现：显式拒绝并给出
-/// 专用诊断码，不产出语义可疑的产物。
+/// 静态 `import … from "node:…"` 在 Node target 上是运行时外部模块：binding
+/// 改名为 fresh 名后按说明符合成 chunk 级 import，给非致命诊断
+/// `node_builtin_static_kept`。守卫不成立（scope 事实不全、fresh 名碰撞）时
+/// 仍显式拒绝，不做猜测。
 #[test]
-fn node_builtin_static_import_is_explicitly_rejected() {
+fn node_builtin_static_import_is_external_on_node_target() {
     let root = temp_tree(
         "nodebuiltinstatic",
         &[
             ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
             (
                 "src/app.js",
-                "import { readFile } from 'node:fs/promises';\nexport const run = readFile;\n",
+                "import { readFile } from 'node:fs/promises';\nimport \"node:os\";\nexport const run = readFile;\n",
             ),
         ],
     );
@@ -474,8 +476,55 @@ fn node_builtin_static_import_is_explicitly_rejected() {
         }],
     );
     let chunks = plan_chunks(&graph, &link_plan);
+    assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/app").unwrap();
+    assert!(entry.code.contains("import { readFile as readFile__vmz_node"), "{}", entry.code);
+    assert!(entry.code.contains("from \"node:fs/promises\""), "{}", entry.code);
+    assert!(entry.code.contains("import \"node:os\";"), "{}", entry.code);
+    assert!(entry.code.contains("readFile__vmz_node"), "{}", entry.code);
+    assert!(
+        codes(&plan.diagnostics).contains(&"vmz::pack::emit::node_builtin_static_kept".to_string()),
+        "{:?}",
+        plan.diagnostics
+    );
+    assert!(
+        !codes(&plan.diagnostics)
+            .contains(&"vmz::pack::emit::node_builtin_static_unsupported".to_string()),
+        "{:?}",
+        plan.diagnostics
+    );
+}
+
+/// Browser target 上静态 `node:` 导入仍显式拒绝：浏览器没有内建模块，
+/// 原样保留会在运行时解析失败。
+#[test]
+fn node_builtin_static_import_is_rejected_on_browser_target() {
+    let root = temp_tree(
+        "nodebuiltinstaticbrowser",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/app.js",
+                "import { readFile } from 'node:fs/promises';\nexport const run = readFile;\n",
+            ),
+        ],
+    );
+    let graph =
+        build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["run".into()]),
+        }],
+    );
+    let chunks = plan_chunks(&graph, &link_plan);
     let Err(errors) = plan_emit(&graph, &link_plan, &chunks, &options()) else {
-        panic!("static node: import must be rejected")
+        panic!("static node: import must be rejected on the browser target")
     };
     assert!(
         codes(&errors).contains(&"vmz::pack::emit::node_builtin_static_unsupported".to_string()),

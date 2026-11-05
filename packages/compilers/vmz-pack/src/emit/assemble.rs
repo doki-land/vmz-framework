@@ -80,6 +80,13 @@ struct Bindings {
     named: BTreeSet<(String, String)>,
 }
 
+/// Node 内建模块的 chunk 级外部 import 绑定（按说明符归并）。
+///
+/// 外部 import 的 local 一律先改写为 `{local}__vmz_node{node_index}` 再合成，
+/// 与同 chunk 绑定共用 `plan_binding_rewrite` 守卫：只有引用清单完整、
+/// 无类型位置引用、fresh 名不碰撞时才成立，否则维持显式拒绝。
+type ExternalBindings = Bindings;
+
 /// 待决议的本模块导出：`local` 需确认在 chunk 内可解析后才合成。
 struct DeferredExport {
     local: String,
@@ -134,6 +141,10 @@ pub(crate) fn assemble_chunk(
     let mut star_export_names: Vec<(String, String)> = Vec::new();
     let mut merged: BTreeMap<usize, Bindings> = BTreeMap::new();
     let mut side_effects: BTreeSet<usize> = BTreeSet::new();
+    // Node 内建模块的外部 import：按说明符归并，chunk 头部合成真实 ESM
+    // import 语句（local 已改写为 fresh 名）。
+    let mut external_imports: BTreeMap<String, ExternalBindings> = BTreeMap::new();
+    let mut external_side_effects: BTreeSet<String> = BTreeSet::new();
     // 已被本 chunk 文本引用的目标 chunk（合成 import、副作用 import 与
     // export-from）。求值保留阶段据此判定是否还需要补一条副作用 import。
     let mut referenced_chunks: BTreeSet<usize> = BTreeSet::new();
@@ -209,6 +220,7 @@ pub(crate) fn assemble_chunk(
         let (mut renames, binding_decisions) = plan_same_chunk_bindings(
             context,
             chunk_index,
+            node_index,
             node,
             record,
             source,
@@ -220,6 +232,7 @@ pub(crate) fn assemble_chunk(
             &mut merged,
             &mut same_chunk_locals,
             &mut import_locals,
+            &mut external_imports,
             warnings,
             errors,
         );
@@ -876,14 +889,32 @@ pub(crate) fn assemble_chunk(
                     Some(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN
                 );
                 if builtin {
-                    // 静态 `node:` 导入在拼接模型下需要 chunk 级外部 import 合成
-                    // （合并、去重、与面名决议交互），当前合同不支持：显式拒绝并
-                    // 指向可行写法，不产生语义可疑的产物。
+                    if context.graph.target == crate::resolve::Target::Node {
+                        // Node target：绑定形态已在预决议登记并合成 fresh 名
+                        // 外部 import；副作用形态补一条外部 import 保真。
+                        if import.kind == ImportKind::SideEffect {
+                            external_side_effects.insert(import.specifier.clone());
+                            warnings.push(
+                                PackDiagnostic::new(
+                                    "vmz::pack::emit::node_builtin_static_kept",
+                                    format!(
+                                        "静态副作用导入 `{}` 是 Node.js 内建模块，按 chunk 级外部 import 保留，由 Node 宿主解析",
+                                        import.specifier
+                                    ),
+                                )
+                                .with_path(module_path.clone())
+                                .with_span(import.span),
+                            );
+                        }
+                        continue;
+                    }
+                    // Browser target：内建模块在浏览器不存在，显式拒绝并指向
+                    // 仅在 Node 宿主求值分支里使用的动态写法。
                     errors.push(
                         PackDiagnostic::new(
                             "vmz::pack::emit::node_builtin_static_unsupported",
                             format!(
-                                "静态导入 `{}` 是 Node.js 内建模块：打包层仅支持动态 `import(\"node:…\")` 延迟加载（仅在 Node 宿主求值的分支内使用），静态外链导入未实现",
+                                "静态导入 `{}` 是 Node.js 内建模块：浏览器目标不支持内建模块，改用动态 `import(\"node:…\")` 或移除该依赖",
                                 import.specifier
                             ),
                         )
@@ -1168,6 +1199,49 @@ pub(crate) fn assemble_chunk(
     }
     for target_chunk in &side_effects {
         imports_text.push_str(&format!("import {};\n", json_string(&placeholder(*target_chunk))));
+    }
+    // Node 内建模块外部 import：按说明符升序合成，local 已是 fresh 名，
+    // 不参与 chunk 内名字冲突。语法组合同合成 import（default 与具名可并
+    // 一条，命名空间单独成条）。
+    for (specifier, bindings) in &external_imports {
+        let quoted = json_string(specifier);
+        let named_clause = if bindings.named.is_empty() {
+            String::new()
+        } else {
+            let parts: Vec<String> = bindings
+                .named
+                .iter()
+                .map(
+                    |(name, local)| {
+                        if name == local { name.clone() } else { format!("{name} as {local}") }
+                    },
+                )
+                .collect();
+            format!("{{ {} }}", parts.join(", "))
+        };
+        let mut defaults = bindings.defaults.iter();
+        match defaults.next() {
+            Some(first) if !named_clause.is_empty() => {
+                imports_text.push_str(&format!("import {first}, {named_clause} from {quoted};\n"));
+            }
+            Some(first) => {
+                imports_text.push_str(&format!("import {first} from {quoted};\n"));
+            }
+            None => {
+                if !named_clause.is_empty() {
+                    imports_text.push_str(&format!("import {named_clause} from {quoted};\n"));
+                }
+            }
+        }
+        for extra in defaults {
+            imports_text.push_str(&format!("import {extra} from {quoted};\n"));
+        }
+        for namespace in &bindings.namespaces {
+            imports_text.push_str(&format!("import * as {namespace} from {quoted};\n"));
+        }
+    }
+    for specifier in &external_side_effects {
+        imports_text.push_str(&format!("import {};\n", json_string(specifier)));
     }
 
     // 决议延后的 Local/Default 导出：local 必须在 chunk 内可解析
@@ -1626,6 +1700,7 @@ fn plan_binding_rewrite(
 fn plan_same_chunk_bindings(
     context: &EmitContext<'_>,
     chunk_index: usize,
+    node_index: usize,
     node: &ModuleNode,
     record: &ModuleRecord,
     source: &str,
@@ -1637,6 +1712,7 @@ fn plan_same_chunk_bindings(
     merged: &mut BTreeMap<usize, Bindings>,
     same_chunk_locals: &mut BTreeSet<(String, String)>,
     import_locals: &mut Vec<(String, usize, String)>,
+    external_imports: &mut BTreeMap<String, ExternalBindings>,
     warnings: &mut Vec<PackDiagnostic>,
     errors: &mut Vec<PackDiagnostic>,
 ) -> (BTreeMap<String, BindingRewrite>, HashMap<(usize, usize), BindingDecision>) {
@@ -1665,6 +1741,94 @@ fn plan_same_chunk_bindings(
         else {
             continue;
         };
+        // Node 内建模块：Node target 上是运行时外部模块，binding 改名为 fresh
+        // 名后按说明符合成 chunk 级 import；Browser target 留给主循环显式拒绝。
+        if let Err(diagnostic) = edge.target.as_ref() {
+            if diagnostic.code != crate::resolve::CODE_NODE_BUILTIN
+                || context.graph.target != crate::resolve::Target::Node
+            {
+                continue;
+            }
+            for (binding_index, binding) in import.bindings.iter().enumerate() {
+                if binding.inline_type_only {
+                    continue;
+                }
+                let consumer = binding.local.as_str();
+                if !binding_is_used(
+                    record,
+                    source,
+                    consumer,
+                    active_spans,
+                    export_spans,
+                    referenced_in_active,
+                ) {
+                    decisions.insert((import_index, binding_index), BindingDecision::Handled);
+                    continue;
+                }
+                let landing = format!("{consumer}__vmz_node{node_index}");
+                match plan_binding_rewrite(
+                    record,
+                    source,
+                    consumer,
+                    &landing,
+                    active_spans,
+                    &stripped_spans,
+                ) {
+                    Ok(rewrite) => {
+                        let bindings = external_imports.entry(import.specifier.clone()).or_default();
+                        match &binding.imported {
+                            ImportedName::Default => {
+                                bindings.defaults.insert(landing.clone());
+                            }
+                            ImportedName::Name(name) => {
+                                bindings.named.insert((name.clone(), landing.clone()));
+                            }
+                            ImportedName::Namespace => {
+                                bindings.namespaces.insert(landing.clone());
+                            }
+                        }
+                        // 外部 binding 与同 chunk 绑定同一可解析口径：本模块的
+                        // deferred 导出据此能落到该 fresh 名。
+                        same_chunk_locals.insert((landing.clone(), module_path.to_string()));
+                        import_locals.push((landing.clone(), chunk_index, module_path.to_string()));
+                        warnings.push(
+                            PackDiagnostic::new(
+                                "vmz::pack::emit::node_builtin_static_kept",
+                                format!(
+                                    "静态导入 `{}` 是 Node.js 内建模块，按 chunk 级外部 import 保留，由 Node 宿主解析",
+                                    import.specifier
+                                ),
+                            )
+                            .with_path(module_path.to_string())
+                            .with_span(import.span),
+                        );
+                        if renames.insert(consumer.to_string(), rewrite).is_some() {
+                            errors.push(
+                                PackDiagnostic::new(
+                                    REJECT,
+                                    format!("消费者模块存在多个名为 `{consumer}` 的 import 绑定，非法源形态"),
+                                )
+                                .with_path(module_path.to_string())
+                                .with_span(import.span),
+                            );
+                        }
+                    }
+                    Err(failure) => errors.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::node_builtin_static_unsupported",
+                            format!(
+                                "静态导入 `{}` 是 Node.js 内建模块：绑定 `{consumer}` 改名 `{landing}` 的守卫不成立（{}），维持显式拒绝",
+                                import.specifier, failure.reason
+                            ),
+                        )
+                        .with_path(module_path.to_string())
+                        .with_span(import.span),
+                    ),
+                }
+                decisions.insert((import_index, binding_index), BindingDecision::Handled);
+            }
+            continue;
+        }
         let Ok(id) = edge.target.as_ref() else { continue };
         let Some(target) = context.graph.index_of(id) else { continue };
         if context.graph.nodes[target].kind != NodeKind::Js || !context.retained[target] {
