@@ -135,4 +135,26 @@ assert.equal(
     'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | 😀x\n  | ^^',
 );
 
+// A span across lines renders both endpoint lines, with `...` skipping the middle.
+const multiSource = 'aaa\nbbb\nccc\nddd';
+const multiStart = Buffer.from(multiSource, 'utf8').indexOf(Buffer.from('aaa', 'utf8'));
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: multiStart, end: Buffer.byteLength('aaa\nbbb\nccc', 'utf8') },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(multiSource),
+            sourceText: multiSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:1:1\n1 | aaa\n  | ^^^\n    ...\n3 | ccc\n  | ^^^',
+);
+
 console.log('SPAN-CONTEXT-CONVERSION GATE OK');

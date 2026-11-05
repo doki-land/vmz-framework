@@ -108,6 +108,15 @@ export function formatDiagnosticPretty(d: DiagnosticInput, message: string, opts
         if (endLine.line > startLine.line + 1) {
             lines.push(paint(`${' '.repeat(gutterWidth + 3)}...`, ANSI.dim));
         }
+        renderSnippetLine(
+            lines,
+            gutterWidth,
+            endLine.line,
+            endLine.text,
+            0,
+            displayWidth(utf8ByteSlice(source, endLine.lineStart, Math.min(span.end, endLine.lineEnd))),
+            d.severity,
+        );
     }
 
     return lines.join('\n');
