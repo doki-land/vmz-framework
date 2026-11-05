@@ -143,6 +143,44 @@ export default class PanelGrid {
 }
 
 #[test]
+fn each_on_component_binds_props_for_host_fields_and_item_scope() {
+    // `v-for` on a component must keep two kinds of props live: host-field props
+    // (`theme` switches must reach every row) and item-scoped props (a replaced
+    // row object must reach its child).
+    let src = r#"
+export default class PanelGrid {
+  panels: { id: string; title: string }[] = [];
+  theme = "light";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div><PanelCard v-for="panel in panels" :key="panel.id" :panel="panel" :theme="theme" /></div>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    let item_fn = js.find("function(api, box").map(|at| &js[at..]).unwrap_or("");
+    assert!(!item_fn.is_empty(), "each item closure must exist: {js}");
+    // Host-field prop: subscribes `theme` and reads it inside the row closure.
+    let theme_bind = item_fn
+        .split("api.bindComponentProp(this,")
+        .skip(1)
+        .find(|s| s.contains(r#""theme""#))
+        .unwrap_or_else(|| panic!("row component must bind `theme`: {js}"));
+    let theme_deps = theme_bind.split('[').nth(1).unwrap_or("").split(']').next().unwrap_or("");
+    assert!(theme_deps.contains(r#""theme""#), "theme must be a dep: {js}");
+    // Item-scoped prop: no host dep, still bound so list applies replay it.
+    let panel_bind = item_fn
+        .split("api.bindComponentProp(this,")
+        .skip(1)
+        .find(|s| s.contains(r#""panel""#))
+        .unwrap_or_else(|| panic!("row component must bind `panel`: {js}"));
+    assert!(panel_bind.contains("box1.item"), "panel getter reads the row item: {js}");
+}
+
+#[test]
 fn v_once_region_emits_create_time_writes_without_any_subscription() {
     let src = r#"
 export default class OnceDemo {

@@ -1399,7 +1399,11 @@ fn emit_component(
     for (ev, handler) in &event_parts {
         stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
     }
-    if !once && client.is_none() && aliases.is_empty() {
+    // Inside `v-for` the aliases are non-empty: item-scoped props still need a
+    // binding, because the item patch list is replayed on every list apply and
+    // host-field deps keep theme-like external state reaching the child rows.
+    let in_each = !aliases.is_empty();
+    if !once && client.is_none() {
         for a in attrs {
             if a.name == "style:tw"
                 || a.name.starts_with("client:")
@@ -1414,7 +1418,9 @@ fn emit_component(
                 continue;
             };
             let deps = with_memo_deps(collect_template_deps(e, fields, scope), memo);
-            if deps.is_empty() {
+            // Outside a row nothing can invalidate a dep-free prop, so the patch
+            // would never run.
+            if deps.is_empty() && !in_each {
                 continue;
             }
             let deps = deps_js(&deps);
