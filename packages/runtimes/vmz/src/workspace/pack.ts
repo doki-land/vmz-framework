@@ -235,11 +235,12 @@ interface PackSsrFromDeploymentIrOpts {
 
 /**
  * Node graph roots and their `dependsOn` closure — the only chunk ids a Node
- * consumer can request. Pages and the application shell are roots; layouts and
- * components enter through `dependsOn` (pages merge their `layoutChain` into
- * it). Units outside the closure have no Node consumer: the SSR registry imports
- * a component entry only when some root reaches it, and `loadCtor` only asks for
- * page / layout chunk ids.
+ * consumer can request. Pages and the application shell are roots; components
+ * enter through `dependsOn` (pages merge their `layoutChain` into it). Standalone
+ * layout units (`layouts/*`, emitted with kind `other`) are roots of their own
+ * because `loadCtor` asks for page / layout chunk ids directly and no page lists
+ * them in `dependsOn`. Units outside the closure have no Node consumer: the SSR
+ * registry imports a component entry only when some root reaches it.
  */
 function nodeReachableChunkIds(ir: DeploymentIr): Set<string> {
     const dependsOn = new Map<string, string[]>();
@@ -253,7 +254,7 @@ function nodeReachableChunkIds(ir: DeploymentIr): Set<string> {
             if (id) deps.push(id);
         }
         dependsOn.set(chunkId, deps);
-        if (unit.kind === 'page' || unit.kind === 'application') roots.push(chunkId);
+        if (unit.kind === 'page' || unit.kind === 'application' || unit.kind === 'other') roots.push(chunkId);
     }
     const reachable = new Set<string>();
     const queue = roots.slice();

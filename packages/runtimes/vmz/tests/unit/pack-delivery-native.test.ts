@@ -409,6 +409,30 @@ describe('packSsrFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.ok(!chunkIds.includes('components/Orphan'), `orphan chunk leaked into the node pack: ${chunkIds.join(', ')}`);
     });
 
+    it('keeps standalone layout units as node roots even without any dependsOn edge', () => {
+        // `layouts/DocumentLayout` is emitted with kind `other` and is requested
+        // by the integrated document mount via `packNodeEntryFile`. No page lists
+        // it in `dependsOn`, so it must be a root rather than a closure member.
+        const layout = {
+            chunkId: 'layouts/DocumentLayout',
+            kind: 'other',
+            clientEntry: 'layouts/DocumentLayout.client.js',
+            dependsOn: ['components/Greeting'],
+        };
+        const units = [...nodeUnits, layout];
+        const distDir = makeDistWithUnits('node-layout-root', units, {
+            ...nodeClientFiles,
+            'layouts/DocumentLayout.client.js': 'export default class DocumentLayout {}',
+        });
+        const binding = fakeBinding(nodePlanResponse);
+        packSsrFromDeploymentIr(distDir, { projectRoot: root, binding });
+        const request = JSON.parse(binding.calls[0].requestJson);
+        assert.deepEqual(
+            request.entries.map((e: { logical: string }) => e.logical).sort(),
+            ['Application', 'components/Greeting', 'layouts/DocumentLayout', 'pages/index'],
+        );
+    });
+
     it('rejects one chunkId mapping to conflicting client entries', () => {
         const conflicting = [
             { chunkId: 'components/Greeting', kind: 'component', clientEntry: 'components/Greeting.client.js' },
