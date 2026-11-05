@@ -24,16 +24,19 @@ It is especially useful for:
 
 ## Install
 
-`@vmz/plugin-shiki` resolves Shiki from the application. `shiki` (`>=3`) is a required peer dependency, not a
-bundled dependency, so install it alongside the plugin:
+`@vmz/plugin-shiki` resolves Shiki from the application. `shiki`, `@shikijs/langs` and `@shikijs/themes` (`>=3`) are
+required peer dependencies, not bundled dependencies, so install them alongside the plugin:
 
 ```bash
-pnpm add @vmz/plugin-shiki shiki
+pnpm add @vmz/plugin-shiki shiki @shikijs/langs @shikijs/themes
 ```
 
-The runtime loads plain `shiki` by default (a literal dynamic import that client bundles can vendor). A TextMate
-adapter adds custom grammars on top; installing `@shikijs/*` transitively through an adapter does not replace the
-application-level `shiki` install.
+The runtime loads `shiki/core` plus explicitly imported grammar and theme modules, so a client bundle only carries the
+grammars this plugin can actually resolve instead of every `bundle-full` language. Supported grammars:
+`javascript`, `typescript`, `tsx`, `jsx`, `json`, `html`, `css`, `markdown`, `bash` (plus `text`/`plaintext`, which
+Shiki serves without a grammar module). Supported themes: `vitesse-dark` (default) and `vitesse-light`. A theme outside
+that set is rejected with an explicit error instead of being silently swapped. A TextMate adapter adds custom grammars
+on top; it does not replace the application-level `shiki` install.
 
 ## Third-party TextMate grammar (VMZ-2)
 
@@ -49,7 +52,8 @@ export default defineConfig({
 ```
 
 The adapter specifier is host-resolved (serve-host resolve hooks on Node, an import map or vendor copy in the
-browser) and never vendored by the packer; when it fails to load, the runtime falls back to plain `shiki`.
+browser) and never vendored by the packer; when it fails to load, the runtime falls back to the built-in grammar set
+above.
 
 The plugin writes `dist/_vmz/plugin-shiki.config.json`; the runtime reads it in SSR (`VMZ_DIST`) and in the browser (`fetch`).
 

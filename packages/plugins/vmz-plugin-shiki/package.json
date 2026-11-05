@@ -36,9 +36,13 @@
         "@vmz/plugin": "workspace:*"
     },
     "peerDependencies": {
+        "@shikijs/langs": ">=3",
+        "@shikijs/themes": ">=3",
         "shiki": ">=3"
     },
     "devDependencies": {
+        "@shikijs/langs": "^3.23.0",
+        "@shikijs/themes": "^3.23.0",
         "@types/node": "^22.15.0",
         "shiki": "^3.12.2",
         "vmz-textmate": "workspace:*",

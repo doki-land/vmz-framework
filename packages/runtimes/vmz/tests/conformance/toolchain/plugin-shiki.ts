@@ -38,7 +38,9 @@ fs.writeFileSync(
 );
 
 const { shiki } = await import(pathToFileURL(distPlugin).href);
-const { configureShiki, getShikiRuntimeConfig, resetShikiRuntimeForTests, highlight } = await import(pathToFileURL(distRuntime).href);
+const { configureShiki, getShikiRuntimeConfig, resetShikiRuntimeForTests, highlight, prewarmShiki } = await import(
+    pathToFileURL(distRuntime).href
+);
 
 resetShikiRuntimeForTests();
 const plugin = shiki({ textmate: pathToFileURL(customTextmate).href });
@@ -154,14 +156,50 @@ if (!syncDegraded.includes('shiki-fallback') || !syncDegraded.includes('c &lt; d
 }
 
 
+console.log('plugin-shiki: generic path uses fine-grained entries (pack size)…');
+// `shiki`'s root entry reaches `bundle-full`, which registers every bundled
+// grammar and theme as its own dynamic import. Delivery must only carry the
+// grammars the runtime can resolve, so the generic path loads `shiki/core`
+// plus explicit `@shikijs/langs` / `@shikijs/themes` modules.
+resetShikiRuntimeForTests();
+configureShiki({});
+const jsHtml = await highlight('const x = 1', 'javascript', 'vitesse-dark');
+if (!jsHtml.includes('<span') || jsHtml.includes('shiki-fallback')) {
+    fail(`generic javascript highlight missing tokens: ${jsHtml.slice(0, 120)}`);
+}
+const mdHtml = await highlight('# title', 'markdown', 'vitesse-light');
+if (!mdHtml.includes('<span') || mdHtml.includes('shiki-fallback')) {
+    fail(`generic markdown highlight missing tokens: ${mdHtml.slice(0, 120)}`);
+}
+resetShikiRuntimeForTests();
+configureShiki({});
+let unsupportedTheme = '';
+try {
+    await prewarmShiki({ themes: ['nord'] });
+} catch (error) {
+    unsupportedTheme = error instanceof Error ? error.message : String(error);
+}
+if (!unsupportedTheme.includes('unsupported theme')) {
+    fail(`unknown theme must be rejected explicitly, got: ${unsupportedTheme}`);
+}
+const themeFallback = await highlight('a < b', 'javascript', 'nord');
+if (!themeFallback.includes('shiki-fallback') || !themeFallback.includes('a &lt; b')) {
+    fail(`unknown theme must degrade to escaped <pre>: ${themeFallback.slice(0, 120)}`);
+}
+
 console.log('plugin-shiki: no computed dynamic import in shipped runtime (G4)…');
 // Browser chunks can only vendor what the packer can see: a computed
 // `import(specVar)` ships as a bare specifier and fails in the browser with
 // "Failed to resolve module specifier 'shiki'". The only non-literal dynamic
 // import allowed is the documented custom-textmate escape hatch.
 const runtimeSrc = fs.readFileSync(distRuntime, 'utf8');
-if (!/await import\('shiki'\)/.test(runtimeSrc)) {
-    fail('generic shiki load must use a literal specifier so vmz-pack can vendor it');
+for (const specifier of ['shiki/core', 'shiki/engine/javascript', '@shikijs/langs/javascript', '@shikijs/themes/vitesse-dark']) {
+    if (!runtimeSrc.includes(`import('${specifier}')`)) {
+        fail(`generic highlighter must import \`${specifier}\` literally so vmz-pack can vendor it`);
+    }
+}
+if (/import\('shiki'\)/.test(runtimeSrc)) {
+    fail('generic highlighter must not load the bundled `shiki` entry (it reaches `bundle-full`)');
 }
 const computedImports = runtimeSrc.match(/import\(([^'"`][^)]*)\)/g) || [];
 const leaked = computedImports.filter((m) => !/webpackIgnore/.test(m));

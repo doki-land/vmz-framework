@@ -3,7 +3,7 @@
  * TextMate grammar via configurable peer (default `vmz-textmate/shiki`).
  */
 
-import type { Highlighter, ShikiTransformer } from 'shiki';
+import type { LanguageInput, ShikiTransformer, ThemeInput } from 'shiki';
 
 export type ShikiRuntimeConfig = {
     /**
@@ -49,7 +49,20 @@ const stripPreInlineStyle: ShikiTransformer = {
 
 let config: ShikiRuntimeConfig = {};
 let configResolved = false;
-type CodeHighlighter = Pick<Highlighter, 'codeToHtml'>;
+
+/**
+ * The highlight surface every adapter must provide. Kept structural instead of
+ * `Pick<Highlighter, 'codeToHtml'>`: the fine-grained entry returns a
+ * `HighlighterCore`, and both satisfy this shape.
+ */
+type CodeHighlighter = {
+    codeToHtml(code: string, options: {
+        lang: string;
+        theme: string;
+        transformers?: ShikiTransformer[];
+        structure?: 'classic' | 'inline';
+    }): string;
+};
 let cached: CodeHighlighter | null = null;
 let pending: Promise<CodeHighlighter> | null = null;
 
@@ -146,15 +159,66 @@ async function loadTextmateHighlighter(themes: string[]): Promise<CodeHighlighte
     return null;
 }
 
-async function loadGenericHighlighter(themes: string[]): Promise<Highlighter> {
-    // Literal specifier only: a computed dynamic import (variable argument) is
+/**
+ * Grammars the generic (non-TextMate) path can resolve. `shiki`'s root entry
+ * reaches `bundle-full`, which registers every bundled grammar and theme as its
+ * own dynamic import — 272 async chunks of unused `@shikijs/langs` grammars in
+ * the delivered pack. The fine-grained entry below keeps the reachable grammar
+ * set equal to what the runtime can actually resolve.
+ *
+ * `text` / `plaintext` / `txt` / `plain` need no module: Shiki treats them as
+ * plain text (`isPlainLang`).
+ */
+const LANG_MODULES: Record<string, () => Promise<{ default: LanguageInput }>> = {
+    javascript: () => import('@shikijs/langs/javascript'),
+    typescript: () => import('@shikijs/langs/typescript'),
+    tsx: () => import('@shikijs/langs/tsx'),
+    jsx: () => import('@shikijs/langs/jsx'),
+    json: () => import('@shikijs/langs/json'),
+    html: () => import('@shikijs/langs/html'),
+    css: () => import('@shikijs/langs/css'),
+    markdown: () => import('@shikijs/langs/markdown'),
+    bash: () => import('@shikijs/langs/bash'),
+};
+
+/** Themes the generic path can resolve (`vitesse-dark` is the runtime default). */
+const THEME_MODULES: Record<string, () => Promise<{ default: ThemeInput }>> = {
+    'vitesse-dark': () => import('@shikijs/themes/vitesse-dark'),
+    'vitesse-light': () => import('@shikijs/themes/vitesse-light'),
+};
+
+async function loadGenericHighlighter(themes: string[]): Promise<CodeHighlighter> {
+    // Literal specifiers only: a computed dynamic import (variable argument) is
     // invisible to the packer, so the browser chunk would keep a bare specifier
     // and fail with "Failed to resolve module specifier 'shiki'". Literal
     // imports let vmz-pack vendor the highlighter into an async client chunk.
-    const { createHighlighter } = await import('shiki');
-    return createHighlighter({
-        themes,
-        langs: ['javascript', 'typescript', 'tsx', 'jsx', 'json', 'html', 'css', 'markdown', 'bash', 'text'],
+    for (const theme of themes) {
+        if (!THEME_MODULES[theme]) {
+            // Explicit rejection, no silent substitution: a theme outside the
+            // shipped set cannot be highlighted, and pretending otherwise would
+            // emit the wrong colours.
+            throw new Error(
+                `@vmz/plugin-shiki: unsupported theme ${JSON.stringify(theme)} ` +
+                    `(supported: ${Object.keys(THEME_MODULES).join(', ')})`,
+            );
+        }
+    }
+    // Every supported theme is registered at once: the highlighter is created
+    // once per process and per-call `theme` switches must not hit an
+    // unregistered theme. The requested list only decides what must be
+    // resolvable (validation above), not what is registered.
+    const [{ createHighlighterCore }, { createJavaScriptRegexEngine }, themeModules, langModules] = await Promise.all([
+        import('shiki/core'),
+        import('shiki/engine/javascript'),
+        Promise.all(Object.values(THEME_MODULES).map((load) => load())),
+        Promise.all(Object.values(LANG_MODULES).map((load) => load())),
+    ]);
+    return createHighlighterCore({
+        themes: themeModules.map((module) => module.default),
+        langs: langModules.map((module) => module.default),
+        // Grammar fidelity comes from the same JS RegExp engine `vmz-textmate`
+        // ships: it needs no 608 KiB inlined Oniguruma wasm beside the chunk.
+        engine: createJavaScriptRegexEngine(),
     });
 }
 
