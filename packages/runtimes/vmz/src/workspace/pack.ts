@@ -266,15 +266,18 @@ export function packFromDeploymentIr(outDir: string, opts: PackFromDeploymentIrO
         chunkCount: chunks.length,
         styleCount: plan.styles.length,
         entryCount: plan.entryFiles.length,
-        // `vmz-pack` runs no compressor: chunk bytes are the linked output verbatim.
-        minify: 'none',
+        // Chunk text is token-minified inside `vmz-pack` while preserving string,
+        // template and regex bodies plus ASI-significant line breaks. Identifiers
+        // are not renamed and dead code is not eliminated.
+        minify: 'tokens',
         // `link` active fixed-point pruning really ran — bootstrap entries
         // declare full execution, internal modules are pruned to reachable exports.
         treeShake: 'vmz-pack-link-pruning',
-        // Chunk source maps are line-level v3: every assembled line maps back
-        // to its module line (`<packOut>/<fileName>.map`, `sourceMapFileName`
-        // on the wire); token-level mappings and `names` are not implemented.
-        sourceMaps: 'chunk-v3-line-mappings',
+        // Chunk source maps are v3 token-level: every minified token maps back
+        // through the assembled line to its module line (`<packOut>/<fileName>.map`,
+        // `sourceMapFileName` on the wire). Generated columns are token columns,
+        // source columns stay at the assembled slice start; `names` is unused.
+        sourceMaps: 'chunk-v3-token-mappings',
         nativeManifest,
     };
     body.packDigest = sha256Hex(stableStringify({ ...body }));

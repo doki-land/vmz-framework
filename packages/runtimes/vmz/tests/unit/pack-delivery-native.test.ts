@@ -134,9 +134,9 @@ describe('packFromDeploymentIr on the vmz-pack binding (v0)', () => {
         assert.equal(manifest.deploymentSchema, 'vmz.deployment.v0');
         assert.equal(manifest.chunkCount, 2);
         assert.equal(manifest.entryCount, 2);
-        assert.equal(manifest.minify, 'none');
+        assert.equal(manifest.minify, 'tokens');
         assert.equal(manifest.treeShake, 'vmz-pack-link-pruning');
-        assert.equal(manifest.sourceMaps, 'chunk-v3-line-mappings');
+        assert.equal(manifest.sourceMaps, 'chunk-v3-token-mappings');
         assert.equal(manifest.chunks.length, 2);
         assert.equal(manifest.chunks[0].fileName, 'entry-client-aa11.js');
         assert.equal(manifest.chunks[0].bytes, Buffer.byteLength(planResponse.plan.artifacts[0].code, 'utf8'));

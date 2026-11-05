@@ -66,8 +66,9 @@ const rustAdapter = readJson(rustAdapterPath);
 const routes = readJson(path.join(build.dist, 'vmz-routes.json'));
 
 if (pack.schema !== 'vmz.pack.manifest.v0') fail(`bad pack schema ${pack.schema}`);
-// `vmz-pack` runs no compressor — the manifest must never advertise minification.
-if (pack.minify !== 'none') fail(`minify must be none, got ${pack.minify}`);
+// Chunk text is token-minified in `vmz-pack` (no identifier renaming) and the
+// manifest must say exactly that.
+if (pack.minify !== 'tokens') fail(`minify must be tokens, got ${pack.minify}`);
 // Tree-shaking basis is the Rust link active fixed-point (entries keep all exports).
 if (pack.treeShake !== 'vmz-pack-link-pruning') fail(`treeShake must be vmz-pack-link-pruning, got ${pack.treeShake}`);
 if (!Array.isArray(pack.chunks) || !pack.chunks.length) fail('pack manifest must list vmz-pack chunks');
