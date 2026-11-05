@@ -50,15 +50,47 @@ export function unicodeScalarColumn(lineText: string, byteOffsetInLine: number):
     return buf.subarray(0, end).toString('utf8').length > 0 ? [...buf.subarray(0, end).toString('utf8')].length : 1;
 }
 
-/** Map 1-based scalar column to JS string index for underline rendering. */
-export function scalarColumnToIndex(lineText: string, column: number): number {
-    if (column <= 1) return 0;
-    let pos = 1;
-    let index = 0;
-    for (const ch of lineText) {
-        if (pos >= column) break;
-        index += ch.length;
-        pos += 1;
-    }
-    return index;
+const ZERO_WIDTH_PATTERN = /\p{Mn}|\p{Me}|\p{Cf}/u;
+
+function isWideCodePoint(cp: number): boolean {
+    return (
+        (cp >= 0x1100 && cp <= 0x115f) ||
+        cp === 0x2329 ||
+        cp === 0x232a ||
+        (cp >= 0x2e80 && cp <= 0x303e) ||
+        (cp >= 0x3041 && cp <= 0x33ff) ||
+        (cp >= 0x3400 && cp <= 0x4dbf) ||
+        (cp >= 0x4e00 && cp <= 0x9fff) ||
+        (cp >= 0xa000 && cp <= 0xa4cf) ||
+        (cp >= 0xa960 && cp <= 0xa97f) ||
+        (cp >= 0xac00 && cp <= 0xd7a3) ||
+        (cp >= 0xf900 && cp <= 0xfaff) ||
+        (cp >= 0xfe10 && cp <= 0xfe19) ||
+        (cp >= 0xfe30 && cp <= 0xfe6f) ||
+        (cp >= 0xff00 && cp <= 0xff60) ||
+        (cp >= 0xffe0 && cp <= 0xffe6) ||
+        (cp >= 0x1b000 && cp <= 0x1b2ff) ||
+        (cp >= 0x1f000 && cp <= 0x1f02f) ||
+        (cp >= 0x1f0a0 && cp <= 0x1f0ff) ||
+        (cp >= 0x1f100 && cp <= 0x1f1ad) ||
+        (cp >= 0x1f300 && cp <= 0x1f64f) ||
+        (cp >= 0x1f680 && cp <= 0x1f6ff) ||
+        (cp >= 0x1f900 && cp <= 0x1f9ff) ||
+        (cp >= 0x1fa70 && cp <= 0x1faff) ||
+        (cp >= 0x20000 && cp <= 0x3fffd)
+    );
+}
+
+/** Terminal cells occupied by one Unicode scalar (wide CJK/emoji render as two). */
+export function scalarDisplayWidth(ch: string): number {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp === 0 || ZERO_WIDTH_PATTERN.test(ch)) return 0;
+    return isWideCodePoint(cp) ? 2 : 1;
+}
+
+/** Display width of a line fragment in terminal cells. */
+export function displayWidth(text: string): number {
+    let cells = 0;
+    for (const ch of text) cells += scalarDisplayWidth(ch);
+    return cells;
 }

@@ -1,5 +1,5 @@
 import type { DiagnosticInput, FormatOptions, PositionContext, Severity } from './index.js';
-import { scalarColumnToIndex, utf8LineAt } from './utf8.js';
+import { displayWidth, utf8ByteSlice, utf8LineAt } from './utf8.js';
 
 export type PrettyStyle = 'compact' | 'pretty';
 
@@ -46,18 +46,16 @@ function renderSnippetLine(
     gutterWidth: number,
     lineNum: number,
     lineText: string,
-    colStart: number,
-    colEnd: number,
+    startCell: number,
+    endCell: number,
     severity: Severity,
 ): void {
     const gutter = paint(`${String(lineNum).padStart(gutterWidth)} | `, ANSI.dim);
     out.push(`${gutter}${lineText}`);
-    const startIdx = scalarColumnToIndex(lineText, colStart);
-    const endIdx = Math.max(startIdx + 1, scalarColumnToIndex(lineText, colEnd + 1));
     const marker =
         paint(`${' '.repeat(gutterWidth)} | `, ANSI.dim) +
-        ' '.repeat(startIdx) +
-        paint('^'.repeat(endIdx - startIdx), ...severityStyle(severity));
+        ' '.repeat(startCell) +
+        paint('^'.repeat(Math.max(1, endCell - startCell)), ...severityStyle(severity));
     out.push(marker);
 }
 
@@ -81,7 +79,6 @@ export function formatDiagnosticPretty(d: DiagnosticInput, message: string, opts
     const span = d.span!;
     const path = d.path || '';
     const startPos = position.lineCol(span.start);
-    const endPos = position.lineCol(Math.max(span.start, span.end - 1));
     lines.push(formatLocation(path, startPos.line, startPos.column));
 
     const startLine = utf8LineAt(source, span.start);
@@ -89,9 +86,25 @@ export function formatDiagnosticPretty(d: DiagnosticInput, message: string, opts
     const gutterWidth = String(endLine.line).length;
 
     if (startLine.line === endLine.line) {
-        renderSnippetLine(lines, gutterWidth, startLine.line, startLine.text, startPos.column, endPos.column, d.severity);
+        renderSnippetLine(
+            lines,
+            gutterWidth,
+            startLine.line,
+            startLine.text,
+            displayWidth(utf8ByteSlice(source, startLine.lineStart, span.start)),
+            displayWidth(utf8ByteSlice(source, startLine.lineStart, Math.min(span.end, startLine.lineEnd))),
+            d.severity,
+        );
     } else {
-        renderSnippetLine(lines, gutterWidth, startLine.line, startLine.text, startPos.column, startLine.text.length + 1, d.severity);
+        renderSnippetLine(
+            lines,
+            gutterWidth,
+            startLine.line,
+            startLine.text,
+            displayWidth(utf8ByteSlice(source, startLine.lineStart, span.start)),
+            displayWidth(startLine.text),
+            d.severity,
+        );
         if (endLine.line > startLine.line + 1) {
             lines.push(paint(`${' '.repeat(gutterWidth + 3)}...`, ANSI.dim));
         }

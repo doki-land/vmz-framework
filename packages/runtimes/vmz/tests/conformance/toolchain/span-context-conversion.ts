@@ -67,6 +67,72 @@ const where = formatDiagnostic(
 );
 assert.match(where, /^error\[test\.code\]: boom\n  --> demo\.vmz:2:1\n/);
 // rustc style: the caret row repeats only the gutter (`  | `), never the line number.
-assert.match(where, /\n2 \| 中文\n  \| \^/);
+// A wide CJK scalar occupies two terminal cells, so the underline covers both.
+assert.equal(where, 'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | 中文\n  | ^^');
+
+// Caret row is padded by rendered cells, not by Unicode scalar columns.
+const wideSource = 'line1\n中文x';
+const widePos = createPositionContext(wideSource);
+const wen = Buffer.from(wideSource, 'utf8').indexOf(Buffer.from('文', 'utf8'));
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: wen, end: wen + 3 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: widePos,
+            sourceText: wideSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:2\n2 | 中文x\n  |   ^^',
+);
+
+// A combining mark adds zero cells, an emoji presentation scalar adds two.
+const combiningSource = 'line1\ne\u0301x';
+const combining = Buffer.from(combiningSource, 'utf8').indexOf(Buffer.from('e\u0301', 'utf8'));
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: combining, end: combining + Buffer.byteLength('e\u0301', 'utf8') },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(combiningSource),
+            sourceText: combiningSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | e\u0301x\n  | ^',
+);
+const emojiSource = 'line1\n😀x';
+const emojiWidth = Buffer.from(emojiSource, 'utf8').indexOf(Buffer.from('😀', 'utf8'));
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: emojiWidth, end: emojiWidth + 4 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(emojiSource),
+            sourceText: emojiSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | 😀x\n  | ^^',
+);
 
 console.log('SPAN-CONTEXT-CONVERSION GATE OK');
