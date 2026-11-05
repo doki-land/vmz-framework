@@ -66,6 +66,7 @@ const where = formatDiagnostic(
     },
 );
 assert.match(where, /^error\[test\.code\]: boom\n  --> demo\.vmz:2:1\n/);
-assert.match(where, /\n2 \| 中文\n2 \| \^/);
+// rustc style: the caret row repeats only the gutter (`  | `), never the line number.
+assert.match(where, /\n2 \| 中文\n  \| \^/);
 
 console.log('SPAN-CONTEXT-CONVERSION GATE OK');
