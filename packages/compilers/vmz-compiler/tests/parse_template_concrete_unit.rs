@@ -163,7 +163,7 @@ fn comment_is_dropped_from_concrete_and_ir() {
 }
 
 #[test]
-fn v_model_concrete_and_legacy_ir_lower() {
+fn v_model_on_native_input_lowers_to_dom_value() {
     let src = r#"<input v-model="query" />"#;
     let concrete = parse_template_concrete_body_primary(src).unwrap();
     assert!(matches!(
@@ -180,21 +180,35 @@ fn v_model_concrete_and_legacy_ir_lower() {
     let ir = parse_template(src).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, .. } => {
-            assert!(attrs.iter().any(|a| a.name == "modelValue"));
-            assert!(attrs.iter().any(|a| a.name == "@update:modelValue"));
+            assert!(attrs.iter().any(|a| a.name == "value"));
+            assert!(attrs.iter().any(|a| a.name == "@input"));
+            assert!(!attrs.iter().any(|a| a.name == "modelValue"));
         }
         other => panic!("expected Element, got {other:?}"),
     }
 }
 
-/// Freeze gate: `v-model` must lower via Model plan, not a TemplateAttr string special name.
+#[test]
+fn v_model_on_component_keeps_prop_contract() {
+    let ir = parse_template(r#"<Widget v-model="q" />"#).unwrap();
+    match &ir.roots[0] {
+        TemplateNode::Element { attrs, .. } => {
+            assert!(attrs.iter().any(|a| a.name == "modelValue"));
+            assert!(attrs.iter().any(|a| a.name == "@update:modelValue"));
+            assert!(!attrs.iter().any(|a| a.name == "value"));
+        }
+        other => panic!("expected Element, got {other:?}"),
+    }
+}
+
+/// Freeze gate: `v-model` never survives as a raw attr name.
 #[test]
 fn template_attr_has_no_raw_v_model_string_name() {
     let ir = parse_template(r#"<input v-model="q" />"#).unwrap();
     match &ir.roots[0] {
         TemplateNode::Element { attrs, .. } => {
             assert!(!attrs.iter().any(|a| a.name == "v-model" || a.name.starts_with("v-model:")));
-            assert!(attrs.iter().any(|a| a.name == "modelValue"));
+            assert!(attrs.iter().any(|a| a.name == "value"));
         }
         other => panic!("expected Element, got {other:?}"),
     }

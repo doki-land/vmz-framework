@@ -1,6 +1,6 @@
 //! Adapter: Concrete AST → legacy [`TemplateIr`] (emit contract unchanged).
 
-use super::template_common::TemplateParseError;
+use super::template_common::{TemplateParseError, native_model_bind};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg};
 use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 
@@ -29,7 +29,7 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
         ConcreteNode::Element { tag, attrs, children, .. } => {
             let mut ir_attrs = Vec::new();
             for attr in attrs {
-                ir_attrs.extend(lower_attr(attr)?);
+                ir_attrs.extend(lower_attr(attr, tag, attrs)?);
             }
             let mut ir_children = Vec::new();
             for child in children {
@@ -59,20 +59,45 @@ fn normalize_render_text(value: &str) -> String {
     normalized
 }
 
-fn lower_attr(attr: &ConcreteAttr) -> Result<Vec<TemplateAttr>, TemplateParseError> {
+fn lower_attr(
+    attr: &ConcreteAttr,
+    tag: &str,
+    attrs: &[ConcreteAttr],
+) -> Result<Vec<TemplateAttr>, TemplateParseError> {
     match attr {
         ConcreteAttr::Static { name, value, .. } => Ok(vec![TemplateAttr {
             name: name.clone(),
             value: AttrValue::Static(value.clone()),
             ..Default::default()
         }]),
-        ConcreteAttr::Directive { dir, span } => lower_directive(dir, span.start as usize),
+        ConcreteAttr::Directive { dir, span } => {
+            lower_directive(dir, span.start as usize, tag, attrs)
+        }
     }
+}
+
+fn static_attr_value<'a>(attrs: &'a [ConcreteAttr], name: &str) -> Option<&'a str> {
+    attrs.iter().find_map(|a| match a {
+        ConcreteAttr::Static { name: n, value, .. } if n == name => Some(value.as_str()),
+        _ => None,
+    })
+}
+
+fn bound_attr_expr<'a>(attrs: &'a [ConcreteAttr], name: &str) -> Option<&'a str> {
+    attrs.iter().find_map(|a| match a {
+        ConcreteAttr::Directive {
+            dir: Directive::Bind { arg: DirectiveArg::Static(n), expr, .. },
+            ..
+        } if n == name => Some(expr.as_str()),
+        _ => None,
+    })
 }
 
 fn lower_directive(
     dir: &Directive,
     offset: usize,
+    tag: &str,
+    attrs: &[ConcreteAttr],
 ) -> Result<Vec<TemplateAttr>, TemplateParseError> {
     match dir {
         Directive::If { test } => Ok(vec![TemplateAttr {
@@ -184,6 +209,31 @@ fn lower_directive(
             ..Default::default()
         }]),
         Directive::Model { arg, expr, modifiers } => {
+            // Native form elements bind the DOM `value` / `checked` prop and a
+            // native write-back event. Only component tags keep the Vue 3
+            // `:modelValue` + `@update:modelValue` contract.
+            if let Some(bind) = native_model_bind(
+                tag,
+                arg.as_deref(),
+                expr,
+                modifiers,
+                static_attr_value(attrs, "type"),
+                bound_attr_expr(attrs, "value"),
+                static_attr_value(attrs, "value"),
+            ) {
+                return Ok(vec![
+                    TemplateAttr {
+                        name: bind.prop.into(),
+                        value: AttrValue::Interp(bind.prop_expr),
+                        ..Default::default()
+                    },
+                    TemplateAttr {
+                        name: format!("@{}", bind.event),
+                        value: AttrValue::Interp(bind.handler),
+                        ..Default::default()
+                    },
+                ]);
+            }
             // Vue 3 contract: v-model → :modelValue + @update:modelValue;
             // v-model:arg → :arg + @update:arg.
             let prop = arg.clone().unwrap_or_else(|| "modelValue".into());

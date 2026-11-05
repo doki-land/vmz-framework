@@ -181,6 +181,74 @@ export default class PanelGrid {
 }
 
 #[test]
+fn v_model_on_native_elements_emits_dom_value_bindings() {
+    let src = r#"
+export default class NoteForm {
+  msg = "hello";
+  agree = false;
+  kind = "a";
+  tags = "one";
+}
+"#;
+    let cases: [(&str, &[&str]); 5] = [
+        (
+            r#"<div><textarea v-model="msg"></textarea></div>"#,
+            &[
+                r#"api.specFieldAttr(this, 0, "msg", e1, "value")"#,
+                r#"api.on(e1, "input", $event => ((this.msg) = $event.target.value))"#,
+            ],
+        ),
+        (
+            r#"<div><input v-model.trim="msg" /></div>"#,
+            &[r#"((this.msg) = $event.target.value.trim())"#],
+        ),
+        (
+            r#"<div><input type="checkbox" v-model="agree" /></div>"#,
+            &[
+                r#"api.specFieldAttr(this, 0, "agree", e1, "checked")"#,
+                r#"((this.agree) = $event.target.checked)"#,
+            ],
+        ),
+        (
+            r#"<div><input type="radio" value="a" v-model="kind" /></div>"#,
+            &[r#""checked""#, r#"(this.kind) === ("a")"#, r#"((this.kind) = ("a"))"#],
+        ),
+        (
+            r#"<div><select v-model="tags"><option>one</option></select></div>"#,
+            &[r#""change""#, r#"((this.tags) = $event.target.value)"#],
+        ),
+    ];
+    for (tpl_src, needles) in cases {
+        let client = analyze_script(ScriptKind::Client, src);
+        let tpl = parse_template(tpl_src).unwrap();
+        let program = build_program_module("t.vmz", &client.decl, &tpl);
+        assert!(is_direct_eligible(&program.units[0].view), "{tpl_src}");
+        let js = emit_client_js(src, &client, &tpl, None).unwrap();
+        for needle in needles {
+            assert!(js.contains(needle), "{tpl_src} must emit {needle}\n{js}");
+        }
+        assert!(!js.contains("modelValue"), "{tpl_src} must not use the prop contract\n{js}");
+    }
+}
+
+#[test]
+fn v_model_on_component_emits_prop_and_update_event() {
+    let src = r#"
+export default class NoteForm {
+  msg = "hello";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div><Widget v-model="msg" /></div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains(r#"{"modelValue":this.msg}"#), "{js}");
+    assert!(js.contains(r#"onComponentEvent(c1, "update:modelValue""#), "{js}");
+    assert!(!js.contains(r#""value", e1"#), "{js}");
+}
+
+#[test]
 fn v_once_region_emits_create_time_writes_without_any_subscription() {
     let src = r#"
 export default class OnceDemo {

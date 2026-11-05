@@ -65,6 +65,102 @@ impl fmt::Display for TemplateParseError {
 
 impl std::error::Error for TemplateParseError {}
 
+/// `v-model` lowered to DOM semantics for a native form element.
+///
+/// Vue splits native models by element kind (`vModelText`, `vModelSelect`,
+/// `vModelCheckbox`, `vModelRadio`); a native model never travels through
+/// `modelValue` / `update:modelValue`, which only binds component props.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NativeModelBind {
+    /// DOM prop carrying the model value (`value` or `checked`).
+    pub prop: &'static str,
+    /// Expression bound to [`Self::prop`].
+    pub prop_expr: String,
+    /// Native event that writes the model back.
+    pub event: &'static str,
+    /// Handler expression; `$event` is the DOM event.
+    pub handler: String,
+}
+
+fn js_string_literal(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for c in value.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// Lower `v-model` on `<input>` / `<textarea>` / `<select>` into a DOM prop
+/// binding plus a native write-back handler.
+///
+/// Returns `None` for component tags and for `v-model:arg`, which keep the
+/// `modelValue` / `update:modelValue` component contract.
+pub(crate) fn native_model_bind(
+    tag: &str,
+    arg: Option<&str>,
+    expr: &str,
+    modifiers: &[String],
+    input_type: Option<&str>,
+    value_bind: Option<&str>,
+    value_static: Option<&str>,
+) -> Option<NativeModelBind> {
+    if arg.is_some() || !matches!(tag, "input" | "textarea" | "select") {
+        return None;
+    }
+    let lazy = modifiers.iter().any(|m| m == "lazy");
+    let trim = modifiers.iter().any(|m| m == "trim");
+    let number = modifiers.iter().any(|m| m == "number");
+    let text_value = match (trim, number) {
+        (true, true) => "$event.target.value.trim()".to_string(),
+        (false, true) => "Number($event.target.value)".to_string(),
+        (true, false) => "$event.target.value.trim()".to_string(),
+        (false, false) => "$event.target.value".to_string(),
+    };
+    let text_event = if lazy { "change" } else { "input" };
+    let kind = input_type.map(|t| t.to_ascii_lowercase());
+    match (tag, kind.as_deref()) {
+        ("input", Some("checkbox")) => Some(NativeModelBind {
+            prop: "checked",
+            prop_expr: expr.to_string(),
+            event: "change",
+            handler: format!("$event => (({expr}) = $event.target.checked)"),
+        }),
+        ("input", Some("radio")) => {
+            let value = value_bind
+                .map(str::to_string)
+                .or_else(|| value_static.map(js_string_literal))
+                .unwrap_or_else(|| "\"on\"".into());
+            Some(NativeModelBind {
+                prop: "checked",
+                prop_expr: format!("({expr}) === ({value})"),
+                event: "change",
+                handler: format!("$event => (({expr}) = ({value}))"),
+            })
+        }
+        ("select", _) => Some(NativeModelBind {
+            prop: "value",
+            prop_expr: expr.to_string(),
+            event: "change",
+            handler: format!("$event => (({expr}) = {text_value})"),
+        }),
+        _ => Some(NativeModelBind {
+            prop: "value",
+            prop_expr: expr.to_string(),
+            event: text_event,
+            handler: format!("$event => (({expr}) = {text_value})"),
+        }),
+    }
+}
+
 /// Decode HTML character references in template text / static attrs.
 pub fn decode_html_entities(input: &str) -> String {
     if !input.contains('&') {

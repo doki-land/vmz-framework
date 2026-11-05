@@ -14,6 +14,7 @@ use vmz_types::{
 };
 
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_ctx};
+use crate::parse::template_common::native_model_bind;
 use crate::parse::template_const::{fold_const_expr, fold_if_chain};
 use crate::template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, SemanticIr,
@@ -371,7 +372,16 @@ fn walk_semantic_nodes(
             }
             SemanticNode::SlotOutlet { children, props, .. } => {
                 for p in props {
-                    walk_semantic_prop_bindings(p, "slot", fields, scope, each_frames, b, region);
+                    walk_semantic_prop_bindings(
+                        p,
+                        "slot",
+                        props,
+                        fields,
+                        scope,
+                        each_frames,
+                        b,
+                        region,
+                    );
                 }
                 walk_semantic_nodes(children, fields, scope, each_frames, b, region);
             }
@@ -561,15 +571,32 @@ fn walk_semantic_element(
     };
 
     for p in props {
-        walk_semantic_prop_bindings(p, tag, fields, scope, each_frames, b, region);
+        walk_semantic_prop_bindings(p, tag, props, fields, scope, each_frames, b, region);
     }
 
     walk_semantic_nodes(children, fields, scope, each_frames, b, region);
 }
 
+fn semantic_static_value<'a>(props: &'a [SemanticProp], name: &str) -> Option<&'a str> {
+    props.iter().find_map(|p| match p {
+        SemanticProp::Static { name: n, value, .. } if n == name => Some(value.as_str()),
+        _ => None,
+    })
+}
+
+fn semantic_bound_expr<'a>(props: &'a [SemanticProp], name: &str) -> Option<&'a str> {
+    props.iter().find_map(|p| match p {
+        SemanticProp::Bind { arg: DirectiveArg::Static(n), expr, .. } if n == name => {
+            Some(expr.as_str())
+        }
+        _ => None,
+    })
+}
+
 fn walk_semantic_prop_bindings(
     p: &SemanticProp,
     tag: &str,
+    props: &[SemanticProp],
     fields: &[String],
     scope: &[String],
     each_frames: &[EachFrame],
@@ -615,7 +642,41 @@ fn walk_semantic_prop_bindings(
             let eid = b.intern_expr(body);
             b.add_binding(BindingKind::Event, reads, region, Some(eid), Some("v-on".into()));
         }
-        SemanticProp::Model { arg, expr, .. } => {
+        SemanticProp::Model { arg, expr, modifiers, .. } => {
+            // Native form elements bind DOM `value` / `checked` and a native
+            // write-back event, matching the emit contract. Component tags keep
+            // the `modelValue` / `update:modelValue` contract.
+            if let Some(bind) = native_model_bind(
+                tag,
+                arg.as_deref(),
+                expr,
+                modifiers,
+                semantic_static_value(props, "type"),
+                semantic_bound_expr(props, "value"),
+                semantic_static_value(props, "value"),
+            ) {
+                add_expr_binding(
+                    &bind.prop_expr,
+                    BindingKind::Attr,
+                    Some(bind.prop.into()),
+                    fields,
+                    scope,
+                    each_frames,
+                    b,
+                    region,
+                );
+                let body = sanitize(&bind.handler);
+                let reads = expr_to_paths(b, &body, fields, scope, each_frames);
+                let eid = b.intern_expr(body);
+                b.add_binding(
+                    BindingKind::Event,
+                    reads,
+                    region,
+                    Some(eid),
+                    Some(format!("@{}", bind.event)),
+                );
+                return;
+            }
             let prop = arg.clone().unwrap_or_else(|| "modelValue".into());
             add_expr_binding(
                 expr,
