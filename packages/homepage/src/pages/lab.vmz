@@ -179,6 +179,9 @@ export default class LabIndexPage {
     groups = [];
     _unwatchLocale = null;
 
+    /** SSR and hydration must start from the same localized catalog. */
+    copyReady = this.applyLocaleCopy(readLocaleId());
+
     onMount() {
         this.applyLocaleCopy();
         this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));

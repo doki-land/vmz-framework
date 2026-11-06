@@ -196,6 +196,9 @@ export default class ProductPage {
     tocItems = [];
     _unwatchLocale = null;
 
+    /** SSR and hydration must start from the same localized copy. */
+    copyReady = this.applyLocaleCopy(readLocaleId());
+
     onMount() {
         this.applyLocaleCopy(readLocaleId());
         this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
