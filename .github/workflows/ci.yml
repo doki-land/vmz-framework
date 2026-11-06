@@ -10,8 +10,8 @@ on:
 #   build-runtimes — sole cargo/napi + JS runtime dist artifact
 #   fmt            — `pnpm fmt:check` after artifact restore (native must be built first)
 #   build-test     — pack smoke already done upstream; unit + examples
-#   ui-browser     — ui-automation + browser-production (Chrome)
-#   runtime-gates  — Slim + runtime-quality-baseline + authoring/hydration gates
+#   ui-browser     — ui-automation + direct host box + radio checkedness + chart hydration + browser-production (Chrome)
+#   runtime-gates  — Slim + runtime-quality-baseline + authoring/hydration gates + dev pack input skip
 # Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
 # After artifact restore, each consumer runs `pnpm verify -- skip-native-pre` first.
 

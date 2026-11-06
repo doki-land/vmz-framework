@@ -36,8 +36,16 @@ const PRESETS = {
         'ssr-keyed-non-kernel',
         'v-pre',
         'v-once',
+        'dev-pack-input-skip',
     ],
-    'ui-browser': ['--keep-going', 'ui-automation', 'browser-production'],
+    'ui-browser': [
+        '--keep-going',
+        'ui-automation',
+        'ui-direct-host-box',
+        'radio-checked-dirty',
+        'chart-hydration-stability',
+        'browser-production',
+    ],
 };
 
 const id = process.argv[2];

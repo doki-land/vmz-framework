@@ -84,6 +84,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: '0.1.24: outputRevision stable without dirty input',
         pre: ['build:runtimes'],
     },
+    'dev-pack-input-skip': {
+        file: 'tooling/dev-pack-input-skip.ts',
+        description: 'Dev rebuild skips pack when pack inputs are unchanged and repacks on change',
+        pre: ['build:runtimes'],
+    },
     'dev-invalidation-closure': {
         file: 'tooling/dev-invalidation-closure.ts',
         description: '0.1.24: HMR plan includes importer page on component edit',
@@ -371,6 +376,16 @@ export const CHECKS: Record<string, CheckEntry> = {
     'ui-direct-host-box': {
         file: 'ui/ui-direct-host-box.ts',
         description: 'Direct chip hosts display:contents (ui-direct-host-box) + Notification stays block',
+    },
+    'radio-checked-dirty': {
+        file: 'ui/radio-checked-dirty.ts',
+        description: 'Radio model update after user input moves checkedness through IDL',
+        pre: ['build:runtimes'],
+    },
+    'chart-hydration-stability': {
+        file: 'ui/chart-hydration-stability.ts',
+        description: '`/charts` SSR SVG subtree is reused by hydration instead of rebuilt',
+        pre: ['build:runtimes'],
     },
     'component-event-wire': {
         file: 'ui/component-event-wire.ts',
@@ -870,9 +885,12 @@ export const CHECK_ALL = [
     'dev-rebuild-convergence',
     'dev-invalidation-closure',
     'dev-output-write-suppression',
+    'dev-pack-input-skip',
     'style-theme',
     'ui-automation',
     'ui-direct-host-box',
+    'radio-checked-dirty',
+    'chart-hydration-stability',
     'component-event-wire',
     'highlighter-wasm',
     'highlighter-ce-binding',

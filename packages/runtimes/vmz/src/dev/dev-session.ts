@@ -80,7 +80,7 @@ function cycleFailure(report: ConfigCycleReport): Error {
 const PACK_INPUT_IGNORED_DIRS = new Set(['_vmz', 'node_modules', '.cache', '.git']);
 const PACK_INPUT_IGNORED_NAMES = /^\.vmz-dev-host\.pid$/;
 
-interface PackManifestView {
+export interface PackManifestView {
     chunks?: Array<{ fileName?: string; sourceMap?: string; modules?: unknown[] }>;
     styles?: Array<{ fileName?: string; sourcePaths?: unknown[] }>;
     assets?: Array<{ fileName?: string }>;
@@ -89,7 +89,7 @@ interface PackManifestView {
     unitChunks?: Array<{ fileName?: string | null }>;
 }
 
-interface PackInputSnapshot {
+export interface PackInputSnapshot {
     files: Array<{ path: string; digest: string }>;
     listings: Array<{ dir: string; names: string[] }>;
     deploymentOrigins: string;
@@ -181,7 +181,7 @@ function deploymentOriginsDigest(outDir: string): string | null {
 }
 
 /** 记下决定 pack 产物的全部输入；任何一项取不到就放弃快照（等同于永远重打包）。 */
-function capturePackInputSnapshot(manifest: PackManifestView, outDir: string, project: string): PackInputSnapshot | null {
+export function capturePackInputSnapshot(manifest: PackManifestView, outDir: string, project: string): PackInputSnapshot | null {
     const inputs = packInputFiles(manifest);
     if (!inputs) return null;
     const files: Array<{ path: string; digest: string }> = [];
@@ -216,7 +216,7 @@ function capturePackInputSnapshot(manifest: PackManifestView, outDir: string, pr
 }
 
 /** 返回 null 表示全部输入字节全等；否则返回第一个变化原因。 */
-function packInputsChangedReason(snapshot: PackInputSnapshot, outDir: string): string | null {
+export function packInputsChangedReason(snapshot: PackInputSnapshot, outDir: string): string | null {
     const lockfileDigest = readFileDigest(snapshot.lockfile.path);
     if (!lockfileDigest) return `lockfile unreadable: ${snapshot.lockfile.path}`;
     if (lockfileDigest !== snapshot.lockfile.digest) return 'lockfile changed';
@@ -243,7 +243,7 @@ function packInputsChangedReason(snapshot: PackInputSnapshot, outDir: string): s
 }
 
 /** 复用上次 manifest 前确认 entry/chunk/island 查表指向的文件仍在盘上；缺任何一个就退回真实 pack。 */
-function missingPackOutput(manifest: PackManifestView, outDir: string): string | null {
+export function missingPackOutput(manifest: PackManifestView, outDir: string): string | null {
     const packDir = path.join(outDir, '_vmz', 'pack');
     if (!existsSync(path.join(outDir, '_vmz', 'pack-manifest.json'))) return '_vmz/pack-manifest.json';
     const names = new Set<string>();
