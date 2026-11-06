@@ -224,6 +224,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Keyed each hydration reclaims SSR rows by `data-vmz-key`',
         pre: ['build:runtimes'],
     },
+    'ssr-route-slot-layout': {
+        file: 'runtime/ssr-route-slot-layout.ts',
+        description: 'Pass-through `<slot/>` layouts hydrate the SSR route in place instead of wiping it',
+        pre: ['build:runtimes'],
+    },
     'ssr-keyed-non-kernel': {
         file: 'runtime/ssr-keyed-non-kernel.ts',
         description: 'Keyed component and `v-once` rows carry `data-vmz-key` and reclaim SSR nodes after reorder',

@@ -27,6 +27,29 @@ import { createUnknownComponentElement, markUnknownComponentHost, serializeUnkno
 import { runDirectResume } from './adopt.js';
 import { resumeIslands } from './resume.js';
 
+/**
+ * A layout whose whole template is a default `<slot/>` contributes no DOM of its
+ * own: SSR renders the page straight into the route container. Mounting such a
+ * layout would `replaceChildren()` the SSR tree, so the page hydrate that follows
+ * always sees an empty host and recreates every node (verified on the homepage and
+ * charts route: 0 of 336 / 0 of 18743 SSR nodes were reused).
+ *
+ * Only trusted for layouts with no state, props, or lifecycle, so dropping the
+ * instance cannot change behavior — a pass-through layout has nothing to run.
+ */
+function isTransparentSlotLayout(Layout) {
+    const plan = Layout && Layout.__vmzPlan;
+    if (!plan || !Array.isArray(plan.root_ids) || !Array.isArray(plan.nodes) || plan.root_ids.length !== 1) {
+        return false;
+    }
+    const root = plan.nodes.find((n) => n && n.id === plan.root_ids[0]);
+    if (!root || root.kind !== 'slot') return false;
+    if (Array.isArray(Layout.__vmzState) && Layout.__vmzState.length) return false;
+    if (Array.isArray(Layout.__vmzProps) && Layout.__vmzProps.length) return false;
+    const proto = Layout.prototype;
+    return !(proto && (typeof proto.onMount === 'function' || typeof proto.onDestroy === 'function'));
+}
+
 export async function hydrateRoute(Page, container, props = {}, layoutCtors = [], opts = {}) {
     if (typeof document === 'undefined') {
         throw new Error('vmz:dom hydrateRoute() requires a document (browser)');
@@ -41,6 +64,16 @@ export async function hydrateRoute(Page, container, props = {}, layoutCtors = []
     const layoutInsts = [];
     let host = container;
     const ctors = Array.isArray(layoutCtors) ? layoutCtors.filter(Boolean) : [];
+
+    // Pass-through layout chain: hydrate the page into the SSR container directly so
+    // the rendered subtree becomes the adopt pool instead of being wiped by mount().
+    if (ctors.length && ctors.every(isTransparentSlotLayout) && hasMeaningfulChild(container)) {
+        const pageInst = await hydrate(Page, container, props, opts);
+        container.__vmzPageHost = container;
+        container.__vmzLayoutInsts = [];
+        container.__vmzInst = pageInst;
+        return pageInst;
+    }
 
     for (const Layout of ctors) {
         const inst = await mount(Layout, host, {});
