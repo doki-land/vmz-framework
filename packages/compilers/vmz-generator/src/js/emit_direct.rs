@@ -1578,6 +1578,14 @@ fn project_slot_stmt(
     }
 }
 
+/// `v-bind:[expr]` — Vue resolves the attribute name from the expression at patch
+/// time. Keeping `[expr]` as the literal attribute name writes a bogus attribute
+/// and never touches the intended one.
+fn dynamic_arg_inner(name: &str) -> Option<&str> {
+    let inner = name.strip_prefix('[')?.strip_suffix(']')?.trim();
+    (!inner.is_empty()).then_some(inner)
+}
+
 fn emit_bind_attr(
     expr: &str,
     binding: Option<BindingId>,
@@ -1596,6 +1604,57 @@ fn emit_bind_attr(
     let e = sanitize_interp(expr);
     let name = if attr_name == "className" { "class" } else { attr_name };
     let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    if let Some(dyn_expr) = dynamic_arg_inner(name) {
+        let name_body = bind_template_expr(dyn_expr, fields, methods, scope, aliases);
+        if once {
+            stmts.push(format!(
+                "{{ var __v, __n; try {{ __v = {body}; }} catch {{ __v = null; }} try {{ __n = {name_body}; }} catch {{ __n = null; }} if (__n != null) api.attr({el}, String(__n), __v); }}"
+            ));
+            return;
+        }
+        let (binding_id, mut deps, _cf_js) =
+            bind_payload(&e, binding, fields, methods, scope, aliases, ir);
+        for d in collect_template_deps(dyn_expr, fields, scope) {
+            if !deps.iter().any(|x| x == &d) {
+                deps.push(d);
+            }
+        }
+        let deps_js = deps_js(&with_memo_deps(deps, memo));
+        let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+        let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+        let patch_name = format!(
+            "__patchAttr{}",
+            binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into())
+        );
+        stmts.push(format!(
+            "(function() {{
+  var __prevName = null;
+  function {patch_name}() {{
+    {memo_gate}var __v, __n;
+    try {{ __v = {body}; }} catch {{ __v = null; }}
+    try {{ __n = {name_body}; }} catch {{ __n = null; }}
+    if (__n == null) {{
+      if (__prevName !== null) api.attr({el}, __prevName, null);
+      __prevName = null;
+      return;
+    }}
+    __n = String(__n);
+    if (__prevName !== null && __prevName !== __n) api.attr({el}, __prevName, null);
+    api.attr({el}, __n, __v);
+    __prevName = __n;
+  }}
+  api.trackPatch(this, [{deps_js}], {patch_name}, {id_arg});
+}}).call(this);",
+            patch_name = patch_name,
+            memo_gate = memo_gate,
+            body = body,
+            name_body = name_body,
+            el = el,
+            deps_js = deps_js,
+            id_arg = id_arg
+        ));
+        return;
+    }
     // `v-once`: evaluate at create time only, never register a patch.
     if once {
         stmts.push(format!(

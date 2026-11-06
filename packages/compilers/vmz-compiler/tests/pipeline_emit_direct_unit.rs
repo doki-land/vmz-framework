@@ -248,6 +248,50 @@ export default class NoteForm {
     assert!(!js.contains(r#""value", e1"#), "{js}");
 }
 
+/// Vue resolves `v-bind:[expr]` at patch time. Keeping `[expr]` as the literal
+/// attribute name writes a bogus attribute (`[keyName]`) and never touches the
+/// intended one, so the earlier name must also be retired when it changes.
+#[test]
+fn dynamic_attribute_argument_resolves_name_at_patch_time() {
+    let src = r#"
+export default class DynamicAttr {
+  keyName = "title";
+  val = "hello";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div :[keyName]="val">x</div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(!js.contains(r#""[keyName]""#), "literal dynamic arg reached emit: {js}");
+    assert!(
+        js.contains("api.attr(e0, __n, __v)") && js.contains("api.attr(e0, __prevName, null)"),
+        "resolved name must be written and the previous one retired: {js}"
+    );
+    assert!(js.contains(r#"["val", "keyName"]"#), "name and value deps must both subscribe: {js}");
+}
+
+#[test]
+fn dynamic_attribute_argument_under_v_once_writes_once_with_resolved_name() {
+    let src = r#"
+export default class DynamicAttrOnce {
+  keyName = "title";
+  val = "hello";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<div v-once :[keyName]="val">x</div>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(!js.contains("api.trackPatch("), "v-once must not subscribe: {js}");
+    assert!(
+        js.contains("if (__n != null) api.attr(e0, String(__n), __v)"),
+        "v-once dynamic arg must resolve before writing: {js}"
+    );
+}
+
 #[test]
 fn v_once_region_emits_create_time_writes_without_any_subscription() {
     let src = r#"
