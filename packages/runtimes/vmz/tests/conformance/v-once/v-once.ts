@@ -142,7 +142,11 @@ function onceRegionSignature(html: string): string {
         if (node.nodeType === 3) return `T${JSON.stringify(node.textContent)}`;
         if (node.nodeType !== 1) return '';
         const attrs: Array<[string, string]> = [];
-        for (const a of node.attributes) attrs.push([a.name, a.value]);
+        for (const a of node.attributes) {
+            // SSR 传输摘要只存在于服务端产物，不属于客户端 DOM 结构合同。
+            if (a.name === 'data-vmz-html-hash') continue;
+            attrs.push([a.name, a.value]);
+        }
         attrs.sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
         const kids = Array.from(node.childNodes as any[], canonical).filter(Boolean);
         return `E${node.tagName.toLowerCase()}${JSON.stringify(attrs)}[${kids.join(',')}]`;
@@ -156,7 +160,17 @@ function assertOnceRegion(html: string, stage: string): void {
     // 创建时写入的属性 / 插值 / v-html / 后代子树 / 区域内 v-if
     if (!html.includes('title="calm"')) fail(`${stage}: once attr not written at create: ${html}`);
     if (!html.includes('label: first')) fail(`${stage}: once interp missing: ${html}`);
-    if (!html.includes('<b>first</b>')) fail(`${stage}: once v-html missing: ${html}`);
+    // `v-html` 的真实产物带 SSR 内容摘要属性，按 DOM 结果判定而不是猜标签原串。
+    const onceRegion = parseHTML(`<!DOCTYPE html><html><body>${html}</body></html>`).window.document.querySelector(
+        '[data-fixture="once-region"]',
+    );
+    const onceHtml = onceRegion?.querySelector('b');
+    if (!onceHtml || onceHtml.textContent !== 'first') {
+        fail(`${stage}: once v-html missing or wrong content: ${onceRegion?.innerHTML ?? html}`);
+    }
+    if (stage === 'SSR' && !onceHtml.hasAttribute('data-vmz-html-hash')) {
+        fail(`${stage}: once v-html missing data-vmz-html-hash: ${onceRegion.innerHTML}`);
+    }
     if (!html.includes('data-fixture="once-nested"')) fail(`${stage}: once nested subtree missing: ${html}`);
     if (!html.includes('<i>deep</i>')) fail(`${stage}: once deep descendant missing: ${html}`);
     if (!html.includes('data-fixture="once-if"')) fail(`${stage}: once v-if branch missing: ${html}`);
