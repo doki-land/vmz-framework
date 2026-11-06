@@ -1,4 +1,5 @@
 import { mergeClassParts, mergeStyleParts } from '../../shared/dom-attr-normalize.js';
+import { HTML_HASH_ATTR, htmlDigest } from '../../shared/html-digest.js';
 import type { BindingId, DirectInstance, PatchFn } from '../direct-api.types.js';
 import { applyDirectHostBox } from '../direct-host-box.js';
 import type {
@@ -219,15 +220,21 @@ export const directApi = {
         return document.createTextNode(value == null ? '' : String(value));
     },
     /**
-     * Emitted `v-html` guard. Resume parks the SSR children of a reclaimed element,
-     * so the live `innerHTML` is still empty when the first patch runs. Ask adopt to
-     * move them back and compare before writing: an equal markup keeps the SSR
-     * subtree instead of re-parsing it. SSR has no adopt context and falls through.
+     * Emitted `v-html` write. Resume parks the SSR children of a reclaimed host,
+     * so the live `innerHTML` is still empty when the first patch runs. SSR stamps
+     * `HTML_HASH_ATTR` with the digest of the exact payload string it wrote: a
+     * matching digest proves the parked subtree is the same payload, so adopt
+     * moves it back and no text is ever re-parsed. A different digest writes the
+     * new payload and refreshes the marker for later identical runs.
      */
-    reclaimHtml(el, value) {
+    html(el, value) {
+        const next = value == null ? '' : String(value);
+        const digest = htmlDigest(next);
         const adopt = directApi._resumeAdopt;
-        if (!adopt || typeof adopt.reclaimHtml !== 'function') return false;
-        return adopt.reclaimHtml(el as Element, value == null ? '' : String(value));
+        if (adopt && typeof adopt.reclaimHtml === 'function' && adopt.reclaimHtml(el as Element, digest)) return;
+        const marker = typeof el.getAttribute === 'function' ? el.getAttribute(HTML_HASH_ATTR) : null;
+        if (el.innerHTML !== next) el.innerHTML = next;
+        if (marker != null) (el as Element).setAttribute(HTML_HASH_ATTR, digest);
     },
 
     nsScopeDepth() {

@@ -23,6 +23,7 @@ import {
     stripFns,
 } from '../dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../unknown-component.js';
+import { HTML_HASH_ATTR } from '../../shared/html-digest.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -242,17 +243,25 @@ function createResumeAdopt(pool, rootEl) {
 
     /**
      * `v-html` on a reclaimed element. `markElement` parked its SSR children, so
-     * the live element reads empty and a plain `innerHTML` compare always misses,
-     * re-parsing the whole payload. Move the parked children back (an O(children)
-     * DOM move, no parse) and compare the live markup: equal means the parked
-     * subtree already *is* the rendered payload and must stay.
+     * the live element reads empty. SSR stamped the digest of the exact payload
+     * string it wrote on the host (`HTML_HASH_ATTR`), so compare that marker with
+     * the digest of the string this create would write: equal means the parked
+     * subtree already *is* that payload, and moving it back keeps every SSR node.
+     * A different digest drops the parked payload so the normal write replaces it.
      */
-    const reclaimHtml = (el, value) => {
+    const reclaimHtml = (el, digest) => {
         if (!used.has(el)) return false;
         const childPool = el.__vmzResumePool;
-        if (!childPool) return false;
-        while (childPool.firstChild) el.appendChild(childPool.firstChild);
-        return String(el.innerHTML) === value;
+        const stamp = String(el.getAttribute(HTML_HASH_ATTR) || '');
+        if (stamp !== digest) {
+            // A different payload replaces this host, so parked SSR children can
+            // never be adopted afterwards. Drop them now instead of leaving a
+            // stale pool for a later identical patch to resurrect.
+            if (childPool) while (childPool.firstChild) childPool.removeChild(childPool.firstChild);
+            return false;
+        }
+        if (childPool) while (childPool.firstChild) el.appendChild(childPool.firstChild);
+        return true;
     };
 
     return {

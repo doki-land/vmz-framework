@@ -23,5 +23,10 @@ class RawHtml {
     }
 }
 
-assert.equal(await renderToString(RawHtml), '<div class="raw-html"><strong>Rendered</strong></div>');
+// The payload digest marker rides on the host so resume can keep this exact
+// subtree, and its `[0-9a-z-]` alphabet must survive serialization unescaped.
+assert.match(
+    await renderToString(RawHtml),
+    /^<div class="raw-html" data-vmz-html-hash="[0-9a-z-]+"><strong>Rendered<\/strong><\/div>$/,
+);
 console.log('ssr-direct-html ok');

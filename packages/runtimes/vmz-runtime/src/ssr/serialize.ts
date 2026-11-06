@@ -24,6 +24,7 @@ import {
 } from '../browser/dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../browser/unknown-component.js';
 import { splitStyleDeclarations } from '../shared/dom-attr-normalize.js';
+import { HTML_HASH_ATTR, htmlDigest } from '../shared/html-digest.js';
 import { _ssrDocumentLastError, ensureSsrDocument } from './document.js';
 import { awaitSsrOnMount, ssrComponentName, ssrOnMountContext } from './onmount.js';
 
@@ -166,11 +167,19 @@ function serializeOpenTag(node) {
         // selected option, so the raw attribute must not be emitted.
         if (k === 'value' && (lowerTag === 'textarea' || lowerTag === 'select')) continue;
         if (k === 'style') continue;
+        // Always replaced by the digest of the payload written below, so an
+        // author-supplied marker can never mask a different payload.
+        if (k === HTML_HASH_ATTR) continue;
         if (k === 'className') attrs += ` class="${escapeHtml(v)}"`;
         else attrs += ` ${k}="${escapeHtml(v)}"`;
     }
     const style = serializeStyleAttr(node);
     if (style) attrs += ` style="${escapeHtml(style)}"`;
+    // `v-html` hosts carry the digest of the exact string SSR wrote, so the
+    // client can keep the SSR subtree without DOM-serializing its payload.
+    if (node.__rawHtml != null && !node.__rawOuter) {
+        attrs += ` ${HTML_HASH_ATTR}="${escapeHtml(htmlDigest(String(node.__rawHtml)))}"`;
+    }
     return { tag, open: `<${tag}${attrs}>` };
 }
 
@@ -746,6 +755,11 @@ const serializeApi = {
         if (!el || el.__kind !== 'el') return;
         el.__rawHtml = value == null ? '' : String(value);
         el.children = [];
+    },
+    // Emitted `v-html` write. SSR always records the payload, and the open tag
+    // gains `data-vmz-html-hash` from that exact string at serialize time.
+    html(el, value) {
+        serializeApi.setHtml(el, value);
     },
     setText(el, value) {
         if (!el || el.__kind !== 'el') return;

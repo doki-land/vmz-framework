@@ -504,7 +504,7 @@ export default class MemoShow {
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains(".style.display ="), "v-show keeps its patch: {js}");
-    assert!(js.contains(".innerHTML ="), "v-html keeps its patch: {js}");
+    assert!(js.contains("api.html("), "v-html keeps its patch: {js}");
     // v-show 与 v-html 两个补丁都被门控，且各自持有独立快照。
     assert_eq!(js.matches("var memoSnap").count(), 2, "one snapshot per patch: {js}");
     assert_eq!(js.matches("__memoNext)) return;").count(), 2, "both patches gated: {js}");
@@ -869,8 +869,8 @@ export default class HtmlDemo {
     assert!(js.contains("api.trackPatch(this,"), "{js}");
     // Re-assigning the same string re-parses the SSR subtree that hydrate adopted.
     assert!(
-        js.contains("api.reclaimHtml") && js.contains(".innerHTML !== __s)"),
-        "v-html must ask resume to reclaim and skip an unchanged write: {js}"
+        js.contains("api.html(e0, __s)"),
+        "v-html must go through the digest-aware write: {js}"
     );
     assert!(!js.contains("api.bindHtml(this,"), "{js}");
     assert!(!js.contains("api.bindAttr(this,"), "{js}");
@@ -1442,11 +1442,11 @@ export default class HtmlPaths {
         let tpl = parse_template(tpl_src).unwrap();
         let js = emit_client_js(src, &client, &tpl, None).unwrap();
         assert!(
-            js.contains("api.reclaimHtml") && js.contains(".innerHTML !== __s)"),
-            "{tpl_src} must compare before writing: {js}"
+            js.contains("api.html(e0, __s)"),
+            "{tpl_src} must go through the digest-aware write: {js}"
         );
         assert!(
-            !js.contains("String(__v); e0.innerHTML ="),
+            !js.contains("e0.innerHTML ="),
             "{tpl_src} still writes unconditionally: {js}"
         );
     }

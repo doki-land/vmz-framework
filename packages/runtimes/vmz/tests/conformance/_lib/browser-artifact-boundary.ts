@@ -26,6 +26,7 @@ const RUNTIME_SHARED_NAMES = new Set([
     'direct-host-box.js',
     'unknown-component.js',
     'dom-attr-normalize.js',
+    'html-digest.js',
 ]);
 
 /**

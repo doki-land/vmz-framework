@@ -85,8 +85,8 @@ export type ResumeAdoptCtx = {
     scopeDepth?: () => number;
     rewindScope?: (depth: number) => void;
     beginBranchScope?: () => () => void;
-    /** Keep the parked SSR subtree when its live markup equals the new `v-html` string. */
-    reclaimHtml?: (el: Element, value: string) => boolean;
+    /** Keep the parked SSR subtree when its SSR payload digest equals `digest`. */
+    reclaimHtml?: (el: Element, digest: string) => boolean;
     _enterBalance?: number;
     inst?: DirectInstance;
 };

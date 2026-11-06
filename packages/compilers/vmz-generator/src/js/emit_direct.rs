@@ -2382,11 +2382,11 @@ fn emit_bind_html(
     let e = sanitize_interp(expr);
     let body = bind_template_expr(&e, fields, methods, scope, aliases);
     // `v-once`: write raw HTML once at create, never register a patch.
-    // Writing the equal string back would re-parse the SSR subtree that hydrate
-    // just reclaimed, so only assign when the current markup really differs.
+    // `api.html` compares the SSR payload digest before writing, so a hydrate
+    // whose SSR markup matches keeps the reclaimed subtree instead of reparsing it.
     if once {
         stmts.push(format!(
-            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} var __s = __v == null ? '' : String(__v); if (!(api.reclaimHtml && api.reclaimHtml({el}, __s)) && {el}.innerHTML !== __s) {el}.innerHTML = __s; }}"
+            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} var __s = __v == null ? '' : String(__v); api.html({el}, __s); }}"
         ));
         return;
     }
@@ -2408,7 +2408,7 @@ fn emit_bind_html(
     {memo_gate}var __raw;
     try {{ __raw = {body}; }} catch {{ __raw = null; }}
     var __s = __raw == null ? '' : String(__raw);
-    if (!(api.reclaimHtml && api.reclaimHtml({el}, __s)) && {el}.innerHTML !== __s) {el}.innerHTML = __s;
+    api.html({el}, __s);
     if (!__cf || !__cf.branches) return;
     var __next = -1;
     for (var __i = 0; __i < __cf.branches.length; __i++) {{
@@ -2442,7 +2442,7 @@ fn emit_bind_html(
         ));
     } else {
         stmts.push(format!(
-            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} var __s = __v == null ? '' : String(__v); if (!(api.reclaimHtml && api.reclaimHtml({el}, __s)) && {el}.innerHTML !== __s) {el}.innerHTML = __s; }}, {id_arg});",
+            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} var __s = __v == null ? '' : String(__v); api.html({el}, __s); }}, {id_arg});",
             deps_js = deps_js,
             memo_gate = memo_gate,
             body = body,
