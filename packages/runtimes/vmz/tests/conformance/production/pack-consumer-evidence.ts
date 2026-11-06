@@ -18,6 +18,7 @@ import path from 'node:path';
 import {
     assertManifestClosed,
     assertModulesUnique,
+    assertNestedSsrImportsResolve,
     assertReferenceIntegrity,
     loadPack,
     type LoadedPack,
@@ -73,7 +74,13 @@ const notes: string[] = [];
 
 // --- homepage: static + cdn-flavored (web-hybrid) ---------------------------
 allErrors.push(...assertSite('homepage/static', buildSite('homepage', 'packages/homepage', 'static')));
-allErrors.push(...assertSite('homepage/web-hybrid', buildSite('homepage', 'packages/homepage', 'web-hybrid')));
+const homepageWebHybrid = buildSite('homepage', 'packages/homepage', 'web-hybrid');
+allErrors.push(...assertSite('homepage/web-hybrid', homepageWebHybrid));
+if (homepageWebHybrid.status === 0) {
+    for (const line of assertNestedSsrImportsResolve(homepageWebHybrid.dist)) {
+        allErrors.push(`homepage/web-hybrid: ${line}`);
+    }
+}
 
 // --- vmz-official (sibling repo, local only) ---------------------------------
 if (!fs.existsSync(VMZ_OFFICIAL)) {

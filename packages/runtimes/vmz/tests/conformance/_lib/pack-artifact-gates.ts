@@ -288,6 +288,54 @@ export function assertModulesUnique(pack: LoadedPack): string[] {
 }
 
 /**
+ * Nested SSR delivery imports: the assembler relocates runtime copies into
+ * `ssr/`, so every relative import there must resolve inside the dist rather
+ * than through the source-tree `shared/` layout. Walk is bounded by
+ * [`SCAN_LIMITS`].
+ */
+export function assertNestedSsrImportsResolve(dist: string, subdir = 'ssr'): string[] {
+    const errors: string[] = [];
+    const dir = path.join(dist, subdir);
+    if (!fs.existsSync(dir)) return [`missing nested SSR directory \`${subdir}\``];
+    const stack: Array<{ abs: string; depth: number }> = [{ abs: dir, depth: 0 }];
+    let files = 0;
+    while (stack.length) {
+        const item = stack.pop()!;
+        if (item.depth > SCAN_LIMITS.maxDepth) {
+            errors.push(`${subdir}: directory depth exceeds scan cap`);
+            continue;
+        }
+        for (const entry of fs.readdirSync(item.abs, { withFileTypes: true })) {
+            const abs = path.join(item.abs, entry.name);
+            if (entry.isDirectory()) {
+                stack.push({ abs, depth: item.depth + 1 });
+                continue;
+            }
+            if (!entry.isFile() || !/\.(?:js|mjs)$/.test(entry.name)) continue;
+            files += 1;
+            if (files > SCAN_LIMITS.maxFiles) {
+                errors.push(`${subdir}: file count exceeds scan cap`);
+                return errors;
+            }
+            const bytes = fs.readFileSync(abs);
+            if (bytes.length > SCAN_LIMITS.maxCodeBytes) {
+                errors.push(`${path.relative(dist, abs)}: exceeds code scan cap`);
+                continue;
+            }
+            const code = bytes.toString('utf8');
+            for (const specifier of importSpecifiers(code)) {
+                if (!specifier.startsWith('.')) continue;
+                const target = path.resolve(path.dirname(abs), specifier.split(/[?#]/)[0]);
+                if (!fs.existsSync(target)) {
+                    errors.push(`${path.relative(dist, abs)}: import \`${specifier}\` resolves to missing file`);
+                }
+            }
+        }
+    }
+    return errors;
+}
+
+/**
  * Route boundaries: every expected page owns a non-entry chunk that carries
  * its compiled client module; entry chunks contain no page module and reach
  * pages only through dynamic imports.
