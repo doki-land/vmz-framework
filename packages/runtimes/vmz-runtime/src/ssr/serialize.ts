@@ -192,17 +192,21 @@ export function flattenSerializeNode(node) {
         // rowKernel SSR: full outerHTML payload (do not re-wrap).
         if (node.__rawOuter && node.__rawHtml != null) return String(node.__rawHtml);
         const { open } = serializeOpenTag(node);
-        if (node.__rawHtml != null) {
-            return isVoidTag(tag) ? `${open}${String(node.__rawHtml)}` : `${open}${String(node.__rawHtml)}</${tag}>`;
-        }
         const lowerTag = String(tag).toLowerCase();
         const control = controlValue(node, lowerTag);
+        if (node.__rawHtml != null) {
+            const lead = needsSacrificialLF(node, lowerTag, null) ? '\n' : '';
+            const raw = String(node.__rawHtml);
+            return isVoidTag(tag) ? `${open}${raw}` : `${open}${lead}${raw}</${tag}>`;
+        }
         if (lowerTag === 'textarea' && control != null) {
-            return `${open}${escapeHtml(control)}</${tag}>`;
+            const lead = needsSacrificialLF(node, lowerTag, control) ? '\n' : '';
+            return `${open}${lead}${escapeHtml(control)}</${tag}>`;
         }
         if (lowerTag === 'select' && control != null) markSelectSelection(node, control);
         const inner = (node.children || []).map(flattenSerializeNode).join('');
-        return isVoidTag(tag) ? `${open}${inner}` : `${open}${inner}</${tag}>`;
+        const lead = needsSacrificialLF(node, lowerTag, control) ? '\n' : '';
+        return isVoidTag(tag) ? `${open}${inner}` : `${open}${lead}${inner}</${tag}>`;
     }
     return '';
 }
@@ -244,12 +248,14 @@ export function* streamSerializeChunks(node) {
         yield open;
         const lowerTag = String(tag).toLowerCase();
         const control = controlValue(node, lowerTag);
+        const lead = needsSacrificialLF(node, lowerTag, control) ? '\n' : '';
         if (node.__rawHtml != null) {
-            yield String(node.__rawHtml);
+            yield lead + String(node.__rawHtml);
         } else if (lowerTag === 'textarea' && control != null) {
-            yield escapeHtml(control);
+            yield lead + escapeHtml(control);
         } else {
             if (lowerTag === 'select' && control != null) markSelectSelection(node, control);
+            if (lead) yield lead;
             for (const c of node.children || []) yield* streamSerializeChunks(c);
         }
         if (!isVoidTag(tag)) yield `</${tag}>`;
@@ -930,5 +936,41 @@ function escapeHtml(s) {
         // tokenization, so a raw `\r` would not survive the parse. Emit a character
         // reference instead: hydration then keeps the exact server value.
         .replace(/\r/g, '&#13;');
+}
+
+/** `<pre>` / `<textarea>` drop one leading LF after their start tag (HTML spec). */
+function dropsLeadingLF(tag) {
+    return tag === 'pre' || tag === 'textarea';
+}
+
+/** Does the first token inside `node` start with LF? Comments and tags do not. */
+function firstTokenStartsWithLF(node) {
+    if (node == null || node === false) return false;
+    if (typeof node === 'string') return node.startsWith('\n');
+    if (node.__kind === 'text') return String(node.value ?? '').startsWith('\n');
+    if (node.__kind === 'comment') return false;
+    if (node.__kind === 'frag') {
+        if (node.__rawHtml != null) return String(node.__rawHtml).startsWith('\n');
+        for (const c of node.children || []) {
+            if (c == null || c === false) continue;
+            return firstTokenStartsWithLF(c);
+        }
+    }
+    return false;
+}
+
+/**
+ * A value that itself starts with LF needs one sacrificial newline: the parser
+ * discards the first LF token, leaving the real one in the DOM.
+ */
+function needsSacrificialLF(node, lowerTag, control) {
+    if (!dropsLeadingLF(lowerTag)) return false;
+    if (lowerTag === 'textarea' && control != null) return String(control).startsWith('\n');
+    if (node.__rawHtml != null) return String(node.__rawHtml).startsWith('\n');
+    for (const c of node.children || []) {
+        if (c == null || c === false) continue;
+        return firstTokenStartsWithLF(c);
+    }
+    return false;
 }
 
