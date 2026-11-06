@@ -1,0 +1,37 @@
+<template>
+    <div id="emit">
+        <em>{{ state.mode }}</em>
+        <button type="button" id="emit-wire" @click="wire">wire</button>
+    </div>
+</template>
+<script client>
+type Handler = (() => unknown) | null;
+
+export default class WriteBarrierEmit {
+    _xhr: { onabort: Handler } = { onabort: null };
+    state: { handler: unknown; mode: string } = { handler: null, mode: "idle" };
+
+    wire() {
+        const resolve = (value: unknown) => value;
+        const xhr = this._xhr;
+        xhr.onabort = () =>
+            resolve({
+                aborted: true,
+                status: 0,
+                body: null,
+                error: "",
+            });
+        this.state.handler = { tag: "abort", status: 0 };
+        this.state.mode = this.state.mode === "idle" ? "on" : "off";
+        xhrSend(xhr, resolve);
+    }
+}
+
+function xhrSend(xhr: { onabort: Handler }, resolve: (value: unknown) => void) {
+    xhr.onabort = () =>
+        resolve({
+            aborted: true,
+            status: 0,
+        });
+}
+</script>

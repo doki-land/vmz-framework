@@ -101,13 +101,13 @@ fn collect_statements(
             }
             Statement::ClassDeclaration(class) => {
                 for member in &class.body {
-                    if let ClassMember::Method { body, .. } = member {
-                        collect_statements(body, source, owned, aliases, hits);
+                    if let ClassMember::Method { body, params, .. } = member {
+                        collect_function_body(params, body, source, owned, aliases, hits);
                     }
                 }
             }
             Statement::FunctionDeclaration(function) => {
-                collect_statements(&function.body, source, owned, aliases, hits)
+                collect_function_body(&function.params, &function.body, source, owned, aliases, hits)
             }
             Statement::ExportDeclaration(export) => {
                 if let Some(inner) = export.declaration.as_deref() {
@@ -191,6 +191,42 @@ fn collect_statement(
     collect_statements(std::slice::from_ref(statement), source, owned, aliases, hits);
 }
 
+/// Collect a function body in its own alias scope.
+///
+/// Aliases are discovered per script, so a `const xhr = this._xhr` in one class
+/// method would otherwise leak into unrelated module-level functions. A
+/// parameter named `xhr` in `function xhrSend(xhr)` shadows that alias and the
+/// function is not a component method — rewriting its writes to
+/// `this.constructor.__vmzWritePath` emits code that throws at runtime.
+fn collect_function_body(
+    params: &[oak_typescript::ast::FunctionParam],
+    body: &[Statement],
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &HashMap<String, (String, Vec<Seg>)>,
+    hits: &mut Vec<OakBarrierHit>,
+) {
+    let mut scoped = aliases.clone();
+    for param in params {
+        for name in &param.binding_names {
+            scoped.remove(name);
+        }
+    }
+    // Default values are evaluated in the function scope, so `(xhr = this._xhr)`
+    // re-binds the parameter name to the owned path instead of shadowing it.
+    for param in params {
+        let Some(default) = &param.default else { continue };
+        collect_expression(default, source, owned, &mut scoped, hits);
+        if param.pattern_text.is_none()
+            && !param.name.is_empty()
+            && let Some(path) = owned_path(default, owned, &scoped, source)
+        {
+            scoped.insert(param.name.clone(), path);
+        }
+    }
+    collect_statements(body, source, owned, &mut scoped, hits);
+}
+
 fn collect_expression(
     expression: &Expression,
     source: &str,
@@ -203,14 +239,17 @@ fn collect_expression(
             if let Some((root, segments)) = owned_path(left, owned, aliases, source)
                 && !segments.is_empty()
             {
+                // A concise arrow body (`() => resolve({ ... })`) is parsed as a
+                // statement, so Oak's span for the right-hand expression (and
+                // for the enclosing assignment) includes the statement `;`.
+                // Copying that slice verbatim puts the `;` inside the emitted
+                // call and leaves the call with no closing `)`.
+                let rhs = trim_statement_end(source, right.span.clone().into());
                 hits.push(OakBarrierHit {
-                    span: expression.span.clone().into(),
+                    span: expression.span.start..rhs.end,
                     root,
                     segments,
-                    kind: OakBarrierKind::Path {
-                        operator: operator.clone(),
-                        rhs: right.span.clone().into(),
-                    },
+                    kind: OakBarrierKind::Path { operator: operator.clone(), rhs },
                 });
             }
             collect_expression(right, source, owned, aliases, hits);
@@ -236,12 +275,13 @@ fn collect_expression(
                 && let Some((root, segments)) = owned_path(object, owned, aliases, source)
             {
                 let args = if let (Some(first), Some(last)) = (args.first(), args.last()) {
-                    first.span.start..last.span.end
+                    trim_statement_end(source, first.span.start..last.span.end)
                 } else {
                     0..0
                 };
+                let span = trim_statement_end(source, expression.span.clone().into());
                 hits.push(OakBarrierHit {
-                    span: expression.span.clone().into(),
+                    span,
                     root,
                     segments,
                     kind: OakBarrierKind::Mutator { method, args },
@@ -270,11 +310,16 @@ fn collect_expression(
         // Writes inside callbacks/timers still need the barrier: the promise
         // `.then` / `setTimeout` body runs after the event, but the component is
         // still a WriteBarrier one, so a bare nested write never reports.
-        ExpressionKind::ArrowFunction { body, .. } => {
-            collect_statement(body, source, owned, aliases, hits)
-        }
-        ExpressionKind::FunctionExpression { body, .. } => {
-            collect_statements(body, source, owned, aliases, hits)
+        ExpressionKind::ArrowFunction { body, params, .. } => collect_function_body(
+            params,
+            std::slice::from_ref(body.as_ref()),
+            source,
+            owned,
+            aliases,
+            hits,
+        ),
+        ExpressionKind::FunctionExpression { body, params, .. } => {
+            collect_function_body(params, body, source, owned, aliases, hits)
         }
         ExpressionKind::AsExpression { expression, .. }
         | ExpressionKind::SatisfiesExpression { expression, .. }
@@ -299,8 +344,8 @@ fn collect_expression(
                     ObjectProperty::Property { value, .. } | ObjectProperty::Spread(value) => {
                         collect_expression(value, source, owned, aliases, hits);
                     }
-                    ObjectProperty::Method { body, .. } => {
-                        collect_statements(body, source, owned, aliases, hits);
+                    ObjectProperty::Method { body, params, .. } => {
+                        collect_function_body(params, body, source, owned, aliases, hits);
                     }
                 }
             }
@@ -359,6 +404,23 @@ fn owned_path(
         }
         _ => None,
     }
+}
+
+/// Trim trailing statement terminators and whitespace from an expression span.
+///
+/// Oak parses a concise arrow body (`x => expr`) as a statement, so its span —
+/// and the span of the assignment that owns it — can extend past the `;`.
+fn trim_statement_end(source: &str, span: std::ops::Range<usize>) -> std::ops::Range<usize> {
+    let mut end = span.end.min(source.len());
+    while end > span.start {
+        let byte = source.as_bytes()[end - 1];
+        if byte.is_ascii_whitespace() || byte == b';' {
+            end -= 1;
+        } else {
+            break;
+        }
+    }
+    span.start..end
 }
 
 fn render_barrier(source: &str, hit: &OakBarrierHit) -> String {

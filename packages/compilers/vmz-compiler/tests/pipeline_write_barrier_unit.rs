@@ -590,3 +590,138 @@ export default class Demo {
     assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"a\"], 1)"));
     assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"b\"], 2)"));
 }
+
+#[test]
+fn keeps_concise_arrow_rhs_out_of_the_statement_terminator() {
+    let src = r#"
+export default class Demo {
+  _xhr = { onabort: null };
+  wire() {
+    this._xhr.onabort = () =>
+      resolve({
+        aborted: true,
+        status: 0,
+      });
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["_xhr"]));
+    assert_eq!(out.rewritten, 1, "emit:\n{}", out.source);
+    assert!(out.source.contains("__vmzWritePath(this, \"_xhr\", [\"onabort\"]"), "emit:\n{}", out.source);
+    assert!(!out.source.contains(";}"), "terminator inside the call:\n{}", out.source);
+    assert!(out.source.contains("}));"), "call must stay balanced:\n{}", out.source);
+}
+
+#[test]
+fn keeps_expression_rhs_out_of_the_statement_terminator() {
+    let src = r#"
+export default class Demo {
+  state = { handler: null as unknown, mode: "" };
+  install(flag: boolean) {
+    this.state.handler = { tag: "abort", status: 0 };
+    this.state.mode = flag ? "on" : "off";
+    this.state.handler = `${flag}`;
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["state"]));
+    assert_eq!(out.rewritten, 3, "emit:\n{}", out.source);
+    assert!(!out.source.contains(";}"), "terminator inside the call:\n{}", out.source);
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"state\", [\"handler\"], { tag: \"abort\", status: 0 })"),
+        "object literal rhs:\n{}",
+        out.source
+    );
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"state\", [\"mode\"], flag ? \"on\" : \"off\")"),
+        "conditional rhs:\n{}",
+        out.source
+    );
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"state\", [\"handler\"], `${flag}`)"),
+        "template rhs:\n{}",
+        out.source
+    );
+}
+
+#[test]
+fn keeps_method_alias_out_of_module_scope_functions() {
+    let src = r#"
+class Upload {
+  _xhr = { onabort: null };
+  pick() {
+    const xhr = this._xhr;
+    xhrSend(xhr, "POST", "/upload");
+  }
+}
+function xhrSend(xhr, method, url) {
+  return new Promise((resolve) => {
+    xhr.onabort = () => resolve({ aborted: true });
+  });
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["_xhr"]));
+    assert_eq!(out.rewritten, 0, "module function write must stay plain:\n{}", out.source);
+    assert!(out.source.contains("xhr.onabort = () => resolve({ aborted: true })"), "emit:\n{}", out.source);
+    assert!(!out.source.contains("__vmzWritePath"), "leaked alias:\n{}", out.source);
+}
+
+#[test]
+fn keeps_aliases_scoped_to_every_function_form() {
+    let src = r#"
+class Demo {
+  _xhr = { onabort: null };
+  wire() {
+    const xhr = this._xhr;
+    const fn = function (xhr) {
+      xhr.onabort = () => {};
+    };
+    const arrow = (xhr) => {
+      xhr.onabort = () => {};
+    };
+    const bare = (xhr) => {
+      xhr.onabort = () => {};
+    };
+    const obj = {
+      send(xhr) {
+        xhr.onabort = () => {};
+      },
+    };
+    function inner(xhr) {
+      xhr.onabort = () => {};
+    }
+    fn(xhr);
+    arrow(xhr);
+    bare(xhr);
+    obj.send(xhr);
+    inner(xhr);
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["_xhr"]));
+    assert_eq!(out.rewritten, 0, "shadowed aliases must stay plain:\n{}", out.source);
+    assert!(!out.source.contains("__vmzWritePath"), "leaked alias:\n{}", out.source);
+}
+
+#[test]
+fn keeps_default_parameter_alias_on_the_barrier() {
+    let src = r#"
+class Demo {
+  _xhr = { onabort: null };
+  wire() {
+    const bind = (xhr = this._xhr) => {
+      xhr.onabort = () => {};
+    };
+    bind();
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["_xhr"]));
+    assert_eq!(out.rewritten, 1, "default alias must rewrite:\n{}", out.source);
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"_xhr\", [\"onabort\"], () => {})"),
+        "emit:\n{}",
+        out.source
+    );
+}
+

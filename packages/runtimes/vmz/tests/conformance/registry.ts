@@ -186,6 +186,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Sparse index writes (`rows[4] = row`) skip holes instead of throwing in the keyed kernel',
         pre: ['build:runtimes'],
     },
+    'write-barrier-emit-syntax': {
+        file: 'runtime/write-barrier-emit-syntax.ts',
+        description: 'Concise arrow and object literal RHS stay parsable and module functions keep plain aliases',
+        pre: ['build:runtimes'],
+    },
     'write-barrier-suite': {
         description: 'WriteBarrier static + array + shared + logical + root update + mutator args',
         composite: [
@@ -783,6 +788,7 @@ export const CHECK_ALL = [
     'reactive-depth-root-length',
     'reactive-depth-nested-writes',
     'reactive-depth-sparse-index',
+    'write-barrier-emit-syntax',
     'async-graph',
     'motion-ir',
     'resume',
