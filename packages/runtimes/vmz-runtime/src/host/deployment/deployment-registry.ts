@@ -115,13 +115,16 @@ export async function importAndRegisterComponentEntries(
 ): Promise<ComponentRegistryMap> {
     const map: ComponentRegistryMap = {};
     const loaded = opts.loaded ?? null;
-    const packNode = readPackNodeManifest(distDir);
+    const packNode = opts.unpacked ? null : readPackNodeManifest(distDir);
     for (const entry of entries) {
         if (loaded && loaded.has(entry.chunkId)) continue;
         // Node/SSR consumes the packed unit bytes (`_vmz/pack-node/`) whenever the
         // build packed the node graph — bare package imports in dependency
         // components only exist in vendored form there. Dev sessions do not pack:
-        // the unpacked `${chunkId}.client.js` remains the module identity.
+        // the unpacked `${chunkId}.client.js` remains the module identity. Client
+        // hosts pass `unpacked` and stay on that tree: units they mount come from
+        // the unpacked client graph, including client-only fixtures that no page
+        // reaches and the node graph therefore excludes.
         const abs = packNode ? packNodeEntryAbs(distDir, entry, packNode) : path.join(distDir, entry.entry);
         let href = pathToFileURL(abs).href;
         if (opts.cacheBust != null && opts.cacheBust !== '') {

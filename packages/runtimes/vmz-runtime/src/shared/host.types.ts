@@ -73,6 +73,13 @@ export type DedupeComponentEntriesOpts = {
 export type ImportComponentEntriesOpts = {
     cacheBust?: string | number;
     loaded?: Set<string>;
+    /**
+     * Import the unpacked client tree (`${chunkId}.client.js`) even when
+     * `_vmz/pack-node-manifest.json` exists. Client hosts (headless logic
+     * mounts) execute unpacked client bytes, so their registry must use the
+     * same tree. Node/SSR hosts keep the default packed-node lookup.
+     */
+    unpacked?: boolean;
 };
 
 export type BootstrapComponentRegistryOpts = LoadComponentEntriesOpts &
@@ -126,5 +133,7 @@ export type RenderHostOpts = {
     preload?: 'all' | 'closure' | 'none';
     cacheBust?: string | number;
     rootChunkIds?: string[] | null;
+    /** Client hosts import registry entries from the unpacked client tree. */
+    unpackedEntries?: boolean;
     [key: string]: unknown;
 };

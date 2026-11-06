@@ -29,6 +29,7 @@ export async function createRenderHost(distDir: string, opts: Record<string, unk
         loaded: loadedChunkIds,
         preload: (opts.preload as BootstrapComponentRegistryOpts['preload']) ?? 'none',
         closureRoots: opts.closureRoots as string[] | undefined,
+        unpacked: opts.unpackedEntries === true,
     };
 
     if (bootstrapOpts.preload !== 'none') {
@@ -48,6 +49,7 @@ export async function createRenderHost(distDir: string, opts: Record<string, unk
         return importAndRegisterComponentEntries(distDir, entries, dom.registerComponents, {
             cacheBust: opts.cacheBust as string | number | undefined,
             loaded: loadedChunkIds,
+            unpacked: opts.unpackedEntries === true,
         });
     }
 

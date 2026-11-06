@@ -70,6 +70,10 @@ export async function createLogicHost(opts: { outDir: string; chunkId: string; c
         strictDeployment: strict,
         preload: 'none',
         explicit: opts.components,
+        // Logic mounts unpacked client bytes (`arts.clientPath`), so the
+        // registry must read the same tree. Node packing only covers units some
+        // page reaches, and a client-only fixture is deliberately absent there.
+        unpackedEntries: true,
     });
     await renderHost.ensureComponents([opts.chunkId.replace(/\\/g, '/')]);
 
