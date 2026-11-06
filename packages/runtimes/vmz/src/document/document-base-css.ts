@@ -8,7 +8,7 @@
  * colors inside code blocks come from the Shiki theme and stay identical on
  * every site. Sites do not ship document stylesheets.
  *
- * House rules (规划设计/vmz 05): pure-white base with near-black blocks for
+ * House rules: pure-white base with near-black blocks for
  * rhythm, body text ≥ 16px, small text ≥ 12px at weight ≥ 400, no uppercase
  * letter-spaced micro labels, no 3D / volumetric surfaces.
  */

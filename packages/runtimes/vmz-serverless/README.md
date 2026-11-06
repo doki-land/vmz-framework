@@ -20,5 +20,5 @@ node scripts/stage-vmz-dist.mjs /path/to/vmz/dist/web-ssr
 
 ## Boundary
 
-- Node server capability: `@vmz/server` (separate handoff)
+- Node server capability: `@vmz/server` (separate deliverable)
 - Author surface: VMZ `<script server>` only — no handwritten `/api/*` routes in this package

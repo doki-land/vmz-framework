@@ -2,7 +2,7 @@
  * Document — wire the compiled app stylesheet and the framework-owned document
  * base layer into static document assets.
  *
- * Layering (see 规划设计/vmz 04 文档层):
+ * Layering:
  * - `assets/vmz-designs.css`: the site's compiled design tokens (`vmz-designs.css`
  *   / `vmz.css` from the app build, or `designs/styles/index.css` standalone).
  * - `assets/vmz-document.css`: the framework document base (`DOCUMENT_BASE_CSS`),

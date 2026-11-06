@@ -1,7 +1,7 @@
 /**
  * Gate: `vmz test` delivery build must emit static HTML under `profiles.*.name`
  * (not only serve-host). Pre-nesting createWorkspace into `<out-dir>/cdn` without
- * pack+assemble left Browser Host 404 — see handoff serve-profile-name.
+ * pack+assemble left Browser Host 404.
  */
 import fs from 'node:fs';
 import os from 'node:os';
