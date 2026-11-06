@@ -1054,6 +1054,7 @@ fn emit_element(
         return Ok("null".to_string());
     };
     if let Some(each) = each {
+        let row = if tag == "template" { RowEmit::Template } else { RowEmit::Element };
         return emit_each_block(
             tag,
             attrs,
@@ -1070,7 +1071,7 @@ fn emit_element(
             child_ctors,
             once,
             memo,
-            RowEmit::Element,
+            row,
         );
     }
     emit_plain_element(
@@ -1316,6 +1317,31 @@ fn emit_plain_element(
     once: bool,
     memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
+    // `<template>` is a transparent wrapper: it never becomes a DOM element, so
+    // its body renders as a fragment at the same position (Vue `<template v-if>` /
+    // `<template v-for>` semantics). Rendering a literal `<template>` element put
+    // the children into inert content, which dropped them from the page.
+    if tag == "template" {
+        let frag = fresh("f", next_id);
+        stmts.push(format!("var {frag} = api.frag();"));
+        for child in emit_nodes(
+            children,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+            child_ctors,
+            once,
+            memo,
+        )? {
+            stmts.push(format!("{frag}.appendChild({child});"));
+        }
+        return Ok(frag);
+    }
     // `v-once` on this element freezes this subtree (all descendants inherit it).
     let once = once || has_once_marker(attrs);
     let el = fresh("e", next_id);
@@ -1965,6 +1991,41 @@ fn emit_component(
             // ignored instead of dropped, and a dynamic name is evaluated once at create
             // time — a name change later does not move already projected nodes.
             if let Some((slot_name, body)) = slot_template(child) {
+                // `<template v-for #name>`: the loop lives on the wrapper, so the
+                // slot receives the whole keyed list fragment instead of one static
+                // copy of the body (which left the item alias unbound and dropped
+                // every iteration).
+                if let ViewNode::Element { attrs, children: loop_body, each: Some(each), .. } = child
+                {
+                    let frag = emit_each_block(
+                        "template",
+                        attrs,
+                        loop_body,
+                        each,
+                        fields,
+                        scope,
+                        aliases,
+                        each_depth,
+                        handler_ctx,
+                        ir,
+                        stmts,
+                        next_id,
+                        child_ctors,
+                        once,
+                        memo,
+                        RowEmit::Template,
+                    )?;
+                    stmts.push(project_slot_stmt(
+                        &v,
+                        &slot_name,
+                        &frag,
+                        fields,
+                        handler_ctx.methods,
+                        scope,
+                        aliases,
+                    ));
+                    continue;
+                }
                 let kids = emit_nodes(
                     body,
                     fields,
@@ -2419,11 +2480,18 @@ fn emit_bind_text_content(
 enum RowEmit {
     Element,
     Component,
+    /// `<template v-for>` row: the transparent wrapper never reaches the DOM,
+    /// so each item renders a fragment of the template body children.
+    Template,
 }
 
 impl RowEmit {
     fn is_component(self) -> bool {
         matches!(self, RowEmit::Component)
+    }
+
+    fn is_template(self) -> bool {
+        matches!(self, RowEmit::Template)
     }
 }
 
@@ -2510,6 +2578,7 @@ fn emit_each_block(
     // `v-memo` rows need the snapshot gate, which the clone kernel cannot express.
     // Component rows are instance creates, not cloneable DOM: always fat createItem.
     let row_kernel = if row.is_component()
+        || row.is_template()
         || once
         || has_memo_marker(attrs)
         || children.iter().any(subtree_has_once_marker)
@@ -2568,6 +2637,30 @@ fn emit_each_block(
                 once,
                 memo,
             )?,
+            RowEmit::Template => {
+                // The transparent wrapper contributes no DOM node: the row root is a
+                // fragment holding the template body, so a multi-root body stays one
+                // keyed row (Vue `<template v-for>`).
+                let frag = fresh("f", next_id);
+                item_stmts.push(format!("var {frag} = api.frag();"));
+                for kid in emit_nodes(
+                    children,
+                    fields,
+                    &child_scope,
+                    &child_aliases,
+                    depth,
+                    handler_ctx,
+                    ir,
+                    &mut item_stmts,
+                    next_id,
+                    child_ctors,
+                    once,
+                    memo,
+                )? {
+                    item_stmts.push(format!("{frag}.appendChild({kid});"));
+                }
+                frag
+            }
         };
         Ok(format!(
             "function(api, {box_id}) {{\n{}  return {item_root};\n}}",
@@ -2598,7 +2691,11 @@ fn emit_each_block(
             var pfn = oldPatches[op];
             api.untrackPatch(inst, pfn.__vmzItemDeps || [], pfn, null);
           }
-          if (old.dom && old.dom.parentNode) api.removeNode(old.dom);
+          if (old.dom) {
+            if (Array.isArray(old.dom)) {
+              for (var od = 0; od < old.dom.length; od++) if (old.dom[od].parentNode) api.removeNode(old.dom[od]);
+            } else if (old.dom.parentNode) api.removeNode(old.dom);
+          }
         }
         keyed.delete(k);
       }
@@ -2622,9 +2719,21 @@ fn emit_each_block(
         api._eachCtx = prevEach;
         api._inst = prevInst;
         api._itemPatches = null;
+        // `<template v-for>` rows are multi-root: a DocumentFragment is emptied by
+        // insertion, so keep the row as its node list and move/remove every node.
+        if (dom && dom.nodeType === 11) {
+          var rowNodes = [];
+          while (dom.firstChild) rowNodes.push(dom.removeChild(dom.firstChild));
+          dom = rowNodes;
+        }
         entry = { box: box, dom: dom, patches: itemPatches };
         keyed.set(key, entry);
-        if (dom && end.parentNode) end.parentNode.insertBefore(dom, end);
+        var host = end.parentNode;
+        if (host && Array.isArray(dom)) {
+          for (var dn = 0; dn < dom.length; dn++) host.insertBefore(dom[dn], end);
+        } else if (host && dom) {
+          host.insertBefore(dom, end);
+        }
         for (var p = 0; p < itemPatches.length; p++) {
           try { itemPatches[p].call(inst); } catch {}
         }
@@ -2645,7 +2754,17 @@ fn emit_each_block(
       for (i = list.length - 1; i >= 0; i--) {
         var ke = keyed.get(keyOf(list[i], i));
         var knode = ke && (ke.dom || ke);
-        if (!knode || knode.nodeType !== 1 || knode.parentNode !== hostParent) continue;
+        if (!knode) continue;
+        if (Array.isArray(knode)) {
+          if (!knode.length || knode[0].parentNode !== hostParent) continue;
+          var klast = knode[knode.length - 1];
+          if (klast.nextSibling !== anchor) {
+            for (var m = 0; m < knode.length; m++) hostParent.insertBefore(knode[m], anchor);
+          }
+          anchor = knode[0];
+          continue;
+        }
+        if (knode.nodeType !== 1 || knode.parentNode !== hostParent) continue;
         if (knode.nextSibling !== anchor) hostParent.insertBefore(knode, anchor);
         anchor = knode;
       }

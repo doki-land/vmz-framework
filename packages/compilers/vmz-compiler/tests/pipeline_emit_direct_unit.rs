@@ -1192,3 +1192,95 @@ fn bind_object_spread_is_ssr_safe() {
         "no object-valued `v-bind` attribute reaches the SSR string path: {js}"
     );
 }
+
+/// `<template v-for #default>` must iterate the slot body. The wrapper used to
+/// match the named-slot branch and drop its `each`, so the slot received one
+/// static copy with the item alias left unbound (`i.label` was a free variable
+/// and the catch-all text binder rendered empty output).
+#[test]
+fn template_v_for_named_slot_projects_each_iteration() {
+    let src = r#"
+export default class SlotEachHost {
+  items = [{ id: 1, label: "one" }, { id: 2, label: "two" }];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<section><NavList><template v-for="i in items" :key="i.id" #default><li>{{ i.label }}</li></template></NavList></section>"#,
+    )
+    .unwrap();
+    let program = build_program_module("SlotEachHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains("api.projectDefaultSlot("),
+        "the loop fragment must project into the default slot: {js}"
+    );
+    assert!(
+        js.contains("createItem:"),
+        "`<template v-for>` must lower to a keyed each schedule: {js}"
+    );
+    assert!(
+        js.contains("key: function(box1) { return (box1.item.id); }"),
+        "the wrapper `:key` must bind through the item box: {js}"
+    );
+    assert!(
+        !js.contains("i.label"),
+        "item alias must bind through `box1.item`, never stay a free variable: {js}"
+    );
+    assert!(js.contains("box1.item.label"), "iteration scope must reach the interp: {js}");
+    assert!(
+        !js.contains(r#"api.el("template")"#),
+        "the `<template>` wrapper must stay transparent: {js}"
+    );
+}
+
+/// A plain `<template v-for>` (no slot marker) is also transparent: rows are
+/// fragment-rooted so a multi-root body keeps one keyed row per item.
+#[test]
+fn template_v_for_body_is_a_multi_root_row() {
+    let src = r#"
+export default class TemplateEachHost {
+  rows = [{ id: 1, label: "one" }];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<ul><template v-for="r in rows" :key="r.id"><em>{{ r.label }}</em><span>{{ r.id }}</span></template></ul>"#,
+    )
+    .unwrap();
+    let program = build_program_module("TemplateEachHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("createItem:"), "expected an each schedule: {js}");
+    assert!(
+        js.contains("dom.nodeType === 11"),
+        "fragment rows need the node-list row bookkeeping: {js}"
+    );
+    assert!(
+        !js.contains(r#"api.el("template")"#),
+        "`<template v-for>` must not render a literal template element: {js}"
+    );
+    assert!(!js.contains("r.label"), "row alias stays a free variable: {js}");
+}
+
+/// A bare `<template>` wrapper (no `v-for`) is transparent too: children render
+/// at the wrapper position instead of inside inert template content.
+#[test]
+fn plain_template_wrapper_is_transparent() {
+    let src = r#"
+export default class PlainTemplateHost {
+  title = "hello";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<section><template><h2>{{ title }}</h2></template></section>"#).unwrap();
+    let program = build_program_module("PlainTemplateHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        !js.contains(r#"api.el("template")"#),
+        "`<template>` must stay a transparent fragment: {js}"
+    );
+    assert!(js.contains("api.frag()"), "expected a fragment wrapper: {js}");
+}

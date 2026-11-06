@@ -191,4 +191,90 @@ describe('named slot projection', () => {
         expect(html).toContain('<section>BODY</section>');
         expect(html).not.toContain('FALLBACK');
     });
+
+    it('projects a `<template v-for #default>` keyed list into the default slot', async () => {
+        const window = installDom();
+        const Host = eachSlotHost([{ id: 1, label: 'one' }, { id: 2, label: 'two' }]);
+        registerComponents({ ListBox, Host });
+        const container = window.document.createElement('div');
+        window.document.body.appendChild(container);
+        await mount(Host, container, {});
+
+        const items = container.querySelectorAll('ul > li');
+        expect(items.length).toBe(2);
+        expect(items[0].textContent).toBe('one');
+        expect(items[1].textContent).toBe('two');
+        container.remove();
+    });
+
+    it('serializes a `<template v-for #default>` keyed list', async () => {
+        const Host = eachSlotHost([{ id: 1, label: 'one' }, { id: 2, label: 'two' }]);
+        registerComponents({ ListBox, Host });
+        const html = await renderToString(Host);
+        expect(html).toContain('<li>one</li>');
+        expect(html).toContain('<li>two</li>');
+    });
 });
+
+/**
+ * Mirrors the emitted `__vmzCreate` for
+ *
+ *     <NavList><template v-for="i in items" :key="i.id" #default><li>{{ i.label }}</li></template></NavList>
+ *
+ * Fragment rows are inserted before the each `end` marker and the whole list
+ * fragment is projected into the default slot.
+ */
+class ListBox {
+    static __vmzDirect = true;
+    static __vmzCreate(api: any) {
+        const ul = api.el('ul');
+        ul.appendChild(api.el('slot'));
+        return ul;
+    }
+}
+
+function eachSlotHost(items: Array<{ id: number; label: string }>) {
+    return class EachSlotHost {
+        items = items;
+        static __vmzDirect = true;
+        static __vmzCreate(api: any) {
+            const root = api.el('section');
+            const list = api.component(this, ListBox, {}, null);
+            const frag = api.frag();
+            const start = api.comment('vmz-each:');
+            const end = api.comment('/vmz-each');
+            frag.appendChild(start);
+            frag.appendChild(end);
+            const keyed = new Map<number, any[]>();
+            const apply = () => {
+                const next = new Set(this.items.map((it) => it.id));
+                for (const k of Array.from(keyed.keys())) {
+                    if (next.has(k)) continue;
+                    for (const node of keyed.get(k)!) if (node.parentNode) node.remove();
+                    keyed.delete(k);
+                }
+                for (const it of this.items) {
+                    if (keyed.has(it.id)) continue;
+                    const li = api.el('li');
+                    const text = api.text('');
+                    api.trackPatch(
+                        this,
+                        ['items.*.label'],
+                        function () {
+                            text.textContent = String(it.label ?? '');
+                        },
+                        null,
+                    );
+                    li.appendChild(text);
+                    const row = [li];
+                    if (end.parentNode) for (const node of row) end.parentNode.insertBefore(node, end);
+                    keyed.set(it.id, row);
+                }
+            };
+            apply();
+            api.projectDefaultSlot(list, frag);
+            root.appendChild(list);
+            return root;
+        }
+    };
+}
