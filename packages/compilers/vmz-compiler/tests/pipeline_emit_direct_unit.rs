@@ -626,6 +626,53 @@ export default class OnceList {
     assert!(!js.contains("], apply, "), "v-once each must not subscribe the list: {js}");
 }
 
+/// Non-kernel rows have no clone template, so the row key must reach the root
+/// node: SSR writes `data-vmz-key` and resume reclaims the row by identity
+/// instead of by the order its tag happens to appear in.
+#[test]
+fn v_once_rows_pass_the_key_to_the_root_element() {
+    let src = r#"
+export default class OnceKeys {
+  tags: { id: string; label: string }[] = [];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<ul><li v-for="tag in tags" :key="tag.id" v-once>{{ tag.label }}</li></ul>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains("var box = { item: item, index: i, __vmzKey: key };"),
+        "row box must carry the key: {js}"
+    );
+    assert!(js.contains(r#"api.el("li", box1.__vmzKey);"#), "row root must receive the key: {js}");
+    assert!(!js.contains("], apply, "), "v-once must keep the no-resubscribe semantics: {js}");
+}
+
+#[test]
+fn component_rows_pass_the_key_to_the_host() {
+    let src = r#"
+export default class ComponentKeys {
+  items: { id: string; label: string }[] = [];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<ul><Child v-for="i in items" :key="i.id" :label="i.label" /></ul>"#)
+            .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains("var box = { item: item, index: i, __vmzKey: key };"),
+        "row box must carry the key: {js}"
+    );
+    assert!(js.contains(", box1.__vmzKey);"), "component host must receive the row key: {js}");
+}
+
 #[test]
 fn component_tag_is_eligible() {
     let src = r#"

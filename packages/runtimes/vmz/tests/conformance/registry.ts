@@ -224,6 +224,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Keyed each hydration reclaims SSR rows by `data-vmz-key`',
         pre: ['build:runtimes'],
     },
+    'ssr-keyed-non-kernel': {
+        file: 'runtime/ssr-keyed-non-kernel.ts',
+        description: 'Keyed component and `v-once` rows carry `data-vmz-key` and reclaim SSR nodes after reorder',
+        pre: ['build:runtimes'],
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',

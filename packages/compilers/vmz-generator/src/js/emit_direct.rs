@@ -757,6 +757,7 @@ fn emit_node(
                 child_ctors,
                 once,
                 memo,
+                None,
             )
         }
         ViewNode::Slot { name, attrs, children } => {
@@ -789,6 +790,7 @@ fn emit_node(
                 child_ctors,
                 once,
                 memo,
+                None,
             )
         }
     }
@@ -1098,6 +1100,7 @@ fn emit_element(
         child_ctors,
         once,
         memo,
+        None,
     )
 }
 
@@ -1325,6 +1328,7 @@ fn emit_plain_element(
     child_ctors: &HashMap<String, String>,
     once: bool,
     memo: Option<&MemoCtx>,
+    row_key: Option<&str>,
 ) -> Result<String, String> {
     // `<template>` is a transparent wrapper: it never becomes a DOM element, so
     // its body renders as a fragment at the same position (Vue `<template v-if>` /
@@ -1354,7 +1358,10 @@ fn emit_plain_element(
     // `v-once` on this element freezes this subtree (all descendants inherit it).
     let once = once || has_once_marker(attrs);
     let el = fresh("e", next_id);
-    stmts.push(format!("var {el} = api.el({});", q(tag)));
+    // A keyed row root carries its key so SSR can emit `data-vmz-key` and resume
+    // can reclaim the row by identity instead of tag order.
+    let key_arg = row_key.map(|k| format!(", {k}")).unwrap_or_default();
+    stmts.push(format!("var {el} = api.el({}{key_arg});", q(tag)));
     stmts.push(format!("api.adoptEnter({el});"));
     // `v-memo`：v-once 优先；否则本元素成为子树最近一层 memo 门控。
     let memo_owned;
@@ -1772,6 +1779,7 @@ fn emit_component(
     child_ctors: &HashMap<String, String>,
     once: bool,
     memo: Option<&MemoCtx>,
+    row_key: Option<&str>,
 ) -> Result<String, String> {
     // `v-once`: the host component and its slot subtree are frozen after create.
     let once = once || has_once_marker(attrs);
@@ -1907,8 +1915,9 @@ fn emit_component(
         };
         let deps = deps_js(&is_deps);
         let id_arg = is_binding.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+        let key_arg = row_key.map(|k| format!(", {k}")).unwrap_or_default();
         stmts.push(format!(
-            "var {v} = api.dynamicComponent(this, {id_arg}, [{deps}], function() {{ return {is_body}; }}, function() {{ return {props}; }});"
+            "var {v} = api.dynamicComponent(this, {id_arg}, [{deps}], function() {{ return {is_body}; }}, function() {{ return {props}; }}{key_arg});"
         ));
     } else {
         let ctor_arg = if child_ctors.contains_key(tag) {
@@ -1917,7 +1926,10 @@ fn emit_component(
             // Registry lookup: self-reference, lazy edges, or unit fixtures without a graph.
             q(tag)
         };
-        stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
+        let key_arg = row_key.map(|k| format!(", {k}")).unwrap_or_default();
+        stmts.push(format!(
+            "var {v} = api.component(this, {ctor_arg}, {props}, {client_arg}{key_arg});"
+        ));
     }
     // Interpolated fallthrough attrs patch the host element after it exists.
     for (name, binding, expr) in &host_attr_bindings {
@@ -2648,6 +2660,10 @@ fn emit_each_block(
     // Client hot path: rowKernel.create / cloneNode. With a kernel, omit fat createItem to
     // shrink bundles — but still emit IR-homologous serializeItem for SSR (same schedule as
     // today's fat createItem). Do not treat rowKernel.html as SSR truth source.
+    // Non-kernel rows (component, `v-once`, `v-memo`, `<template v-for>`) have no clone
+    // template, so their key must travel on the row root: SSR writes `data-vmz-key` and
+    // resume reclaims by identity instead of tag order.
+    let row_key = if row_kernel.is_empty() { Some(format!("{box_id}.__vmzKey")) } else { None };
     let item_fn = |ir: &mut IrDepCursor<'_>, next_id: &mut u32| -> Result<String, String> {
         let mut item_stmts = Vec::new();
         let item_root = match row {
@@ -2666,6 +2682,7 @@ fn emit_each_block(
                 child_ctors,
                 once,
                 memo,
+                row_key.as_deref(),
             )?,
             RowEmit::Component => emit_component(
                 tag,
@@ -2682,6 +2699,7 @@ fn emit_each_block(
                 child_ctors,
                 once,
                 memo,
+                row_key.as_deref(),
             )?,
             RowEmit::Template => {
                 // The transparent wrapper contributes no DOM node: the row root is a
@@ -2751,7 +2769,7 @@ fn emit_each_block(
       var key = keyOf(item, i);
       var entry = keyed.get(key);
       if (!entry) {
-        var box = { item: item, index: i };
+        var box = { item: item, index: i, __vmzKey: key };
         var prevEach = api._eachCtx;
         var prevInst = api._inst;
         var itemPatches = [];

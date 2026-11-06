@@ -85,8 +85,24 @@ function createResumeAdopt(pool, rootEl) {
         }
     }
 
-    const adoptElement = (tag, svg = false) => {
+    const adoptElement = (tag, svg = false, key = null) => {
         const want = String(tag || 'div').toLowerCase();
+        // Keyed non-kernel rows (`component`, `v-once`, `v-memo`) carry their key on
+        // the root, so reclaim by identity. Falling back to tag order reuses a node
+        // that belongs to another key as soon as list order diverges from SSR.
+        if (key != null) {
+            const wanted = String(key);
+            for (const el of elementCandidates()) {
+                if (String(el.tagName).toLowerCase() !== want) continue;
+                if (typeof el.getAttribute !== 'function') continue;
+                if (el.getAttribute('data-vmz-key') !== wanted) continue;
+                return markElement(el);
+            }
+            noteDomCreate();
+            const fresh = svg ? document.createElementNS(SVG_NS, tag || 'svg') : document.createElement(tag || 'div');
+            (fresh as any).__vmzKey = wanted;
+            return fresh;
+        }
         for (const el of elementCandidates()) {
             if (String(el.tagName).toLowerCase() === want) return markElement(el);
         }
@@ -145,11 +161,13 @@ function createResumeAdopt(pool, rootEl) {
         return document.createTextNode(value == null ? '' : String(value));
     };
 
-    const componentHost = (name) => {
+    const componentHost = (name, key = null) => {
         const want = String(name || '');
+        const wanted = key == null ? null : String(key);
         for (const el of elementCandidates()) {
             if (String(el.tagName).toLowerCase() !== 'div') continue;
             if (el.getAttribute('data-vmz') !== want) continue;
+            if (wanted != null && el.getAttribute('data-vmz-key') !== wanted) continue;
             return markElement(el);
         }
         return null;

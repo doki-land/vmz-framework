@@ -191,12 +191,17 @@ export const directApi = {
     _itemPatches: null as PatchFn[] | null,
     _eachCtx: null as EachCtx | null,
     _resumeAdopt: null as ResumeAdoptCtx | null,
-    el(tag) {
+    el(tag, key?) {
         const name = tag || 'div';
         const svg = inSvgScope() || name === 'svg';
-        if (directApi._resumeAdopt) return directApi._resumeAdopt.el(name, svg);
+        const rowKey = key == null ? null : key;
+        if (directApi._resumeAdopt) return directApi._resumeAdopt.el(name, svg, rowKey);
         noteDomCreate();
-        return svg ? document.createElementNS(SVG_NS, name) : document.createElement(name);
+        const node = svg ? document.createElementNS(SVG_NS, name) : document.createElement(name);
+        // Row keys live as expandos on the live DOM (the clone kernel does the same)
+        // and as `data-vmz-key` in SSR output for resume reclamation.
+        if (rowKey != null) (node as any).__vmzKey = rowKey;
+        return node;
     },
     elNS(ns, tag) {
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.elNS === 'function') {
@@ -509,17 +514,18 @@ export const directApi = {
     /**
      * Nested component (sync Direct child or island schedule).
      */
-    component(hostInst, nameOrCtor, props, client) {
+    component(hostInst, nameOrCtor, props, client, key?) {
         const name = componentDisplayName(nameOrCtor);
         let host = null;
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
-            host = directApi._resumeAdopt.componentHost(name);
+            host = directApi._resumeAdopt.componentHost(name, key);
         }
         if (!host) {
             noteDomCreate();
             host = document.createElement('div');
             host.setAttribute('data-vmz', name);
         }
+        if (key != null) (host as any).__vmzKey = key;
         return mountDirectComponentHost(host, hostInst, name, nameOrCtor, props as Record<string, unknown> | undefined, client);
     },
     /**
@@ -528,7 +534,7 @@ export const directApi = {
      * are re-evaluated per mount so the new type starts from current values, and
      * the child listener bag is carried over so `@event` handlers keep working.
      */
-    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps) {
+    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps, key?) {
         const resolve = () => {
             try {
                 return getCtor.call(hostInst);
@@ -540,13 +546,14 @@ export const directApi = {
         const name = componentDisplayName(initial);
         let host = null;
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
-            host = directApi._resumeAdopt.componentHost(name);
+            host = directApi._resumeAdopt.componentHost(name, key);
         }
         if (!host) {
             noteDomCreate();
             host = document.createElement('div');
             host.setAttribute('data-vmz', name);
         }
+        if (key != null) (host as any).__vmzKey = key;
         let current = initial;
         const render = (next) => {
             const old = host.__vmzInst;

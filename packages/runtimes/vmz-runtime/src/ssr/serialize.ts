@@ -91,7 +91,10 @@ function isVoidTag(tag) {
 function controlValue(node, tag) {
     if (tag !== 'textarea' && tag !== 'select') return null;
     const v = node.attrs ? node.attrs.value : null;
-    return v == null || v === false ? null : String(v);
+    if (v == null || v === false) return null;
+    // A `multiple` select model is a list; keep every entry addressable.
+    if (tag === 'select' && Array.isArray(v)) return v.map((item) => String(item));
+    return String(v);
 }
 
 function nodeText(node) {
@@ -103,8 +106,9 @@ function nodeText(node) {
     return '';
 }
 
-/** Mark the `<option>` whose value (or text) equals the model value. */
+/** Mark the `<option>` whose value (or text) equals one of the model values. */
 function markSelectSelection(node, wanted) {
+    const wants = Array.isArray(wanted) ? wanted.map((item) => String(item)) : [String(wanted)];
     const visit = (n) => {
         if (!n || typeof n !== 'object') return;
         if (n.__kind === 'el') {
@@ -112,7 +116,7 @@ function markSelectSelection(node, wanted) {
             if (tag === 'option') {
                 const raw =
                     n.attrs && n.attrs.value != null ? String(n.attrs.value) : nodeText(n).trim();
-                if (raw === wanted) {
+                if (wants.includes(raw)) {
                     if (!n.attrs) n.attrs = {};
                     n.attrs.selected = '';
                 } else if (n.attrs && Object.prototype.hasOwnProperty.call(n.attrs, 'selected')) {
@@ -387,6 +391,7 @@ function makeVirtualEl(tag) {
         children: [],
         style: {},
         __rawHtml: null,
+        __vmzKey: null,
         parentNode: null,
         setAttribute(name, value) {
             applySerializeAttr(this, name, value);
@@ -496,10 +501,17 @@ const serializeApi = {
         if (serializeApi._ssrCollected) serializeApi._ssrCollected.push(child);
         return child;
     },
-    el(tag) {
+    el(tag, key?) {
         const node = makeVirtualEl(tag) as ReturnType<typeof makeVirtualEl> & { namespaceURI?: string };
         if (String(tag || '').toLowerCase() === 'svg') {
             node.namespaceURI = 'http://www.w3.org/2000/svg';
+        }
+        // Row roots need their key in the HTML so hydration reclaims by identity,
+        // not the order in which tags happen to appear.
+        if (key != null) {
+            node.__vmzKey = key;
+            if (!node.attrs) node.attrs = Object.create(null);
+            node.attrs['data-vmz-key'] = String(key);
         }
         return node;
     },
@@ -754,7 +766,7 @@ const serializeApi = {
             bindingId,
         );
     },
-    component(hostInst, nameOrCtor, props, client) {
+    component(hostInst, nameOrCtor, props, client, key?) {
         const name = typeof nameOrCtor === 'function' ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component' : nameOrCtor;
         const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : getRegisteredComponent(name);
         if (!Ctor) {
@@ -815,6 +827,7 @@ const serializeApi = {
             const boxStyle = directHostBoxStyleAttr(name, Ctor);
             if (boxStyle) attrs.style = boxStyle;
             applyHostAttrs(attrs);
+            if (key != null) attrs['data-vmz-key'] = String(key);
             if (isEventEntryStrategy(String(client))) {
                 attrs['data-vmz-entry'] = 'event';
             }
@@ -844,6 +857,7 @@ const serializeApi = {
                 const boxStyle = directHostBoxStyleAttr(name, Ctor);
                 if (boxStyle) attrs.style = boxStyle;
                 applyHostAttrs(attrs);
+                if (key != null) attrs['data-vmz-key'] = String(key);
                 return {
                     __kind: 'el',
                     tag: 'div',
@@ -865,7 +879,7 @@ const serializeApi = {
      * create time, so the dynamic boundary serializes exactly like the resolved
      * static component.
      */
-    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps) {
+    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps, key?) {
         let Ctor = null;
         try {
             Ctor = getCtor.call(hostInst);
@@ -878,7 +892,7 @@ const serializeApi = {
         } catch {
             props = {};
         }
-        return serializeApi.component(hostInst, Ctor, props, null);
+        return serializeApi.component(hostInst, Ctor, props, null, key);
     },
 };
 
