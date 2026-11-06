@@ -214,6 +214,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'SSR and hydrated select option selection agree',
         pre: ['build:runtimes'],
     },
+    'ssr-resume-identity': {
+        file: 'runtime/ssr-resume-identity.ts',
+        description: 'Hydrate reclaims SSR nodes at every depth instead of recreating the subtree',
+        pre: ['build:runtimes'],
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',

@@ -33,16 +33,29 @@ function createResumeAdopt(pool, rootEl) {
 
     const currentScope = () => scopeStack[scopeStack.length - 1] || pool;
 
+    /** `rootEl`'s children were parked into `pool` before create — see bottom. */
+    let rootElTookPool = false;
+
     const markElement = (n) => {
         used.add(n);
         if (typeof n.getAttribute === 'function') {
             const k = n.getAttribute('data-vmz-key');
             if (k != null && n.__vmzKey == null) n.__vmzKey = k;
         }
-        // Private child pool ??never dump into the parent/global pool (that let
-        // if branches reclaim Drawer/sibling hosts parked as uncles).
-        const childPool = document.createDocumentFragment();
-        while (n.firstChild) childPool.appendChild(n.firstChild);
+        // `runDirectResume` parks `rootEl`'s children into the top-level pool
+        // before create. Adopting `rootEl` must hand that same pool to it as the
+        // child scope: making a fresh (empty) child pool here would leave every
+        // SSR descendant unreachable and silently recreate the whole subtree.
+        let childPool;
+        if (n === rootEl && !rootElTookPool) {
+            rootElTookPool = true;
+            childPool = pool;
+        } else {
+            // Private child pool ??never dump into the parent/global pool (that let
+            // if branches reclaim Drawer/sibling hosts parked as uncles).
+            childPool = document.createDocumentFragment();
+            while (n.firstChild) childPool.appendChild(n.firstChild);
+        }
         n.__vmzResumePool = childPool;
         return n;
     };
