@@ -216,6 +216,46 @@ assert.equal(
     'error[test.code]: boom\n     --> demo.vmz:9:1\n   9 | line9\n     | ^^^^^\n       ...\n1000 | 1000abc\n     | ^^^^^^^',
 );
 
+// CRLF sources render exactly like LF sources: the trailing `\r` is not a cell.
+const crlfSource = 'ab\r\ncd\r\nef';
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: 4, end: 6 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(crlfSource),
+            sourceText: crlfSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | cd\n  | ^^',
+);
+// A span whose end includes the CR still underlines only the visible characters.
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: 4, end: 7 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(crlfSource),
+            sourceText: crlfSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | cd\n  | ^^',
+);
+
 // A zero-width span points at an insertion site and still gets one caret.
 const emptySource = 'ab\ncd';
 assert.equal(

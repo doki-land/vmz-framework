@@ -81,10 +81,10 @@ function isWideCodePoint(cp: number): boolean {
     );
 }
 
-/** Terminal cells occupied by one Unicode scalar (wide CJK/emoji render as two). */
+/** Terminal cells occupied by one Unicode scalar (wide CJK/emoji render as two, CR as zero). */
 export function scalarDisplayWidth(ch: string): number {
     const cp = ch.codePointAt(0) ?? 0;
-    if (cp === 0 || ZERO_WIDTH_PATTERN.test(ch)) return 0;
+    if (cp === 0 || cp === 0x0d || ZERO_WIDTH_PATTERN.test(ch)) return 0;
     return isWideCodePoint(cp) ? 2 : 1;
 }
 
@@ -107,11 +107,14 @@ export function displayWidth(text: string): number {
 /**
  * Expand tabs to spaces so the printed source line and the caret row agree in
  * any terminal, regardless of that terminal's own tab-stop configuration.
+ * Carriage returns from CRLF sources are dropped because they terminate the
+ * line rather than occupy a cell.
  */
 export function expandTabs(text: string): string {
     let cells = 0;
     let out = '';
     for (const ch of text) {
+        if (ch === '\r') continue;
         if (ch === '\t') {
             const pad = SNIPPET_TAB_WIDTH - (cells % SNIPPET_TAB_WIDTH);
             out += ' '.repeat(pad);
