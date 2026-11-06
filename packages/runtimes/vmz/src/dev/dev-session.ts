@@ -11,7 +11,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildIntegratedDocuments, projectHasDocuments } from '../document/document-integrate.js';
 import { createWorkspace, resolveNativePath } from '../workspace/public-api.js';
@@ -39,7 +40,8 @@ import {
     staticRevisionFromArtifact,
 } from './dev-incremental.js';
 import { diffFingerprints, fileFingerprintMap } from '../workspace/watch-diff.js';
-import { packFromDeploymentIr } from '../workspace/pack.js';
+import { packFromDeploymentIr, deploymentUnitOrigins } from '../workspace/pack.js';
+import { loadDeploymentIr } from '../workspace/bundler-adapter.js';
 
 /** Track serve-host so a failed/killed launcher cannot leave an orphan port. */
 const DEV_HOST_PID = '.vmz-dev-host.pid';
@@ -71,6 +73,198 @@ function cycleFailure(report: ConfigCycleReport): Error {
     return report.error ? Object.assign(error, { diagnostic: report.error }) : error;
 }
 
+/**
+ * Pack 输入快照：dev 只在「决定产物字节的全部输入」完全不变时才复用上次产物。
+ * 判据是文件内容哈希，不使用 mtime、文件数量或后缀推导；读不到或未知的输入一律按变更处理。
+ */
+const PACK_INPUT_IGNORED_DIRS = new Set(['_vmz', 'node_modules', '.cache', '.git']);
+const PACK_INPUT_IGNORED_NAMES = /^\.vmz-dev-host\.pid$/;
+
+interface PackManifestView {
+    chunks?: Array<{ fileName?: string; sourceMap?: string; modules?: unknown[] }>;
+    styles?: Array<{ fileName?: string; sourcePaths?: unknown[] }>;
+    assets?: Array<{ fileName?: string }>;
+    entryFiles?: Array<{ file?: string }>;
+    dynamicFiles?: Array<{ from?: string; to?: string }>;
+    unitChunks?: Array<{ fileName?: string | null }>;
+}
+
+interface PackInputSnapshot {
+    files: Array<{ path: string; digest: string }>;
+    listings: Array<{ dir: string; names: string[] }>;
+    deploymentOrigins: string;
+    lockfile: { path: string; digest: string };
+    manifest: { path: string; digest: string };
+}
+
+/** Rust 侧的模块路径带 `//?/`（或 `\\?\`）verbatim 前缀，落盘读取前需要剥离。 */
+function packInputFsPath(filePath: string): string {
+    return filePath.replace(/^(?:\\\\\?\\|\/\/\?\/)/, '').replace(/\\/g, '/');
+}
+
+function readFileDigest(filePath: string): string | null {
+    try {
+        return createHash('sha256').update(readFileSync(filePath)).digest('hex');
+    } catch {
+        return null;
+    }
+}
+
+function findLockfile(project: string): string | null {
+    let dir = path.resolve(project);
+    while (true) {
+        const candidate = path.join(dir, 'pnpm-lock.yaml');
+        if (existsSync(candidate)) return candidate;
+        const parent = path.dirname(dir);
+        if (parent === dir) return null;
+        dir = parent;
+    }
+}
+
+function listPackInputDir(dir: string): string[] | null {
+    const names: string[] = [];
+    const walk = (current: string, prefix: string): boolean => {
+        let entries;
+        try {
+            entries = readdirSync(current, { withFileTypes: true });
+        } catch {
+            return false;
+        }
+        entries.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+        for (const entry of entries) {
+            if (PACK_INPUT_IGNORED_DIRS.has(entry.name) || PACK_INPUT_IGNORED_NAMES.test(entry.name)) continue;
+            const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+            if (entry.isDirectory()) {
+                if (!walk(path.join(current, entry.name), rel)) return false;
+            } else {
+                names.push(rel);
+            }
+        }
+        return true;
+    };
+    return walk(dir, '') ? names : null;
+}
+
+/** manifest 形状不认识时返回 null（而非空集合），避免把未知输入当成「没变化」。 */
+function packInputFiles(manifest: PackManifestView): string[] | null {
+    if (!Array.isArray(manifest.chunks) || manifest.chunks.length === 0) return null;
+    const files = new Set<string>();
+    for (const chunk of manifest.chunks) {
+        if (!Array.isArray(chunk.modules)) return null;
+        for (const module of chunk.modules) {
+            if (typeof module !== 'string' || !module) return null;
+            files.add(packInputFsPath(module));
+        }
+    }
+    if (!Array.isArray(manifest.styles)) return null;
+    for (const style of manifest.styles) {
+        if (!Array.isArray(style.sourcePaths)) return null;
+        for (const source of style.sourcePaths) {
+            if (typeof source !== 'string' || !source) return null;
+            files.add(packInputFsPath(source));
+        }
+    }
+    return [...files].sort();
+}
+
+/** pack 只经 `deploymentUnitOrigins` 读取 IR；对这份 origins 取规范摘要，避免把构建期 affected/seed 噪声算成输入变更。 */
+function deploymentOriginsDigest(outDir: string): string | null {
+    try {
+        const origins = deploymentUnitOrigins(outDir, loadDeploymentIr(outDir));
+        const canonical = Object.keys(origins)
+            .sort()
+            .map((key) => `${key}\u0000${origins[key]}`);
+        return createHash('sha256').update(canonical.join('\u0001')).digest('hex');
+    } catch {
+        return null;
+    }
+}
+
+/** 记下决定 pack 产物的全部输入；任何一项取不到就放弃快照（等同于永远重打包）。 */
+function capturePackInputSnapshot(manifest: PackManifestView, outDir: string, project: string): PackInputSnapshot | null {
+    const inputs = packInputFiles(manifest);
+    if (!inputs) return null;
+    const files: Array<{ path: string; digest: string }> = [];
+    for (const file of inputs) {
+        const digest = readFileDigest(file);
+        if (!digest) return null;
+        files.push({ path: file, digest });
+    }
+    const listings: Array<{ dir: string; names: string[] }> = [];
+    for (const dir of [...new Set(files.map((file) => path.dirname(file.path)))].sort()) {
+        if (dir.split(/[\\/]/).includes('node_modules')) continue;
+        const names = listPackInputDir(dir);
+        if (!names) return null;
+        listings.push({ dir, names });
+    }
+    const deploymentOrigins = deploymentOriginsDigest(outDir);
+    if (!deploymentOrigins) return null;
+    const lockfilePath = findLockfile(project);
+    if (!lockfilePath) return null;
+    const lockfileDigest = readFileDigest(lockfilePath);
+    if (!lockfileDigest) return null;
+    const manifestPath = path.join(outDir, '_vmz', 'pack-manifest.json');
+    const manifestDigest = readFileDigest(manifestPath);
+    if (!manifestDigest) return null;
+    return {
+        files,
+        listings,
+        deploymentOrigins,
+        lockfile: { path: lockfilePath, digest: lockfileDigest },
+        manifest: { path: manifestPath, digest: manifestDigest },
+    };
+}
+
+/** 返回 null 表示全部输入字节全等；否则返回第一个变化原因。 */
+function packInputsChangedReason(snapshot: PackInputSnapshot, outDir: string): string | null {
+    const lockfileDigest = readFileDigest(snapshot.lockfile.path);
+    if (!lockfileDigest) return `lockfile unreadable: ${snapshot.lockfile.path}`;
+    if (lockfileDigest !== snapshot.lockfile.digest) return 'lockfile changed';
+    const manifestDigest = readFileDigest(snapshot.manifest.path);
+    if (!manifestDigest) return `pack manifest unreadable: ${snapshot.manifest.path}`;
+    if (manifestDigest !== snapshot.manifest.digest) return 'pack manifest changed';
+    const deploymentOrigins = deploymentOriginsDigest(outDir);
+    if (!deploymentOrigins) return 'deployment IR unreadable';
+    if (deploymentOrigins !== snapshot.deploymentOrigins) return 'deployment IR changed';
+    for (const file of snapshot.files) {
+        const digest = readFileDigest(file.path);
+        if (!digest) return `input unreadable: ${file.path}`;
+        if (digest !== file.digest) return `input changed: ${file.path}`;
+    }
+    for (const listing of snapshot.listings) {
+        const names = listPackInputDir(listing.dir);
+        if (!names) return `input directory unreadable: ${listing.dir}`;
+        if (names.length !== listing.names.length) return `input directory changed: ${listing.dir}`;
+        for (let i = 0; i < names.length; i += 1) {
+            if (names[i] !== listing.names[i]) return `input directory changed: ${listing.dir}`;
+        }
+    }
+    return null;
+}
+
+/** 复用上次 manifest 前确认 entry/chunk/island 查表指向的文件仍在盘上；缺任何一个就退回真实 pack。 */
+function missingPackOutput(manifest: PackManifestView, outDir: string): string | null {
+    const packDir = path.join(outDir, '_vmz', 'pack');
+    if (!existsSync(path.join(outDir, '_vmz', 'pack-manifest.json'))) return '_vmz/pack-manifest.json';
+    const names = new Set<string>();
+    for (const entry of manifest.entryFiles ?? []) if (typeof entry.file === 'string' && entry.file) names.add(entry.file);
+    for (const dynamic of manifest.dynamicFiles ?? []) {
+        if (typeof dynamic.from === 'string' && dynamic.from) names.add(dynamic.from);
+        if (typeof dynamic.to === 'string' && dynamic.to) names.add(dynamic.to);
+    }
+    for (const chunk of manifest.chunks ?? []) {
+        if (typeof chunk.fileName === 'string' && chunk.fileName) names.add(chunk.fileName);
+        if (typeof chunk.sourceMap === 'string' && chunk.sourceMap) names.add(chunk.sourceMap);
+    }
+    for (const style of manifest.styles ?? []) if (typeof style.fileName === 'string' && style.fileName) names.add(style.fileName);
+    for (const asset of manifest.assets ?? []) if (typeof asset.fileName === 'string' && asset.fileName) names.add(asset.fileName);
+    for (const unit of manifest.unitChunks ?? []) if (typeof unit.fileName === 'string' && unit.fileName) names.add(unit.fileName);
+    for (const name of names) {
+        if (!existsSync(path.join(packDir, ...name.split('/')))) return name;
+    }
+    return null;
+}
+
 export function createDevSession(options: DevSessionOptions) {
     const project = options.project;
     const outDir = options.outDir;
@@ -92,6 +286,9 @@ export function createDevSession(options: DevSessionOptions) {
     let stopped = false;
     let lastOutputRevision: string | null = null;
     let lastStaticRevision: string | null = null;
+    let lastBuildMs = 0;
+    let lastPackManifest: PackManifestView | null = null;
+    let lastPackInputs: PackInputSnapshot | null = null;
     const generationIgnore = new Set<string>();
 
     function planAndRebuild(changes?: Array<{ path: string; kind: 'update' | 'delete' }>) {
@@ -104,7 +301,9 @@ export function createDevSession(options: DevSessionOptions) {
         } catch {
             hmrPlan = null;
         }
+        const startedAt = Date.now();
         const report = ws.build();
+        lastBuildMs = Date.now() - startedAt;
         return { report, hmrPlan };
     }
 
@@ -159,7 +358,7 @@ export function createDevSession(options: DevSessionOptions) {
         if (!emitLocales()) return false;
         const mode = report.full ? 'full' : 'affected';
         const chunks = (report.affectedChunks || []).join(', ') || '(none)';
-        log.info(`${label} ok (${mode}; chunks=[${chunks}]; ${(report.emitted ?? []).length} emitted)`);
+        log.info(`${label} ok (${mode}; chunks=[${chunks}]; ${(report.emitted ?? []).length} emitted; ${lastBuildMs}ms build)`);
         return true;
     }
 
@@ -238,21 +437,34 @@ export function createDevSession(options: DevSessionOptions) {
         }
         if (!opts.staticOnly) {
             const startedAt = Date.now();
-            try {
-                const { manifest } = packBrowser(outDir, { projectRoot: project });
-                log.info(`dev pack ok (${manifest.chunkCount} chunks, ${Date.now() - startedAt}ms)`);
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                log.error(`dev pack failed: ${message}`);
+            const changedReason = lastPackInputs ? packInputsChangedReason(lastPackInputs, outDir) : 'no pack input snapshot';
+            const missing = changedReason === null && lastPackManifest ? missingPackOutput(lastPackManifest, outDir) : null;
+            if (changedReason === null && !missing && lastPackManifest) {
+                log.info(`dev pack skip (inputs unchanged, ${Date.now() - startedAt}ms)`);
+            } else {
+                if (changedReason) log.info(`dev pack (inputs changed: ${changedReason})`);
+                if (missing) log.info(`dev pack (manifest reuse rejected: missing ${missing})`);
                 try {
-                    await softReload({
-                        phase: 'abort',
-                        error: { message, stack: err instanceof Error ? err.stack : undefined },
-                    });
-                } catch {
-                    /* host may be gone; keep the reported pack error */
+                    const { manifest } = packBrowser(outDir, { projectRoot: project });
+                    lastPackManifest = manifest as PackManifestView;
+                    lastPackInputs = capturePackInputSnapshot(lastPackManifest, outDir, project);
+                    log.info(`dev pack ok (${manifest.chunkCount} chunks, ${Date.now() - startedAt}ms)`);
+                    if (!lastPackInputs) log.info('dev pack inputs: snapshot unavailable (unknown input) — next rebuild repacks');
+                } catch (err) {
+                    lastPackManifest = null;
+                    lastPackInputs = null;
+                    const message = err instanceof Error ? err.message : String(err);
+                    log.error(`dev pack failed: ${message}`);
+                    try {
+                        await softReload({
+                            phase: 'abort',
+                            error: { message, stack: err instanceof Error ? err.stack : undefined },
+                        });
+                    } catch {
+                        /* host may be gone; keep the reported pack error */
+                    }
+                    return 'error';
                 }
-                return 'error';
             }
         }
         try {
