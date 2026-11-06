@@ -23,6 +23,7 @@ import {
     stripFns,
 } from '../browser/dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../browser/unknown-component.js';
+import { splitStyleDeclarations } from '../shared/dom-attr-normalize.js';
 import { _ssrDocumentLastError, ensureSsrDocument } from './document.js';
 import { awaitSsrOnMount, ssrComponentName, ssrOnMountContext } from './onmount.js';
 
@@ -125,6 +126,32 @@ function markSelectSelection(node, wanted) {
     for (const c of node.children || []) visit(c);
 }
 
+/**
+ * Inline style as the browser would serialize it: the `style` attribute merged
+ * with the live `style.*` writes that Direct patches and `v-show` perform
+ * (`el.style.display = …`). SSR virtual elements only kept the attribute, so a
+ * server-first response showed elements that hydration hid.
+ */
+function serializeStyleAttr(node) {
+    const declared = node.attrs && node.attrs.style != null ? String(node.attrs.style) : '';
+    const live = node.style;
+    if (!live || typeof live !== 'object') return declared;
+    const display = live.display;
+    if (display === undefined) return declared;
+    // `el.style.display = ''` removes the declaration instead of writing it.
+    if (display === '' || display == null) {
+        return splitStyleDeclarations(declared)
+            .filter((chunk) => {
+                const idx = chunk.indexOf(':');
+                return idx < 0 || chunk.slice(0, idx).trim() !== 'display';
+            })
+            .map((chunk) => chunk.trim())
+            .filter(Boolean)
+            .join('; ');
+    }
+    return mergeStyleParts(declared, { display });
+}
+
 function serializeOpenTag(node) {
     const tag = node.tag || 'div';
     const lowerTag = String(tag).toLowerCase();
@@ -134,9 +161,12 @@ function serializeOpenTag(node) {
         // `textarea` value renders as text content and `select` value as a
         // selected option, so the raw attribute must not be emitted.
         if (k === 'value' && (lowerTag === 'textarea' || lowerTag === 'select')) continue;
+        if (k === 'style') continue;
         if (k === 'className') attrs += ` class="${escapeHtml(v)}"`;
         else attrs += ` ${k}="${escapeHtml(v)}"`;
     }
+    const style = serializeStyleAttr(node);
+    if (style) attrs += ` style="${escapeHtml(style)}"`;
     return { tag, open: `<${tag}${attrs}>` };
 }
 
@@ -338,6 +368,17 @@ function virtualRemove(node) {
     node.parentNode = null;
 }
 
+/**
+ * Replace an element's content with escaped text (`v-text` / `el.textContent`).
+ * Direct emit writes `textContent` for both static and reactive text, so SSR
+ * must model it or the first response ships an empty element.
+ */
+function replaceSerializeText(node, value) {
+    const text = value == null ? '' : String(value);
+    node.__rawHtml = null;
+    node.children = text === '' ? [] : [{ __kind: 'text', value: text, parentNode: node }];
+}
+
 function makeVirtualEl(tag) {
     const node = {
         __kind: 'el',
@@ -367,6 +408,17 @@ function makeVirtualEl(tag) {
         set(value) {
             this.__rawHtml = value == null ? '' : String(value);
             this.children = [];
+        },
+    });
+    // Direct emit writes `el.textContent` for v-text (static `api.setText` and
+    // reactive `el.textContent = …`). Mirror it so the serializer sees the text.
+    Object.defineProperty(node, 'textContent', {
+        configurable: true,
+        get() {
+            return nodeText(this);
+        },
+        set(value) {
+            replaceSerializeText(this, value);
         },
     });
     return node;
@@ -652,6 +704,15 @@ const serializeApi = {
         if (!el || el.__kind !== 'el') return;
         el.__rawHtml = value == null ? '' : String(value);
         el.children = [];
+    },
+    setText(el, value) {
+        if (!el || el.__kind !== 'el') return;
+        replaceSerializeText(el, value);
+    },
+    setShow(el, condition) {
+        if (!el || el.__kind !== 'el') return;
+        if (!el.style || typeof el.style !== 'object') el.style = {};
+        el.style.display = condition ? '' : 'none';
     },
     bindHtml(inst, bindingId, deps, get, el) {
         serializeApi.trackPatch(

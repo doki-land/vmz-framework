@@ -127,7 +127,7 @@ function pushStyleValues(out: string[], key: string, value: unknown): void {
  * nested parens and inside quotes (e.g. `content: 'a;b'`, data URIs with
  * `;base64,`) do not split — a naive split would truncate those values.
  */
-function splitStyleDeclarations(text: string): string[] {
+export function splitStyleDeclarations(text: string): string[] {
     const chunks: string[] = [];
     let depth = 0;
     let quote: string | null = null;
