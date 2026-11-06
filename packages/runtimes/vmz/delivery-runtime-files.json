@@ -12,6 +12,7 @@
         { "src": "browser/unknown-component.js", "out": "unknown-component.js" },
         { "src": "shared/dom-attr-normalize.js", "out": "dom-attr-normalize.js" },
         { "src": "shared/html-digest.js", "out": "html-digest.js" },
+        { "src": "shared/row-key.js", "out": "row-key.js" },
         { "src": "faces/http.js", "out": "vmz-http.js" },
         { "src": "browser/client-nav.js", "out": "vmz-client-nav.js" }
     ],

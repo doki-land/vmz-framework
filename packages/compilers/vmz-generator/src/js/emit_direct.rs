@@ -2704,9 +2704,11 @@ fn emit_each_block(
             RowEmit::Template => {
                 // The transparent wrapper contributes no DOM node: the row root is a
                 // fragment holding the template body, so a multi-root body stays one
-                // keyed row (Vue `<template v-for>`).
+                // keyed row (Vue `<template v-for>`). The fragment carries the row key
+                // so SSR can write an identity marker pair around the row nodes and
+                // resume can start the row in its own adoption scope.
                 let frag = fresh("f", next_id);
-                item_stmts.push(format!("var {frag} = api.frag();"));
+                item_stmts.push(format!("var {frag} = api.fragRow({box_id}.__vmzKey);"));
                 for kid in emit_nodes(
                     children,
                     fields,
@@ -2723,6 +2725,7 @@ fn emit_each_block(
                 )? {
                     item_stmts.push(format!("{frag}.appendChild({kid});"));
                 }
+                item_stmts.push("api.rowEnd();".to_string());
                 frag
             }
         };

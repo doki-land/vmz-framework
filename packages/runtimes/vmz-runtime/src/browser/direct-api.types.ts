@@ -121,6 +121,10 @@ export type DirectApi = {
     el: (tag: string) => Element;
     text: (value?: unknown) => Text;
     frag: () => DocumentFragment;
+    /** Multi-root `<template v-for>` row fragment (scoped on resume by key). */
+    fragRow: (key?: unknown) => DocumentFragment;
+    /** Closes the row scope opened by `fragRow`. */
+    rowEnd: () => void;
     comment: (value?: string) => Comment;
     attr: (el: Element, name: string, value: unknown) => void;
     mergeClass: (...parts: unknown[]) => string;

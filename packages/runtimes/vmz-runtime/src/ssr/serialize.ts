@@ -25,6 +25,7 @@ import {
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../browser/unknown-component.js';
 import { splitStyleDeclarations } from '../shared/dom-attr-normalize.js';
 import { HTML_HASH_ATTR, htmlDigest } from '../shared/html-digest.js';
+import { rowEndMarker, rowMarker } from '../shared/row-key.js';
 import { _ssrDocumentLastError, ensureSsrDocument } from './document.js';
 import { awaitSsrOnMount, ssrComponentName, ssrOnMountContext } from './onmount.js';
 
@@ -190,7 +191,14 @@ export function flattenSerializeNode(node) {
     if (node.__kind === 'comment') return '';
     if (node.__kind === 'frag') {
         if (node.__rawHtml != null) return String(node.__rawHtml);
-        return (node.children || []).map(flattenSerializeNode).join('');
+        const inner = (node.children || []).map(flattenSerializeNode).join('');
+        // Multi-root `<template v-for>` rows have no element root to carry
+        // `data-vmz-key`, so their identity travels as a marker pair around the
+        // row's nodes. Resume reads the same pair and scopes adoption to it.
+        if (node.__vmzRowKey != null) {
+            return `<!--${rowMarker(node.__vmzRowKey)}-->${inner}<!--${rowEndMarker(node.__vmzRowKey)}-->`;
+        }
+        return inner;
     }
     if (node.__kind === 'el') {
         const tag = node.tag || 'div';
@@ -234,6 +242,12 @@ export function* streamSerializeChunks(node) {
     if (node.__kind === 'frag') {
         if (node.__rawHtml != null) {
             yield String(node.__rawHtml);
+            return;
+        }
+        if (node.__vmzRowKey != null) {
+            yield `<!--${rowMarker(node.__vmzRowKey)}-->`;
+            for (const c of node.children || []) yield* streamSerializeChunks(c);
+            yield `<!--${rowEndMarker(node.__vmzRowKey)}-->`;
             return;
         }
         for (const c of node.children || []) yield* streamSerializeChunks(c);
@@ -565,6 +579,15 @@ const serializeApi = {
                 virtualInsertBefore(this, node, ref);
             },
         };
+    },
+    /** Multi-root `<template v-for>` row fragment; serializes its marker pair. */
+    fragRow(key) {
+        const frag = serializeApi.frag();
+        if (key != null) (frag as any).__vmzRowKey = String(key);
+        return frag;
+    },
+    rowEnd() {
+        /* SSR rows are one-shot: the marker pair closes at serialization. */
     },
     insertBefore(parent, node, ref) {
         virtualInsertBefore(parent, node, ref);

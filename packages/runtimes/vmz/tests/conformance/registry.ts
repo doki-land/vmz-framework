@@ -307,6 +307,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Keyed component and `v-once` rows carry `data-vmz-key` and reclaim SSR nodes after reorder',
         pre: ['build:runtimes'],
     },
+    'ssr-keyed-row-fragment': {
+        file: 'runtime/ssr-keyed-row-fragment.ts',
+        description: 'Multi-root `<template v-for>` rows serialize marker pairs and reclaim SSR nodes by key',
+        pre: ['build:runtimes'],
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
@@ -843,6 +848,7 @@ export const CHECK_ALL = [
     'ssr-keyed-resume',
     'ssr-route-slot-layout',
     'ssr-keyed-non-kernel',
+    'ssr-keyed-row-fragment',
     'v-pre',
     'v-once',
     'ssr-select-multiple',

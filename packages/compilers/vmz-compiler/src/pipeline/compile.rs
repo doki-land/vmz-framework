@@ -789,6 +789,7 @@ fn rewrite_flat_delivery_imports(text: &str) -> String {
         ("../browser/unknown-component.js", "./unknown-component.js"),
         ("../shared/dom-attr-normalize.js", "./dom-attr-normalize.js"),
         ("../shared/html-digest.js", "./html-digest.js"),
+        ("../shared/row-key.js", "./row-key.js"),
         ("../browser/client-nav.js", "./vmz-client-nav.js"),
         ("../ssr/dom-ssr.js", "./dom-ssr.js"),
         ("../faces/server.js", "./vmz-runtime.js"),
@@ -807,6 +808,7 @@ fn rewrite_nested_ssr_delivery(text: &str) -> String {
     // reach the root copy one level up.
     out = replace_import_path(&out, "../shared/dom-attr-normalize.js", "../dom-attr-normalize.js");
     out = replace_import_path(&out, "../shared/html-digest.js", "../html-digest.js");
+    out = replace_import_path(&out, "../shared/row-key.js", "../row-key.js");
     for (from, to) in [
         ("../browser/dom-core.js", "../dom-core.js"),
         ("../browser/direct-host-box.js", "../direct-host-box.js"),
@@ -824,6 +826,7 @@ fn rewrite_nested_browser_delivery(text: &str) -> String {
         "../../dom-attr-normalize.js",
     );
     out = replace_import_path(&out, "../../shared/html-digest.js", "../../html-digest.js");
+    out = replace_import_path(&out, "../../shared/row-key.js", "../../row-key.js");
     // `dom-ssr.js` 只交付在根（flat barrel），nested `ssr/` 下没有它：
     // island resume 的动态边必须指向根级产物。
     out = replace_import_path(&out, "../../ssr/dom-ssr.js", "../../dom-ssr.js");

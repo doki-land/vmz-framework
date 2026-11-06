@@ -1414,6 +1414,11 @@ export default class TemplateEachHost {
         "fragment rows need the node-list row bookkeeping: {js}"
     );
     assert!(
+        js.contains(r#"api.fragRow(box1.__vmzKey)"#),
+        "the row key must reach the fragment so SSR can write row markers: {js}"
+    );
+    assert!(js.contains("api.rowEnd();"), "row scopes must be closed: {js}");
+    assert!(
         !js.contains(r#"api.el("template")"#),
         "`<template v-for>` must not render a literal template element: {js}"
     );

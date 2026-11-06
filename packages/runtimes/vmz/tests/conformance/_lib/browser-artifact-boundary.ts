@@ -27,6 +27,7 @@ const RUNTIME_SHARED_NAMES = new Set([
     'unknown-component.js',
     'dom-attr-normalize.js',
     'html-digest.js',
+    'row-key.js',
 ]);
 
 /**

@@ -85,6 +85,9 @@ export type ResumeAdoptCtx = {
     scopeDepth?: () => number;
     rewindScope?: (depth: number) => void;
     beginBranchScope?: () => () => void;
+    /** Open a multi-root `<template v-for>` row scope (claim the SSR marker pair). */
+    rowStart?: (key: unknown) => boolean;
+    rowEnd?: () => void;
     /** Keep the parked SSR subtree when its SSR payload digest equals `digest`. */
     reclaimHtml?: (el: Element, digest: string) => boolean;
     _enterBalance?: number;

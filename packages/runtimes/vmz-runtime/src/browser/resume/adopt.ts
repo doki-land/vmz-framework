@@ -24,6 +24,7 @@ import {
 } from '../dom-core.js';
 import { createUnknownComponentElement, markUnknownComponentHost, serializeUnknownComponentNode } from '../unknown-component.js';
 import { HTML_HASH_ATTR } from '../../shared/html-digest.js';
+import { ROW_END_MARKER_PREFIX, ROW_MARKER_PREFIX, rowEndMarker, rowMarker } from '../../shared/row-key.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -264,10 +265,77 @@ function createResumeAdopt(pool, rootEl) {
         return true;
     };
 
+    /**
+     * Scope adoption to one multi-root `<template v-for>` row.
+     *
+     * The row has no element root to carry `data-vmz-key`, so SSR wrote a
+     * `<!--vmz-row:KEY-->…<!--vmz-row-end:KEY-->` pair around its nodes. Claim
+     * exactly that pair, move its inner nodes into a private scope, and drop the
+     * markers so the resumed DOM matches a client-created row. A missing or
+     * unbalanced pair means "this row is not in SSR": push an empty scope so the
+     * row is built fresh instead of stealing a sibling row's nodes.
+     */
+    const rowStart = (key) => {
+        const scope = currentScope();
+        const rowPool = document.createDocumentFragment();
+        let claimed = false;
+        if (key != null) {
+            const wanted = rowMarker(key);
+            const wantedEnd = rowEndMarker(key);
+            const nodes: Node[] = [...scope.childNodes];
+            let start = -1;
+            for (let i = 0; i < nodes.length; i++) {
+                const n = nodes[i];
+                if (n.nodeType !== 8) continue;
+                if (String(n.nodeValue || '') === wanted) {
+                    start = i;
+                    break;
+                }
+            }
+            let end = -1;
+            if (start >= 0) {
+                // Nested rows directly inside this row contribute their own pair at
+                // the same sibling level, so pairing is depth-counted.
+                let depth = 0;
+                for (let i = start + 1; i < nodes.length; i++) {
+                    const n = nodes[i];
+                    if (n.nodeType !== 8) continue;
+                    const data = String(n.nodeValue || '');
+                    if (data.startsWith(ROW_MARKER_PREFIX)) {
+                        depth += 1;
+                    } else if (data.startsWith(ROW_END_MARKER_PREFIX)) {
+                        if (depth === 0) {
+                            if (data === wantedEnd) end = i;
+                            break;
+                        }
+                        depth -= 1;
+                    }
+                }
+            }
+            if (end > start) {
+                const startMarker = nodes[start];
+                const endMarker = nodes[end];
+                for (let i = start + 1; i < end; i++) rowPool.appendChild(nodes[i]);
+                if (startMarker.parentNode === scope) scope.removeChild(startMarker);
+                if (endMarker.parentNode === scope) scope.removeChild(endMarker);
+                claimed = true;
+            }
+        }
+        scopeStack.push(rowPool);
+        return claimed;
+    };
+
+    const rowEnd = () => {
+        if (scopeStack.length <= 1) return;
+        scopeStack.pop();
+    };
+
     return {
         el: adoptElement,
         elNS: adoptElementNS,
         claimKeyed,
+        rowStart,
+        rowEnd,
         text: adoptText,
         componentHost,
         enter,

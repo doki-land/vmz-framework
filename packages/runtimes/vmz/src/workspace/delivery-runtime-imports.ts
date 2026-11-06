@@ -25,6 +25,7 @@ function rewriteFlatDeliveryImports(text: string): string {
         ['../browser/unknown-component.js', './unknown-component.js'],
         ['../shared/dom-attr-normalize.js', './dom-attr-normalize.js'],
         ['../shared/html-digest.js', './html-digest.js'],
+        ['../shared/row-key.js', './row-key.js'],
         ['../browser/client-nav.js', './vmz-client-nav.js'],
         ['../ssr/dom-ssr.js', './dom-ssr.js'],
         ['../faces/server.js', './vmz-runtime.js'],
@@ -43,6 +44,7 @@ function rewriteNestedSsrDelivery(text: string): string {
     // reach the root copy one level up.
     out = replaceImportPath(out, '../shared/dom-attr-normalize.js', '../dom-attr-normalize.js');
     out = replaceImportPath(out, '../shared/html-digest.js', '../html-digest.js');
+    out = replaceImportPath(out, '../shared/row-key.js', '../row-key.js');
     for (const [from, to] of [
         ['../browser/dom-core.js', '../dom-core.js'],
         ['../browser/direct-host-box.js', '../direct-host-box.js'],
@@ -56,6 +58,7 @@ function rewriteNestedSsrDelivery(text: string): string {
 function rewriteNestedBrowserDelivery(text: string): string {
     let out = replaceImportPath(text, '../../shared/dom-attr-normalize.js', '../../dom-attr-normalize.js');
     out = replaceImportPath(out, '../../shared/html-digest.js', '../../html-digest.js');
+    out = replaceImportPath(out, '../../shared/row-key.js', '../../row-key.js');
     // `dom-ssr.js` 只交付在根（flat barrel），nested `ssr/` 下没有它：
     // island resume 的动态边必须指向根级产物。
     out = replaceImportPath(out, '../../ssr/dom-ssr.js', '../../dom-ssr.js');

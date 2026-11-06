@@ -269,6 +269,20 @@ export const directApi = {
         noteDomCreate();
         return document.createDocumentFragment();
     },
+    /**
+     * Multi-root `<template v-for>` row. Resume narrows adoption to the SSR
+     * marker pair for this key; a key with no pair gets an empty scope so a new
+     * row can never steal nodes that belong to another key.
+     */
+    fragRow(key ?) {
+        const adopt = directApi._resumeAdopt;
+        if (adopt && typeof adopt.rowStart === 'function') adopt.rowStart(key);
+        return directApi.frag();
+    },
+    rowEnd() {
+        const adopt = directApi._resumeAdopt;
+        if (adopt && typeof adopt.rowEnd === 'function') adopt.rowEnd();
+    },
     comment(value) {
         noteDomCreate();
         return document.createComment(value == null ? '' : String(value));
