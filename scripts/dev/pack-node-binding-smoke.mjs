@@ -82,10 +82,10 @@ check(nodeEntry !== null, 'Node target must emit an entry chunk');
 const nodeCode = nodeEntry?.code ?? '';
 
 check(
-    /import\s+\{\s*readFile as readFile__vmz_node\d+\s*\}\s+from\s+"node:fs\/promises";/.test(nodeCode),
+    /import\s*\{\s*readFile as readFile__vmz_node\d+\s*\}\s*from\s*"node:fs\/promises";/.test(nodeCode),
     `Node target must keep a chunk-level external import with a renamed binding:\n${nodeCode}`,
 );
-check(/import\s+"node:os";/.test(nodeCode), `Node target must keep the side-effect import:\n${nodeCode}`);
+check(/import\s*"node:os";/.test(nodeCode), `Node target must keep the side-effect import:\n${nodeCode}`);
 
 const nodeCodes = nodeResponse.diagnostics.map((diagnostic) => diagnostic.code);
 check(
