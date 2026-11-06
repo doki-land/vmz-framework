@@ -1,5 +1,5 @@
 import type { DiagnosticInput, FormatOptions, PositionContext, Severity } from './index.js';
-import { displayWidth, utf8ByteSlice, utf8LineAt } from './utf8.js';
+import { displayWidth, expandTabs, utf8ByteSlice, utf8LineAt } from './utf8.js';
 
 export type PrettyStyle = 'compact' | 'pretty';
 
@@ -54,7 +54,7 @@ function renderSnippetLine(
     severity: Severity,
 ): void {
     const gutter = paint(`${String(lineNum).padStart(gutterWidth)} | `, ANSI.dim);
-    out.push(`${gutter}${lineText}`);
+    out.push(`${gutter}${expandTabs(lineText)}`);
     const marker =
         paint(`${' '.repeat(gutterWidth)} | `, ANSI.dim) +
         ' '.repeat(startCell) +

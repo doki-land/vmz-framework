@@ -88,9 +88,38 @@ export function scalarDisplayWidth(ch: string): number {
     return isWideCodePoint(cp) ? 2 : 1;
 }
 
-/** Display width of a line fragment in terminal cells. */
+/** Tab stops used when rendering source snippets, matching rustc and miette defaults. */
+export const SNIPPET_TAB_WIDTH = 4;
+
+/** Display width of a line fragment in terminal cells (tabs advance to the next stop). */
 export function displayWidth(text: string): number {
     let cells = 0;
-    for (const ch of text) cells += scalarDisplayWidth(ch);
+    for (const ch of text) {
+        if (ch === '\t') {
+            cells += SNIPPET_TAB_WIDTH - (cells % SNIPPET_TAB_WIDTH);
+        } else {
+            cells += scalarDisplayWidth(ch);
+        }
+    }
     return cells;
+}
+
+/**
+ * Expand tabs to spaces so the printed source line and the caret row agree in
+ * any terminal, regardless of that terminal's own tab-stop configuration.
+ */
+export function expandTabs(text: string): string {
+    let cells = 0;
+    let out = '';
+    for (const ch of text) {
+        if (ch === '\t') {
+            const pad = SNIPPET_TAB_WIDTH - (cells % SNIPPET_TAB_WIDTH);
+            out += ' '.repeat(pad);
+            cells += pad;
+            continue;
+        }
+        out += ch;
+        cells += scalarDisplayWidth(ch);
+    }
+    return out;
 }

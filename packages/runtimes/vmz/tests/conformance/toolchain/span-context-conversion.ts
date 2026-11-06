@@ -135,6 +135,44 @@ assert.equal(
     'error[test.code]: boom\n  --> demo.vmz:2:1\n2 | 😀x\n  | ^^',
 );
 
+// Tabs expand to the next 4-cell stop in both the source line and the caret row.
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: 1, end: 4 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext('\tlet x'),
+            sourceText: '\tlet x',
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:1:2\n1 |     let x\n  |     ^^^',
+);
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: 3, end: 5 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext('ab\tcd'),
+            sourceText: 'ab\tcd',
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n  --> demo.vmz:1:4\n1 | ab  cd\n  |     ^^',
+);
+
 // A zero-width span points at an insertion site and still gets one caret.
 const emptySource = 'ab\ncd';
 assert.equal(
