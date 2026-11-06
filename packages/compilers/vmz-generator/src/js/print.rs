@@ -116,7 +116,7 @@ fn minify_tokens(
     let mut line = 0u32;
     let mut col = 0u32;
     let mut segments = Vec::new();
-    let source_lines = SourceLines::new(source);
+    let mut cursor = PositionCursor::new(source);
     let mut prev: Option<(T, usize, usize)> = None;
 
     for token in tokens.iter() {
@@ -136,7 +136,7 @@ fn minify_tokens(
                 let separator = separator(prev_kind, &source[prev_start..prev_end], fragment, gap);
                 push_text(&mut out, &mut line, &mut col, separator);
             }
-            let (src_line, src_col) = source_lines.line_col(start);
+            let (src_line, src_col) = cursor.advance_to(start);
             segments.push(SourceMapSegment {
                 gen_line: line,
                 gen_col: col,
@@ -149,6 +149,38 @@ fn minify_tokens(
         }
     }
     Ok((out, segments))
+}
+
+/// 顺序读取源文本位置：token 起点单调递增，整趟只扫一遍字节。
+///
+/// 不能用 [`SourceLines::line_col`]：它会从行首 `chars()` 数到目标偏移，
+/// 遇到单行超长文本（例如内联的大 JSON 数据）就是 O(行长度 × token 数)。
+struct PositionCursor<'a> {
+    source: &'a str,
+    offset: usize,
+    line: u32,
+    col: u32,
+}
+
+impl<'a> PositionCursor<'a> {
+    fn new(source: &'a str) -> Self {
+        Self { source, offset: 0, line: 0, col: 0 }
+    }
+
+    /// 前进到 `target`（调用方保证单调不减），返回该处的行与 UTF-16 列。
+    fn advance_to(&mut self, target: usize) -> (u32, u32) {
+        let target = target.min(self.source.len());
+        for ch in self.source[self.offset..target].chars() {
+            if ch == '\n' {
+                self.line += 1;
+                self.col = 0;
+            } else {
+                self.col += ch.len_utf16() as u32;
+            }
+        }
+        self.offset = target;
+        (self.line, self.col)
+    }
 }
 
 /// Split a token span into the byte ranges that survive type erasure.

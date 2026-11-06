@@ -161,6 +161,100 @@ fn single_module_change_rebuilds_only_its_chunk() {
     assert_eq!(after.len(), 3, "变化 chunk 的旧文件必须删除：{after:?}");
 }
 
+/// 共享模块的纯内容改动只失效包含它的 chunk 与其下游依赖 chunk：
+/// 图摘要不变，无关 chunk 继续复用旧文件名与字节，结果与冷构建逐字节一致。
+#[test]
+fn shared_module_content_change_rebuilds_only_dependent_chunks() {
+    // `two` 不依赖 shared，作为「无关 chunk」的对照组。
+    const TREE: &[(&str, &str)] = &[
+        ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+        ("src/one.js", "import { shared } from './shared.js';\nexport const a1 = shared;\n"),
+        ("src/two.js", "export const a2 = 2;\n"),
+        ("src/shared.js", "export const shared = 7;\n"),
+    ];
+    let root = temp_tree("sharedcontent", TREE);
+    let entries = ["one", "two"];
+    let build_all = || {
+        let graph = build_with(&root, &entries);
+        let uses: Vec<EntryUse> = entries
+            .iter()
+            .zip(["a1", "a2"])
+            .map(|(logical, export)| EntryUse {
+                entry_logical: logical.to_string(),
+                execution: EntryExecution::SideEffects,
+                exports: EntryExports::Named(vec![export.to_string()]),
+            })
+            .collect();
+        let link_plan = link(&graph, &uses);
+        let chunks = plan_chunks(&graph, &link_plan);
+        assert!(chunks.diagnostics.is_empty(), "{:?}", chunks.diagnostics);
+        (graph, link_plan, chunks)
+    };
+
+    let (graph, link_plan, chunks) = build_all();
+    let out = root.join("out");
+    let mut cache = EmitCache::load(&out);
+    let first = plan_emit_with_cache(&graph, &link_plan, &chunks, &options(), &mut cache).unwrap();
+    write_emit_incremental(&first, &out, true).unwrap();
+    cache.store().unwrap();
+    let before: BTreeMap<String, String> = first
+        .artifacts
+        .iter()
+        .map(|artifact| (artifact.chunk_id.clone(), artifact.file_name.clone()))
+        .collect();
+
+    fs::write(root.join("src/shared.js"), "export const shared = 8;\n").unwrap();
+    let (graph, link_plan, chunks) = build_all();
+    let mut cache = EmitCache::load(&out);
+    let second = plan_emit_with_cache(&graph, &link_plan, &chunks, &options(), &mut cache).unwrap();
+    assert_eq!(first.graph_digest, second.graph_digest, "纯内容改动不得改变图摘要");
+    assert!(!cache.graph_changed(), "纯内容改动不得触发整体失效");
+    write_emit_incremental(&second, &out, true).unwrap();
+    cache.store().unwrap();
+
+    let shared_node = graph
+        .nodes
+        .iter()
+        .position(|node| node.resolved.path.ends_with("shared.js"))
+        .expect("shared.js 必须在图里");
+    let mut affected = vec![false; chunks.chunks.len()];
+    for (index, chunk) in chunks.chunks.iter().enumerate() {
+        affected[index] = chunk.modules.contains(&shared_node);
+    }
+    // 反向传递：依赖受影响 chunk 的 chunk 也会嵌入新文件名。
+    loop {
+        let mut grew = false;
+        for (index, chunk) in chunks.chunks.iter().enumerate() {
+            if affected[index] || !chunk.depends_on.iter().any(|dep| affected[*dep]) {
+                continue;
+            }
+            affected[index] = true;
+            grew = true;
+        }
+        if !grew {
+            break;
+        }
+    }
+
+    let mut reused = 0;
+    for (index, chunk) in chunks.chunks.iter().enumerate() {
+        let old_name = before.get(&chunk.id).expect("chunk id 必须稳定");
+        let new_name = &second.artifacts[index].file_name;
+        if affected[index] {
+            assert_ne!(old_name, new_name, "受影响 chunk 必须重建：{}", chunk.id);
+        } else {
+            assert_eq!(old_name, new_name, "无关 chunk 必须复用：{}", chunk.id);
+            reused += 1;
+        }
+    }
+    assert!(reused >= 1, "对照树里必须有与 shared.js 无关的 chunk");
+
+    let cold_dir = root.join("out-cold");
+    let cold_plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    write_emit(&cold_plan, &cold_dir).unwrap();
+    assert_eq!(snapshot(&cold_dir), snapshot(&out), "增量与冷构建必须逐字节一致");
+}
+
 /// 图结构变化（新增模块 + 新边）必须整体失效：即使缓存条目仍在，
 /// 本次任何 chunk 都不得复用旧结果。
 #[test]
