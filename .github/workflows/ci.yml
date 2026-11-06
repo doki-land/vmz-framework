@@ -119,6 +119,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
 
       - name: Install dependencies
         run: pnpm install
