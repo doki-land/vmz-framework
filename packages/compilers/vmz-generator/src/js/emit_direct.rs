@@ -1356,7 +1356,12 @@ fn emit_plain_element(
                 let attr_name = if a.name == "className" { "class" } else { a.name.as_str() };
                 stmts.push(format!("api.attr({el}, {}, {});", q(attr_name), q(s)));
             }
-            ViewAttrValue::Bare => {}
+            // `<button disabled>` / `<option value>` carry no value in the template,
+            // so they must still reach the DOM. `true` is the empty-attribute
+            // sentinel shared with `BOOLEAN_HTML_ATTRS` and SSR serialization.
+            ViewAttrValue::Bare => {
+                stmts.push(format!("api.attr({el}, {}, true);", q(&a.name)));
+            }
             ViewAttrValue::Interp { expr: e } if is_show_attr(&a.name) => {
                 emit_bind_show(
                     e,

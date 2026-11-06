@@ -37,6 +37,25 @@ export default class CounterButton {
 }
 
 #[test]
+fn bare_static_attrs_emit_empty_attribute_writes() {
+    let src = r#"
+export default class BareAttrs {
+  count = 0;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<div><button disabled>off</button><option value>—</option></div>"#)
+            .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // A value-less template attribute is still an empty-valued DOM attribute.
+    assert!(js.contains(r#""disabled", true);"#), "bare `disabled` dropped: {js}");
+    assert!(js.contains(r#""value", true);"#), "bare `value` dropped: {js}");
+}
+
+#[test]
 fn if_else_emits_if_block() {
     let src = r#"
 export default class BranchDemo {
