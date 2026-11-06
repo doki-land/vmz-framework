@@ -43,7 +43,7 @@ function collect(node) {
     return out;
 }
 
-const { registerComponents, renderToString, hydrateRoute } = await import(domHref);
+const { registerComponents, renderToString, hydrateRoute, hydrate } = await import(domHref);
 
 /** Page shape: root div > p > b(text), plus a button (element + text identity). */
 class RoutePage {
@@ -133,7 +133,52 @@ class StatefulSlotLayout {
     }
 }
 
-registerComponents({ RoutePage, TransparentLayout, WrappedLayout, StatefulSlotLayout });
+/** Shell with an internal `<main><slot/></main>`: SSR flattens the outlet in place. */
+class ShellHost {
+    static __vmzDirect = true;
+    static __vmzProps = [];
+    static __vmzState = [];
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-vmz-ui', 'shell-host');
+        api.adoptEnter(rootEl);
+        const main = api.el('main');
+        api.attr(main, 'data-vmz-shell', 'main');
+        api.adoptEnter(main);
+        const slot = api.el('slot');
+        api.adoptEnter(slot);
+        api.adoptLeave();
+        main.appendChild(slot);
+        api.adoptLeave();
+        rootEl.appendChild(main);
+        api.adoptLeave();
+        return rootEl;
+    }
+}
+
+/** Page that projects its own `<main>` into `ShellHost`'s default outlet. */
+class ProjectedPage {
+    static __vmzDirect = true;
+    static __vmzCreate(api) {
+        const hostEl = api.component(this, ShellHost, {}, null);
+        api.adoptEnter(hostEl);
+        const main = api.el('main');
+        api.attr(main, 'data-fixture', 'projected-main');
+        api.adoptEnter(main);
+        const p = api.el('p');
+        api.attr(p, 'data-fixture', 'projected-p');
+        api.adoptEnter(p);
+        p.appendChild(api.text('projected copy'));
+        api.adoptLeave();
+        main.appendChild(p);
+        api.adoptLeave();
+        api.projectDefaultSlot(hostEl, main);
+        api.adoptLeave();
+        return hostEl;
+    }
+}
+
+registerComponents({ RoutePage, TransparentLayout, WrappedLayout, StatefulSlotLayout, ShellHost, ProjectedPage });
 
 const pageHtml = await renderToString(RoutePage, { props: {} });
 if (!pageHtml.includes('data-fixture="route-p"')) fail(`SSR page missing p: ${pageHtml}`);
@@ -197,6 +242,35 @@ if (!pageHtml.includes('data-fixture="route-p"')) fail(`SSR page missing p: ${pa
     if (inst === app.__vmzInst) fail('stateful layout must not hand #app to the page instance');
     if (!app.querySelector('[data-fixture="route-p"]')) fail('page missing under stateful slot layout');
     console.log('ssr-route-slot-layout: stateful slot layout keeps the mount path');
+}
+
+// 4. Projected page inside a slotted shell: SSR flattens the outlet in place, so
+// the page subtree is only reachable through the default slot pool.
+{
+    const projectedHtml = await renderToString(ProjectedPage, { props: {} });
+    if (!projectedHtml.includes('data-fixture="projected-p"')) fail(`SSR projection missing p: ${projectedHtml}`);
+    if (/<slot[\s>]/.test(projectedHtml)) fail(`SSR must flatten the slot outlet: ${projectedHtml}`);
+    const { window } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${projectedHtml}</div></body></html>`);
+    installDom(window);
+    const app = window.document.getElementById('app');
+    const ssrMain = app.querySelector('[data-fixture="projected-main"]');
+    const ssrP = app.querySelector('[data-fixture="projected-p"]');
+    const before = collect(app);
+    const seen = new WeakSet(before);
+
+    await hydrate(ProjectedPage, app, {});
+    if (app.querySelector('[data-fixture="projected-main"]') !== ssrMain) {
+        fail('projected <main> was recreated instead of adopted');
+    }
+    if (app.querySelector('[data-fixture="projected-p"]') !== ssrP) {
+        fail('projected <p> was recreated instead of adopted');
+    }
+    if (!app.querySelector('[data-vmz-shell="main"]')?.contains(ssrMain)) {
+        fail('projected <main> did not land inside the shell outlet');
+    }
+    const fresh = collect(app).filter((n) => !seen.has(n));
+    if (fresh.length) fail(`slot projection still created ${fresh.length} node(s) on hydrate`);
+    console.log('ssr-route-slot-layout: projected page reclaimed through the slot outlet');
 }
 
 console.log('ssr-route-slot-layout GATE PASS: pass-through layouts hydrate the SSR route in place');

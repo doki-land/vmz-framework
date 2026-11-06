@@ -107,7 +107,13 @@ function createResumeAdopt(pool, rootEl) {
             if (String(el.tagName).toLowerCase() === want) return markElement(el);
         }
         noteDomCreate();
-        return svg ? document.createElementNS(SVG_NS, tag || 'svg') : document.createElement(tag || 'div');
+        const fresh = svg ? document.createElementNS(SVG_NS, tag || 'svg') : document.createElement(tag || 'div');
+        // Direct SSR flattens `<slot/>` away and writes the projected children in
+        // place, so a rebuilt outlet has no SSR counterpart: its projection stays
+        // in the enclosing scope. Share that scope as the outlet pool so a later
+        // `adoptEnter(host)` can still reclaim the projected subtree.
+        if (want === 'slot') (fresh as any).__vmzResumePool = currentScope();
+        return fresh;
     };
 
     const adoptElementNS = (ns, tag) => {
@@ -173,8 +179,30 @@ function createResumeAdopt(pool, rootEl) {
         return null;
     };
 
+    /** Any parked SSR node in `frag` that no earlier create has claimed. */
+    const hasUnusedNode = (frag) => {
+        for (const n of frag.childNodes) {
+            if (!used.has(n)) return true;
+        }
+        return false;
+    };
+
     const enter = (node) => {
-        if (!node || !node.__vmzResumePool) return false;
+        if (!node) return false;
+        // `adoptEnter(host)` in the parent template wraps the *projection*, not the
+        // component's own internals (its host pool was consumed by the component
+        // create). The parked projection lives under the default `<slot/>` outlet,
+        // so entering the host must push that outlet's pool.
+        const owner = node.__vmzInst;
+        if (owner) {
+            const slot = findOwnedDefaultSlot(owner.__vmzDomRoot);
+            const slotPool = slot && slot.__vmzResumePool;
+            if (slotPool && hasUnusedNode(slotPool)) {
+                scopeStack.push(slotPool);
+                return true;
+            }
+        }
+        if (!node.__vmzResumePool) return false;
         scopeStack.push(node.__vmzResumePool);
         return true;
     };
