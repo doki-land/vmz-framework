@@ -20,7 +20,7 @@ members = [
 default-members = ["packages/compilers/vmz-compiler"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.3.14"
 edition = "2024"
 license = "MIT"
 authors = ["VMZ Contributors"]
