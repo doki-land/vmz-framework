@@ -1,7 +1,11 @@
 <template>
     <div id="emit">
-        <em>{{ state.mode }}</em>
-        <button type="button" id="emit-wire" @click="wire">wire</button>
+        <em>
+            {{ state.mode }}
+        </em>
+        <button type="button" id="emit-wire" @click="wire">
+            wire
+        </button>
     </div>
 </template>
 <script client>
