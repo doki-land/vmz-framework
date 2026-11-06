@@ -103,6 +103,9 @@ fn minify_tokens(
     source: &str,
     deletions: &[(usize, usize)],
 ) -> Result<(String, Vec<SourceMapSegment>), String> {
+    // 测试期探针按「一次压缩」武装：只判定单次调用是否重复扫描。
+    #[cfg(test)]
+    scan_probe::arm(source.len());
     let text = SourceText::new(source);
     let language = TypeScriptLanguage::default();
     let lexer = TypeScriptLexer::new(&language);
@@ -151,6 +154,45 @@ fn minify_tokens(
     Ok((out, segments))
 }
 
+#[cfg(test)]
+mod scan_probe {
+    use std::cell::Cell;
+
+    thread_local! {
+        /// `Some(源长度)` = 守卫已武装，累计扫描超过该长度即判定重复扫描。
+        static LIMIT: Cell<Option<usize>> = const { Cell::new(None) };
+        /// 本次武装期间实际遍历过的字符数。
+        static SCANNED: Cell<usize> = const { Cell::new(0) };
+    }
+
+    /// 武装探针：`len` 为源文本字符数。
+    pub(super) fn arm(len: usize) {
+        LIMIT.with(|limit| limit.set(Some(len)));
+        SCANNED.with(|scanned| scanned.set(0));
+    }
+
+    /// 关闭探针并返回本次累计的扫描字符数。
+    pub(super) fn disarm() -> usize {
+        LIMIT.with(|limit| limit.set(None));
+        SCANNED.with(|scanned| scanned.replace(0))
+    }
+
+    /// 记录一次位置定位实际遍历过的字符数。
+    ///
+    /// 超出源长度立即失败：平方级的 `line_col` 实现会很快触发，
+    /// 不必等它把整份文本重复扫上几分钟。
+    pub(super) fn record(visited: usize) {
+        SCANNED.with(|scanned| scanned.set(scanned.get() + visited));
+        if let Some(limit) = LIMIT.with(Cell::get) {
+            let total = SCANNED.with(Cell::get);
+            assert!(
+                total <= limit,
+                "source map positions rescanned the source: {total} chars for a {limit}-char source"
+            );
+        }
+    }
+}
+
 /// 顺序读取源文本位置：token 起点单调递增，整趟只扫一遍字节。
 ///
 /// 不能用 [`SourceLines::line_col`]：它会从行首 `chars()` 数到目标偏移，
@@ -170,7 +212,13 @@ impl<'a> PositionCursor<'a> {
     /// 前进到 `target`（调用方保证单调不减），返回该处的行与 UTF-16 列。
     fn advance_to(&mut self, target: usize) -> (u32, u32) {
         let target = target.min(self.source.len());
+        #[cfg(test)]
+        let mut visited = 0usize;
         for ch in self.source[self.offset..target].chars() {
+            #[cfg(test)]
+            {
+                visited += 1;
+            }
             if ch == '\n' {
                 self.line += 1;
                 self.col = 0;
@@ -178,6 +226,8 @@ impl<'a> PositionCursor<'a> {
                 self.col += ch.len_utf16() as u32;
             }
         }
+        #[cfg(test)]
+        scan_probe::record(visited);
         self.offset = target;
         (self.line, self.col)
     }
@@ -375,8 +425,20 @@ impl<'a> SourceLines<'a> {
     pub fn line_col(&self, offset: usize) -> (u32, u32) {
         let offset = offset.min(self.source.len());
         let line = self.starts.partition_point(|&start| start <= offset) - 1;
-        let column =
-            self.source[self.starts[line]..offset].chars().map(|ch| ch.len_utf16() as u32).sum();
+        let mut column = 0u32;
+        #[cfg(test)]
+        let mut visited = 0usize;
+        for ch in self.source[self.starts[line]..offset].chars() {
+            column += ch.len_utf16() as u32;
+            #[cfg(test)]
+            {
+                visited += 1;
+            }
+        }
+        // 从行首重新数到目标偏移：逐 token 调用就是平方级。探针在此记录，
+        // 让守卫能在退回该写法时立刻失败。
+        #[cfg(test)]
+        scan_probe::record(visited);
         (line as u32, column)
     }
 }
@@ -448,4 +510,58 @@ fn vlq(value: i64) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{minify_source, scan_probe};
+
+    /// 合成输入的 token 数量级与内联大数据的真实产物一致（数万 token）。
+    const NUMBERS: usize = 37_000;
+    /// 尾部允许未被扫描的字符数（最后一个 token 之后的部分）。
+    const TAIL_CHARS: usize = 64;
+
+    fn single_line_payload() -> String {
+        let mut source = String::with_capacity(200 * 1024);
+        source.push_str("const data=[");
+        for index in 0..NUMBERS {
+            if index > 0 {
+                source.push(',');
+            }
+            source.push_str(&index.to_string());
+        }
+        source.push_str("];");
+        source
+    }
+
+    /// 回归守卫：单行超长文本的压缩只做一遍位置扫描。
+    ///
+    /// 这不是性能基准，也不设墙钟阈值：判据是可数的内部工作量。旧的
+    /// `SourceLines::line_col` 对每个 token 都从行首重新数一遍，扫描字符数
+    /// 是 O(行长度 × token 数)，一旦退回这种写法就会超过源长度若干数量级。
+    /// 探针在累计扫描超过源长度时立即失败。
+    #[test]
+    fn minify_positions_scan_single_line_source_once() {
+        let source = single_line_payload();
+        assert!(!source.contains('\n'), "守卫输入必须是单行文本");
+        let source_bytes = source.len();
+        let source_chars = source.chars().count();
+        assert!(source_bytes > 180 * 1024, "合成输入应接近 200KB，实际 {source_bytes} 字节");
+
+        let (code, segments) = minify_source(&source).expect("合成输入必须能压缩");
+        let scanned = scan_probe::disarm();
+
+        // 输出断言：压缩必须真的发生，而不是跳过压缩后原样返回。
+        assert_eq!(code, source, "压缩结果与预期不一致");
+        assert!(segments.len() > 70_000, "合成输入应有可比数量的 token，实际 {}", segments.len());
+
+        assert!(
+            scanned <= source_chars,
+            "位置定位重复扫描：{scanned} 字符 / 源文本 {source_chars} 字符"
+        );
+        assert!(
+            scanned + TAIL_CHARS >= source_chars,
+            "位置游标没有走到文本末尾：{scanned} 字符 / 源文本 {source_chars} 字符"
+        );
+    }
 }
