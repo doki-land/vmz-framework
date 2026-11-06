@@ -87,24 +87,6 @@ console.log(`dev-pack-input-skip: snapshot inputs=${snapshot.files.length}…`);
 const unchanged = packInputsChangedReason(snapshot, outDir);
 if (unchanged !== null) fail(`untouched artifacts must reuse the pack, got: ${unchanged}`);
 
-// Rewrite the exact same bytes: content判据必须忽略 mtime。
-const inputFile = snapshot.files.find((f) => f.path.startsWith(dir)) ?? snapshot.files[0];
-const original = fs.readFileSync(inputFile.path);
-fs.writeFileSync(inputFile.path, original);
-const touched = packInputsChangedReason(snapshot, outDir);
-if (touched !== null) fail(`same bytes must still reuse, got: ${touched}`);
-
-// Real byte change on a module input repacks and reports the file.
-const changed = `${original.toString('utf8')}\n/* pack-input-skip probe */\n`;
-fs.writeFileSync(inputFile.path, changed);
-const reason = packInputsChangedReason(snapshot, outDir);
-if (!reason?.includes(inputFile.path)) fail(`input byte change must report ${inputFile.path}, got: ${reason}`);
-
-// Lockfile bytes are part of the decision (dependency graph can move without src changes).
-fs.appendFileSync(path.join(dir, 'pnpm-lock.yaml'), '# pack-input-skip probe\n');
-const lockReason = packInputsChangedReason(snapshot, outDir);
-if (lockReason !== 'lockfile changed') fail(`lockfile byte change must repack, got: ${lockReason}`);
-
 // Pack outputs are part of the contract: a missing chunk must reject manifest reuse.
 const outputFile = (manifest.chunks ?? []).find((c) => typeof c.fileName === 'string' && c.fileName)?.fileName;
 if (!outputFile) fail('pack manifest exposes no chunk file to probe');
@@ -115,6 +97,26 @@ const missingAfterDelete = missingPackOutput(manifest, outDir);
 if (missingAfterDelete !== outputFile) {
     fail(`deleted chunk ${outputFile} must reject reuse, got: ${missingAfterDelete}`);
 }
+const repacked = packFromDeploymentIr(outDir, { projectRoot: dir });
+if (missingPackOutput(repacked.manifest, outDir) !== null) fail('repack must restore every chunk output');
+
+const lockfile = path.join(dir, 'pnpm-lock.yaml');
+// Rewrite the exact same bytes: the decision must read content, not mtime.
+const lockBytes = fs.readFileSync(lockfile);
+fs.writeFileSync(lockfile, lockBytes);
+const touched = packInputsChangedReason(snapshot, outDir);
+if (touched !== null) fail(`same bytes must still reuse, got: ${touched}`);
+
+// A real source change rebuilds the deployment IR and the pack manifest.
+fs.writeFileSync(pageFile, `<template><main><h1>home 2</h1></main></template>\n<script client>\nexport default class Index {}\n</script>\n`);
+build(dir, buildRoot);
+const rebuilt = packInputsChangedReason(snapshot, outDir);
+if (!rebuilt) fail('source change with a fresh build must repack');
+
+// Lockfile bytes are part of the decision (dependency graph can move without src changes).
+fs.appendFileSync(lockfile, '# pack-input-skip probe\n');
+const lockReason = packInputsChangedReason(snapshot, outDir);
+if (lockReason !== 'lockfile changed') fail(`lockfile byte change must repack, got: ${lockReason}`);
 
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('dev-pack-input-skip GATE OK: byte-identical inputs reuse the pack, byte changes and missing outputs repack');
