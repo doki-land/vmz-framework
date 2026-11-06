@@ -6,7 +6,7 @@
         "directory": "packages/davinci/davinci"
     },
     "version": "0.0.0",
-    "private": false,
+    "private": true,
     "type": "module",
     "description": "DaVinci engine facade — single public entry for chart/diagram/scene/types/runtime/motion. Tree-shakeable ESM.",
     "license": "MIT",
