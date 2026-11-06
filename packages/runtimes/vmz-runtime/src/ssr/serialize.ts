@@ -921,5 +921,14 @@ function applySerializeAttr(el, name, value) {
 }
 
 function escapeHtml(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        // The HTML input stream normalizes a literal CR (and CRLF) to LF before
+        // tokenization, so a raw `\r` would not survive the parse. Emit a character
+        // reference instead: hydration then keeps the exact server value.
+        .replace(/\r/g, '&#13;');
 }
+
