@@ -197,6 +197,13 @@ export function assertNoBrowserPlanDispatch(root = repoRoot(import.meta.url), sc
     if (/\/vmz-dom\.js/.test(clientNav) && !/dom\.browser\.js/.test(clientNav)) {
         errors.push('client-nav must load thin /dom.browser.js face');
     }
+    const clientNavigation = fs.readFileSync(
+        path.join(root, 'packages/runtimes/vmz-runtime/src/browser/navigation/client-navigation.ts'),
+        'utf8',
+    );
+    if (/dom\.browser\.js/.test(clientNavigation) || /import\(\s*(?:\/\*[\s\S]*?\*\/\s*)?['"`]\//.test(clientNavigation)) {
+        errors.push('client-navigation must resolve page faces through the generated pack handlers, not root-URL imports');
+    }
     if (scan) {
         if (/renderToString|renderToStream/.test(scan.entryClient)) {
             errors.push('entry-client must not reference renderToString/renderToStream');

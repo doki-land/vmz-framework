@@ -10,21 +10,17 @@ export type HydrateRouteFn = (Page: ComponentCtorLike, root: Element, props: obj
 
 export type HydrateRoutePageFn = (Page: ComponentCtorLike, root: Element, props: object) => Promise<unknown>;
 
-export type DomFallbackModule = {
-    hydrate?: HydrateFn;
-    hydrateRoute?: HydrateRouteFn;
-    hydrateRoutePage?: HydrateRoutePageFn;
-};
-
 export type ClientNavOpts = {
     fetchImpl?: typeof fetch;
     document?: Document;
     history?: History;
     location?: Location;
+    /** Packed face 的 hydrate，由生成入口静态引入；页面导航缺失时显式报错，不回落到未打包路径。 */
     hydrate?: HydrateFn;
     hydrateRoute?: HydrateRouteFn;
     hydrateRoutePage?: HydrateRoutePageFn;
     destroy?: (inst: DirectInstance | object) => void;
+    /** Pack manifest 的 chunk 查表（生成入口的 import 表）；缺失时页面导航显式报错。 */
     importPage?: (chunkId: string) => Promise<unknown>;
 };
 

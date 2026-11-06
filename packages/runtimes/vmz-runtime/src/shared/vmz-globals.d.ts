@@ -53,9 +53,3 @@ declare global {
         vmzDestroy?: (inst?: unknown) => void;
     }
 }
-
-declare module '/dom.browser.js' {
-    export function hydrate(Ctor: unknown, root: Element, props: object): Promise<unknown>;
-    export function hydrateRoute(Page: unknown, root: Element, props: object, layouts?: unknown[]): Promise<unknown>;
-    export function hydrateRoutePage(Page: unknown, root: Element, props: object): Promise<unknown>;
-}

@@ -40,10 +40,6 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
         else if (win?.vmzDestroy) win.vmzDestroy(inst);
     }
 
-    async function loadDomFallback() {
-        return import(/* @vite-ignore */ '/dom.browser.js' as string);
-    }
-
     async function transitionTo(url: string | URL, { replace = false, fromPop = false, softFail = false }: Record<string, unknown> = {}) {
         const target = new URL(url, loc.href);
         if (target.origin !== loc.origin) {
@@ -98,7 +94,12 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                 else hist.pushState({ vmzClientNav: true }, '', target.href);
             }
 
-            const importChunk = opts.importPage || (async (id: string) => (await import(/* @vite-ignore */ `/${id}.client.js`)).default);
+            const importChunk = (id: string) => {
+                if (typeof opts.importPage !== 'function') {
+                    throw new Error('vmz:client-nav missing importPage — the generated entry must pass the pack manifest table');
+                }
+                return opts.importPage(id);
+            };
 
             let liveRoot: HTMLElement = root;
             let retainedLayout = false;
@@ -109,24 +110,16 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                 applyAppAttrs(root, nextApp);
                 if (chunkId) {
                     const Page = await importChunk(chunkId);
-                    let hydrateRoutePage = opts.hydrateRoutePage;
-                    if (typeof hydrateRoutePage !== 'function') {
-                        const dom = await loadDomFallback();
-                        hydrateRoutePage = dom.hydrateRoutePage;
-                    }
-                    if (typeof hydrateRoutePage === 'function') {
-                        await hydrateRoutePage(Page, root, props);
-                    } else {
-                        let hydrate = opts.hydrate;
-                        if (typeof hydrate !== 'function') {
-                            const dom = await loadDomFallback();
-                            hydrate = dom.hydrate;
-                        }
+                    if (typeof opts.hydrateRoutePage === 'function') {
+                        await opts.hydrateRoutePage(Page, root, props);
+                    } else if (typeof opts.hydrate === 'function') {
                         const pageHost = (root as any).__vmzPageHost || root;
                         if (pageHost.__vmzInst) destroyInst(pageHost.__vmzInst);
-                        await hydrate(Page, pageHost, props);
+                        await opts.hydrate(Page, pageHost, props);
                         (root as any).__vmzPageHost = pageHost;
                         if (!(root as any).__vmzLayoutInsts?.length) (root as any).__vmzInst = pageHost.__vmzInst;
+                    } else {
+                        throw new Error('vmz:client-nav missing hydrateRoutePage and hydrate — the generated entry must pass the packed face');
                     }
                 }
                 retainedLayout = true;
@@ -149,20 +142,12 @@ export function installClientNavigation(opts: Record<string, any> = {}) {
                     for (const id of nextLayout) {
                         layoutCtors.push(await importChunk(id));
                     }
-                    let hydrateRoute = opts.hydrateRoute;
-                    if (typeof hydrateRoute !== 'function') {
-                        const dom = await loadDomFallback();
-                        hydrateRoute = dom.hydrateRoute;
-                    }
-                    if (typeof hydrateRoute === 'function') {
-                        await hydrateRoute(Page, fresh, props, layoutCtors);
+                    if (typeof opts.hydrateRoute === 'function') {
+                        await opts.hydrateRoute(Page, fresh, props, layoutCtors);
+                    } else if (typeof opts.hydrate === 'function') {
+                        await opts.hydrate(Page, fresh, props);
                     } else {
-                        let hydrate = opts.hydrate;
-                        if (typeof hydrate !== 'function') {
-                            const dom = await loadDomFallback();
-                            hydrate = dom.hydrate;
-                        }
-                        await hydrate(Page, fresh, props);
+                        throw new Error('vmz:client-nav missing hydrateRoute and hydrate — the generated entry must pass the packed face');
                     }
                 }
             }
