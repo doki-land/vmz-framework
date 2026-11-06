@@ -27,39 +27,48 @@ fn deps_js(deps: &[String]) -> String {
     deps.iter().map(|d| q(d)).collect::<Vec<_>>().join(", ")
 }
 
+/// One ordered `class` / `style` merge source.
+///
+/// Source order is preserved: static class/style, `:class` / `:style`, and the
+/// `class` / `style` members of `v-bind="obj"` all participate in the same list,
+/// so later sources win property-by-property and class values concatenate in the
+/// order Vue's `mergeProps` would produce.
+enum MergePart {
+    Static(String),
+    Bind {
+        expr: String,
+        binding: Option<BindingId>,
+        /// `v-bind="obj"` source: `expr` is the object, the value is `.class` / `.style`.
+        from_object: bool,
+    },
+}
+
 struct MergeAttrPlan {
-    class_static: Option<String>,
-    class_binds: Vec<(String, Option<BindingId>)>,
-    style_static: Option<String>,
-    style_binds: Vec<(String, Option<BindingId>)>,
+    class_parts: Vec<MergePart>,
+    style_parts: Vec<MergePart>,
 }
 
 fn norm_attr_name(name: &str) -> &str {
     if name == "className" { "class" } else { name }
 }
 
-fn append_class_static(existing: &mut Option<String>, add: &str) {
+fn append_merge_static(parts: &mut Vec<MergePart>, sep: char, add: &str) {
     if add.is_empty() {
         return;
     }
-    match existing {
-        None => *existing = Some(add.to_string()),
-        Some(s) => {
+    match parts.last_mut() {
+        Some(MergePart::Static(s)) => {
             if !s.is_empty() {
-                s.push(' ');
+                s.push(sep);
             }
             s.push_str(add);
         }
+        _ => parts.push(MergePart::Static(add.to_string())),
     }
 }
 
 fn collect_merge_attr_plan(attrs: &[ViewAttr]) -> MergeAttrPlan {
-    let mut plan = MergeAttrPlan {
-        class_static: None,
-        class_binds: Vec::new(),
-        style_static: None,
-        style_binds: Vec::new(),
-    };
+    let mut plan = MergeAttrPlan { class_parts: Vec::new(), style_parts: Vec::new() };
     for a in attrs {
         if a.name == "style:tw" {
             continue;
@@ -67,22 +76,37 @@ fn collect_merge_attr_plan(attrs: &[ViewAttr]) -> MergeAttrPlan {
         let name = norm_attr_name(&a.name);
         match (name, &a.value) {
             ("class", ViewAttrValue::Static { value }) => {
-                append_class_static(&mut plan.class_static, value)
+                append_merge_static(&mut plan.class_parts, ' ', value)
             }
             ("class", ViewAttrValue::Interp { expr }) => {
-                plan.class_binds.push((sanitize_interp(expr), a.binding));
+                plan.class_parts.push(MergePart::Bind {
+                    expr: sanitize_interp(expr),
+                    binding: a.binding,
+                    from_object: false,
+                });
             }
-            ("style", ViewAttrValue::Static { value }) => match &mut plan.style_static {
-                None => plan.style_static = Some(value.clone()),
-                Some(s) => {
-                    if !s.is_empty() {
-                        s.push(';');
-                    }
-                    s.push_str(value);
-                }
-            },
+            ("style", ViewAttrValue::Static { value }) => {
+                append_merge_static(&mut plan.style_parts, ';', value)
+            }
             ("style", ViewAttrValue::Interp { expr }) => {
-                plan.style_binds.push((sanitize_interp(expr), a.binding));
+                plan.style_parts.push(MergePart::Bind {
+                    expr: sanitize_interp(expr),
+                    binding: a.binding,
+                    from_object: false,
+                });
+            }
+            ("v-bind", ViewAttrValue::Interp { expr }) => {
+                let expr = sanitize_interp(expr);
+                plan.class_parts.push(MergePart::Bind {
+                    expr: expr.clone(),
+                    binding: a.binding,
+                    from_object: true,
+                });
+                plan.style_parts.push(MergePart::Bind {
+                    expr,
+                    binding: a.binding,
+                    from_object: true,
+                });
             }
             _ => {}
         }
@@ -238,11 +262,33 @@ fn memo_roots_js(memo: Option<&MemoCtx>) -> String {
     }
 }
 
+/// Merge-source evaluator for one [`MergePart::Bind`].
+///
+/// `v-bind="obj"` contributes `obj.class` (or `obj.className`) / `obj.style`,
+/// while a plain `:class` / `:style` contributes its expression value directly.
+fn merge_part_eval(part: &MergePart, attr_name: &str, i: usize, body: &str) -> String {
+    let (_, _, from_object) = match part {
+        MergePart::Bind { expr, binding, from_object } => (expr, binding, from_object),
+        MergePart::Static(_) => return String::new(),
+    };
+    if !from_object {
+        return format!("var __v{i}; try {{ __v{i} = {body}; }} catch {{ __v{i} = null; }} ");
+    }
+    let pick = if attr_name == "class" {
+        format!("__o{i}.class != null ? __o{i}.class : __o{i}.className")
+    } else {
+        format!("__o{i}.style")
+    };
+    format!(
+        "var __o{i}; try {{ __o{i} = {body}; }} catch {{ __o{i} = null; }} \
+var __v{i} = __o{i} && typeof __o{i} === 'object' ? ({pick}) : null; "
+    )
+}
+
 fn emit_merge_attr(
     attr_name: &str,
     merge_api: &str,
-    static_base: Option<&str>,
-    binds: &[(String, Option<BindingId>)],
+    parts: &[MergePart],
     el: &str,
     fields: &[String],
     methods: &[String],
@@ -254,9 +300,21 @@ fn emit_merge_attr(
     stmts: &mut Vec<String>,
     next_id: &mut u32,
 ) {
-    if binds.is_empty() {
-        if let Some(s) = static_base.filter(|s| !s.is_empty()) {
-            stmts.push(format!("api.attr({el}, {}, {});", q(attr_name), q(s)));
+    if parts.is_empty() {
+        return;
+    }
+    let has_bind = parts.iter().any(|p| matches!(p, MergePart::Bind { .. }));
+    if !has_bind {
+        let joined = parts
+            .iter()
+            .filter_map(|p| match p {
+                MergePart::Static(s) if !s.is_empty() => Some(s.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(if attr_name == "class" { " " } else { ";" });
+        if !joined.is_empty() {
+            stmts.push(format!("api.attr({el}, {}, {});", q(attr_name), q(&joined)));
         }
         return;
     }
@@ -264,35 +322,38 @@ fn emit_merge_attr(
     // `v-once`: evaluate once at create time, never register a patch.
     if once {
         let mut eval_stmts = String::new();
-        let mut merge_args =
-            static_base.filter(|s| !s.is_empty()).map(q).unwrap_or_else(|| "null".to_string());
-        for (i, (expr, _)) in binds.iter().enumerate() {
-            let body = bind_template_expr(expr, fields, methods, scope, aliases);
-            eval_stmts.push_str(&format!(
-                "var __v{i}; try {{ __v{i} = {body}; }} catch {{ __v{i} = null; }} "
-            ));
-            merge_args.push_str(&format!(", __v{i}"));
+        let mut merge_args: Vec<String> = Vec::new();
+        for (i, p) in parts.iter().enumerate() {
+            match p {
+                MergePart::Static(s) if !s.is_empty() => merge_args.push(q(s)),
+                MergePart::Static(_) => {}
+                MergePart::Bind { expr, .. } => {
+                    let body = bind_template_expr(expr, fields, methods, scope, aliases);
+                    eval_stmts.push_str(&merge_part_eval(p, attr_name, i, &body));
+                    merge_args.push(format!("__v{i}"));
+                }
+            }
         }
         stmts.push(format!(
-            "{{ {eval_stmts}api.attr({el}, {}, api.{merge_api}({merge_args})); }}",
-            q(attr_name)
+            "{{ {eval_stmts}api.attr({el}, {}, api.{merge_api}({args})); }}",
+            q(attr_name),
+            args = merge_args.join(", ")
         ));
         return;
     }
 
-    let static_arg =
-        static_base.filter(|s| !s.is_empty()).map(q).unwrap_or_else(|| "null".to_string());
     let mut all_deps: Vec<String> = Vec::new();
-    let mut bind_bodies: Vec<String> = Vec::new();
     let mut binding_id: Option<u32> = None;
-    for (expr, binding) in binds {
+    for p in parts {
+        let MergePart::Bind { expr, binding, .. } = p else {
+            continue;
+        };
         let (bid, deps, _) = bind_payload(expr, *binding, fields, methods, scope, aliases, ir);
         for d in deps {
             if !all_deps.iter().any(|x| x == &d) {
                 all_deps.push(d);
             }
         }
-        bind_bodies.push(bind_template_expr(expr, fields, methods, scope, aliases));
         if binding_id.is_none() {
             binding_id = bid;
         }
@@ -303,32 +364,30 @@ fn emit_merge_attr(
     let name_q = q(attr_name);
 
     if memo.is_none()
-        && bind_bodies.len() == 1
-        && static_base.is_none()
-        && let Some(field) = single_field_binding_target(&binds[0].0, fields, scope, aliases)
+        && parts.len() == 1
+        && let MergePart::Bind { expr, from_object: false, .. } = &parts[0]
+        && let Some(field) = single_field_binding_target(expr, fields, scope, aliases)
     {
         stmts.push(format!("api.specFieldAttr(this, {id_arg}, {}, {el}, {});", q(&field), name_q));
         return;
     }
 
-    if bind_bodies.len() == 1 {
-        let body = &bind_bodies[0];
-        stmts.push(format!(
-            "api.trackPatch(this, [{deps_js}], function() {{ {gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.attr({el}, {name_q}, api.{merge_api}({static_arg}, __v)); }}, {id_arg});"
-        ));
-        return;
-    }
-
     let mut eval_stmts = String::new();
-    let mut merge_args = static_arg;
-    for (i, body) in bind_bodies.iter().enumerate() {
-        eval_stmts.push_str(&format!(
-            "var __v{i}; try {{ __v{i} = {body}; }} catch {{ __v{i} = null; }} "
-        ));
-        merge_args.push_str(&format!(", __v{i}"));
+    let mut merge_args: Vec<String> = Vec::new();
+    for (i, p) in parts.iter().enumerate() {
+        match p {
+            MergePart::Static(s) if !s.is_empty() => merge_args.push(q(s)),
+            MergePart::Static(_) => {}
+            MergePart::Bind { expr, .. } => {
+                let body = bind_template_expr(expr, fields, methods, scope, aliases);
+                eval_stmts.push_str(&merge_part_eval(p, attr_name, i, &body));
+                merge_args.push(format!("__v{i}"));
+            }
+        }
     }
     stmts.push(format!(
-        "api.trackPatch(this, [{deps_js}], function() {{ {gate}{eval_stmts}api.attr({el}, {name_q}, api.{merge_api}({merge_args})); }}, {id_arg});"
+        "api.trackPatch(this, [{deps_js}], function() {{ {gate}{eval_stmts}api.attr({el}, {name_q}, api.{merge_api}({args})); }}, {id_arg});",
+        args = merge_args.join(", ")
     ));
 }
 
@@ -1032,6 +1091,215 @@ fn emit_element(
     )
 }
 
+/// Attribute names that a `v-bind="obj"` spread may own on an element.
+///
+/// Names handled by other emitters keep their own channel and must not be written
+/// twice: `class` / `style` go through the merge plan, `@` events through the
+/// listener binder, `v-html` / `v-show` / `v-text` through their dedicated
+/// binders, and `v-once` / `v-memo` / slot markers are compile-time only.
+fn spread_attr_target(a: &ViewAttr) -> Option<String> {
+    if a.name == "style:tw"
+        || is_merge_attr(&a.name)
+        || is_once_marker(&a.name)
+        || is_memo_marker(&a.name)
+        || a.name == "v-bind"
+        || a.name == "v-on"
+        || a.name.starts_with('#')
+        || a.name.starts_with("client:")
+        || is_html_attr(&a.name)
+        || is_show_attr(&a.name)
+        || is_text_attr(&a.name)
+        || is_event_attr(&a.name)
+        || dynamic_arg_inner(&a.name).is_some()
+        || matches!(a.value, ViewAttrValue::Bare)
+    {
+        return None;
+    }
+    Some(norm_attr_name(&a.name).to_string())
+}
+
+/// Object literal of compile-time names, null-prototype so a key such as
+/// `toString` never resolves through `Object.prototype`.
+fn null_proto_names_var(var: &str, names: &[String]) -> String {
+    let mut out = format!("var {var} = Object.create(null); ");
+    for name in names {
+        out.push_str(&format!("{var}[{}] = 1; ", q(name)));
+    }
+    out
+}
+
+/// `v-bind="obj"` on an element.
+///
+/// Vue merges every source in template order, so:
+/// - `class` / `className` / `style` inside the object join the merge plan at the
+///   spread's source position (later sources win, classes concatenate).
+/// - `onXxx` keys become listeners through the call-site listener bag.
+/// - any other key writes through `api.attr`; a key that appears **after** the
+///   spread blocks the object (the later explicit attribute wins), and a key that
+///   appeared **before** the spread is restored when the object drops it.
+/// - keys that disappear from the object remove their attribute instead of
+///   leaving a zombie value.
+fn emit_bind_object(
+    attrs: &[ViewAttr],
+    spread_at: usize,
+    el: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+    ir: &IrDepCursor<'_>,
+    stmts: &mut Vec<String>,
+    once: bool,
+    memo: Option<&MemoCtx>,
+    next_id: &mut u32,
+) {
+    let ViewAttrValue::Interp { expr } = &attrs[spread_at].value else {
+        return;
+    };
+    let e = sanitize_interp(expr);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    let slot = format!("{el}:b{spread_at}");
+    let mut blocked: Vec<String> = Vec::new();
+    let mut fallback: Vec<(String, String)> = Vec::new();
+    for (i, other) in attrs.iter().enumerate() {
+        if i == spread_at {
+            continue;
+        }
+        let Some(name) = spread_attr_target(other) else {
+            continue;
+        };
+        if i > spread_at {
+            if !blocked.iter().any(|n| n == &name) {
+                blocked.push(name);
+            }
+        } else if !fallback.iter().any(|(n, _)| n == &name) {
+            let val = match &other.value {
+                ViewAttrValue::Static { value: s } => q(s),
+                ViewAttrValue::Interp { expr } => {
+                    bind_template_expr(&sanitize_interp(expr), fields, methods, scope, aliases)
+                }
+                ViewAttrValue::Bare => continue,
+            };
+            fallback.push((name, val));
+        }
+    }
+    let blocked_var = null_proto_names_var("__blocked", &blocked);
+    let skip_keys = "'class' || __k === 'className' || __k === 'style'";
+
+    // `v-once`: write once at create and never register a patch.
+    if once {
+        stmts.push(format!(
+            "{{ {blocked_var}var __src; try {{ __src = {body}; }} catch {{ __src = null; }} \
+if (__src && typeof __src === 'object') {{\n\
+  var __keys = Object.keys(__src);\n\
+  for (var __i = 0; __i < __keys.length; __i++) {{\n\
+    var __k = __keys[__i];\n\
+    if (__k === {skip_keys}) continue;\n\
+    if (/^on[^a-z]/.test(__k)) continue;\n\
+    if (__k in __blocked) continue;\n\
+    api.attr({el}, __k, __src[__k]);\n\
+  }}\n\
+}}\n\
+api.bindObjectListeners({el}, {slot}, __src, this, 'bind'); }}",
+            slot = q(&slot)
+        ));
+        return;
+    }
+
+    let (binding_id, deps, _cf_js) =
+        bind_payload(&e, attrs[spread_at].binding, fields, methods, scope, aliases, ir);
+    let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    let deps_js = deps_js(&with_memo_deps(deps, memo));
+    let gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+    let patch_name = format!(
+        "__patchBindObj{}",
+        binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into())
+    );
+    let fallback_var = if fallback.is_empty() {
+        "var __fallback = Object.create(null);".to_string()
+    } else {
+        let mut out = String::from("var __fallback = Object.create(null); ");
+        for (name, val) in &fallback {
+            out.push_str(&format!("__fallback[{}] = function() {{ return {val}; }}; ", q(name)));
+        }
+        out
+    };
+    stmts.push(format!(
+        "(function() {{\n\
+  {blocked_var}{fallback_var}var __prev = null;\n\
+  function {patch_name}() {{\n\
+    {gate}var __src;\n\
+    try {{ __src = {body}; }} catch {{ __src = null; }}\n\
+    var __next = []; var __vals = Object.create(null);\n\
+    if (__src && typeof __src === 'object') {{\n\
+      for (var __k in __src) {{\n\
+        if (!Object.prototype.hasOwnProperty.call(__src, __k)) continue;\n\
+        if (__k === {skip_keys}) continue;\n\
+        if (/^on[^a-z]/.test(__k)) continue;\n\
+        if (__k in __blocked) continue;\n\
+        __next.push(__k); __vals[__k] = __src[__k];\n\
+      }}\n\
+    }}\n\
+    if (__prev) {{\n\
+      for (var __i = 0; __i < __prev.length; __i++) {{\n\
+        var __pk = __prev[__i];\n\
+        if (!Object.prototype.hasOwnProperty.call(__vals, __pk)) continue;\n\
+        if (__fallback[__pk]) api.attr({el}, __pk, __fallback[__pk].call(this));\n\
+        else api.attr({el}, __pk, null);\n\
+      }}\n\
+    }}\n\
+    for (var __j = 0; __j < __next.length; __j++) api.attr({el}, __next[__j], __vals[__next[__j]]);\n\
+    __prev = __next;\n\
+    api.bindObjectListeners({el}, {slot}, __src, this, 'bind');\n\
+  }}\n\
+  api.trackPatch(this, [{deps_js}], {patch_name}, {id_arg});\n\
+}}).call(this);",
+        slot = q(&slot)
+    ));
+}
+
+/// `v-on="obj"` on an element: event keys attach through the per-call-site bag so
+/// a key that leaves the object detaches its listener.
+fn emit_event_object(
+    attrs: &[ViewAttr],
+    at: usize,
+    el: &str,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+    ir: &IrDepCursor<'_>,
+    stmts: &mut Vec<String>,
+    once: bool,
+    memo: Option<&MemoCtx>,
+    next_id: &mut u32,
+) {
+    let ViewAttrValue::Interp { expr } = &attrs[at].value else {
+        return;
+    };
+    let e = sanitize_interp(expr);
+    let body = bind_template_expr(&e, fields, methods, scope, aliases);
+    let slot = q(&format!("{el}:o{at}"));
+    if once {
+        stmts.push(format!(
+            "{{ var __src; try {{ __src = {body}; }} catch {{ __src = null; }} api.bindObjectListeners({el}, {slot}, __src, this, 'on'); }}"
+        ));
+        return;
+    }
+    let (binding_id, deps, _cf_js) =
+        bind_payload(&e, attrs[at].binding, fields, methods, scope, aliases, ir);
+    let id_arg = binding_id.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+    let deps_js = deps_js(&with_memo_deps(deps, memo));
+    let gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+    let patch_name = format!(
+        "__patchObjEvt{}",
+        binding_id.map(|id| id.to_string()).unwrap_or_else(|| "X".into())
+    );
+    stmts.push(format!(
+        "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {gate}var __src; try {{ __src = {body}; }} catch {{ __src = null; }} api.bindObjectListeners({el}, {slot}, __src, this, 'on'); }}, {id_arg});"
+    ));
+}
+
 fn emit_plain_element(
     tag: &str,
     attrs: &[ViewAttr],
@@ -1065,7 +1333,7 @@ fn emit_plain_element(
         memo
     };
     let merge_plan = collect_merge_attr_plan(attrs);
-    for a in attrs {
+    for (ai, a) in attrs.iter().enumerate() {
         if a.name == "style:tw"
             || is_merge_attr(&a.name)
             || is_once_marker(&a.name)
@@ -1238,6 +1506,40 @@ fn emit_plain_element(
                     next_id,
                 );
             }
+            // `v-bind="obj"`: keys spread onto the element with removal semantics.
+            ViewAttrValue::Interp { .. } if a.name == "v-bind" => {
+                emit_bind_object(
+                    attrs,
+                    ai,
+                    &el,
+                    fields,
+                    handler_ctx.methods,
+                    scope,
+                    aliases,
+                    ir,
+                    stmts,
+                    once,
+                    memo,
+                    next_id,
+                );
+            }
+            // `v-on="obj"`: event names attach through the call-site listener bag.
+            ViewAttrValue::Interp { .. } if a.name == "v-on" => {
+                emit_event_object(
+                    attrs,
+                    ai,
+                    &el,
+                    fields,
+                    handler_ctx.methods,
+                    scope,
+                    aliases,
+                    ir,
+                    stmts,
+                    once,
+                    memo,
+                    next_id,
+                );
+            }
             ViewAttrValue::Interp { expr: e } => {
                 emit_bind_attr(
                     e,
@@ -1260,8 +1562,7 @@ fn emit_plain_element(
     emit_merge_attr(
         "class",
         "mergeClass",
-        merge_plan.class_static.as_deref(),
-        &merge_plan.class_binds,
+        &merge_plan.class_parts,
         &el,
         fields,
         handler_ctx.methods,
@@ -1276,8 +1577,7 @@ fn emit_plain_element(
     emit_merge_attr(
         "style",
         "mergeStyle",
-        merge_plan.style_static.as_deref(),
-        &merge_plan.style_binds,
+        &merge_plan.style_parts,
         &el,
         fields,
         handler_ctx.methods,
@@ -1344,6 +1644,11 @@ fn emit_component(
     let mut client: Option<String> = None;
     let mut prop_parts = Vec::new();
     let mut event_parts: Vec<(String, String)> = Vec::new();
+    // `v-bind="obj"` / `v-on="obj"` are object spreads, never props named `vBind`
+    // / `vOn`: the spread joins the create props in source order and keeps a
+    // per-key binder, the event object keeps a per-call-site listener bag.
+    let mut spread_binds: Vec<(String, Vec<String>)> = Vec::new();
+    let mut spread_events: Vec<(String, Vec<String>)> = Vec::new();
     for a in attrs {
         if a.name == "style:tw" || is_once_marker(&a.name) || is_memo_marker(&a.name) {
             continue;
@@ -1353,6 +1658,20 @@ fn emit_component(
         }
         if let Some(strategy) = a.name.strip_prefix("client:") {
             client = Some(if strategy.is_empty() { "load".into() } else { strategy.to_string() });
+            continue;
+        }
+        if a.name == "v-bind" || a.name == "v-on" {
+            let ViewAttrValue::Interp { expr: e } = &a.value else {
+                continue;
+            };
+            let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
+            let deps = collect_template_deps(e, fields, scope);
+            if a.name == "v-bind" {
+                prop_parts.push(format!("...api.spreadProps({body})"));
+                spread_binds.push((body, deps));
+            } else {
+                spread_events.push((body, deps));
+            }
             continue;
         }
         if is_component_event_attr(&a.name) {
@@ -1399,15 +1718,51 @@ fn emit_component(
     for (ev, handler) in &event_parts {
         stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
     }
+    // `v-on="obj"`: attach now (empty deps under `v-once` so the bag is frozen)
+    // and let the call-site patch detach keys that leave the object.
+    for (i, (body, deps)) in spread_events.iter().enumerate() {
+        let deps = if once { String::new() } else { deps_js(&with_memo_deps(deps.clone(), memo)) };
+        stmts.push(format!(
+            "api.bindComponentEvents(this, {v}, {}, [{deps}], function() {{ return {body}; }});",
+            q(&format!("pcev{i}"))
+        ));
+    }
     // Inside `v-for` the aliases are non-empty: item-scoped props still need a
     // binding, because the item patch list is replayed on every list apply and
     // host-field deps keep theme-like external state reaching the child rows.
     let in_each = !aliases.is_empty();
     if !once && client.is_none() {
+        for (i, (body, deps)) in spread_binds.iter().enumerate() {
+            let deps = with_memo_deps(deps.clone(), memo);
+            // Outside a row nothing can invalidate a dep-free spread, and create
+            // already delivered the same keys through `api.spreadProps`.
+            if deps.is_empty() && !in_each {
+                continue;
+            }
+            let deps = deps_js(&deps);
+            let slot = q(&format!("pcobj{i}"));
+            match memo {
+                Some(_) => {
+                    let last = fresh("memoSpread", next_id);
+                    stmts.push(format!("var {last} = null;"));
+                    let gate = memo_gate_prelude(memo, stmts, next_id, &format!("return {last};"));
+                    stmts.push(format!(
+                        "api.bindComponentProps(this, {v}, {slot}, [{deps}], function() {{ {gate}var __o; try {{ __o = {body}; }} catch {{ __o = null; }} {last} = __o; return {last}; }});"
+                    ));
+                }
+                None => {
+                    stmts.push(format!(
+                        "api.bindComponentProps(this, {v}, {slot}, [{deps}], function() {{ return {body}; }});"
+                    ));
+                }
+            }
+        }
         for a in attrs {
             if a.name == "style:tw"
                 || a.name.starts_with("client:")
                 || a.name.starts_with('#')
+                || a.name == "v-bind"
+                || a.name == "v-on"
                 || is_component_event_attr(&a.name)
                 || is_once_marker(&a.name)
                 || is_memo_marker(&a.name)

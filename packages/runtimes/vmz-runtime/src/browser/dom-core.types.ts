@@ -12,6 +12,10 @@ export type ComponentCtor = ComponentCtorLike & {
 
 export type VmzDomElement = Element & {
     __vmzEvt?: Record<string, EventListener>;
+    __vmzObjEvt?: Record<
+        string,
+        { types: Record<string, { handlers: Function[]; wrapper: EventListener }> }
+    >;
     __vmzInst?: DirectInstance;
     __vmzPropBindSeq?: number;
     __vmzDispose?: (() => void) | null;

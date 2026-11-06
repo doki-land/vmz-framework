@@ -955,3 +955,126 @@ export default class CounterDemo {
         "template inline handler stays a plain root update: {js}"
     );
 }
+
+const SPREAD_SRC: &str = r#"
+export default class SpreadDemo {
+  props: Record<string, unknown> = {};
+  listeners: Record<string, unknown> = {};
+  panelProps: Record<string, unknown> = {};
+  panelEvents: Record<string, unknown> = {};
+  fixed = "f";
+  extra = "x";
+  onClick() {}
+}
+"#;
+
+fn spread_js(template: &str) -> String {
+    let client = analyze_script(ScriptKind::Client, SPREAD_SRC);
+    let tpl = parse_template(template).unwrap();
+    emit_client_js(SPREAD_SRC, &client, &tpl, None).unwrap()
+}
+
+/// `v-bind="obj"` on an element spreads real attributes, keeps class/style in the
+/// ordered merge sources, defers to a later explicit attribute, and removes keys
+/// that leave the object instead of leaving zombies.
+#[test]
+fn bind_object_spreads_element_attributes_with_removal() {
+    let js = spread_js(
+        r#"<div><section v-bind="props" :title="fixed" :class="extra" class="base" style="color: red"></section></div>"#,
+    );
+    // No literal `v-bind` attribute: the object never reaches `api.attr` as a name.
+    assert!(!js.contains("\"v-bind\""), "element spread must not emit a `v-bind` attribute: {js}");
+    assert!(
+        js.contains("var __blocked = Object.create(null); __blocked[\"title\"] = 1;"),
+        "a later explicit attribute wins over the spread: {js}"
+    );
+    assert!(
+        js.contains("if (__fallback[__pk]) api.attr(e1, __pk, __fallback[__pk].call(this));")
+            && js.contains("else api.attr(e1, __pk, null);"),
+        "a key that leaves the object is removed (restored when an earlier explicit source owns it): {js}"
+    );
+    assert!(
+        js.contains("api.trackPatch(this, [\"props\"], __patchBindObj0, 0);"),
+        "the spread patches on the object expression deps: {js}"
+    );
+    assert!(
+        js.contains("api.mergeClass(__v0, __v1, \"base\")")
+            && js.contains("__o0.class != null ? __o0.class : __o0.className"),
+        "object `class` joins the ordered class merge sources: {js}"
+    );
+    assert!(
+        js.contains("api.mergeStyle(__v0, \"color: red\")") && js.contains("(__o0.style)"),
+        "object `style` joins the ordered style merge sources: {js}"
+    );
+    assert!(
+        js.contains("api.bindObjectListeners(e1, \"e1:b0\", __src, this, 'bind');"),
+        "`onXxx` keys inside `v-bind` route through the call-site listener bag: {js}"
+    );
+
+    // An explicit attribute that comes *before* the spread loses to it and is
+    // restored when the object drops the key.
+    let js = spread_js(r#"<div><section :title="fixed" v-bind="props"></section></div>"#);
+    assert!(
+        js.contains("__fallback[\"title\"] = function() { return this.fixed; };")
+            && !js.contains("__blocked[\"title\"]"),
+        "an earlier explicit attribute is the fallback, not a block: {js}"
+    );
+}
+
+/// `v-on="obj"` attaches and detaches listeners per call site, with no global
+/// `off` semantics and no literal `v-on` attribute.
+#[test]
+fn bind_object_listeners_use_call_site_scope() {
+    let js = spread_js(r#"<div><button v-on="listeners" @click="onClick">go</button></div>"#);
+    assert!(
+        !js.contains("\"v-on\""),
+        "element event object must not emit a `v-on` attribute: {js}"
+    );
+    assert!(
+        js.contains("api.bindObjectListeners(e1, \"e1:o0\", __src, this, 'on');"),
+        "event keys attach through the per-element bag: {js}"
+    );
+    assert!(
+        js.contains("api.trackPatch(this, [\"listeners\"], function __patchObjEvt"),
+        "the listener bag is reapplied on the object expression deps: {js}"
+    );
+}
+
+/// Component hosts take the spread as props, never as a prop named `vBind` /
+/// `vOn`, and keep a per-key binder plus a per-call-site event bag.
+#[test]
+fn bind_object_spreads_component_props_and_events() {
+    let js = spread_js(r#"<div><PanelCard v-bind="panelProps" v-on="panelEvents" /></div>"#);
+    assert!(
+        js.contains("{...api.spreadProps(this.panelProps)}"),
+        "component spread joins create props in source order: {js}"
+    );
+    assert!(
+        js.contains("api.bindComponentProps(this, c1, \"pcobj0\", [\"panelProps\"], function() { return this.panelProps; });"),
+        "component spread updates and removals land on the prop binder: {js}"
+    );
+    assert!(
+        js.contains("api.bindComponentEvents(this, c1, \"pcev0\", [\"panelEvents\"], function() { return this.panelEvents; });"),
+        "component event object keeps a call-site listener bag: {js}"
+    );
+    assert!(
+        !js.contains("\"vBind\"") && !js.contains("\"vOn\""),
+        "object host attrs must not become props named `vBind` / `vOn`: {js}"
+    );
+}
+
+/// SSR runs the same create function (`__vmzSerialize = __vmzCreate`), so the
+/// object spread is applied at create time and no `v-bind="[object Object]"`
+/// attribute can reach the markup.
+#[test]
+fn bind_object_spread_is_ssr_safe() {
+    let js = spread_js(r#"<div><section v-bind="props"></section></div>"#);
+    assert!(
+        js.contains("SpreadDemo.__vmzSerialize = SpreadDemo.__vmzCreate;"),
+        "SSR reuses the same create tree: {js}"
+    );
+    assert!(
+        !js.contains("[object Object]") && !js.contains("\"v-bind\""),
+        "no object-valued `v-bind` attribute reaches the SSR string path: {js}"
+    );
+}

@@ -43,6 +43,13 @@ let directPropBindSeq = 0;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/** Vue accepts a function or an array of functions for one handler slot. */
+function normalizeHandlerList(value: unknown): Function[] {
+    if (typeof value === 'function') return [value as Function];
+    if (Array.isArray(value)) return value.filter((fn): fn is Function => typeof fn === 'function');
+    return [];
+}
+
 /**
  * Nesting depth of inline `<svg>` subtrees during create/resume.
  *
@@ -524,6 +531,197 @@ export const directApi = {
             },
             bindingId,
         );
+    },
+    /**
+     * Object form of `bindComponentProp`: spread every key of the patch-time object
+     * across the child props and clear props whose keys disappear from the object.
+     */
+    bindComponentProps(hostInst, hostEl, slot, deps, get) {
+        if (hostEl && hostEl.__vmzPropBindSeq == null) {
+            hostEl.__vmzPropBindSeq = ++directPropBindSeq;
+        }
+        const seq = hostEl && hostEl.__vmzPropBindSeq != null ? hostEl.__vmzPropBindSeq : ++directPropBindSeq;
+        const bindingId = `pc:${seq}:*${slot || 'obj'}`;
+        const seen: Record<string, unknown> = Object.create(null);
+        directApi.trackPatch(
+            hostInst,
+            deps || [],
+            function bindComponentPropsPatch() {
+                let raw: unknown;
+                try {
+                    raw = get.call(hostInst);
+                } catch {
+                    raw = null;
+                }
+                const child = hostEl && hostEl.__vmzInst;
+                if (!child || child.__vmzDestroyed) return;
+                const next: Record<string, unknown> = Object.create(null);
+                if (raw && typeof raw === 'object') {
+                    for (const key of Object.keys(raw as Record<string, unknown>)) {
+                        if (!key || key.startsWith('#')) continue;
+                        next[key] = (raw as Record<string, unknown>)[key];
+                    }
+                }
+                const notify = (key: string, value: unknown) => {
+                    child[key] = value;
+                    if (typeof child.__vmzOnParentProp === 'function') {
+                        try {
+                            child.__vmzOnParentProp(key, value);
+                        } catch (err) {
+                            console.error('vmz:dom __vmzOnParentProp', err);
+                        }
+                    }
+                    scheduleRefresh(child, { type: 'replace', root: key });
+                };
+                for (const key of Object.keys(seen)) {
+                    if (key in next) continue;
+                    delete seen[key];
+                    notify(key, undefined);
+                }
+                for (const key of Object.keys(next)) {
+                    const value = next[key];
+                    const had = key in seen;
+                    const prev = seen[key];
+                    seen[key] = value;
+                    // Create-time `...api.spreadProps()` already delivered identical
+                    // values, so an unchanged first pass must not schedule a refresh.
+                    if (had && Object.is(prev, value)) continue;
+                    if (!had && Object.is((child as Record<string, unknown>)[key], value)) continue;
+                    notify(key, value);
+                }
+            },
+            bindingId,
+        );
+    },
+    /**
+     * Object form of `onComponentEvent`: diff event names per call site and detach
+     * listeners whose keys disappear. No global `off` semantics — the bag entry
+     * belongs to this call site only.
+     */
+    bindComponentEvents(hostInst, hostEl, slot, deps, get) {
+        if (hostEl && hostEl.__vmzPropBindSeq == null) {
+            hostEl.__vmzPropBindSeq = ++directPropBindSeq;
+        }
+        const seq = hostEl && hostEl.__vmzPropBindSeq != null ? hostEl.__vmzPropBindSeq : ++directPropBindSeq;
+        const attached: Record<
+            string,
+            { handlers: Function[]; wrapper: (...args: unknown[]) => void }
+        > = Object.create(null);
+        directApi.trackPatch(
+            hostInst,
+            deps || [],
+            function bindComponentEventsPatch() {
+                let raw: unknown;
+                try {
+                    raw = get.call(hostInst);
+                } catch {
+                    raw = null;
+                }
+                const child = hostEl && hostEl.__vmzInst;
+                if (!child || child.__vmzDestroyed) return;
+                const next: Record<string, Function[]> = Object.create(null);
+                if (raw && typeof raw === 'object') {
+                    for (const key of Object.keys(raw as Record<string, unknown>)) {
+                        if (!key || key.startsWith('#')) continue;
+                        const list = normalizeHandlerList((raw as Record<string, unknown>)[key]);
+                        if (list.length) next[key] = list;
+                    }
+                }
+                const bag =
+                    child.__vmzComponentListeners ||
+                    (child.__vmzComponentListeners = Object.create(null));
+                for (const key of Object.keys(attached)) {
+                    if (key in next) continue;
+                    const rec = attached[key];
+                    delete attached[key];
+                    const list = bag[key];
+                    if (!Array.isArray(list)) continue;
+                    const index = list.indexOf(rec.wrapper);
+                    if (index >= 0) list.splice(index, 1);
+                    if (!list.length) delete bag[key];
+                }
+                for (const key of Object.keys(next)) {
+                    const handlers = next[key];
+                    const rec = attached[key];
+                    if (rec) {
+                        rec.handlers = handlers;
+                        continue;
+                    }
+                    const created = { handlers, wrapper: null as unknown as (...args: unknown[]) => void };
+                    created.wrapper = (...args: unknown[]) => {
+                        for (const fn of created.handlers) fn(...args);
+                    };
+                    (bag[key] || (bag[key] = [])).push(created.wrapper);
+                    attached[key] = created;
+                }
+            },
+            `pcev:${seq}:${slot || 'obj'}`,
+        );
+    },
+    /**
+     * `v-bind="obj"` / `v-on="obj"` listeners scoped to one call site.
+     *
+     * `mode: 'bind'` reads `onXxx` keys out of a bind object, `mode: 'on'` reads
+     * event names directly. Vue lowercases element listener names, so both modes
+     * normalize before touching `addEventListener`.
+     */
+    bindObjectListeners(el, slot, source, inst, mode) {
+        if (!el || !slot) return;
+        const bag = el.__vmzObjEvt || (el.__vmzObjEvt = Object.create(null));
+        const state = bag[slot] || (bag[slot] = { types: Object.create(null) });
+        const prev = state.types;
+        const next: Record<string, Function[]> = Object.create(null);
+        if (source && typeof source === 'object') {
+            for (const key of Object.keys(source as Record<string, unknown>)) {
+                let type: string;
+                if (mode === 'bind') {
+                    if (!/^on[A-Z]/.test(key)) continue;
+                    type = key.slice(2).toLowerCase();
+                } else {
+                    type = String(key).toLowerCase();
+                }
+                const list = normalizeHandlerList((source as Record<string, unknown>)[key]);
+                if (type && list.length) next[type] = list;
+            }
+        }
+        for (const type of Object.keys(prev)) {
+            if (type in next) continue;
+            el.removeEventListener(type, prev[type].wrapper);
+            delete prev[type];
+        }
+        for (const type of Object.keys(next)) {
+            const handlers = next[type];
+            const rec = prev[type];
+            if (rec) {
+                rec.handlers = handlers;
+                continue;
+            }
+            const created = { handlers, wrapper: null as unknown as EventListener };
+            created.wrapper = (ev: Event) => {
+                if (type === 'submit' && ev && typeof ev.preventDefault === 'function') {
+                    ev.preventDefault();
+                }
+                runDomEventHandler(inst || null, null, () => {
+                    for (const fn of created.handlers) fn.call(inst || null, ev);
+                });
+            };
+            prev[type] = created;
+            el.addEventListener(type, created.wrapper);
+        }
+    },
+    /**
+     * Filter a `v-bind="obj"` source down to bindable keys before it reaches
+     * component props (`#slot` markers belong to the compiler, not the child).
+     */
+    spreadProps(source) {
+        const out: Record<string, unknown> = Object.create(null);
+        if (source && typeof source === 'object') {
+            for (const key of Object.keys(source as Record<string, unknown>)) {
+                if (!key || key.startsWith('#')) continue;
+                out[key] = (source as Record<string, unknown>)[key];
+            }
+        }
+        return out;
     },
     /**
      * Project parent children into nested Direct component default `<slot>`.

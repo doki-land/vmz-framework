@@ -148,5 +148,27 @@ export type DirectApi = {
         hostInst: DirectInstance,
         propName: string,
     ) => void;
+    bindComponentProps: (
+        inst: DirectInstance,
+        hostEl: HTMLElement,
+        slot: string,
+        deps: string[],
+        get: PatchFn,
+    ) => void;
+    bindComponentEvents: (
+        inst: DirectInstance,
+        hostEl: HTMLElement,
+        slot: string,
+        deps: string[],
+        get: PatchFn,
+    ) => void;
+    bindObjectListeners: (
+        el: Element,
+        slot: string,
+        source: unknown,
+        inst: DirectInstance | null,
+        mode: 'bind' | 'on',
+    ) => void;
+    spreadProps: (source: unknown) => Record<string, unknown>;
     component: (Ctor: ComponentCtorLike | string, props?: object) => HTMLElement;
 };
