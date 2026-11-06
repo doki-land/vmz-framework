@@ -922,6 +922,13 @@ function applySerializeAttr(el, name, value) {
         else el.attrs[key] = value === true ? '' : String(value);
         return;
     }
+    // A `multiple` select model is a list. Stringifying it here would emit one
+    // `value="c,a"` attribute, so `markSelectSelection` could never match an
+    // option and SSR shipped a select with nothing selected.
+    if (key === 'value' && String(el.tag || '').toLowerCase() === 'select' && Array.isArray(value)) {
+        el.attrs[key] = value.map((item) => String(item));
+        return;
+    }
     if (value == null || value === false) delete el.attrs[key];
     else el.attrs[key] = value === true ? '' : String(value);
 }
