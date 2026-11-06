@@ -79,6 +79,25 @@ import { siteNavItems } from "../nav.ts";
 
 const REPO_HREF = "https://github.com/doki-land/vmz-framework";
 
+/** Seed the same rows `refreshCopy` produces, so hydration starts from SSR data. */
+function seedNavItems(localeId) {
+    return withLocaleHint(localeId, () =>
+        siteNavItems(
+            localeId,
+            {
+                product: navProduct(),
+                docs: docs(),
+                showcase: navShowcase(),
+                lab: navLab(),
+                icons: navIcons(),
+                charts: navCharts(),
+                about: navAbout(),
+            },
+            docsPaths(localeId).docsRootHref,
+        ).filter((item) => item.id !== "docs"),
+    );
+}
+
 export default class SiteFooter {
     localeId = "zh-hans";
     brandLabel = "";
@@ -101,7 +120,7 @@ export default class SiteFooter {
     githubHref = REPO_HREF;
     issuesHref = `${REPO_HREF}/issues`;
     discussionsHref = `${REPO_HREF}/discussions`;
-    navItems = [];
+    navItems = seedNavItems(readLocaleId());
     _unwatchLocale = null;
 
     onMount() {
@@ -133,19 +152,7 @@ export default class SiteFooter {
         this.guideHref = paths.guideHref;
         this.deployDocHref = paths.deployDocHref;
         this.pluginsHref = paths.pluginsHref;
-        this.navItems = siteNavItems(
-            this.localeId,
-            {
-                product: navProduct(),
-                docs: docs(),
-                showcase: navShowcase(),
-                lab: navLab(),
-                icons: navIcons(),
-                charts: navCharts(),
-                about: navAbout(),
-            },
-            paths.docsRootHref,
-        ).filter((item) => item.id !== "docs");
+        this.navItems = seedNavItems(this.localeId);
     }
 
     applyLocaleCopy(preferred) {
