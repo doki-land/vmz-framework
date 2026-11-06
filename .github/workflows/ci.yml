@@ -23,8 +23,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Release gate fixtures
-        run: node --test scripts/ci/require-ci-success.test.mjs
+      - name: Release gate and publish preflight fixtures
+        run: node --test scripts/ci/require-ci-success.test.mjs scripts/ci/preflight-publish.test.mjs
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6

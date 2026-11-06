@@ -270,5 +270,10 @@ jobs:
             ls -la "$dir"
           done
 
+      - name: Preflight registry facts for the whole package set
+        # Refuse to start when any package lacks a `0.0.0` placeholder or its
+        # patch continuity is broken: a half-way publish cannot be undone.
+        run: node scripts/ci/preflight-publish.mjs --version=${{ needs.provenance.outputs.version }}
+
       - name: Publish packages to npm
         run: pnpm exec nifty publish --access public --version=${{ needs.provenance.outputs.version }}
