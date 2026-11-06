@@ -14,6 +14,13 @@ import type {
 } from '../dom-core.types.js';
 import { createUnknownComponentElement } from '../unknown-component.js';
 
+/**
+ * `xlink:href` parsed from SSR HTML lives in the XLink namespace. A plain
+ * `setAttribute` writes a non-namespaced attribute instead, so the SVG host
+ * (`<use>`) no longer resolves the reference after hydration or client create.
+ */
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
+
 export const BOOLEAN_HTML_ATTRS = new Set([
     'disabled',
     'checked',
@@ -76,6 +83,16 @@ export function applyDomAttr(el, name, value) {
         const s = mergeStyleParts(value);
         if (s) el.setAttribute('style', s);
         else el.removeAttribute('style');
+        return;
+    }
+    if (String(key).startsWith('xlink:') && el && typeof el.setAttributeNS === 'function') {
+        const local = String(key).slice('xlink:'.length);
+        if (value == null || value === false) {
+            if (typeof el.removeAttributeNS === 'function') el.removeAttributeNS(XLINK_NS, local);
+            else el.removeAttribute(key);
+        } else {
+            el.setAttributeNS(XLINK_NS, `xlink:${local}`, value === true ? '' : String(value));
+        }
         return;
     }
     if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
