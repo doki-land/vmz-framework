@@ -51,6 +51,8 @@ export const BOOLEAN_HTML_ATTRS = new Set([
  * value and replay it once the synchronous create pass has finished.
  */
 const pendingSelectValues = new WeakMap<object, unknown>();
+/** First `value` write seeds a textarea's default value once. */
+const seededTextareaDefaults = new WeakSet<object>();
 const pendingSelectReplays = new WeakSet<object>();
 
 function replaySelectValue(el) {
@@ -139,6 +141,13 @@ export function applyDomAttr(el, name, value) {
             }
         } else if (el.value !== next) {
             el.value = next;
+        }
+        if (el.tagName === 'TEXTAREA' && !seededTextareaDefaults.has(el)) {
+            // SSR ships a textarea's initial value as its text child. Resume parks
+            // that child in the adopt pool, so `defaultValue` (the form-reset target)
+            // stayed empty. Seed it on the first write; later model updates leave it.
+            seededTextareaDefaults.add(el);
+            el.defaultValue = next;
         }
         if (listed) return;
         if (value == null || value === false) el.removeAttribute('value');
