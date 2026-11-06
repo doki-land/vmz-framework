@@ -91,10 +91,10 @@ export function assertThinRuntimeImports(scan: ThinHostScan): string[] {
         errors.push('missing entry-client.js (static profile)');
         return errors;
     }
-    if (!/from\s+["'][^"']*dom\.browser\.js/.test(scan.entryClient)) {
+    if (!/from\s*["'][^"']*dom\.browser\.js/.test(scan.entryClient)) {
         errors.push('entry-client must import hydrate face from dom.browser.js');
     }
-    if (/from\s+["'][^"']*vmz-dom\.js/.test(scan.entryClient)) {
+    if (/from\s*["'][^"']*vmz-dom\.js/.test(scan.entryClient)) {
         errors.push('entry-client must not import full ./vmz-dom.js barrel');
     }
     // Prefer component samples from serve fixture (specialized Direct emit).
@@ -104,11 +104,11 @@ export function assertThinRuntimeImports(scan: ThinHostScan): string[] {
             if (!name.endsWith('.client.js')) continue;
             const text = fs.readFileSync(path.join(componentsDir, name), 'utf8');
             if (!text.includes('__vmzRunTask')) continue;
-            if (/from\s+["'][^"']*vmz-dom\.js["']/.test(text)) {
+            if (/from\s*["'][^"']*vmz-dom\.js["']/.test(text)) {
                 errors.push(`${name} still imports vmz-dom.js for __vmzRunTask`);
                 break;
             }
-            if (!/from\s+["'][^"']*dom-core\.js["']/.test(text) && !/from\s+["'][^"']*dom\.browser\.js["']/.test(text)) {
+            if (!/from\s*["'][^"']*dom-core\.js["']/.test(text) && !/from\s*["'][^"']*dom\.browser\.js["']/.test(text)) {
                 errors.push(`${name} __vmzRunTask must resolve to dom-core.js or dom.browser.js`);
                 break;
             }

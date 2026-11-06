@@ -214,7 +214,10 @@ console.log('pack-artifact-gates: G8 CJS interop executed for real…');
     );
     if (!cjsOwner) fail('acme-cjs never emitted as a chunk');
     const shellCode = pack1.tree.get(cjsOwner.fileName)?.toString('utf8') ?? '';
-    if (!shellCode.includes('let module = { exports: {} };') || !shellCode.includes('function require(id)')) {
+    // Packed chunks are emitted minified, so assert the shell semantically
+    // rather than against formatted source literals.
+    const shellCompact = shellCode.replace(/\s+/g, '');
+    if (!shellCompact.includes('letmodule={exports:{}};') || !shellCompact.includes('functionrequire(id)')) {
         fail(`CJS chunk ${cjsOwner.chunkId} lacks the interop shell`);
     }
     // Runtime proof: importing the emitted isolated chunk must not throw
