@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseHTML } from 'linkedom';
 import { repoRoot } from '../_lib/repo-root.ts';
 
 const root = repoRoot(import.meta.url);
@@ -43,7 +44,7 @@ for (const name of ['Button', 'Badge', 'Link', 'Tag', 'Icon']) {
 }
 
 console.log('ui-direct-host-box: SSR serialize Button host…');
-const { registerComponents, renderToString } = await import(
+const { registerComponents, renderToString, hydrate } = await import(
     pathToFileURL(path.join(root, 'packages', 'runtimes', 'vmz-runtime', 'dist', 'faces', 'dom.js')).href
 );
 
@@ -94,5 +95,30 @@ if (!/data-vmz="Button"[^>]*style="display:contents"/.test(html) && !/style="dis
 const notifHost = html.match(/<div[^>]*data-vmz="Notification"[^>]*>/);
 if (!notifHost) fail(`SSR missing Notification host: ${html.slice(0, 400)}`);
 if (notifHost[0].includes('display:contents')) fail(`Notification must keep layout box: ${notifHost[0]}`);
+
+console.log('ui-direct-host-box: hydrate keeps block host without a style attribute…');
+const { window } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${html}</div></body></html>`);
+globalThis.window = window;
+globalThis.document = window.document;
+globalThis.HTMLElement = window.HTMLElement;
+globalThis.Node = window.Node;
+globalThis.DocumentFragment = window.DocumentFragment;
+globalThis.Text = window.Text;
+globalThis.Comment = window.Comment;
+
+const app = window.document.getElementById('app');
+const ssrButtonHost = app.querySelector('[data-vmz="Button"]');
+const ssrNotificationHost = app.querySelector('[data-vmz="Notification"]');
+await hydrate(Page, app);
+const buttonHost = app.querySelector('[data-vmz="Button"]');
+const notificationHost = app.querySelector('[data-vmz="Notification"]');
+if (buttonHost !== ssrButtonHost) fail('Button host replaced on hydrate');
+if (notificationHost !== ssrNotificationHost) fail('Notification host replaced on hydrate');
+if (!buttonHost.getAttribute('style')?.includes('display:contents')) {
+    fail(`Button host lost display:contents on hydrate: ${buttonHost.outerHTML}`);
+}
+if (notificationHost.hasAttribute('style')) {
+    fail(`Notification block host gained a style attribute on hydrate: ${notificationHost.outerHTML}`);
+}
 
 console.log('ui-direct-host-box PASS');
