@@ -214,6 +214,41 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'SSR and hydrated select option selection agree',
         pre: ['build:runtimes'],
     },
+    'ssr-select-multiple': {
+        file: 'runtime/ssr-select-multiple.ts',
+        description: 'Multiple select models keep every entry and mark the options in document order',
+        pre: ['build:runtimes'],
+    },
+    'ssr-escape-cr': {
+        file: 'runtime/ssr-escape-cr.ts',
+        description: 'SSR escapes CR so hydration keeps the exact server text',
+        pre: ['build:runtimes'],
+    },
+    'ssr-pre-textarea-leading-newline': {
+        file: 'runtime/ssr-pre-textarea-leading-newline.ts',
+        description: 'SSR keeps a leading LF in `pre`/`textarea` through a sacrificial newline',
+        pre: ['build:runtimes'],
+    },
+    'ssr-xlink-namespace': {
+        file: 'runtime/ssr-xlink-namespace.ts',
+        description: 'Client `xlink:href` writes use the XLink namespace like parsed SSR HTML',
+        pre: ['build:runtimes'],
+    },
+    'client-textarea-default-value': {
+        file: 'runtime/client-textarea-default-value.ts',
+        description: 'The first textarea value write seeds `defaultValue` for form reset',
+        pre: ['build:runtimes'],
+    },
+    'client-select-default-selected': {
+        file: 'runtime/client-select-default-selected.ts',
+        description: 'The first select value write seeds option `selected` so `form.reset()` keeps the SSR choice',
+        pre: ['build:runtimes'],
+    },
+    'client-input-default-state': {
+        file: 'runtime/client-input-default-state.ts',
+        description: 'Only the first input write seeds `value`/`checked` defaults, later updates stay on the IDL',
+        pre: ['build:runtimes'],
+    },
     'ssr-resume-identity': {
         file: 'runtime/ssr-resume-identity.ts',
         description: 'Hydrate reclaims SSR nodes at every depth instead of recreating the subtree',
@@ -323,6 +358,11 @@ export const CHECKS: Record<string, CheckEntry> = {
     'highlighter-wasm': {
         file: 'ui/highlighter-wasm.ts',
         description: '@vmz/highlighter + unknown-wasm32 + vmz-highlighter CE',
+        pre: ['build:content-engines'],
+    },
+    'highlighter-ce-binding': {
+        file: 'ui/highlighter-ce-binding.ts',
+        description: '`vmz-highlighter` CE reacts to `textContent` and `language`/`theme` writes',
         pre: ['build:content-engines'],
     },
     'markdown-wasm32': {
@@ -727,6 +767,13 @@ export const CHECK_ALL = [
     'resume-composition',
     'ssr-svg-region-slot',
     'ssr-direct-html',
+    'ssr-select-multiple',
+    'ssr-escape-cr',
+    'ssr-pre-textarea-leading-newline',
+    'ssr-xlink-namespace',
+    'client-textarea-default-value',
+    'client-select-default-selected',
+    'client-input-default-state',
     'keyed-list',
     'slot-projection',
     'invalidation',
@@ -762,6 +809,7 @@ export const CHECK_ALL = [
     'ui-direct-host-box',
     'component-event-wire',
     'highlighter-wasm',
+    'highlighter-ce-binding',
     'markdown-wasm32',
     'replaceable-content-plugin',
     'ui-v-if-dom',
