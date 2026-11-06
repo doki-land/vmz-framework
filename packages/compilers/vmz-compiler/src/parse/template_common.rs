@@ -138,6 +138,7 @@ pub(crate) fn native_model_bind(
     input_type: Option<&str>,
     value_bind: Option<&str>,
     value_static: Option<&str>,
+    multiple: bool,
 ) -> Option<NativeModelBind> {
     if arg.is_some() || !matches!(tag, "input" | "textarea" | "select") {
         return None;
@@ -189,7 +190,15 @@ pub(crate) fn native_model_bind(
             prop: "value",
             prop_expr: expr.to_string(),
             event: "change",
-            handler: format!("$event => (({expr}) = {text_value})"),
+            // A `multiple` select writes back every selected option as an array;
+            // without it the native `.value` stays a single string.
+            handler: if multiple {
+                format!(
+                    "$event => (({expr}) = Array.from($event.target.selectedOptions, (__vmzO) => __vmzO.value))"
+                )
+            } else {
+                format!("$event => (({expr}) = {text_value})")
+            },
         }),
         _ => Some(NativeModelBind {
             prop: "value",

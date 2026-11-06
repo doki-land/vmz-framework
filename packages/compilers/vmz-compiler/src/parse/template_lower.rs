@@ -218,6 +218,16 @@ fn lower_directive(
                 )
                 .with_arg("expr", expr));
             }
+            // `v-model` never binds a file input: browsers expose only a fake
+            // path through `.value`, so the write-back silently corrupts state.
+            if tag == "input"
+                && static_attr_value(attrs, "type").is_some_and(|t| t.eq_ignore_ascii_case("file"))
+            {
+                return Err(TemplateParseError::coded(
+                    "vmz::template::v_model_on_file_input",
+                    offset,
+                ));
+            }
             // Native form elements bind the DOM `value` / `checked` prop and a
             // native write-back event. Only component tags keep the Vue 3
             // `:modelValue` + `@update:modelValue` contract.
@@ -229,6 +239,8 @@ fn lower_directive(
                 static_attr_value(attrs, "type"),
                 bound_attr_expr(attrs, "value"),
                 static_attr_value(attrs, "value"),
+                static_attr_value(attrs, "multiple").is_some()
+                    || bound_attr_expr(attrs, "multiple").is_some(),
             ) {
                 return Ok(vec![
                     TemplateAttr {

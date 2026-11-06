@@ -7,6 +7,7 @@
     "vmz::template::parse_failed": "解析 `<template>` 失败：{detail}",
     "vmz::template::invalid_expr": "模板表达式无效：{detail}",
     "vmz::template::v_model_invalid_target": "`v-model` 的目标必须是可赋值的标识符或成员表达式：`{expr}`",
+    "vmz::template::v_model_on_file_input": "`v-model` 不能绑定到 `<input type=\"file\">`",
     "vmz::template::each_missing_key": "`<{tag}>` 上的 `v-for` 应声明 `:key`",
     "vmz::template::each_static_key": "`<{tag}>` 上的 `v-for` 不得使用静态 key `{key}`",
     "vmz::template::each_literal_key": "`<{tag}>` 上的 `v-for` 不得使用字面量 key `{key}`",

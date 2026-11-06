@@ -37,6 +37,33 @@ export const BOOLEAN_HTML_ATTRS = new Set([
     'inert',
 ]);
 
+/**
+ * A `<select>` is patched before its `<option>` children are appended: emit
+ * writes the model attr while the select is still empty, so the first write
+ * selects nothing and the model never changes again. Remember the pending
+ * value and replay it once the synchronous create pass has finished.
+ */
+const pendingSelectValues = new WeakMap<object, unknown>();
+const pendingSelectReplays = new WeakSet<object>();
+
+function replaySelectValue(el) {
+    if (!pendingSelectValues.has(el)) return;
+    const value = pendingSelectValues.get(el);
+    const opts = el.options || el.querySelectorAll?.('option') || [];
+    if (!opts.length) return;
+    pendingSelectValues.delete(el);
+    applyDomAttr(el, 'value', value);
+}
+
+function deferSelectValue(el) {
+    if (pendingSelectReplays.has(el)) return;
+    pendingSelectReplays.add(el);
+    queueMicrotask(() => {
+        pendingSelectReplays.delete(el);
+        replaySelectValue(el);
+    });
+}
+
 export function applyDomAttr(el, name, value) {
     const key = name === 'className' ? 'class' : name;
     if (key === 'class') {
@@ -70,9 +97,18 @@ export function applyDomAttr(el, name, value) {
     // also need the IDL `.value` property so controlled updates stay in sync after switches.
     // linkedom `<select>.value` is getter-only ??sync via `option.selected` instead of throwing.
     if (key === 'value' && el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.tagName === 'SELECT')) {
+        // A `multiple` select model is a list: every option in the model is
+        // selected and there is no single `value` attribute to reflect.
+        const listed = Array.isArray(value) ? value.map((v) => String(v)) : null;
         const next = value == null || value === false ? '' : String(value);
         if (el.tagName === 'SELECT') {
             const opts = el.options || el.querySelectorAll?.('option') || [];
+            if (!opts.length) {
+                pendingSelectValues.set(el, value);
+                deferSelectValue(el);
+                return;
+            }
+            pendingSelectValues.delete(el);
             for (const opt of opts) {
                 // Match SSR `markSelectSelection`: an option without a `value`
                 // attribute contributes its trimmed text. Reading IDL `.value`
@@ -82,11 +118,12 @@ export function applyDomAttr(el, name, value) {
                     typeof opt.hasAttribute === 'function' && opt.hasAttribute('value')
                         ? String(opt.getAttribute('value') ?? '')
                         : String(opt.textContent ?? opt.value ?? '').trim();
-                opt.selected = optionValue === next;
+                opt.selected = listed ? listed.includes(optionValue) : optionValue === next;
             }
         } else if (el.value !== next) {
             el.value = next;
         }
+        if (listed) return;
         if (value == null || value === false) el.removeAttribute('value');
         else el.setAttribute('value', next);
         return;

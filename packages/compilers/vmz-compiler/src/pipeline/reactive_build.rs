@@ -654,6 +654,8 @@ fn walk_semantic_prop_bindings(
                 semantic_static_value(props, "type"),
                 semantic_bound_expr(props, "value"),
                 semantic_static_value(props, "value"),
+                semantic_static_value(props, "multiple").is_some()
+                    || semantic_bound_expr(props, "multiple").is_some(),
             ) {
                 add_expr_binding(
                     &bind.prop_expr,
