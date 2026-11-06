@@ -1394,21 +1394,56 @@ fn emit_plain_element(
                     next_id,
                 );
             }
+            // `@[expr]` — the listener type comes from the evaluated expression.
+            // Re-key the listener whenever that value changes.
+            ViewAttrValue::Interp { expr: e } if dynamic_event_inner(&a.name).is_some() => {
+                let dyn_expr = dynamic_event_inner(&a.name).expect("guard checked");
+                let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
+                let name_body =
+                    bind_template_expr(dyn_expr, fields, handler_ctx.methods, scope, aliases);
+                let raw = wrap_handler(&body, handler_ctx, scope)?;
+                let guards = event_guards(&a.modifiers, &el);
+                let handler = if guards.is_empty() {
+                    raw
+                } else {
+                    format!("(ev) => {{ {guards} return ({raw})(ev); }}")
+                };
+                let slot = *next_id;
+                *next_id += 1;
+                if once {
+                    stmts.push(format!(
+                        "{{ var __vmzEvtName{slot}; try {{ __vmzEvtName{slot} = {name_body}; }} catch {{ __vmzEvtName{slot} = null; }} api.bindObjectListeners({el}, {slot}, __vmzEvtName{slot} == null ? null : {{ [String(__vmzEvtName{slot})]: {handler} }}, this, \"on\"); }}"
+                    ));
+                } else {
+                    let deps: Vec<String> = collect_template_deps(dyn_expr, fields, scope);
+                    let deps_js = deps_js(&with_memo_deps(deps, memo));
+                    let memo_gate = memo_gate_prelude(memo, stmts, next_id, "return;");
+                    let id_arg =
+                        a.binding.map(|id| id.0.to_string()).unwrap_or_else(|| "null".into());
+                    stmts.push(format!(
+                        "(function() {{
+  var __vmzOwner{slot} = this;
+  function __patchEvt{slot}() {{
+    {memo_gate}var __vmzEvtName{slot};
+    try {{ __vmzEvtName{slot} = {name_body}; }} catch {{ __vmzEvtName{slot} = null; }}
+    api.bindObjectListeners({el}, {slot}, __vmzEvtName{slot} == null ? null : {{ [String(__vmzEvtName{slot})]: {handler} }}, __vmzOwner{slot}, \"on\");
+  }}
+  api.trackPatch(this, [{deps_js}], __patchEvt{slot}, {id_arg});
+}}).call(this);"
+                    ));
+                }
+            }
             ViewAttrValue::Interp { expr: e } if is_event_attr(&a.name) => {
                 let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
                 let type_name = event_dom_type(&a.name);
 
                 // ---- modifiers extraction ----
                 let mods = &a.modifiers;
-                let has_stop = mods.iter().any(|m| m == "stop");
-                let has_prevent = mods.iter().any(|m| m == "prevent");
-                let has_self = mods.iter().any(|m| m == "self");
                 let has_capture = mods.iter().any(|m| m == "capture");
                 let has_passive = mods.iter().any(|m| m == "passive");
                 let has_once = mods.iter().any(|m| m == "once");
                 let has_trim = mods.iter().any(|m| m == "trim");
                 let has_number = mods.iter().any(|m| m == "number");
-                let has_exact = mods.iter().any(|m| m == "exact");
 
                 // v-model: @update:xxx → input (default) / change (.lazy)
                 let is_vmodel_event = a.name.strip_prefix("@update:").is_some();
@@ -1474,38 +1509,7 @@ fn emit_plain_element(
                     };
 
                     // stop / prevent / self → guards prepended to handler body
-                    let mut guards = String::new();
-                    if has_self {
-                        guards.push_str(&format!("if (ev.target !== {el}) return; "));
-                    }
-                    if has_stop {
-                        guards.push_str("ev.stopPropagation(); ");
-                    }
-                    if has_prevent {
-                        guards.push_str("ev.preventDefault(); ");
-                    }
-                    // System modifiers: requested keys must be held, and `.exact`
-                    // rejects every other system key (Vue `withModifiers`).
-                    for (mod_name, flag) in [
-                        ("ctrl", "ctrlKey"),
-                        ("alt", "altKey"),
-                        ("shift", "shiftKey"),
-                        ("meta", "metaKey"),
-                    ] {
-                        if mods.iter().any(|m| m == mod_name) {
-                            guards.push_str(&format!("if (!ev.{flag}) return; "));
-                        } else if has_exact {
-                            guards.push_str(&format!("if (ev.{flag}) return; "));
-                        }
-                    }
-                    // Key modifiers filter after the modifier guards (Vue `withKeys`
-                    // hyphenates `event.key` and skips events without a key).
-                    if let Some(keys) = collect_key_candidates(mods) {
-                        let list = keys.iter().map(|k| q(k)).collect::<Vec<_>>().join(",");
-                        guards.push_str(&format!(
-                            r"if ('key' in ev) {{ var __vmzKey = String(ev.key).replace(/\B([A-Z])/g, '-$1').toLowerCase(); if ([{list}].indexOf(__vmzKey) < 0) return; }} "
-                        ));
-                    }
+                    let guards = event_guards(mods, &el);
                     let wrapped = if guards.is_empty() {
                         handler
                     } else {
@@ -1677,6 +1681,45 @@ fn number_model_cast(value: &str) -> String {
     format!(
         "((__vmzV) => {{ const __vmzN = Number(__vmzV); return __vmzV === \"\" || Number.isNaN(__vmzN) ? __vmzV : __vmzN; }})({value})"
     )
+}
+
+/// Modifier guards shared by static and dynamic event names. Order matches Vue:
+/// self → stop → prevent → system keys → `.exact` → key filter.
+fn event_guards(mods: &[String], el: &str) -> String {
+    let mut guards = String::new();
+    if mods.iter().any(|m| m == "self") {
+        guards.push_str(&format!("if (ev.target !== {el}) return; "));
+    }
+    if mods.iter().any(|m| m == "stop") {
+        guards.push_str("ev.stopPropagation(); ");
+    }
+    if mods.iter().any(|m| m == "prevent") {
+        guards.push_str("ev.preventDefault(); ");
+    }
+    // System modifiers: requested keys must be held, and `.exact` rejects
+    // every other system key (Vue `withModifiers`).
+    let has_exact = mods.iter().any(|m| m == "exact");
+    for (mod_name, flag) in [
+        ("ctrl", "ctrlKey"),
+        ("alt", "altKey"),
+        ("shift", "shiftKey"),
+        ("meta", "metaKey"),
+    ] {
+        if mods.iter().any(|m| m == mod_name) {
+            guards.push_str(&format!("if (!ev.{flag}) return; "));
+        } else if has_exact {
+            guards.push_str(&format!("if (ev.{flag}) return; "));
+        }
+    }
+    // Key modifiers filter after the modifier guards (Vue `withKeys`
+    // hyphenates `event.key` and skips events without a key).
+    if let Some(keys) = collect_key_candidates(mods) {
+        let list = keys.iter().map(|k| q(k)).collect::<Vec<_>>().join(",");
+        guards.push_str(&format!(
+            r"if ('key' in ev) {{ var __vmzKey = String(ev.key).replace(/\B([A-Z])/g, '-$1').toLowerCase(); if ([{list}].indexOf(__vmzKey) < 0) return; }} "
+        ));
+    }
+    guards
 }
 
 fn emit_component(
@@ -2049,6 +2092,11 @@ fn project_slot_stmt(
 fn dynamic_arg_inner(name: &str) -> Option<&str> {
     let inner = name.strip_prefix('[')?.strip_suffix(']')?.trim();
     (!inner.is_empty()).then_some(inner)
+}
+
+/// `@[expr]` — Vue resolves the listener type from the expression at patch time.
+fn dynamic_event_inner(name: &str) -> Option<&str> {
+    name.strip_prefix('@').and_then(dynamic_arg_inner)
 }
 
 fn emit_bind_attr(

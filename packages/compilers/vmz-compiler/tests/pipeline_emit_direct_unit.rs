@@ -132,6 +132,25 @@ export default class NumberModel {
 }
 
 #[test]
+fn dynamic_event_name_rekeys_listener() {
+    let src = r#"
+export default class DynamicEvent {
+  evt = "click";
+  hits = 0;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<button @[evt]="(() => hits++)">go</button>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("api.bindObjectListeners("), "no dynamic listener: {js}");
+    assert!(js.contains(r#"[String(__vmzEvtName"#), "name not resolved at patch: {js}");
+    assert!(js.contains("api.trackPatch(this, ["), "name changes are not tracked: {js}");
+    assert!(!js.contains(r#""[evt]""#), "literal `[evt]` used as event type: {js}");
+}
+
+#[test]
 fn if_else_emits_if_block() {
     let src = r#"
 export default class BranchDemo {
