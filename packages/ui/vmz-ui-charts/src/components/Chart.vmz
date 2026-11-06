@@ -420,8 +420,6 @@ export default class Chart {
 
     // ---- 交互与生命周期内部字段 ----
 
-    /** 每次 scene() 计算递增。异步返回时先比对再应用，为未来异步管线预留。 */
-    public _latestRevision: number = 0;
     /** ResizeObserver 实例，onMount 创建 onUnmount 断开。 */
     public _resizeObserver: ResizeObserver | null = null;
     /** auto 主题的 matchMedia 状态。 */
@@ -429,9 +427,15 @@ export default class Chart {
     /** 容器测量尺寸（width/height 为 null 时由 ResizeObserver 回写）。 */
     public _measuredWidth: number | null = null;
     public _measuredHeight: number | null = null;
-    /** 渲染期缓存：最近一次编译产物，命中测试直接读，不重编译。 */
-    public _semanticScene: SemanticScene | null = null;
-    public _plan: ChartCompilePlan | null = null;
+    /** 渲染期缓存：最近一次编译产物，命中测试直接读，不重编译。
+     *  `#` 私有字段不参与响应式（生成器 `__vmzState` 只收集非 `#` 字段）——
+     *  渲染期写入它们不得再触发 patch，否则形成自激回路。 */
+    #semanticScene: SemanticScene | null = null;
+    #plan: ChartCompilePlan | null = null;
+    /** 只读公开句柄：demo / 宿主核对编译产物用，不参与响应式。 */
+    public get _plan(): ChartCompilePlan | null {
+        return this.#plan;
+    }
     /** 当前 hover / 键盘聚焦的 mark id。 */
     public _hoverId: string | null = null;
     /** 键盘聚焦索引（marks 顺序）。 */
@@ -527,23 +531,40 @@ export default class Chart {
         return this.diagnostics.some((d) => d.severity === "error");
     }
 
+    /** 只在内容真正变化时写 `diagnostics`。渲染期无条件赋值（哪怕内容相同）
+     *  都会把依赖标脏并再入队 patch，形成自激回路。 */
+    public _setDiagnostics(next: ReadonlyArray<{ severity: string; code: string; message: string }>): void {
+        if (next.length === this.diagnostics.length) {
+            let same = true;
+            for (let i = 0; i < next.length; i++) {
+                const a = this.diagnostics[i];
+                const b = next[i];
+                if (a.severity !== b.severity || a.code !== b.code || a.message !== b.message) {
+                    same = false;
+                    break;
+                }
+            }
+            if (same) return;
+        }
+        this.diagnostics = next;
+    }
+
     // ---- 渲染管线 ----
 
     /** 计算属性：spec / data / 尺寸变化时重新编译并解析为 DisplayScene。 */
     public scene(): DisplayScene | null {
-        this._latestRevision++;
         if (this._zeroSize()) {
-            this.diagnostics = [];
-            this._semanticScene = null;
-            this._plan = null;
+            this._setDiagnostics([]);
+            this.#semanticScene = null;
+            this.#plan = null;
             return null;
         }
         const snapshot = this._filteredSnapshot();
         const effSpec = this._effectiveSpec();
         if (!effSpec || !snapshot) {
-            this.diagnostics = [];
-            this._semanticScene = null;
-            this._plan = null;
+            this._setDiagnostics([]);
+            this.#semanticScene = null;
+            this.#plan = null;
             return null;
         }
         let plan = compile(effSpec, snapshot);
@@ -556,11 +577,11 @@ export default class Chart {
                 plan = { ...plan, series: fullPlan.series };
             }
         }
-        this.diagnostics = plan.diagnostics.items.map((d) => ({
+        this._setDiagnostics(plan.diagnostics.items.map((d) => ({
             severity: d.severity,
             code: d.code,
             message: d.message,
-        }));
+        })));
         // zoom/pan 基准：未缩放时的 x 域与 kind，从首次编译的比例尺捕获。
         const xScale = plan.scales.get("x");
         if (xScale && (xScale.kind === "linear" || xScale.kind === "log")) {
@@ -575,8 +596,8 @@ export default class Chart {
         const w = this._effWidth();
         const h = this._effHeight();
         const semantic = buildScene(plan, { width: w, height: h }, { theme: this._chartTheme() });
-        this._semanticScene = semantic;
-        this._plan = plan;
+        this.#semanticScene = semantic;
+        this.#plan = plan;
         // preserveNodeIds：交互宿主把 DOM 元素绑回稳定身份；SSR 输出同样
         // 携带 `data-dvz-id`，水合后高亮路径一致。
         return resolve(semantic, { width: w, height: h, preserveNodeIds: true });
@@ -731,7 +752,7 @@ export default class Chart {
     }
 
     public _markCount(): number {
-        return this._plan ? this._plan.marks.length : 0;
+        return this.#plan ? this.#plan.marks.length : 0;
     }
 
     public _ariaLabel(): string {
@@ -743,7 +764,7 @@ export default class Chart {
     public _summary(): string {
         if (this._isEmpty()) return "Empty chart.";
         const count = this._markCount();
-        const series = this._plan && this._plan.series.field !== null ? `, ${this._plan.series.categories.length} series` : "";
+        const series = this.#plan && this.#plan.series.field !== null ? `, ${this.#plan.series.categories.length} series` : "";
         return `${this._ariaLabel()} with ${count} marks${series}.`;
     }
 
@@ -888,7 +909,7 @@ export default class Chart {
             this._announce(`已恢复全部系列`);
             return;
         }
-        const plan = this._plan;
+        const plan = this.#plan;
         const cats = plan && plan.series.field !== null ? plan.series.categories : [];
         const hidden = new Set(this._hiddenSeries);
         if (hidden.has(name)) {
@@ -927,7 +948,7 @@ export default class Chart {
     public _legendNameFromId(id: string): string | null {
         const m = /^legend:(?:swatch|label):(\d+)$/.exec(id);
         if (!m) return null;
-        const plan = this._plan;
+        const plan = this.#plan;
         if (!plan || plan.series.field === null) return null;
         const idx = Number(m[1]);
         return plan.series.categories[idx] ?? null;
@@ -996,7 +1017,7 @@ export default class Chart {
     public _linkReceive(xValue: number, from: object): void {
         void from;
         this._linkEnsure();
-        const plan = this._plan;
+        const plan = this.#plan;
         const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
         if (!plan || !xEnc) return;
         const polylines = this._polylines();
@@ -1093,12 +1114,12 @@ export default class Chart {
 
     /** 从语义场景的轴基线还原 plot 矩形（x 轴底线 + y 轴底线）。 */
     public _plotBounds() {
-        if (!this._semanticScene) return null;
+        if (!this.#semanticScene) return null;
         let xFrom: number | null = null;
         let xTo = 0;
         let yTop = 0;
         let yBottom = 0;
-        for (const g of this._semanticScene.root.children) {
+        for (const g of this.#semanticScene.root.children) {
             if (g.kind !== "group") continue;
             if (g.id !== "x-axis" && g.id !== "y-axis") continue;
             for (const n of g.children) {
@@ -1332,7 +1353,7 @@ export default class Chart {
     /** line/area 卡片的全部系列折线命中区。 */
     public _polylines(): PolylineHit[] {
         const out: PolylineHit[] = [];
-        if (!this._semanticScene) return out;
+        if (!this.#semanticScene) return out;
         if (!this.spec) return out;
         if (this.spec.facetField) return out;
         const markKind = String(this.spec.mark);
@@ -1380,8 +1401,8 @@ export default class Chart {
             for (let i = 0; i < pl.points.length; i++) {
                 if (Math.abs(pl.points[i].x - bestX) > 0.5) continue;
                 dots.push({ x: pl.points[i].x * scaleX, y: pl.points[i].y * scaleY, color: pl.color });
-                const mark = this._plan ? this._plan.marks.find((m) => m.key === pl.keys[i]) : undefined;
-                if (mark && this._plan) {
+                const mark = this.#plan ? this.#plan.marks.find((m) => m.key === pl.keys[i]) : undefined;
+                if (mark && this.#plan) {
                     // 无分组时回退到 y 字段名而不是内部节点 id。
                     const seriesName = mark.series !== null ? mark.series : yEnc ? yEnc.field : pl.id;
                     if (yEnc) {
@@ -1389,11 +1410,11 @@ export default class Chart {
                         parts.push(
                             typeof rank === "number"
                                 ? `${seriesName}: 第 ${rank} 名`
-                                : `${seriesName}: ${formatCell(readCell(this._plan.resolvedData, yEnc.field, mark.rowIndex))}`,
+                                : `${seriesName}: ${formatCell(readCell(this.#plan.resolvedData, yEnc.field, mark.rowIndex))}`,
                         );
                     }
                     if (xLabel === "" && xEnc) {
-                        xLabel = `${xEnc.field}: ${formatCell(readCell(this._plan.resolvedData, xEnc.field, mark.rowIndex))}`;
+                        xLabel = `${xEnc.field}: ${formatCell(readCell(this.#plan.resolvedData, xEnc.field, mark.rowIndex))}`;
                     }
                 }
                 break;
@@ -1407,13 +1428,13 @@ export default class Chart {
         this._tooltip.visible = parts.length > 0;
         // 联动广播：吸附到的真实数据 x 值（定量 x 才有意义）。
         // `__linkQuiet`：收端借道本方法刷新 DOM，不得回播成环。
-        if (this.linkId && xEnc && this._plan && !(this as any).__linkQuiet) {
+        if (this.linkId && xEnc && this.#plan && !(this as any).__linkQuiet) {
             for (const pl of polylines) {
                 for (let i = 0; i < pl.points.length; i++) {
                     if (Math.abs(pl.points[i].x - bestX) > 0.5) continue;
-                    const mark = this._plan.marks.find((m) => m.key === pl.keys[i]);
+                    const mark = this.#plan.marks.find((m) => m.key === pl.keys[i]);
                     if (mark) {
-                        const v = readCell(this._plan.resolvedData, xEnc.field, mark.rowIndex);
+                        const v = readCell(this.#plan.resolvedData, xEnc.field, mark.rowIndex);
                         if (typeof v === "number" && Number.isFinite(v)) this._linkBroadcast(v);
                     }
                     i = pl.points.length;
@@ -1541,10 +1562,10 @@ export default class Chart {
 
     /** 收集 mark 节点（直接子级，role=chart.mark）。 */
     public _markNodes(): SemanticNode[] {
-        if (!this._semanticScene) {
+        if (!this.#semanticScene) {
             return [];
         }
-        return this._semanticScene.root.children.filter((n) => n.role === "chart.mark");
+        return this.#semanticScene.root.children.filter((n) => n.role === "chart.mark");
     }
 
     /** 命中测试：返回最近的 mark 稳定 id，未命中返回 null。 */
@@ -1627,7 +1648,7 @@ export default class Chart {
     /** 从 mark id 还原 tooltip 文本：统计型 mark 读 stat 快照，特殊 mark
      *  读派生量（占比 / 累计 / 秩次），其余读全部编码字段的真实行值。 */
     public _tooltipTextFor(id: string): string {
-        const plan = this._plan;
+        const plan = this.#plan;
         if (!plan || !this.spec) return id;
         const markKind = String(this.spec.mark);
         const xEnc = this.spec.encoding.find((e) => e.channel === "x");
@@ -1916,7 +1937,7 @@ export default class Chart {
 
     /** 按行 key 直接还原 tooltip 文本（crosshair / 键盘顶点路径）。 */
     public _tooltipForRowKey(key: string): string {
-        const plan = this._plan;
+        const plan = this.#plan;
         if (!plan || !this.spec) return key;
         const mark = plan.marks.find((m) => m.key === key);
         if (!mark) return key;
@@ -2259,7 +2280,7 @@ export default class Chart {
 
     /** axis 触发：从 scene 坐标解析 band x 槽的类目（非 band x 返回 null）。 */
     public _slotFromPoint(point: Point2D): string | null {
-        const plan = this._plan;
+        const plan = this.#plan;
         const bounds = this._plotBounds();
         const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
         if (!plan || !bounds || !xEnc) return null;
@@ -2274,7 +2295,7 @@ export default class Chart {
 
     /** axis 触发：同一槽全部系列按图例序合并，值读全部编码字段的真实行值。 */
     public _axisTooltipForSlot(slot: string, point: Point2D): void {
-        const plan = this._plan;
+        const plan = this.#plan;
         const xEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "x") : undefined;
         const yEnc = this.spec ? this.spec.encoding.find((e) => e.channel === "y") : undefined;
         if (!plan || !xEnc) return;
@@ -2329,9 +2350,9 @@ export default class Chart {
         // mark id 集合按 scene 缓存（非响应式 expando），任何 mark 前缀都覆盖，
         // 新 mark 类型不需要回这里补白名单。
         const bag = this as any;
-        if (!bag.__markIdSet || bag.__markIdScene !== this._semanticScene) {
+        if (!bag.__markIdSet || bag.__markIdScene !== this.#semanticScene) {
             bag.__markIdSet = new Set(this._markNodes().map((n) => n.id));
-            bag.__markIdScene = this._semanticScene;
+            bag.__markIdScene = this.#semanticScene;
         }
         const markIds = bag.__markIdSet as Set<string>;
         // 受控选择集优先（宿主回灌的 selection prop）。
