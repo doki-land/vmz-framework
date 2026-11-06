@@ -635,6 +635,25 @@ const serializeApi = {
     bindComponentProp() {
         /* SSR: props already resolved into the child instance at create */
     },
+    bindComponentProps() {
+        /* SSR: `...api.spreadProps()` already delivered the object props at create */
+    },
+    bindComponentEvents() {
+        /* component events attach only on the client */
+    },
+    bindObjectListeners() {
+        /* object listeners attach only on the client */
+    },
+    spreadProps(source) {
+        const out: Record<string, unknown> = Object.create(null);
+        if (source && typeof source === 'object') {
+            for (const key of Object.keys(source as Record<string, unknown>)) {
+                if (!key || key.startsWith('#')) continue;
+                out[key] = (source as Record<string, unknown>)[key];
+            }
+        }
+        return out;
+    },
     projectDefaultSlot(hostEl, node) {
         if (!hostEl || node == null) return;
         // serializeApi.component returns a serialize el tree (or island shell).
@@ -653,8 +672,13 @@ const serializeApi = {
             if (target.tag === 'slot') {
                 target.__rawHtml = null;
                 if (!Array.isArray(target.children)) target.children = [];
-                // Append — multiple projectDefaultSlot calls must accumulate (SSR).
-                // Client path replaces the live <slot> then appends siblings; serialize must push.
+                // The client replaces the live `<slot>` with the first projected node,
+                // which discards its fallback children. Drop the fallback on the first
+                // projection too, then accumulate later projections as siblings.
+                if (!filledSerializeSlots.has(target)) {
+                    filledSerializeSlots.add(target);
+                    target.children.length = 0;
+                }
                 target.children.push(node);
                 return;
             }

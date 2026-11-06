@@ -204,6 +204,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'SSR v-text content and v-show display match hydration',
         pre: ['build:runtimes'],
     },
+    'ssr-slot-fallback': {
+        file: 'runtime/ssr-slot-fallback.ts',
+        description: 'SSR default-slot projection drops fallback like the client',
+        pre: ['build:runtimes'],
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
