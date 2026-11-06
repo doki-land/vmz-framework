@@ -145,7 +145,10 @@ function mountDirectComponentHost(
     // Inline chips use `display: contents` (`ui-direct-host-box`). Block surfaces
     // keep a real box (DataTable select timed out when defaulting everything).
     // A dynamic switch must reset the previous box before applying the new one.
-    if (host.style) host.style.display = '';
+    // Writing an empty declaration at all still materialized a `style` attribute
+    // on hosts that never had one, so hydrate rewrote the SSR DOM for block
+    // surfaces. Only inline chips (`display: contents`) have a box to reset.
+    if (host.style && host.style.display === 'contents') host.style.removeProperty('display');
     applyDirectHostBox(host, name, Ctor);
     const child = createInstance(Ctor, resolved);
     if (!(Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function')) {
