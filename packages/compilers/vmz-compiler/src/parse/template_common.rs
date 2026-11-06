@@ -3,6 +3,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use oak_typescript::ast::ExpressionKind;
+use vmz_oak_frontend_adapter::parse_expression_snippet;
+
 /// Parse failure for Vue template syntax.
 ///
 /// Parser layers only carry a stable catalog code, structured args, and a byte
@@ -108,6 +111,20 @@ fn number_model_cast(value: &str) -> String {
     )
 }
 
+/// `v-model` writes back with `(expr) = value`, so the target must be assignable:
+/// an identifier or a member chain (`form.items[0].name`). Unparsable snippets
+/// keep their existing `vmz::template::invalid_expr` diagnostic instead.
+pub(crate) fn is_assignable_model_target(expr: &str) -> bool {
+    let parsed = parse_expression_snippet(expr);
+    let Some(root) = parsed.expression else {
+        return true;
+    };
+    matches!(
+        root.kind.as_ref(),
+        ExpressionKind::Identifier(_) | ExpressionKind::MemberExpression { .. }
+    )
+}
+
 /// Lower `v-model` on `<input>` / `<textarea>` / `<select>` into a DOM prop
 /// binding plus a native write-back handler.
 ///
@@ -137,12 +154,25 @@ pub(crate) fn native_model_bind(
     let text_event = if lazy { "change" } else { "input" };
     let kind = input_type.map(|t| t.to_ascii_lowercase());
     match (tag, kind.as_deref()) {
-        ("input", Some("checkbox")) => Some(NativeModelBind {
-            prop: "checked",
-            prop_expr: expr.to_string(),
-            event: "change",
-            handler: format!("$event => (({expr}) = $event.target.checked)"),
-        }),
+        ("input", Some("checkbox")) => {
+            // A checkbox model is boolean until a `value` is supplied, then it is
+            // an array model: `checked` is membership and the write-back toggles
+            // one entry instead of replacing the array with a boolean.
+            let value = value_bind
+                .map(str::to_string)
+                .or_else(|| value_static.map(js_string_literal))
+                .unwrap_or_else(|| "\"on\"".into());
+            Some(NativeModelBind {
+                prop: "checked",
+                prop_expr: format!(
+                    "((__vmzM) => Array.isArray(__vmzM) ? __vmzM.indexOf({value}) > -1 : __vmzM)({expr})"
+                ),
+                event: "change",
+                handler: format!(
+                    "$event => (({expr}) = ((__vmzM, __vmzV, __vmzOn) => {{ if (!Array.isArray(__vmzM)) return __vmzOn; const __vmzI = __vmzM.indexOf(__vmzV); if (__vmzOn) return __vmzI < 0 ? __vmzM.concat([__vmzV]) : __vmzM; return __vmzI > -1 ? __vmzM.slice(0, __vmzI).concat(__vmzM.slice(__vmzI + 1)) : __vmzM; }})(({expr}), ({value}), $event.target.checked))"
+                ),
+            })
+        }
         ("input", Some("radio")) => {
             let value = value_bind
                 .map(str::to_string)

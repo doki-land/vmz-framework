@@ -44,9 +44,8 @@ export default class BareAttrs {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl =
-        parse_template(r#"<div><button disabled>off</button><option value>—</option></div>"#)
-            .unwrap();
+    let tpl = parse_template(r#"<div><button disabled>off</button><option value>—</option></div>"#)
+        .unwrap();
     let program = build_program_module("t.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
@@ -71,7 +70,9 @@ export default class HostAttrsPage {
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(
-        js.contains(r#""__hostAttrs":{"id":"card","data-testid":"card","aria-label":"card","data-live":"#),
+        js.contains(
+            r#""__hostAttrs":{"id":"card","data-testid":"card","aria-label":"card","data-live":"#
+        ),
         "fallthrough attrs missing from `__hostAttrs`: {js}"
     );
     assert!(!js.contains("dataTestid"), "`data-testid` camelized into a prop: {js}");
@@ -319,8 +320,9 @@ export default class NoteForm {
         (
             r#"<div><input type="checkbox" v-model="agree" /></div>"#,
             &[
-                r#"api.specFieldAttr(this, 0, "agree", e1, "checked")"#,
-                r#"((this.agree) = $event.target.checked)"#,
+                r#"api.attr(e1, "checked", __v)"#,
+                r#"Array.isArray(__vmzM) ? __vmzM.indexOf("on") > -1"#,
+                r#"if (!Array.isArray(__vmzM)) return __vmzOn"#,
             ],
         ),
         (

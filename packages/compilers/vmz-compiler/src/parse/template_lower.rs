@@ -1,6 +1,6 @@
 //! Adapter: Concrete AST → legacy [`TemplateIr`] (emit contract unchanged).
 
-use super::template_common::{TemplateParseError, native_model_bind};
+use super::template_common::{TemplateParseError, is_assignable_model_target, native_model_bind};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg};
 use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
 
@@ -209,6 +209,15 @@ fn lower_directive(
             ..Default::default()
         }]),
         Directive::Model { arg, expr, modifiers } => {
+            // The write-back handler assigns `(expr) = value`; a non-assignable
+            // target would emit invalid JS that only fails after build.
+            if !is_assignable_model_target(expr) {
+                return Err(TemplateParseError::coded(
+                    "vmz::template::v_model_invalid_target",
+                    offset,
+                )
+                .with_arg("expr", expr));
+            }
             // Native form elements bind the DOM `value` / `checked` prop and a
             // native write-back event. Only component tags keep the Vue 3
             // `:modelValue` + `@update:modelValue` contract.
