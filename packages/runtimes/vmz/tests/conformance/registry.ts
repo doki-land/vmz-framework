@@ -219,6 +219,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Hydrate reclaims SSR nodes at every depth instead of recreating the subtree',
         pre: ['build:runtimes'],
     },
+    'ssr-keyed-resume': {
+        file: 'runtime/ssr-keyed-resume.ts',
+        description: 'Keyed each hydration reclaims SSR rows by `data-vmz-key`',
+        pre: ['build:runtimes'],
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',

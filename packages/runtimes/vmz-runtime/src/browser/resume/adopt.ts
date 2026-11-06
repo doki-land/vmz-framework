@@ -103,6 +103,38 @@ function createResumeAdopt(pool, rootEl) {
         return document.createElementNS(ns || SVG_NS, want);
     };
 
+    /**
+     * Reclaim the SSR row root for one keyed-each key.
+     *
+     * Tag-order adoption cannot distinguish rows when the client list is already
+     * ahead of the SSR order (persisted state, re-filtered store): the first
+     * `<li>` would be reused for whichever key the client renders first, so the
+     * retained DOM node (focus, caret, typed value) belongs to another key.
+     * Keyed rows carry `data-vmz-key` on the server, so match it exactly and leave
+     * unmatched SSR rows for the pool teardown. `null` means "not present in SSR"
+     * and the caller creates a fresh row.
+     */
+    const claimKeyed = (tag, key) => {
+        if (key == null) return null;
+        const want = String(tag || '').toLowerCase();
+        const wanted = String(key);
+        if (!want) return null;
+        for (const el of elementCandidates()) {
+            if (String(el.tagName).toLowerCase() !== want) continue;
+            if (typeof el.getAttribute !== 'function') continue;
+            if (el.getAttribute('data-vmz-key') !== wanted) continue;
+            // Row kernels own the whole row subtree (no nested each/component), and
+            // `hydrate` reads `root.firstChild` for its text slots. Do not stash the
+            // row's children into a resume pool here: the row must keep its SSR
+            // structure as-is.
+            used.add(el);
+            const k = el.getAttribute('data-vmz-key');
+            if (k != null && el.__vmzKey == null) el.__vmzKey = k;
+            return el;
+        }
+        return null;
+    };
+
     const adoptText = (value) => {
         for (const n of textCandidates()) {
             used.add(n);
@@ -165,6 +197,7 @@ function createResumeAdopt(pool, rootEl) {
     return {
         el: adoptElement,
         elNS: adoptElementNS,
+        claimKeyed,
         text: adoptText,
         componentHost,
         enter,

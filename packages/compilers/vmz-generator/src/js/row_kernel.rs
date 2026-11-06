@@ -104,9 +104,8 @@ pub fn try_emit_row_kernel_js(
     let hydrate = emit_hydrate_js(&text_slots, class_slot.as_ref(), &acts);
     let (apply, apply_by_field) = emit_apply_js(&text_slots, class_slot.as_ref());
     let key_field = key_bound.and_then(|k| parse_item_field(k.trim(), &item_prefix));
-    // Create is inlined (local path vars + parent.insertBefore) - does not call hydrate
-    // (vanillajs-style; Fragment mid-hop is slower than live insertBefore on this bench).
-    let create = emit_create_js(&text_slots, class_slot.as_ref(), &acts, key_field.as_deref());
+    // Create reclaims SSR rows by key on resume, otherwise clones the template.
+    let create = emit_create_js(tag, &text_slots, class_slot.as_ref(), &acts, key_field.as_deref());
     let events: Vec<String> = {
         let mut e = acts.iter().map(|(_, _, ev, _)| format!("{:?}", ev)).collect::<Vec<_>>();
         e.sort();
@@ -330,9 +329,11 @@ fn emit_hydrate_js(
     format!("function(root, item) {{\n{} }}", indent(&body))
 }
 
-/// Fresh-create loop: clone + local path vars + keyed.set + parent.insertBefore(root, end).
-/// Inlined (not hydrate.call) so V8 sees straight-line DOM writes like hand-tuned keyed apps.
+/// Fresh-create loop: reclaim a matching SSR row by key when resuming, otherwise
+/// clone the template. Both paths seed `keyed` and insert before `end`.
+/// Clone writes stay inlined (not hydrate.call) so V8 sees straight-line DOM writes.
 fn emit_create_js(
+    tag: &str,
     texts: &[(Vec<u32>, String)],
     class: Option<&(Vec<u32>, String, String, String, String)>,
     _acts: &[(Vec<u32>, String, String, String)],
@@ -351,7 +352,7 @@ fn emit_create_js(
         None => "  var k = keyOf(item, i);\n".to_string(),
     };
     let mut body = format!(
-        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n{key_head}  if (keyed.has(k)) continue;\n  var root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
+        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n{key_head}  if (keyed.has(k)) continue;\n  var root = null;\n  var adopt = api._resumeAdopt;\n  if (adopt && typeof adopt.claimKeyed === 'function') root = adopt.claimKeyed({tag:?}, k);\n  if (root) {{\n    hydrate(root, item);\n  }} else {{\n  root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
     );
     // Text writes target the sole Text child via nodeValue (vanillajs-style).
     // Acts are baked into html (`data-vmz-act`) and copied by cloneNode.
@@ -381,7 +382,7 @@ fn emit_create_js(
             on_val, off_val
         ));
     }
-    body.push_str("  root.__vmzKey = k;\n  keyed.set(k, root);\n");
+    body.push_str("  }\n  root.__vmzKey = k;\n  keyed.set(k, root);\n");
     body.push_str("  parent.insertBefore(root, end);\n");
     body.push_str("  if (entryByIndex) entryByIndex[i] = root;\n}\n");
     format!(
@@ -721,4 +722,20 @@ fn escape_text(s: &str) -> String {
 
 fn indent(s: &str) -> String {
     s.lines().map(|l| format!("  {l}\n")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::emit_create_js;
+
+    /// Keyed row create must ask resume for the SSR row by key first, and only
+    /// clone when the server did not render that key.
+    #[test]
+    fn create_reclaims_ssr_rows_by_key() {
+        let texts = [(vec![0u32], "label".to_string())];
+        let code = emit_create_js("li", &texts, None, &[], Some("id"));
+        assert!(code.contains("adopt.claimKeyed(\"li\", k)"), "missing keyed reclaim: {code}");
+        assert!(code.contains("hydrate(root, item)"), "adopted row must hydrate text slots: {code}");
+        assert!(code.contains("tpl.cloneNode(true)"), "missing clone fallback: {code}");
+    }
 }
