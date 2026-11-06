@@ -199,6 +199,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Direct v-html payload is present in the first SSR response',
         pre: ['build:runtimes'],
     },
+    'direct-vhtml-hydrate': {
+        file: 'runtime/direct-vhtml-hydrate.ts',
+        description: 'Direct v-html keeps matching SSR payload nodes on hydrate and repaints on change',
+        pre: ['build:runtimes'],
+    },
     'ssr-text-show': {
         file: 'runtime/ssr-text-show.ts',
         description: 'SSR v-text content and v-show display match hydration',

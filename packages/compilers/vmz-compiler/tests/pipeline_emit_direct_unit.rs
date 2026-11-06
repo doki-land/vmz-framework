@@ -867,6 +867,11 @@ export default class HtmlDemo {
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("api.trackPatch(this,"), "{js}");
+    // Re-assigning the same string re-parses the SSR subtree that hydrate adopted.
+    assert!(
+        js.contains("api.reclaimHtml") && js.contains(".innerHTML !== __s)"),
+        "v-html must ask resume to reclaim and skip an unchanged write: {js}"
+    );
     assert!(!js.contains("api.bindHtml(this,"), "{js}");
     assert!(!js.contains("api.bindAttr(this,"), "{js}");
     assert!(!js.contains("api.bindText(this,"), "{js}");
@@ -1415,8 +1420,38 @@ export default class TemplateEachHost {
     assert!(!js.contains("r.label"), "row alias stays a free variable: {js}");
 }
 
-/// A bare `<template>` wrapper (no `v-for`) is transparent too: children render
-/// at the wrapper position instead of inside inert template content.
+/// Every `v-html` write path compares against the live `innerHTML` first, so a
+/// hydrate whose SSR markup already matches never re-parses the adopted subtree.
+#[test]
+fn html_writes_skip_unchanged_markup_on_all_paths() {
+    let src = r#"
+export default class HtmlPaths {
+  markup = "<b>x</b>";
+  on = true;
+  a = "<i>a</i>";
+  b = "<i>b</i>";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let cases = [
+        r#"<div v-html="markup"></div>"#,
+        r#"<div v-html="markup" v-once></div>"#,
+        r#"<div v-html="on ? a : b"></div>"#,
+    ];
+    for tpl_src in cases {
+        let tpl = parse_template(tpl_src).unwrap();
+        let js = emit_client_js(src, &client, &tpl, None).unwrap();
+        assert!(
+            js.contains("api.reclaimHtml") && js.contains(".innerHTML !== __s)"),
+            "{tpl_src} must compare before writing: {js}"
+        );
+        assert!(
+            !js.contains("String(__v); e0.innerHTML ="),
+            "{tpl_src} still writes unconditionally: {js}"
+        );
+    }
+}
+
 #[test]
 fn plain_template_wrapper_is_transparent() {
     let src = r#"

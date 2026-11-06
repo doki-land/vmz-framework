@@ -218,6 +218,17 @@ export const directApi = {
         noteDomCreate();
         return document.createTextNode(value == null ? '' : String(value));
     },
+    /**
+     * Emitted `v-html` guard. Resume parks the SSR children of a reclaimed element,
+     * so the live `innerHTML` is still empty when the first patch runs. Ask adopt to
+     * move them back and compare before writing: an equal markup keeps the SSR
+     * subtree instead of re-parsing it. SSR has no adopt context and falls through.
+     */
+    reclaimHtml(el, value) {
+        const adopt = directApi._resumeAdopt;
+        if (!adopt || typeof adopt.reclaimHtml !== 'function') return false;
+        return adopt.reclaimHtml(el as Element, value == null ? '' : String(value));
+    },
 
     nsScopeDepth() {
         return nsStack.length;

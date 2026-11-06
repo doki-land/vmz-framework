@@ -240,6 +240,21 @@ function createResumeAdopt(pool, rootEl) {
         };
     };
 
+    /**
+     * `v-html` on a reclaimed element. `markElement` parked its SSR children, so
+     * the live element reads empty and a plain `innerHTML` compare always misses,
+     * re-parsing the whole payload. Move the parked children back (an O(children)
+     * DOM move, no parse) and compare the live markup: equal means the parked
+     * subtree already *is* the rendered payload and must stay.
+     */
+    const reclaimHtml = (el, value) => {
+        if (!used.has(el)) return false;
+        const childPool = el.__vmzResumePool;
+        if (!childPool) return false;
+        while (childPool.firstChild) el.appendChild(childPool.firstChild);
+        return String(el.innerHTML) === value;
+    };
+
     return {
         el: adoptElement,
         elNS: adoptElementNS,
@@ -251,6 +266,7 @@ function createResumeAdopt(pool, rootEl) {
         scopeDepth,
         rewindScope,
         beginBranchScope,
+        reclaimHtml,
     };
 }
 
