@@ -971,7 +971,16 @@ fn emit_if_block(
     if (applied !== gen || inst.__vmzDestroyed) return;
     if (active >= 0) {{
       unwireBranch(active);
-      if (cached[active] && cached[active].parentNode) api.removeNode(cached[active]);
+      if (cached[active]) {{
+        // Vue `v-if` unmounts the branch: dispose runs child `onDestroy`, drops
+        // their subscriptions and detaches every patch before the node leaves the
+        // document. Keeping the detached subtree cached let a re-shown branch
+        // replay stale state onto nodes that were no longer in the tree.
+        api.disposeTree(cached[active]);
+        if (cached[active].parentNode) api.removeNode(cached[active]);
+      }}
+      cached[active] = null;
+      branchBinds[active] = [];
     }}
     active = next;
     if (next < 0) return;

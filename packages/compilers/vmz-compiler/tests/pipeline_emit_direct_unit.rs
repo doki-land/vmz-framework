@@ -575,6 +575,38 @@ export default class OnceBranch {
 }
 
 #[test]
+fn if_branch_switch_disposes_before_detach() {
+    // Vue `v-if` unmounts the outgoing branch: its child instances and
+    // subscriptions must be disposed, not parked in the cache for a later replay.
+    let src = r#"
+export default class BranchDispose {
+  showA = true;
+  aText = "A";
+  bText = "B";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<div><p v-if="showA">{{ aText }}</p><p v-else>{{ bText }}</p></div>"#)
+            .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains("api.disposeTree(cached[active]);"),
+        "branch switch must dispose the outgoing subtree: {js}"
+    );
+    assert!(js.contains("cached[active] = null;"), "disposed branch must not be reused: {js}");
+    assert!(
+        js.contains("branchBinds[active] = [];"),
+        "disposed branch bindings must be dropped: {js}"
+    );
+    let dispose_at = js.find("api.disposeTree(cached[active]);").unwrap();
+    let remove_at = js.find("api.removeNode(cached[active]);").unwrap();
+    assert!(dispose_at < remove_at, "dispose must run before detach: {js}");
+}
+
+#[test]
 fn v_once_each_freezes_rows_and_drops_row_kernel() {
     let src = r#"
 export default class OnceList {
