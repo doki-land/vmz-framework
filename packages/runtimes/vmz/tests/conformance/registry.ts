@@ -389,7 +389,7 @@ export const CHECKS: Record<string, CheckEntry> = {
     },
     'chart-hydration-stability': {
         file: 'ui/chart-hydration-stability.ts',
-        description: '`/charts` SSR SVG subtree is reused by hydration instead of rebuilt',
+        description: '`/charts` responsive bodies stay client-owned while fixed-size SSR SVG is adopted',
         pre: ['build:runtimes'],
     },
     'component-event-wire': {

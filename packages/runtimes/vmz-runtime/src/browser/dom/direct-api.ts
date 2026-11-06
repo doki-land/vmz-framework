@@ -232,9 +232,14 @@ export const directApi = {
         const digest = htmlDigest(next);
         const adopt = directApi._resumeAdopt;
         if (adopt && typeof adopt.reclaimHtml === 'function' && adopt.reclaimHtml(el as Element, digest)) return;
-        const marker = typeof el.getAttribute === 'function' ? el.getAttribute(HTML_HASH_ATTR) : null;
+        // The browser serializer expands self-closing tags (`<path/>` becomes
+        // `<path></path>`), so `innerHTML` never equals the generated string for
+        // SVG payloads. Compare the payload digest instead: an equal stamp means
+        // this host already holds exactly this payload, so a repeated patch must
+        // keep the live nodes (identity, focus, and `ResizeObserver` targets).
+        if (typeof el.getAttribute === 'function' && el.getAttribute(HTML_HASH_ATTR) === digest) return;
         if (el.innerHTML !== next) el.innerHTML = next;
-        if (marker != null) (el as Element).setAttribute(HTML_HASH_ATTR, digest);
+        if (typeof el.setAttribute === 'function') (el as Element).setAttribute(HTML_HASH_ATTR, digest);
     },
 
     nsScopeDepth() {

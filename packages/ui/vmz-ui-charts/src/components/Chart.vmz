@@ -514,6 +514,17 @@ export default class Chart {
         return { ...base, ...this.themeTokens };
     }
 
+    /**
+     * 图表主体归属：尺寸在构建期未完全确定（响应式维度尚未测量）时，
+     * SVG 归客户端所有。SSR 不序列化一个必然会被容器测量推翻的尺寸。
+     * 显式 width 与 height 都在场时尺寸已知，SSR SVG 可水合复用。
+     */
+    public _bodyAwaitingMeasure(): boolean {
+        const widthPending = this.width === null && this._measuredWidth === null;
+        const heightPending = this.height === null && this._measuredHeight === null;
+        return widthPending || heightPending;
+    }
+
     /** 零尺寸 guard —— 宽或高为 0 时跳过渲染避免 NaN / 空 SVG 闪烁。 */
     public _zeroSize(): boolean {
         return this._effWidth() <= 0 || this._effHeight() <= 0;
@@ -622,6 +633,8 @@ export default class Chart {
         // 每次渲染兜底一次联动注册：props 在水合顺序上晚于 onMount 赋值，
         // 只靠 onMount 注册会漏掉从未被交互的接收端。
         this._linkEnsure();
+        // 响应式维度尚未测量：主体归客户端，SSR 不输出必然被推翻的 SVG。
+        if (this._bodyAwaitingMeasure()) return "";
         if (this._zeroSize()) return "";
         const scene = this.scene();
         if (!scene) return "";
@@ -772,6 +785,7 @@ export default class Chart {
 
     onMount() {
         this.state = initialState(this._effWidth(), this._effHeight());
+        this._seedFallbackSizeWhenUnmeasurable();
         this._attachResizeObserver();
         this._attachThemeMedia();
         this._attachWheel();
@@ -799,6 +813,13 @@ export default class Chart {
 
     public _detachThemeMedia(): void {
         this._themeMedia = null;
+    }
+
+    /** 无 ResizeObserver 的浏览器不会回写测量值，落回默认尺寸避免主体永久为空。 */
+    public _seedFallbackSizeWhenUnmeasurable(): void {
+        if (typeof window === "undefined" || typeof ResizeObserver !== "undefined") return;
+        if (this.width === null && this._measuredWidth === null) this._measuredWidth = FALLBACK_WIDTH;
+        if (this.height === null && this._measuredHeight === null) this._measuredHeight = FALLBACK_HEIGHT;
     }
 
     public _attachResizeObserver(): void {
