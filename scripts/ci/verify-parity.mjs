@@ -25,6 +25,17 @@ const PRESETS = {
         'thin-runtime-host-boundary',
         'thin-runtime-production-proof',
         'runtime-quality-baseline',
+        // Authoring surface + SSR hydration gates added to the default suite.
+        'direct-vhtml-hydrate',
+        'ssr-text-show',
+        'ssr-slot-fallback',
+        'ssr-select-value',
+        'ssr-resume-identity',
+        'ssr-keyed-resume',
+        'ssr-route-slot-layout',
+        'ssr-keyed-non-kernel',
+        'v-pre',
+        'v-once',
     ],
     'ui-browser': ['--keep-going', 'ui-automation', 'browser-production'],
 };
