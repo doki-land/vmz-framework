@@ -27,10 +27,12 @@ export const THIN_RUNTIME_BUDGET = {
      * Browser import closure bytes from entry-client + dom.browser seeds.
      * 0.2.0 baseline was ~138k. After the browser face split (navigation,
      * locale transition, diagnostics) and dropping the SSR barrel leak from
-     * `browser/dom/direct-api`, the measured closure is 177907, so the cap is
-     * recalibrated with a small margin while staying a hard gate.
+     * `browser/dom/direct-api`, the measured closure was 177907. The client
+     * navigation split and the reactivity write barrier then added their own
+     * modules, and the closure now measures 208600, so the cap is recalibrated
+     * with a small margin while staying a hard gate.
      */
-    maxBrowserClosureBytes: 182_000,
+    maxBrowserClosureBytes: 220_000,
     /** runtimeShared / generated from inventory record (0.2.0 baseline ~12). */
     maxRatioRuntimeToGenerated: 16,
 } as const;
