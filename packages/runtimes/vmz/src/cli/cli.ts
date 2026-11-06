@@ -3,12 +3,13 @@
  */
 
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import type { Cli, Command, CommandDiagnostic, ParsedOptions } from '@vmz/commander';
 import { createCli } from '@vmz/commander';
 import { registerApplicationCommands } from './application-cmd.js';
 import { assembleDelivery, emitBuildProof } from '../workspace/build-assemble.js';
+import { listenLocalStaticHost } from '../workspace/cdn-policy.js';
 import { resolveCliLocalesRoot } from './cli-localize.js';
 import { normalizeDeliveryAuthoring, resolveProfileArtifactDir, selectBuildProfile } from '../delivery/delivery-profile.js';
 import { createDevSession } from '../dev/dev-session.js';
@@ -449,6 +450,14 @@ async function cmdServe(args: ParsedOptions): Promise<number> {
         return 1;
     }
     const outDir = resolveProfileArtifactDir(outDirRoot, selected.profile);
+    const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
+    const port = Number(args.port ?? 5173);
+    // `web-static` assemblies are pruned for delivery: the Node runtime face, page
+    // modules and `_vmz/pack-node/` are deliberately absent, so spawning the SSR
+    // host here fails with `ERR_MODULE_NOT_FOUND`. Serve the emitted HTML instead.
+    if (readAssembleAssembly(outDir) === 'web-static') {
+        return await serveWebStaticArtifact(outDir, host, port);
+    }
     const hostJs = path.join(outDir, 'vmz-serve-host.mjs');
     {
         try {
@@ -461,8 +470,6 @@ async function cmdServe(args: ParsedOptions): Promise<number> {
             return 1;
         }
     }
-    const host = typeof args.host === 'string' ? args.host : '127.0.0.1';
-    const port = Number(args.port ?? 5173);
     log.info(`serve http://${host}:${port}`);
     const node = process.env.VMZ_NODE || process.execPath;
     const child = spawn(node, [hostJs], {
@@ -490,6 +497,48 @@ async function cmdServe(args: ParsedOptions): Promise<number> {
             if (signal) resolve(0);
             else resolve(code ?? 1);
         });
+    });
+}
+
+/** `assembly` recorded by the last build at this artifact dir, or `''` when absent. */
+function readAssembleAssembly(outDir: string): string {
+    try {
+        const raw = JSON.parse(readFileSync(path.join(outDir, '_vmz', 'assemble-manifest.json'), 'utf8'));
+        return typeof raw?.assembly === 'string' ? raw.assembly : '';
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Preview a pruned `web-static` artifact through the CDN policy of the build:
+ * per-route HTML, real 404 document, cache headers. No SSR host is involved.
+ */
+async function serveWebStaticArtifact(outDir: string, host: string, port: number): Promise<number> {
+    if (!existsSync(path.join(outDir, 'index.html'))) {
+        log.error(`missing ${path.join(outDir, 'index.html')} — run \`vmz build --profile static\` first`);
+        return 1;
+    }
+    let policy: Record<string, unknown> = {};
+    const policyPath = path.join(outDir, '_vmz', 'cdn-policy-manifest.json');
+    if (existsSync(policyPath)) {
+        try {
+            policy = JSON.parse(readFileSync(policyPath, 'utf8'));
+        } catch {
+            policy = {};
+        }
+    }
+    const server = await listenLocalStaticHost(outDir, policy, { host, port });
+    log.info(`serve static ${server.baseUrl} (web-static artifact, no SSR host)`);
+    return await new Promise((resolve) => {
+        const shutdown = () => {
+            server.close().then(
+                () => resolve(0),
+                () => resolve(1),
+            );
+        };
+        process.once('SIGINT', shutdown);
+        process.once('SIGTERM', shutdown);
     });
 }
 

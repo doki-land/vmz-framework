@@ -671,6 +671,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/static-delivery.ts',
         description: 'A3-static static HTML + 404 + SEO + StaticDeliveryManifest',
     },
+    'serve-static-profile': {
+        file: 'production/serve-static-profile.ts',
+        description: '`vmz serve` previews a pruned web-static artifact instead of spawning the removed SSR host',
+    },
     'cdn-policy': {
         file: 'production/cdn-policy.ts',
         description: 'A3-cdn: routing + cache-policy + static-resume + static-rollback',
@@ -780,6 +784,7 @@ export const CHECKS: Record<string, CheckEntry> = {
             'server-host',
             'release-artifact',
             'static-delivery',
+            'serve-static-profile',
             'cdn-policy',
             'content-addressed-assets',
             'site-delivery',
@@ -919,6 +924,8 @@ export const CHECK_ALL = [
     'ui-icons',
     'charts-render',
     'ui7',
+    // `vmz serve` preview of a pruned `web-static` artifact
+    'serve-static-profile',
     // 0.1.27 Production Evidence Baseline — aggregate (includes official-dogfood via official-homepage)
     'browser-production',
     // Official homepage SSR HTML bytes (real build artifact)

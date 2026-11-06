@@ -54,6 +54,13 @@ interface LocalStaticHostOpts {
     port?: number;
 }
 
+export interface LocalStaticHost {
+    host: string;
+    port: number;
+    baseUrl: string;
+    close: () => Promise<void>;
+}
+
 export function buildCdnPolicyManifest(staticManifest: Record<string, unknown>, opts: BuildCdnPolicyOpts = {}) {
     const origin = String(staticManifest.origin || '');
     const localeArt = opts.localeArtifact || null;
@@ -274,7 +281,11 @@ export function projectCdnAdapter(policy: CdnPolicyManifest, adapterId: 'local-s
  * @param {{ host?: string, port?: number }} [opts]
  * @returns {Promise<{ host: string, port: number, baseUrl: string, close: () => Promise<void> }>}
  */
-export function listenLocalStaticHost(distDir: string, policy: Record<string, unknown>, opts: LocalStaticHostOpts = {}) {
+export function listenLocalStaticHost(
+    distDir: string,
+    policy: Record<string, unknown>,
+    opts: LocalStaticHostOpts = {},
+): Promise<LocalStaticHost> {
     const host = opts.host || '127.0.0.1';
     const port = Number(opts.port || 0);
     const handler = createLocalStaticHandler(distDir, policy);
