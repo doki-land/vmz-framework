@@ -9,4 +9,8 @@ if (major < 24 || (major === 24 && minor < 12)) {
 }
 const { runCli } = await import('../dist/cli/cli.js');
 const code = await runCli(process.argv.slice(2));
+// POSIX pipes flush asynchronously, so `process.exit` can drop queued
+// diagnostics before CI captures them. Drain both streams first.
+await new Promise((resolve) => process.stderr.write('', resolve));
+await new Promise((resolve) => process.stdout.write('', resolve));
 process.exit(code ?? 0);
