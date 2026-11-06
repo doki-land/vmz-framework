@@ -39,6 +39,15 @@
         <button type="button" id="loop-write" @click="updateInForOf">
             loop
         </button>
+        <button type="button" id="switch-write" @click="updateInSwitch">
+            switch
+        </button>
+        <button type="button" id="try-write" @click="updateInTry">
+            try
+        </button>
+        <button type="button" id="while-write" @click="updateInWhile">
+            while
+        </button>
         <button type="button" id="root-pop" @click="popRoot">
             pop
         </button>
@@ -164,6 +173,29 @@ export default class ReactiveDepthDemo {
     updateInForOf() {
         for (const tag of this.board.tags) {
             this.board.meta.note.count = tag.label.length;
+        }
+    }
+    updateInSwitch() {
+        switch (this.board.tags.length) {
+            case 2:
+                this.board.meta.note.count = 3;
+                break;
+            default:
+                this.board.meta.note.count = 4;
+        }
+    }
+    updateInTry() {
+        try {
+            this.board.meta.note.count = 6;
+        } catch {
+            this.board.meta.note.count = 8;
+        }
+    }
+    updateInWhile() {
+        let guard = 0;
+        while (guard < 1) {
+            guard++;
+            this.board.meta.note.count = 2;
         }
     }
     popRoot() {

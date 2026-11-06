@@ -176,6 +176,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Root `rows.length = n` repaints the rendered rows on mount and hydrate',
         pre: ['build:runtimes'],
     },
+    'reactive-depth-nested-writes': {
+        file: 'runtime/reactive-depth-nested-writes.ts',
+        description: 'Nested writes inside callbacks, `for…of`, `switch`, `try` and `while` stay on the barrier',
+        pre: ['build:runtimes'],
+    },
     'write-barrier-suite': {
         description: 'WriteBarrier static + array + shared + logical + root update + mutator args',
         composite: [
@@ -771,6 +776,7 @@ export const CHECK_ALL = [
     'lifetime',
     'write-barrier-suite',
     'reactive-depth-root-length',
+    'reactive-depth-nested-writes',
     'async-graph',
     'motion-ir',
     'resume',

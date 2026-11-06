@@ -508,3 +508,85 @@ export default class Demo {
     assert!(out.source.contains("this.count--"));
     assert!(out.source.contains("--this.count"));
 }
+
+#[test]
+fn rewrites_nested_writes_inside_arrow_callbacks() {
+    let src = r#"
+export default class Demo {
+  board = { meta: { count: 0 } };
+  later() {
+    Promise.resolve().then(() => {
+      this.board.meta.count = 1;
+    });
+    setTimeout(() => {
+      this.board.meta.count = 2;
+    }, 0);
+    this.board.items.forEach((item) => {
+      this.board.meta.count = item.n;
+    });
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["board"]));
+    assert_eq!(out.rewritten, 3, "emit:\n{}", out.source);
+    assert!(!out.source.contains("this.board.meta.count ="), "bare write:\n{}", out.source);
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 1)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 2)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], item.n)"));
+}
+
+#[test]
+fn rewrites_nested_writes_inside_statement_containers() {
+    let src = r#"
+export default class Demo {
+  board = { meta: { count: 0 }, tags: [] };
+  scan() {
+    for (const tag of this.board.tags) {
+      this.board.meta.count = tag.n;
+    }
+    switch (this.board.tags.length) {
+      case 0:
+        this.board.meta.count = 3;
+        break;
+      default:
+        this.board.meta.count = 4;
+    }
+    try {
+      this.board.meta.count = 5;
+    } catch {
+      this.board.meta.count = 6;
+    }
+    let guard = 0;
+    while (guard < 1) {
+      guard++;
+      this.board.meta.count = 7;
+    }
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["board"]));
+    assert_eq!(out.rewritten, 6, "emit:\n{}", out.source);
+    assert!(!out.source.contains("this.board.meta.count ="), "bare write:\n{}", out.source);
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], tag.n)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 3)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 4)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 5)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 6)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"count\"], 7)"));
+}
+
+#[test]
+fn rewrites_nested_writes_in_conditional_alternate() {
+    let src = r#"
+export default class Demo {
+  board = { meta: { a: 0, b: 0 } };
+  pick(flag: boolean) {
+    flag ? (this.board.meta.a = 1) : (this.board.meta.b = 2);
+  }
+}
+"#;
+    let out = rewrite_static_path_writes(src, &owned(&["board"]));
+    assert_eq!(out.rewritten, 2, "emit:\n{}", out.source);
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"a\"], 1)"));
+    assert!(out.source.contains("__vmzWritePath(this, \"board\", [\"meta\", \"b\"], 2)"));
+}

@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use oak_typescript::ast::{ClassMember, Expression, ExpressionKind, Statement};
+use oak_typescript::ast::{ClassMember, Expression, ExpressionKind, ObjectProperty, Statement};
 use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
 use super::write_barrier::WriteBarrierRewrite;
@@ -132,6 +132,50 @@ fn collect_statements(
                 }
                 collect_statement(&for_stmt.body, source, owned, aliases, hits);
             }
+            Statement::WhileStatement(while_stmt) => {
+                collect_expression(&while_stmt.test, source, owned, aliases, hits);
+                collect_statement(&while_stmt.body, source, owned, aliases, hits);
+            }
+            Statement::DoWhileStatement(do_stmt) => {
+                collect_statement(&do_stmt.body, source, owned, aliases, hits);
+                collect_expression(&do_stmt.test, source, owned, aliases, hits);
+            }
+            Statement::ForInStatement(for_in) => {
+                collect_statement(&for_in.left, source, owned, aliases, hits);
+                collect_expression(&for_in.right, source, owned, aliases, hits);
+                collect_statement(&for_in.body, source, owned, aliases, hits);
+            }
+            Statement::ForOfStatement(for_of) => {
+                collect_statement(&for_of.left, source, owned, aliases, hits);
+                collect_expression(&for_of.right, source, owned, aliases, hits);
+                collect_statement(&for_of.body, source, owned, aliases, hits);
+            }
+            Statement::SwitchStatement(switch_stmt) => {
+                collect_expression(&switch_stmt.discriminant, source, owned, aliases, hits);
+                for case in &switch_stmt.cases {
+                    if let Some(test) = &case.test {
+                        collect_expression(test, source, owned, aliases, hits);
+                    }
+                    collect_statements(&case.consequent, source, owned, aliases, hits);
+                }
+            }
+            Statement::TryStatement(try_stmt) => {
+                collect_statements(&try_stmt.block, source, owned, aliases, hits);
+                if let Some(handler) = &try_stmt.handler {
+                    collect_statements(&handler.body, source, owned, aliases, hits);
+                }
+                if let Some(finalizer) = &try_stmt.finalizer {
+                    collect_statements(finalizer, source, owned, aliases, hits);
+                }
+            }
+            Statement::ReturnStatement(ret) => {
+                if let Some(argument) = &ret.argument {
+                    collect_expression(argument, source, owned, aliases, hits);
+                }
+            }
+            Statement::ThrowStatement(throw_stmt) => {
+                collect_expression(&throw_stmt.argument, source, owned, aliases, hits)
+            }
             _ => {}
         }
     }
@@ -214,10 +258,57 @@ fn collect_expression(
                 collect_expression(property, source, owned, aliases, hits);
             }
         }
-        ExpressionKind::BinaryExpression { left, right, .. }
-        | ExpressionKind::ConditionalExpression { test: left, consequent: right, alternate: _ } => {
+        ExpressionKind::BinaryExpression { left, right, .. } => {
             collect_expression(left, source, owned, aliases, hits);
             collect_expression(right, source, owned, aliases, hits);
+        }
+        ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
+            collect_expression(test, source, owned, aliases, hits);
+            collect_expression(consequent, source, owned, aliases, hits);
+            collect_expression(alternate, source, owned, aliases, hits);
+        }
+        // Writes inside callbacks/timers still need the barrier: the promise
+        // `.then` / `setTimeout` body runs after the event, but the component is
+        // still a WriteBarrier one, so a bare nested write never reports.
+        ExpressionKind::ArrowFunction { body, .. } => {
+            collect_statement(body, source, owned, aliases, hits)
+        }
+        ExpressionKind::FunctionExpression { body, .. } => {
+            collect_statements(body, source, owned, aliases, hits)
+        }
+        ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::SatisfiesExpression { expression, .. }
+        | ExpressionKind::TypeAssertionExpression { expression, .. }
+        | ExpressionKind::NonNullExpression(expression) => {
+            collect_expression(expression, source, owned, aliases, hits)
+        }
+        ExpressionKind::SequenceExpression(items) => {
+            for item in items {
+                collect_expression(item, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::NewExpression { func, args } => {
+            collect_expression(func, source, owned, aliases, hits);
+            for arg in args {
+                collect_expression(arg, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::ObjectLiteral { properties } => {
+            for property in properties {
+                match property {
+                    ObjectProperty::Property { value, .. } | ObjectProperty::Spread(value) => {
+                        collect_expression(value, source, owned, aliases, hits);
+                    }
+                    ObjectProperty::Method { body, .. } => {
+                        collect_statements(body, source, owned, aliases, hits);
+                    }
+                }
+            }
+        }
+        ExpressionKind::ArrayLiteral { elements } => {
+            for element in elements {
+                collect_expression(element, source, owned, aliases, hits);
+            }
         }
         ExpressionKind::UnaryExpression { argument, .. }
         | ExpressionKind::AwaitExpression(argument)
