@@ -317,6 +317,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Multi-root `<template v-for>` rows serialize marker pairs and reclaim SSR nodes by key',
         pre: ['build:runtimes'],
     },
+    'ssr-keyed-row-update': {
+        file: 'runtime/ssr-keyed-row-update.ts',
+        description: 'Hydrated multi-root rows keep their DOM nodes across reorder, edit, remove and add',
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
@@ -860,6 +864,7 @@ export const CHECK_ALL = [
     'ssr-slot-projection-resume',
     'ssr-keyed-non-kernel',
     'ssr-keyed-row-fragment',
+    'ssr-keyed-row-update',
     'v-pre',
     'v-once',
     'ssr-select-multiple',
