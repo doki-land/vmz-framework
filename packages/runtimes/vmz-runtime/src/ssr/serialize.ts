@@ -860,6 +860,26 @@ const serializeApi = {
         }
         throw new Error(`vmz:dom serialize component <${name}> requires __vmzCreate (rebuild child with Direct)`);
     },
+    /**
+     * `<component :is>` on the server: `is` and props are evaluated once at
+     * create time, so the dynamic boundary serializes exactly like the resolved
+     * static component.
+     */
+    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps) {
+        let Ctor = null;
+        try {
+            Ctor = getCtor.call(hostInst);
+        } catch {
+            Ctor = null;
+        }
+        let props = {};
+        try {
+            props = getProps.call(hostInst) || {};
+        } catch {
+            props = {};
+        }
+        return serializeApi.component(hostInst, Ctor, props, null);
+    },
 };
 
 function applySerializeAttr(el, name, value) {

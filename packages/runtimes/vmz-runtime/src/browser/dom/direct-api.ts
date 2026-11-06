@@ -16,6 +16,7 @@ import { createUnknownComponentElement } from '../unknown-component.js';
 import { applyDomAttr, eventPropHandlerName } from './attributes.js';
 import {
     createInstance,
+    destroy,
     disposeDomTree,
     findOwnedDefaultSlotTarget,
     findOwnedNamedSlot,
@@ -71,6 +72,117 @@ function isSvgNode(node: unknown): boolean {
     if (ns === SVG_NS) return true;
     const tag = (node as { tagName?: string }).tagName;
     return tag != null && String(tag).toLowerCase() === 'svg' && ns == null;
+}
+
+/** Component display name for a ctor or registry key (`<component :is>` too). */
+function componentDisplayName(nameOrCtor: unknown): string {
+    if (typeof nameOrCtor === 'function') {
+        const fn = nameOrCtor as { __vmzTag?: string; name?: string };
+        return fn.__vmzTag || fn.name || 'Component';
+    }
+    return nameOrCtor == null ? 'Component' : String(nameOrCtor);
+}
+
+/**
+ * Bind props into `host`, resolve the target component, create its child
+ * instance and run its create. Shared by the static `component()` and the
+ * `dynamicComponent()` remount path so both produce the same boundary.
+ */
+function mountDirectComponentHost(
+    host: HTMLElement & { __vmzInst?: DirectInstance | null },
+    hostInst: DirectInstance | null,
+    name: string,
+    nameOrCtor: unknown,
+    props: Record<string, unknown> | undefined,
+    client: string | null,
+): VmzDomNode {
+    const rawProps = (props || {}) as Record<string, unknown>;
+    // `id` / `data-*` / `aria-*` are fallthrough attributes, not props: they
+    // belong on the host element (the component boundary in VMZ).
+    const hostAttrs = rawProps.__hostAttrs as Record<string, unknown> | undefined;
+    if (hostAttrs) {
+        for (const [k, v] of Object.entries(hostAttrs)) applyDomAttr(host, k, v);
+    }
+
+    const resolved: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawProps)) {
+        if (k === '__hostAttrs') continue;
+        // Function props that already look like `onXxx` stay as handlers.
+        // Component `@event` never arrives here (emit uses onComponentEvent).
+        const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
+        if (onKey) resolved[onKey] = v;
+        else if (typeof v === 'function') resolved[k] = (v as Function).call(hostInst);
+        else resolved[k] = v;
+    }
+    if (client) {
+        host.setAttribute('data-vmz-island', name);
+        host.setAttribute('data-vmz-client', String(client));
+        host.setAttribute('data-vmz-props', JSON.stringify(stripFns(resolved)));
+        if (isEventEntryStrategy(String(client))) {
+            host.setAttribute('data-vmz-entry', 'event');
+        }
+        // resume: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
+        scheduleClientOn(host as HTMLElement, String(client), async () => {
+            const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : await resolveComponent(name);
+            if (!Ctor) {
+                // Replace placeholder island with leaf error node (do not throw page).
+                const err = createUnknownComponentElement(name, 'island');
+                host.replaceWith(err);
+                return;
+            }
+            const { resume } = await import('../resume/resume.js');
+            await resume(Ctor, host, { props: resolved, state: {} });
+        });
+        return host;
+    }
+    // Static Ctor import path: use Function directly (no registry lookup).
+    const Ctor = (typeof nameOrCtor === 'function' ? nameOrCtor : components[name]) as
+        | ComponentCtor
+        | undefined;
+    if (!Ctor) {
+        return createUnknownComponentElement(name, 'client');
+    }
+    // Inline chips use `display: contents` (`ui-direct-host-box`). Block surfaces
+    // keep a real box (DataTable select timed out when defaulting everything).
+    // A dynamic switch must reset the previous box before applying the new one.
+    if (host.style) host.style.display = '';
+    applyDirectHostBox(host, name, Ctor);
+    const child = createInstance(Ctor, resolved);
+    if (!(Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function')) {
+        throw new Error(`vmz:dom direct component <${name}> requires __vmzCreate (rebuild child with Direct)`);
+    }
+    // Nested resume: keep parent `_resumeAdopt` so child reclaim parked SSR nodes.
+    // Enter the host's private child pool so nested create cannot see uncle siblings.
+    const adopt = directApi._resumeAdopt;
+    const entered = adopt && typeof adopt.enter === 'function' ? adopt.enter(host) : false;
+    // A child nested inside the parent's `v-for` must not feed the parent item
+    // patch sink: those patches belong to the child instance (`this`) and the
+    // parent's each replays them with the parent host, wiping child output.
+    const prevItemPatches = directApi._itemPatches;
+    directApi._itemPatches = null;
+    let node;
+    try {
+        node = runDirectCreate(Ctor, child);
+    } finally {
+        directApi._itemPatches = prevItemPatches;
+        if (entered && adopt && typeof adopt.leave === 'function') adopt.leave();
+    }
+    if (node) {
+        // ifBlock/eachBlock roots are DocumentFragments: appendChild moves
+        // children into `host` and empties the fragment. Keep a live Element
+        // root so projectDefaultSlot can find `<slot>` (Button v-if/v-else).
+        child.__vmzDomRoot = node.nodeType === 11 ? host : node;
+        host.appendChild(node);
+    }
+    host.__vmzInst = child;
+    if (typeof child.onMount === 'function') {
+        const pending = Promise.resolve().then(() => {
+            if (!child.__vmzDestroyed) return child.onMount();
+        });
+        const bag = (hostInst as any).__vmzPendingChildMounts || ((hostInst as any).__vmzPendingChildMounts = []);
+        bag.push(pending);
+    }
+    return host;
 }
 
 export const directApi = {
@@ -398,8 +510,7 @@ export const directApi = {
      * Nested component (sync Direct child or island schedule).
      */
     component(hostInst, nameOrCtor, props, client) {
-        const name = typeof nameOrCtor === 'function' ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component' : nameOrCtor;
-
+        const name = componentDisplayName(nameOrCtor);
         let host = null;
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
             host = directApi._resumeAdopt.componentHost(name);
@@ -409,88 +520,65 @@ export const directApi = {
             host = document.createElement('div');
             host.setAttribute('data-vmz', name);
         }
-        const rawProps = (props || {}) as Record<string, unknown>;
-        // `id` / `data-*` / `aria-*` are fallthrough attributes, not props: they
-        // belong on the host element (the component boundary in VMZ).
-        const hostAttrs = rawProps.__hostAttrs as Record<string, unknown> | undefined;
-        if (hostAttrs) {
-            for (const [k, v] of Object.entries(hostAttrs)) applyDomAttr(host, k, v);
-        }
-
-        const resolved = {};
-        for (const [k, v] of Object.entries(rawProps)) {
-            if (k === '__hostAttrs') continue;
-            // Function props that already look like `onXxx` stay as handlers.
-            // Component `@event` never arrives here (emit uses onComponentEvent).
-            const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
-            if (onKey) resolved[onKey] = v;
-            else if (typeof v === 'function') resolved[k] = v.call(hostInst);
-            else resolved[k] = v;
-        }
-        if (client) {
-            host.setAttribute('data-vmz-island', name);
-            host.setAttribute('data-vmz-client', String(client));
-            host.setAttribute('data-vmz-props', JSON.stringify(stripFns(resolved)));
-            if (isEventEntryStrategy(String(client))) {
-                host.setAttribute('data-vmz-entry', 'event');
+        return mountDirectComponentHost(host, hostInst, name, nameOrCtor, props as Record<string, unknown> | undefined, client);
+    },
+    /**
+     * `<component :is>` boundary. The host element is stable, the child instance
+     * is torn down and rebuilt whenever the evaluated `is` value changes. Props
+     * are re-evaluated per mount so the new type starts from current values, and
+     * the child listener bag is carried over so `@event` handlers keep working.
+     */
+    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps) {
+        const resolve = () => {
+            try {
+                return getCtor.call(hostInst);
+            } catch {
+                return null;
             }
-            // resume: resume on schedule; EventEntry may lazy-load chunk via __vmzLoadComponent.
-            scheduleClientOn(host, String(client), async () => {
-                const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : await resolveComponent(name);
-                if (!Ctor) {
-                    // Replace placeholder island with leaf error node (do not throw page).
-                    const err = createUnknownComponentElement(name, 'island');
-                    host.replaceWith(err);
-                    return;
-                }
-                const { resume } = await import('../resume/resume.js');
-                await resume(Ctor, host, { props: resolved, state: {} });
-            });
-            return host;
+        };
+        const initial = resolve();
+        const name = componentDisplayName(initial);
+        let host = null;
+        if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
+            host = directApi._resumeAdopt.componentHost(name);
         }
-        // Static Ctor import path: use Function directly (no registry lookup).
-        const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : components[name];
-        if (!Ctor) {
-            return createUnknownComponentElement(name, 'client');
+        if (!host) {
+            noteDomCreate();
+            host = document.createElement('div');
+            host.setAttribute('data-vmz', name);
         }
-        // Inline chips ??`display: contents` (`ui-direct-host-box`). Block surfaces
-        // keep a real box (DataTable select timed out when defaulting everything).
-        applyDirectHostBox(host, name, Ctor);
-        const child = createInstance(Ctor, resolved);
-        if (!(Ctor.__vmzDirect && typeof Ctor.__vmzCreate === 'function')) {
-            throw new Error(`vmz:dom direct component <${name}> requires __vmzCreate (rebuild child with Direct)`);
-        }
-        // Nested resume: keep parent `_resumeAdopt` so child reclaim parked SSR nodes.
-        // Enter the host's private child pool so nested create cannot see uncle siblings.
-        const adopt = directApi._resumeAdopt;
-        const entered = adopt && typeof adopt.enter === 'function' ? adopt.enter(host) : false;
-        // A child nested inside the parent's `v-for` must not feed the parent item
-        // patch sink: those patches belong to the child instance (`this`) and the
-        // parent's each replays them with the parent host, wiping child output.
-        const prevItemPatches = directApi._itemPatches;
-        directApi._itemPatches = null;
-        let node;
-        try {
-            node = runDirectCreate(Ctor, child);
-        } finally {
-            directApi._itemPatches = prevItemPatches;
-            if (entered && adopt && typeof adopt.leave === 'function') adopt.leave();
-        }
-        if (node) {
-            // ifBlock/eachBlock roots are DocumentFragments: appendChild moves
-            // children into `host` and empties the fragment. Keep a live Element
-            // root so projectDefaultSlot can find `<slot>` (Button v-if/v-else).
-            child.__vmzDomRoot = node.nodeType === 11 ? host : node;
-            host.appendChild(node);
-        }
-        host.__vmzInst = child;
-        if (typeof child.onMount === 'function') {
-            const pending = Promise.resolve().then(() => {
-                if (!child.__vmzDestroyed) return child.onMount();
-            });
-            const bag = hostInst.__vmzPendingChildMounts || (hostInst.__vmzPendingChildMounts = []);
-            bag.push(pending);
-        }
+        let current = initial;
+        const render = (next) => {
+            const old = host.__vmzInst;
+            let listeners = null;
+            if (old) {
+                listeners = old.__vmzComponentListeners || null;
+                destroy(old);
+                host.__vmzInst = null;
+            }
+            while (host.firstChild) host.removeChild(host.firstChild);
+            current = next;
+            const nextName = componentDisplayName(next);
+            host.setAttribute('data-vmz', nextName);
+            if (!next) return;
+            const Ctor = typeof next === 'function' ? next : components[nextName];
+            if (!Ctor) return;
+            let props = {};
+            try {
+                props = getProps.call(hostInst) || {};
+            } catch {
+                props = {};
+            }
+            mountDirectComponentHost(host, hostInst, nextName, Ctor, props, null);
+            const child = host.__vmzInst;
+            if (listeners && child) child.__vmzComponentListeners = listeners;
+        };
+        render(initial);
+        directApi.trackPatch(hostInst, deps || [], function __vmzDynamicComponentPatch() {
+            const next = resolve();
+            if (next === current) return;
+            render(next);
+        }, bindingId);
         return host;
     },
     /**

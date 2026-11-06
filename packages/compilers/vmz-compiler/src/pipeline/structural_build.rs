@@ -137,6 +137,10 @@ fn build_node(
         TemplateNode::Element { tag, .. } => {
             if tag == "Link" {
                 build_link(node, ir, routes)
+            } else if tag == "component" {
+                // `<component :is>` is the dynamic boundary: the wrapper itself
+                // never renders, the evaluated `is` value supplies the component.
+                build_component(node, ir, routes)
             } else if is_component_tag(tag) {
                 build_component(node, ir, routes)
             } else if tag.eq_ignore_ascii_case("slot") {
@@ -227,7 +231,7 @@ fn build_branch_body(
             // Link with if/else: strip control attrs then reuse Link lowering.
             build_link_stripped(node, strip, ir, routes)
         }
-        TemplateNode::Element { tag, .. } if is_component_tag(tag) => {
+        TemplateNode::Element { tag, .. } if is_component_tag(tag) || tag == "component" => {
             build_component_stripped(node, strip, ir, routes)
         }
         TemplateNode::Element { .. } => build_element(node, strip, true, ir, routes),

@@ -612,6 +612,76 @@ export default class Host {
     assert!(js.contains("api.component(this,"), "{js}");
 }
 
+/// `<component :is>` used to fall through to `api.el("component")` and mint an
+/// unknown DOM element. It must become a dynamic boundary: the `is` expression
+/// resolves at runtime and `is` never leaks into props.
+#[test]
+fn component_is_emits_dynamic_boundary() {
+    let src = r#"
+export default class DynHost {
+  kind = "ChildA";
+  label = "hi";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<section><component :is="kind" :label="label" /></section>"#).unwrap();
+    let program = build_program_module("DynHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        program.units[0].view.roots.iter().any(|n| {
+            matches!(n, ViewNode::Element { children, .. }
+                if children.iter().any(|c| matches!(c, ViewNode::Component { tag, .. } if tag == "component")))
+        }),
+        "`<component :is>` must build a component node"
+    );
+    assert!(js.contains("api.dynamicComponent(this,"), "dynamic boundary expected: {js}");
+    assert!(
+        js.contains("function() { return this.kind; }"),
+        "the `:is` getter must re-evaluate at switch time: {js}"
+    );
+    assert!(
+        js.contains(r#"function() { return {"label":this.label}; }"#),
+        "props must be re-evaluated per mount: {js}"
+    );
+    assert!(
+        !js.contains(r#"api.el("component")"#),
+        "`<component>` must never become an unknown DOM element: {js}"
+    );
+    assert!(!js.contains(r#""is":"#), "the `is` selector must not leak into props: {js}");
+    assert!(
+        js.contains("api.bindComponentProp")
+            || js.contains("api.onComponentEvent")
+            || !js.contains(":label"),
+        "user props stay ordinary bindings: {js}"
+    );
+}
+
+/// A static `is="ChildA"` value resolves through the component registry.
+#[test]
+fn component_static_is_uses_registry_lookup() {
+    let src = r#"
+export default class DynHost {
+  label = "hi";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<section><component is="ChildA" :label="label" /></section>"#).unwrap();
+    let program = build_program_module("DynHost.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains(r#"function() { return "ChildA"; }"#),
+        "static `is` must resolve by name: {js}"
+    );
+    assert!(
+        js.contains("api.dynamicComponent(this, null, [],"),
+        "a static `is` has no reactive deps: {js}"
+    );
+}
+
 #[test]
 fn ternary_emits_cf_bind_text() {
     let src = r#"
@@ -1274,7 +1344,8 @@ export default class PlainTemplateHost {
 }
 "#;
     let client = analyze_script(ScriptKind::Client, src);
-    let tpl = parse_template(r#"<section><template><h2>{{ title }}</h2></template></section>"#).unwrap();
+    let tpl =
+        parse_template(r#"<section><template><h2>{{ title }}</h2></template></section>"#).unwrap();
     let program = build_program_module("PlainTemplateHost.vmz", &client.decl, &tpl);
     assert!(is_direct_eligible(&program.units[0].view));
     let js = emit_client_js(src, &client, &tpl, None).unwrap();

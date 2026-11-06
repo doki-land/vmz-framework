@@ -1792,11 +1792,17 @@ fn emit_component(
     // interpolated values also keep a reactive patch on the host element.
     let mut host_attr_parts: Vec<String> = Vec::new();
     let mut host_attr_bindings: Vec<(String, Option<BindingId>, String)> = Vec::new();
+    // `<component :is>`: `is` selects the target, it is never a prop.
+    let mut is_attr: Option<&ViewAttr> = None;
     for a in attrs {
         if a.name == "style:tw" || is_once_marker(&a.name) || is_memo_marker(&a.name) {
             continue;
         }
         if a.name.starts_with('#') {
+            continue;
+        }
+        if tag == "component" && a.name == "is" {
+            is_attr = Some(a);
             continue;
         }
         if let Some(strategy) = a.name.strip_prefix("client:") {
@@ -1868,13 +1874,42 @@ fn emit_component(
         None => "null".into(),
     };
     let v = fresh("c", next_id);
-    let ctor_arg = if child_ctors.contains_key(tag) {
-        tag.to_string()
+    if tag == "component" {
+        // `<component :is="expr">`: resolve the target at runtime and swap the
+        // mounted child when the evaluated value changes. Islands need a stable
+        // hydration contract, so `client:` stays rejected for dynamic targets.
+        if let Some(strategy) = &client {
+            return Err(format!(
+                "`<component :is>` 不支持 `client:{strategy}`：动态目标无法稳定水合，改用具体组件标签"
+            ));
+        }
+        let (is_body, is_deps, is_binding) = match is_attr {
+            Some(a) => match &a.value {
+                ViewAttrValue::Interp { expr: e } => {
+                    let body = bind_template_expr(e, fields, handler_ctx.methods, scope, aliases);
+                    let (bid, deps, _cf) =
+                        bind_payload(e, a.binding, fields, handler_ctx.methods, scope, aliases, ir);
+                    (body, with_memo_deps(deps, memo), bid)
+                }
+                ViewAttrValue::Static { value: s } => (q(s), Vec::new(), None),
+                ViewAttrValue::Bare => ("true".to_string(), Vec::new(), None),
+            },
+            None => ("null".to_string(), Vec::new(), None),
+        };
+        let deps = deps_js(&is_deps);
+        let id_arg = is_binding.map(|id| id.to_string()).unwrap_or_else(|| "null".into());
+        stmts.push(format!(
+            "var {v} = api.dynamicComponent(this, {id_arg}, [{deps}], function() {{ return {is_body}; }}, function() {{ return {props}; }});"
+        ));
     } else {
-        // Registry lookup: self-reference, lazy edges, or unit fixtures without a graph.
-        q(tag)
-    };
-    stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
+        let ctor_arg = if child_ctors.contains_key(tag) {
+            tag.to_string()
+        } else {
+            // Registry lookup: self-reference, lazy edges, or unit fixtures without a graph.
+            q(tag)
+        };
+        stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
+    }
     // Interpolated fallthrough attrs patch the host element after it exists.
     for (name, binding, expr) in &host_attr_bindings {
         emit_bind_attr(
@@ -1941,6 +1976,7 @@ fn emit_component(
                 || a.name.starts_with('#')
                 || a.name == "v-bind"
                 || a.name == "v-on"
+                || (tag == "component" && a.name == "is")
                 || is_component_event_attr(&a.name)
                 || is_component_host_attr(&a.name)
                 || is_once_marker(&a.name)
@@ -1995,7 +2031,8 @@ fn emit_component(
                 // slot receives the whole keyed list fragment instead of one static
                 // copy of the body (which left the item alias unbound and dropped
                 // every iteration).
-                if let ViewNode::Element { attrs, children: loop_body, each: Some(each), .. } = child
+                if let ViewNode::Element { attrs, children: loop_body, each: Some(each), .. } =
+                    child
                 {
                     let frag = emit_each_block(
                         "template",
