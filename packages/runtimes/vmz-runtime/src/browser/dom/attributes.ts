@@ -71,7 +71,15 @@ export function applyDomAttr(el, name, value) {
         if (el.tagName === 'SELECT') {
             const opts = el.options || el.querySelectorAll?.('option') || [];
             for (const opt of opts) {
-                opt.selected = String(opt.value ?? '') === next;
+                // Match SSR `markSelectSelection`: an option without a `value`
+                // attribute contributes its trimmed text. Reading IDL `.value`
+                // here keeps the template's indentation and loses the selection
+                // right after hydration.
+                const optionValue =
+                    typeof opt.hasAttribute === 'function' && opt.hasAttribute('value')
+                        ? String(opt.getAttribute('value') ?? '')
+                        : String(opt.textContent ?? opt.value ?? '').trim();
+                opt.selected = optionValue === next;
             }
         } else if (el.value !== next) {
             el.value = next;

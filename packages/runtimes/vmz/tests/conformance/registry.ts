@@ -209,6 +209,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'SSR default-slot projection drops fallback like the client',
         pre: ['build:runtimes'],
     },
+    'ssr-select-value': {
+        file: 'runtime/ssr-select-value.ts',
+        description: 'SSR and hydrated select option selection agree',
+        pre: ['build:runtimes'],
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
