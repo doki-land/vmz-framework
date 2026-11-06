@@ -199,7 +199,11 @@ export function __vmzWritePath(inst, root, segs, value) {
     const rootObj = inst[root];
     const rootArr = rootObj;
     const isRootIndex = normSegs.length === 1 && Array.isArray(rootArr) && leaf !== 'length' && String(Number(leaf)) === leaf;
-    if (isRootIndex) {
+    // Root `rows.length = n` truncates or grows the list itself: the bare `rows`
+    // structure depot only matches a replace notice, so a path notice on
+    // `rows.length` leaves the rendered rows stale.
+    const isRootLength = normSegs.length === 1 && Array.isArray(rootArr) && leaf === 'length';
+    if (isRootIndex || isRootLength) {
         if (!notifyWbShared(rootObj, null)) {
             scheduleRefresh(inst, { type: 'replace', root });
         }

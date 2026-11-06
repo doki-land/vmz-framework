@@ -171,6 +171,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'runtime/write-barrier-mutator-args.ts',
         description: 'Mutator args array contract + dynamic path segments + hydrate first event',
     },
+    'reactive-depth-root-length': {
+        file: 'runtime/reactive-depth-root-length.ts',
+        description: 'Root `rows.length = n` repaints the rendered rows on mount and hydrate',
+        pre: ['build:runtimes'],
+    },
     'write-barrier-suite': {
         description: 'WriteBarrier static + array + shared + logical + root update + mutator args',
         composite: [
@@ -765,6 +770,7 @@ export const CHECK_ALL = [
     'shared-plan',
     'lifetime',
     'write-barrier-suite',
+    'reactive-depth-root-length',
     'async-graph',
     'motion-ir',
     'resume',

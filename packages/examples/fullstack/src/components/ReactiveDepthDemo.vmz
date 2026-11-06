@@ -1,0 +1,196 @@
+<template>
+    <section>
+        <strong>
+            {{ board.tags.length }}
+        </strong>
+        <em>
+            {{ board.meta.note.count }}
+        </em>
+        <span id="root-len">
+            {{ rows.length }}
+        </span>
+        <button type="button" id="nested-leaf" @click="setNestedLabel">
+            leaf
+        </button>
+        <button type="button" id="nested-push" @click="pushNested">
+            push
+        </button>
+        <button type="button" id="nested-replace" @click="replaceNested">
+            replace
+        </button>
+        <button type="button" id="nested-sort" @click="sortNested">
+            sort
+        </button>
+        <button type="button" id="nested-truncate" @click="truncateNested">
+            truncate
+        </button>
+        <button type="button" id="nested-deep" @click="bumpDeep">
+            deep
+        </button>
+        <button type="button" id="nested-swap-object" @click="swapObject">
+            swap
+        </button>
+        <button type="button" id="later-promise" @click="updateInPromise">
+            promise
+        </button>
+        <button type="button" id="later-timeout" @click="updateInTimer">
+            timer
+        </button>
+        <button type="button" id="loop-write" @click="updateInForOf">
+            loop
+        </button>
+        <button type="button" id="root-pop" @click="popRoot">
+            pop
+        </button>
+        <button type="button" id="root-shift" @click="shiftRoot">
+            shift
+        </button>
+        <button type="button" id="root-unshift" @click="unshiftRoot">
+            unshift
+        </button>
+        <button type="button" id="root-reverse" @click="reverseRoot">
+            reverse
+        </button>
+        <button type="button" id="root-index" @click="setRootIndex">
+            index
+        </button>
+        <button type="button" id="root-length" @click="truncateRoot">
+            length
+        </button>
+        <button type="button" id="root-remove-loop" @click="removeDuringLoop">
+            remove
+        </button>
+        <ul id="rows">
+            <li v-for="row in rows" :key="row.id">
+                {{ row.text }}
+            </li>
+        </ul>
+        <ul id="tags">
+            <li v-for="tag in board.tags" :key="tag.id">
+                {{ tag.label }}
+            </li>
+        </ul>
+    </section>
+</template>
+<script client>
+export type Tag = {
+    id: string;
+    label: string;
+};
+export type Row = {
+    id: string;
+    text: string;
+};
+export default class ReactiveDepthDemo {
+    board: { tags: Tag[]; meta: { note: { count: number } } } = {
+        tags: [
+            {
+                id: "a",
+                label: "A",
+            },
+            {
+                id: "b",
+                label: "B",
+            },
+        ],
+        meta: {
+            note: {
+                count: 1,
+            },
+        },
+    };
+    rows: Row[] = [
+        {
+            id: "r1",
+            text: "R1",
+        },
+        {
+            id: "r2",
+            text: "R2",
+        },
+        {
+            id: "r3",
+            text: "R3",
+        },
+    ];
+    setNestedLabel() {
+        this.board.tags[1].label = "B2";
+    }
+    pushNested() {
+        this.board.tags.push({ id: "c", label: "C" });
+    }
+    replaceNested() {
+        this.board.tags[0] = { id: "a", label: "A2" };
+    }
+    sortNested() {
+        this.board.tags.sort((x, y) => (x.label < y.label ? 1 : -1));
+    }
+    truncateNested() {
+        this.board.tags.length = 1;
+    }
+    bumpDeep() {
+        this.board.meta.note.count++;
+    }
+    swapObject() {
+        this.board = {
+            tags: [
+                {
+                    id: "a",
+                    label: "A",
+                },
+                {
+                    id: "b",
+                    label: "B",
+                },
+            ],
+            meta: {
+                note: {
+                    count: 1,
+                },
+            },
+        };
+        this.board.meta.note.count = 7;
+    }
+    updateInPromise() {
+        Promise.resolve().then(() => {
+            this.board.meta.note.count = 9;
+        });
+    }
+    updateInTimer() {
+        setTimeout(() => {
+            this.board.meta.note.count = 5;
+        }, 0);
+    }
+    updateInForOf() {
+        for (const tag of this.board.tags) {
+            this.board.meta.note.count = tag.label.length;
+        }
+    }
+    popRoot() {
+        this.rows.pop();
+    }
+    shiftRoot() {
+        this.rows.shift();
+    }
+    unshiftRoot() {
+        this.rows.unshift({ id: "r0", text: "R0" });
+    }
+    reverseRoot() {
+        this.rows.reverse();
+    }
+    setRootIndex() {
+        this.rows[2] = { id: "r3", text: "R3X" };
+    }
+    truncateRoot() {
+        this.rows.length = 1;
+    }
+    removeDuringLoop() {
+        for (let i = 0; i < this.rows.length; i++) {
+            if (this.rows[i].id === "r2") {
+                this.rows.splice(i, 1);
+                break;
+            }
+        }
+    }
+}
+</script>
