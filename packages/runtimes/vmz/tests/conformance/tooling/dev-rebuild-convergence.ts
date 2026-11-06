@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createWorkspace } from 'vmz';
-import { shouldSoftReload } from '../../../dist/dev-incremental.js';
+import { shouldSoftReload } from '../../../dist/dev/dev-incremental.js';
 
 function fail(msg: string) {
     console.error(`dev-rebuild-convergence FAIL: ${msg}`);

@@ -3,7 +3,7 @@
  * verify id: dev-output-write-suppression
  */
 
-import { filterGenerationIgnore, registerWrittenOutputsIgnore } from '../../../dist/dev-incremental.js';
+import { filterGenerationIgnore, registerWrittenOutputsIgnore } from '../../../dist/dev/dev-incremental.js';
 
 function fail(msg: string) {
     console.error(`dev-output-write-suppression FAIL: ${msg}`);

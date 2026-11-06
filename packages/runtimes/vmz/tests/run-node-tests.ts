@@ -39,6 +39,7 @@ const files = [
     'pack-delivery-native.test.ts',
     'serve-pack-entry.test.ts',
     'format-scope.test.ts',
+    'conformance-registry.test.ts',
 ].map((f) => path.join(here, 'unit', f));
 
 const r = spawnSync(process.execPath, ['--import', resolveHook, '--test', '--experimental-strip-types', ...files], {

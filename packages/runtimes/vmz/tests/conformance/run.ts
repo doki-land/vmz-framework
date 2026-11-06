@@ -170,9 +170,11 @@ function finish(opts: RunOpts, label: string) {
 
 const { keepGoing, rest: args } = parseArgs(process.argv.slice(2));
 const opts: RunOpts = { keepGoing, failures: [] };
+// Pre steps build shared artifacts, so they run once per invocation, not per gate.
+const ranPre = new Set<string>();
 
 if (args.length === 0 || args[0] === '--all') {
-    for (const id of CHECK_ALL) runCheck(id, opts);
+    for (const id of CHECK_ALL) runCheck(id, opts, [], ranPre);
     finish(opts, `all ${CHECK_ALL.length} checks`);
 }
 if (args[0] === '--list' || args[0] === '-l') {
@@ -191,5 +193,5 @@ if (args[0] === '--help' || args[0] === '-h') {
     process.exit(0);
 }
 
-for (const id of args) runCheck(id, opts);
+for (const id of args) runCheck(id, opts, [], ranPre);
 finish(opts, args.join(', '));

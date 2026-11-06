@@ -9,12 +9,20 @@ export type CheckFile = {
     file: string;
     description?: string;
     pre?: string[];
+    /** Same driver as another id. Direct invocation still runs the driver. */
+    aliasOf?: string;
+    /** Intentionally outside `CHECK_ALL`. The reachability test requires a reason. */
+    excluded?: string;
 };
 
 export type CheckComposite = {
     composite: string[];
     description?: string;
     pre?: string[];
+    /** Same driver as another id. Direct invocation still runs the driver. */
+    aliasOf?: string;
+    /** Intentionally outside `CHECK_ALL`. The reachability test requires a reason. */
+    excluded?: string;
 };
 
 export type CheckEntry = CheckFile | CheckComposite;
@@ -371,14 +379,17 @@ export const CHECKS: Record<string, CheckEntry> = {
     'ui-host-box': {
         description: 'Alias — ui-direct-host-box',
         composite: ['ui-direct-host-box'],
+        excluded: 'Convenience alias. The target gate is already in `CHECK_ALL`.',
     },
     upload: {
         description: 'Upload thin gate — covered by ui-automation Form depth + official-homepage',
         composite: ['ui-automation', 'official-homepage'],
+        excluded: 'Convenience aggregate. Its children are already in `CHECK_ALL`.',
     },
     'official-dogfood': {
         description: 'Alias — official-homepage',
         composite: ['official-homepage'],
+        excluded: 'Convenience alias. `browser-production` already runs `official-homepage`.',
     },
     'highlighter-wasm': {
         file: 'ui/highlighter-wasm.ts',
@@ -593,10 +604,12 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'production/skip-native-pre-probe.ts',
         description: 'internal probe: body only; exercises pre build:runtimes skip',
         pre: ['build:runtimes'],
+        excluded: 'Internal probe for `skip-native-pre`. Run through that id after the CI artifact restore.',
     },
     'skip-native-pre': {
         file: 'production/skip-native-pre.ts',
         description: 'CI: VMZ_SKIP_NATIVE_BUILD must short-circuit pre build:runtimes',
+        excluded: 'Requires `VMZ_SKIP_NATIVE_BUILD=1` plus a restored native artifact, so it runs as the CI preset rather than in `CHECK_ALL`.',
     },
     'runtime-quality-baseline': {
         description: '0.2.0 composite: quality + host manifest + thin proof',
@@ -640,18 +653,22 @@ export const CHECKS: Record<string, CheckEntry> = {
     'cdn-routing': {
         file: 'production/cdn-policy.ts',
         description: 'A3-cdn redirects / deep links / no SPA fallback (same driver as cdn-policy)',
+        aliasOf: 'cdn-policy',
     },
     'cdn-cache-policy': {
         file: 'production/cdn-policy.ts',
         description: 'A3-cdn Cache-Control contract (same driver as cdn-policy)',
+        aliasOf: 'cdn-policy',
     },
     'static-resume': {
         file: 'production/cdn-policy.ts',
         description: 'A3-cdn static HTML resume assets (same driver as cdn-policy)',
+        aliasOf: 'cdn-policy',
     },
     'static-rollback': {
         file: 'production/cdn-policy.ts',
         description: 'A3-cdn static artifact rollback (same driver as cdn-policy)',
+        aliasOf: 'cdn-policy',
     },
     'content-addressed-assets': {
         file: 'production/content-addressed-assets.ts',
@@ -664,10 +681,12 @@ export const CHECKS: Record<string, CheckEntry> = {
     'embedded-site': {
         file: 'production/site-delivery.ts',
         description: 'A3-site embedded-only activate (same driver as site-delivery)',
+        aliasOf: 'site-delivery',
     },
     'site-fallback': {
         file: 'production/site-delivery.ts',
         description: 'A3-site release fallback + anti-mix (same driver as site-delivery)',
+        aliasOf: 'site-delivery',
     },
     'production-test': {
         file: 'production/production-test.ts',
@@ -705,22 +724,27 @@ export const CHECKS: Record<string, CheckEntry> = {
     'resume-lazy': {
         description: 'P3 Resume/lazy — resume + runtime-identity + resume-composition + event-flow + browser-core',
         composite: ['resume', 'runtime-identity', 'resume-composition', 'event-flow', 'browser-core'],
+        excluded: 'Convenience aggregate. Its children are already in `CHECK_ALL`.',
     },
     'asset-graph': {
         description: 'P5 Asset Graph v0 — content-addressed assets + static SEO seed (image variants still open)',
         composite: ['content-addressed-assets', 'static-delivery'],
+        excluded: 'Convenience aggregate. Its children are already in `CHECK_ALL`.',
     },
     'ui-commercial': {
         description: 'Commercial surface — ui-automation + official-homepage + commercial visual overflow',
         composite: ['ui-automation', 'official-homepage', 'commercial-visual-evidence'],
+        excluded: 'Convenience aggregate. Its children are already in `CHECK_ALL`.',
     },
     'ui-console': {
         description: 'Console surface — ui-automation + official-homepage + commercial visual overflow',
         composite: ['ui-automation', 'official-homepage', 'commercial-visual-evidence'],
+        excluded: 'Convenience aggregate. Its children are already in `CHECK_ALL`.',
     },
     'motion-continuity': {
         description: 'Motion continuity — motion-ir + ui7 + official-homepage',
         composite: ['motion-ir', 'ui7', 'official-homepage'],
+        excluded: 'Convenience aggregate. Its children are already in `CHECK_ALL`.',
     },
     'browser-production': {
         description: 'Browser Production Profile v1 aggregate (0.1.27 evidence baseline; ≠ thin runtime)',
@@ -796,6 +820,16 @@ export const CHECK_ALL = [
     'resume-composition',
     'ssr-svg-region-slot',
     'ssr-direct-html',
+    'direct-vhtml-hydrate',
+    'ssr-text-show',
+    'ssr-slot-fallback',
+    'ssr-select-value',
+    'ssr-resume-identity',
+    'ssr-keyed-resume',
+    'ssr-route-slot-layout',
+    'ssr-keyed-non-kernel',
+    'v-pre',
+    'v-once',
     'ssr-select-multiple',
     'ssr-escape-cr',
     'ssr-pre-textarea-leading-newline',
@@ -833,6 +867,9 @@ export const CHECK_ALL = [
     'application-isolation',
     'application-composition',
     'application-dev',
+    'dev-rebuild-convergence',
+    'dev-invalidation-closure',
+    'dev-output-write-suppression',
     'style-theme',
     'ui-automation',
     'ui-direct-host-box',
@@ -854,6 +891,8 @@ export const CHECK_ALL = [
     'ui7',
     // 0.1.27 Production Evidence Baseline — aggregate (includes official-dogfood via official-homepage)
     'browser-production',
+    // Official homepage SSR HTML bytes (real build artifact)
+    'homepage-ssr-html',
     // 0.1.28 Slim inventory / boundary / budget (not part of browser-production)
     'runtime-boundary',
     // 0.1.29 Specialized component artifact (not part of browser-production)
