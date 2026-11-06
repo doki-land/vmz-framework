@@ -1741,12 +1741,9 @@ fn event_guards(mods: &[String], el: &str) -> String {
     // System modifiers: requested keys must be held, and `.exact` rejects
     // every other system key (Vue `withModifiers`).
     let has_exact = mods.iter().any(|m| m == "exact");
-    for (mod_name, flag) in [
-        ("ctrl", "ctrlKey"),
-        ("alt", "altKey"),
-        ("shift", "shiftKey"),
-        ("meta", "metaKey"),
-    ] {
+    for (mod_name, flag) in
+        [("ctrl", "ctrlKey"), ("alt", "altKey"), ("shift", "shiftKey"), ("meta", "metaKey")]
+    {
         if mods.iter().any(|m| m == mod_name) {
             guards.push_str(&format!("if (!ev.{flag}) return; "));
         } else if has_exact {

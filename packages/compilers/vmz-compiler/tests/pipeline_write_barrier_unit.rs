@@ -607,7 +607,11 @@ export default class Demo {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["_xhr"]));
     assert_eq!(out.rewritten, 1, "emit:\n{}", out.source);
-    assert!(out.source.contains("__vmzWritePath(this, \"_xhr\", [\"onabort\"]"), "emit:\n{}", out.source);
+    assert!(
+        out.source.contains("__vmzWritePath(this, \"_xhr\", [\"onabort\"]"),
+        "emit:\n{}",
+        out.source
+    );
     assert!(!out.source.contains(";}"), "terminator inside the call:\n{}", out.source);
     assert!(out.source.contains("}));"), "call must stay balanced:\n{}", out.source);
 }
@@ -628,7 +632,9 @@ export default class Demo {
     assert_eq!(out.rewritten, 3, "emit:\n{}", out.source);
     assert!(!out.source.contains(";}"), "terminator inside the call:\n{}", out.source);
     assert!(
-        out.source.contains("__vmzWritePath(this, \"state\", [\"handler\"], { tag: \"abort\", status: 0 })"),
+        out.source.contains(
+            "__vmzWritePath(this, \"state\", [\"handler\"], { tag: \"abort\", status: 0 })"
+        ),
         "object literal rhs:\n{}",
         out.source
     );
@@ -662,7 +668,11 @@ function xhrSend(xhr, method, url) {
 "#;
     let out = rewrite_static_path_writes(src, &owned(&["_xhr"]));
     assert_eq!(out.rewritten, 0, "module function write must stay plain:\n{}", out.source);
-    assert!(out.source.contains("xhr.onabort = () => resolve({ aborted: true })"), "emit:\n{}", out.source);
+    assert!(
+        out.source.contains("xhr.onabort = () => resolve({ aborted: true })"),
+        "emit:\n{}",
+        out.source
+    );
     assert!(!out.source.contains("__vmzWritePath"), "leaked alias:\n{}", out.source);
 }
 
@@ -724,4 +734,3 @@ class Demo {
         out.source
     );
 }
-

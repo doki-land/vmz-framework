@@ -516,7 +516,7 @@ const serializeApi = {
         if (serializeApi._ssrCollected) serializeApi._ssrCollected.push(child);
         return child;
     },
-    el(tag, key?) {
+    el(tag, key ?) {
         const node = makeVirtualEl(tag) as ReturnType<typeof makeVirtualEl> & { namespaceURI?: string };
         if (String(tag || '').toLowerCase() === 'svg') {
             node.namespaceURI = 'http://www.w3.org/2000/svg';
@@ -786,7 +786,7 @@ const serializeApi = {
             bindingId,
         );
     },
-    component(hostInst, nameOrCtor, props, client, key?) {
+    component(hostInst, nameOrCtor, props, client, key ?) {
         const name = typeof nameOrCtor === 'function' ? nameOrCtor.__vmzTag || nameOrCtor.name || 'Component' : nameOrCtor;
         const Ctor = typeof nameOrCtor === 'function' ? nameOrCtor : getRegisteredComponent(name);
         if (!Ctor) {
@@ -899,7 +899,7 @@ const serializeApi = {
      * create time, so the dynamic boundary serializes exactly like the resolved
      * static component.
      */
-    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps, key?) {
+    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps, key ?) {
         let Ctor = null;
         try {
             Ctor = getCtor.call(hostInst);

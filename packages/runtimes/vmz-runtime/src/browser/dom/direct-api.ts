@@ -195,7 +195,7 @@ export const directApi = {
     _itemPatches: null as PatchFn[] | null,
     _eachCtx: null as EachCtx | null,
     _resumeAdopt: null as ResumeAdoptCtx | null,
-    el(tag, key?) {
+    el(tag, key ?) {
         const name = tag || 'div';
         const svg = inSvgScope() || name === 'svg';
         const rowKey = key == null ? null : key;
@@ -535,7 +535,7 @@ export const directApi = {
     /**
      * Nested component (sync Direct child or island schedule).
      */
-    component(hostInst, nameOrCtor, props, client, key?) {
+    component(hostInst, nameOrCtor, props, client, key ?) {
         const name = componentDisplayName(nameOrCtor);
         let host = null;
         if (directApi._resumeAdopt && typeof directApi._resumeAdopt.componentHost === 'function') {
@@ -555,7 +555,7 @@ export const directApi = {
      * are re-evaluated per mount so the new type starts from current values, and
      * the child listener bag is carried over so `@event` handlers keep working.
      */
-    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps, key?) {
+    dynamicComponent(hostInst, bindingId, deps, getCtor, getProps, key ?) {
         const resolve = () => {
             try {
                 return getCtor.call(hostInst);

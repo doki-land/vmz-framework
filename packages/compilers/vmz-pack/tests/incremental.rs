@@ -417,8 +417,5 @@ fn incremental_sweep_keeps_foreign_files_and_cache_dir() {
     assert_eq!(fs::read_to_string(out.join("assets/host-logo.png")).unwrap(), "host asset");
     assert_eq!(fs::read_to_string(out.join("assets/README")).unwrap(), "host readme");
     assert_eq!(fs::read_to_string(out.join("host/extra.json")).unwrap(), "{}");
-    assert!(
-        !out.join("assets/stale-0123456789abcdef.svg").exists(),
-        "闭包外的指纹资源仍必须删除"
-    );
+    assert!(!out.join("assets/stale-0123456789abcdef.svg").exists(), "闭包外的指纹资源仍必须删除");
 }

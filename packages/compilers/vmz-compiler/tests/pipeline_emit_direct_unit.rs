@@ -1445,10 +1445,7 @@ export default class HtmlPaths {
             js.contains("api.html(e0, __s)"),
             "{tpl_src} must go through the digest-aware write: {js}"
         );
-        assert!(
-            !js.contains("e0.innerHTML ="),
-            "{tpl_src} still writes unconditionally: {js}"
-        );
+        assert!(!js.contains("e0.innerHTML ="), "{tpl_src} still writes unconditionally: {js}");
     }
 }
 

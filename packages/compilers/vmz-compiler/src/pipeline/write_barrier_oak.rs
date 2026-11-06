@@ -106,9 +106,14 @@ fn collect_statements(
                     }
                 }
             }
-            Statement::FunctionDeclaration(function) => {
-                collect_function_body(&function.params, &function.body, source, owned, aliases, hits)
-            }
+            Statement::FunctionDeclaration(function) => collect_function_body(
+                &function.params,
+                &function.body,
+                source,
+                owned,
+                aliases,
+                hits,
+            ),
             Statement::ExportDeclaration(export) => {
                 if let Some(inner) = export.declaration.as_deref() {
                     collect_statements(std::slice::from_ref(inner), source, owned, aliases, hits);

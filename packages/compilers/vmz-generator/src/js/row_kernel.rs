@@ -735,7 +735,10 @@ mod tests {
         let texts = [(vec![0u32], "label".to_string())];
         let code = emit_create_js("li", &texts, None, &[], Some("id"));
         assert!(code.contains("adopt.claimKeyed(\"li\", k)"), "missing keyed reclaim: {code}");
-        assert!(code.contains("hydrate(root, item)"), "adopted row must hydrate text slots: {code}");
+        assert!(
+            code.contains("hydrate(root, item)"),
+            "adopted row must hydrate text slots: {code}"
+        );
         assert!(code.contains("tpl.cloneNode(true)"), "missing clone fallback: {code}");
     }
 }
