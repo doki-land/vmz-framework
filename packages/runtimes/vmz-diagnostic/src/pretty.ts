@@ -32,9 +32,9 @@ function severityLabel(severity: Severity): string {
     return severity === 'warning' ? 'warning' : severity;
 }
 
-function formatLocation(path: string, line: number, column: number): string {
+function formatLocation(path: string, line: number, column: number, gutterWidth = 1): string {
     const where = path ? `${path}:${line}:${column}` : `${line}:${column}`;
-    return paint(`  --> ${where}`, ANSI.bold, ANSI.blue);
+    return paint(`${' '.repeat(gutterWidth + 1)}--> ${where}`, ANSI.bold, ANSI.blue);
 }
 
 function canRenderSnippet(d: DiagnosticInput, opts: FormatOptions & { style?: PrettyStyle }): boolean {
@@ -82,11 +82,11 @@ export function formatDiagnosticPretty(d: DiagnosticInput, message: string, opts
     const span = d.span!;
     const path = d.path || '';
     const startPos = position.lineCol(span.start);
-    lines.push(formatLocation(path, startPos.line, startPos.column));
 
     const startLine = utf8LineAt(source, span.start);
     const endLine = utf8LineAt(source, Math.max(span.start, span.end - 1));
     const gutterWidth = String(endLine.line).length;
+    lines.push(formatLocation(path, startPos.line, startPos.column, gutterWidth));
 
     if (startLine.line === endLine.line) {
         renderSnippetLine(

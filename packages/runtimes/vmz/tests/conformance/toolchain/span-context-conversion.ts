@@ -173,6 +173,49 @@ assert.equal(
     'error[test.code]: boom\n  --> demo.vmz:1:4\n1 | ab  cd\n  |     ^^',
 );
 
+// Four-digit line numbers widen the gutter, and the `-->` row follows that width.
+const filler = Array.from({ length: 999 }, (_, i) => `line${i + 1}`).join('\n');
+const longSource = `${filler}\n1000abc`;
+const longStart = Buffer.byteLength(filler, 'utf8') + 1;
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: longStart, end: longStart + 7 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(longSource),
+            sourceText: longSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n     --> demo.vmz:1000:1\n1000 | 1000abc\n     | ^^^^^^^',
+);
+// A short start line pads into the wide gutter of the end line.
+const line9Start = Buffer.byteLength(Array.from({ length: 8 }, (_, i) => `line${i + 1}`).join('\n'), 'utf8') + 1;
+assert.equal(
+    formatDiagnostic(
+        {
+            path: 'demo.vmz',
+            severity: 'error',
+            code: 'test.code',
+            span: { start: line9Start, end: longStart + 7 },
+        },
+        {
+            locale: 'en-US',
+            catalog: { 'test.code': 'boom' },
+            position: createPositionContext(longSource),
+            sourceText: longSource,
+            style: 'pretty',
+        },
+    ),
+    'error[test.code]: boom\n     --> demo.vmz:9:1\n   9 | line9\n     | ^^^^^\n       ...\n1000 | 1000abc\n     | ^^^^^^^',
+);
+
 // A zero-width span points at an insertion site and still gets one caret.
 const emptySource = 'ab\ncd';
 assert.equal(
