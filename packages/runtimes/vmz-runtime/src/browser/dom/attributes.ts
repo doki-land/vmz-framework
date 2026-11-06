@@ -55,12 +55,20 @@ const pendingSelectValues = new WeakMap<object, unknown>();
 const seededTextareaDefaults = new WeakSet<object>();
 /**
  * `form.reset()` restores the *default* state, which browsers derive from the
- * `selected` attribute. The first write therefore records the initial model
- * there, and later model updates move only `option.selected` instead of
- * rewriting the defaults.
+ * `selected`, `value` and `checked` attributes. The first write therefore
+ * records the initial model there, and later model updates move only the IDL
+ * state (or `selected` on the options) instead of rewriting the defaults.
  */
 const seededSelectDefaults = new WeakSet<object>();
+const seededInputValueDefaults = new WeakSet<object>();
+const seededCheckedDefaults = new WeakSet<object>();
 const pendingSelectReplays = new WeakSet<object>();
+
+/** Checkbox and radio `value` attributes are submitted values, not defaults. */
+function isCheckableInput(el) {
+    const type = String(el.type || (el.getAttribute && el.getAttribute('type')) || 'text').toLowerCase();
+    return type === 'checkbox' || type === 'radio';
+}
 
 function replaySelectValue(el) {
     if (!pendingSelectValues.has(el)) return;
@@ -108,9 +116,16 @@ export function applyDomAttr(el, name, value) {
         const on = value === true || value === '';
         // Reflect `checked` through its IDL property. Once the user has interacted
         // with a radio, attribute writes only reach its default state, so a later
-        // model update would otherwise leave the visible control stale.
+        // model update would otherwise leave the visible control stale. Only the
+        // first write records the default; later ones stay on the IDL.
         if (key === 'checked' && el && el.tagName === 'INPUT') {
+            if (!seededCheckedDefaults.has(el)) {
+                seededCheckedDefaults.add(el);
+                if (on) el.setAttribute('checked', '');
+                else el.removeAttribute('checked');
+            }
             if (el.checked !== on) el.checked = on;
+            return;
         }
         if (value === false || value == null || value === '') {
             el.removeAttribute(key);
@@ -171,6 +186,20 @@ export function applyDomAttr(el, name, value) {
             // stayed empty. Seed it on the first write; later model updates leave it.
             seededTextareaDefaults.add(el);
             el.defaultValue = next;
+        }
+        if (el.tagName === 'INPUT') {
+            // For text-like inputs the `value` attribute *is* the default value:
+            // seed it once, then let the IDL follow the model alone. Checkbox and
+            // radio `value` attributes are submitted values, not defaults.
+            if (isCheckableInput(el)) {
+                if (value == null || value === false) el.removeAttribute('value');
+                else el.setAttribute('value', next);
+            } else if (!seededInputValueDefaults.has(el)) {
+                seededInputValueDefaults.add(el);
+                if (value == null || value === false) el.removeAttribute('value');
+                else el.setAttribute('value', next);
+            }
+            return;
         }
         // A select carries its value as option selectedness: a `value` attribute
         // on the select itself has no meaning and SSR never emits one.
