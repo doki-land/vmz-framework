@@ -409,9 +409,17 @@ export const directApi = {
             host = document.createElement('div');
             host.setAttribute('data-vmz', name);
         }
+        const rawProps = (props || {}) as Record<string, unknown>;
+        // `id` / `data-*` / `aria-*` are fallthrough attributes, not props: they
+        // belong on the host element (the component boundary in VMZ).
+        const hostAttrs = rawProps.__hostAttrs as Record<string, unknown> | undefined;
+        if (hostAttrs) {
+            for (const [k, v] of Object.entries(hostAttrs)) applyDomAttr(host, k, v);
+        }
 
         const resolved = {};
-        for (const [k, v] of Object.entries(props || {})) {
+        for (const [k, v] of Object.entries(rawProps)) {
+            if (k === '__hostAttrs') continue;
             // Function props that already look like `onXxx` stay as handlers.
             // Component `@event` never arrives here (emit uses onComponentEvent).
             const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;

@@ -1614,6 +1614,13 @@ fn emit_plain_element(
     Ok(el)
 }
 
+/// Vue leaves non-prop attributes on the component's root node. VMZ exposes the
+/// component boundary as a host element, so these write there instead of being
+/// camelized into instance props (`data-testid` → `dataTestid`).
+fn is_component_host_attr(name: &str) -> bool {
+    name == "id" || name.starts_with("data-") || name.starts_with("aria-")
+}
+
 fn emit_component(
     tag: &str,
     attrs: &[ViewAttr],
@@ -1654,6 +1661,10 @@ fn emit_component(
     // per-key binder, the event object keeps a per-call-site listener bag.
     let mut spread_binds: Vec<(String, Vec<String>)> = Vec::new();
     let mut spread_events: Vec<(String, Vec<String>)> = Vec::new();
+    // Host-DOM fallthrough: create-time values ride `__hostAttrs`, while
+    // interpolated values also keep a reactive patch on the host element.
+    let mut host_attr_parts: Vec<String> = Vec::new();
+    let mut host_attr_bindings: Vec<(String, Option<BindingId>, String)> = Vec::new();
     for a in attrs {
         if a.name == "style:tw" || is_once_marker(&a.name) || is_memo_marker(&a.name) {
             continue;
@@ -1688,6 +1699,20 @@ fn emit_component(
             event_parts.push((component_event_name(&a.name), handler));
             continue;
         }
+        if is_component_host_attr(&a.name) {
+            let value_js = match &a.value {
+                ViewAttrValue::Static { value: s } => q(s),
+                ViewAttrValue::Bare => "true".to_string(),
+                ViewAttrValue::Interp { expr: e } => {
+                    bind_template_expr(e, fields, handler_ctx.methods, scope, aliases)
+                }
+            };
+            host_attr_parts.push(format!("{}:{}", q(&a.name), value_js));
+            if let ViewAttrValue::Interp { expr: e } = &a.value {
+                host_attr_bindings.push((a.name.clone(), a.binding, e.clone()));
+            }
+            continue;
+        }
         let val = match &a.value {
             ViewAttrValue::Static { value: s } => q(s),
             ViewAttrValue::Bare => "true".to_string(),
@@ -1707,6 +1732,9 @@ fn emit_component(
         let wire = component_prop_wire_name(&a.name);
         prop_parts.push(format!("{}:{}", q(&wire), val));
     }
+    if !host_attr_parts.is_empty() {
+        prop_parts.push(format!("{}:{{{}}}", q("__hostAttrs"), host_attr_parts.join(",")));
+    }
     let props = format!("{{{}}}", prop_parts.join(","));
     let client_arg = match &client {
         Some(c) => q(c),
@@ -1720,6 +1748,24 @@ fn emit_component(
         q(tag)
     };
     stmts.push(format!("var {v} = api.component(this, {ctor_arg}, {props}, {client_arg});"));
+    // Interpolated fallthrough attrs patch the host element after it exists.
+    for (name, binding, expr) in &host_attr_bindings {
+        emit_bind_attr(
+            expr,
+            *binding,
+            name,
+            &v,
+            fields,
+            handler_ctx.methods,
+            scope,
+            aliases,
+            ir,
+            stmts,
+            once,
+            memo,
+            next_id,
+        );
+    }
     for (ev, handler) in &event_parts {
         stmts.push(format!("api.onComponentEvent({v}, {}, {handler});", q(ev)));
     }
@@ -1769,6 +1815,7 @@ fn emit_component(
                 || a.name == "v-bind"
                 || a.name == "v-on"
                 || is_component_event_attr(&a.name)
+                || is_component_host_attr(&a.name)
                 || is_once_marker(&a.name)
                 || is_memo_marker(&a.name)
             {

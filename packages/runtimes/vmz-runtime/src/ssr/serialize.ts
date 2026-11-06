@@ -761,13 +761,26 @@ const serializeApi = {
             return serializeUnknownComponentNode(name);
         }
 
+        const rawProps = (props || {}) as Record<string, unknown>;
+        // `id` / `data-*` / `aria-*` belong on the host element, matching the
+        // browser `api.component` fallthrough.
+        const hostAttrs = rawProps.__hostAttrs as Record<string, unknown> | undefined;
         const resolved = {};
-        for (const [k, v] of Object.entries(props || {})) {
+        for (const [k, v] of Object.entries(rawProps)) {
+            if (k === '__hostAttrs') continue;
             const onKey = typeof v === 'function' ? eventPropHandlerName(k) : null;
             if (onKey) continue;
             else if (typeof v === 'function') resolved[k] = v.call(hostInst);
             else resolved[k] = v;
         }
+        const applyHostAttrs = (attrs: Record<string, string>) => {
+            if (!hostAttrs) return attrs;
+            for (const [k, v] of Object.entries(hostAttrs)) {
+                if (v == null || v === false) continue;
+                attrs[k] = v === true ? '' : String(v);
+            }
+            return attrs;
+        };
         if (client) {
             // resume: Island SSR includes body + ResumeEntry slice (same Direct schedule).
             const child = serializeApi._ssrChildInstance(Ctor, resolved);
@@ -801,6 +814,7 @@ const serializeApi = {
             };
             const boxStyle = directHostBoxStyleAttr(name, Ctor);
             if (boxStyle) attrs.style = boxStyle;
+            applyHostAttrs(attrs);
             if (isEventEntryStrategy(String(client))) {
                 attrs['data-vmz-entry'] = 'event';
             }
@@ -829,6 +843,7 @@ const serializeApi = {
                 const attrs: Record<string, string> = { 'data-vmz': name };
                 const boxStyle = directHostBoxStyleAttr(name, Ctor);
                 if (boxStyle) attrs.style = boxStyle;
+                applyHostAttrs(attrs);
                 return {
                     __kind: 'el',
                     tag: 'div',

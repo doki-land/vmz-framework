@@ -56,6 +56,29 @@ export default class BareAttrs {
 }
 
 #[test]
+fn component_host_attrs_do_not_become_props() {
+    let src = r#"
+export default class HostAttrsPage {
+  cardId = "card";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<ChildCard id="card" data-testid="card" aria-label="card" :data-live="cardId" />"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains(r#""__hostAttrs":{"id":"card","data-testid":"card","aria-label":"card","data-live":"#),
+        "fallthrough attrs missing from `__hostAttrs`: {js}"
+    );
+    assert!(!js.contains("dataTestid"), "`data-testid` camelized into a prop: {js}");
+    assert!(js.contains(r#""data-live""#), "interpolated host attr dropped: {js}");
+}
+
+#[test]
 fn if_else_emits_if_block() {
     let src = r#"
 export default class BranchDemo {
