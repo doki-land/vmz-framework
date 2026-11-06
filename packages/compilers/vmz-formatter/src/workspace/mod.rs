@@ -199,6 +199,7 @@ fn format_js_file(
     }
     if check {
         report.need_write += 1;
+        report.diagnostics.push(ReportedDiagnostic::error(path, "vmz::format::would_reformat"));
         return Ok(());
     }
     fs::write(path, &result.output).map_err(|err| format!("{}: {err}", path.display()))?;
@@ -212,6 +213,9 @@ fn format_rust_file(path: &Path, check: bool, report: &mut TargetFormatReport) -
         Ok(rustfmt::RustfmtOutcome::Changed) => {
             if check {
                 report.need_write += 1;
+                report
+                    .diagnostics
+                    .push(ReportedDiagnostic::error(path, "vmz::format::would_reformat"));
             } else {
                 report.formatted += 1;
             }
