@@ -99,6 +99,15 @@ fn js_string_literal(value: &str) -> String {
     out
 }
 
+/// `v-model.number` cast: `Number('')` yields `0` and invalid text yields `NaN`,
+/// which discards what the user typed. Empty and non-numeric values stay strings
+/// and only real numbers are converted.
+fn number_model_cast(value: &str) -> String {
+    format!(
+        "((__vmzV) => {{ const __vmzN = Number(__vmzV); return __vmzV === \"\" || Number.isNaN(__vmzN) ? __vmzV : __vmzN; }})({value})"
+    )
+}
+
 /// Lower `v-model` on `<input>` / `<textarea>` / `<select>` into a DOM prop
 /// binding plus a native write-back handler.
 ///
@@ -120,8 +129,8 @@ pub(crate) fn native_model_bind(
     let trim = modifiers.iter().any(|m| m == "trim");
     let number = modifiers.iter().any(|m| m == "number");
     let text_value = match (trim, number) {
-        (true, true) => "$event.target.value.trim()".to_string(),
-        (false, true) => "Number($event.target.value)".to_string(),
+        (true, true) => number_model_cast("$event.target.value.trim()"),
+        (false, true) => number_model_cast("$event.target.value"),
         (true, false) => "$event.target.value.trim()".to_string(),
         (false, false) => "$event.target.value".to_string(),
     };

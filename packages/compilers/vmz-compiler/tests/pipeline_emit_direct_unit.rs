@@ -106,6 +106,32 @@ export default class KeyDemo {
 }
 
 #[test]
+fn v_model_number_keeps_empty_and_non_numeric_strings() {
+    let src = r#"
+export default class NumberModel {
+  count = 0;
+  label = "";
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl =
+        parse_template(r#"<input v-model.number="count" /><input v-model.trim.number="label" />"#)
+            .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(
+        js.contains(r#"__vmzV === "" || Number.isNaN(__vmzN)"#),
+        "`.number` must keep empty / non-numeric strings: {js}"
+    );
+    assert!(!js.contains("Number($event.target.value)"), "empty stays `0`: {js}");
+    assert!(
+        js.contains("$event.target.value.trim()"),
+        "`.trim.number` must trim before casting: {js}"
+    );
+}
+
+#[test]
 fn if_else_emits_if_block() {
     let src = r#"
 export default class BranchDemo {

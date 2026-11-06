@@ -1422,9 +1422,9 @@ fn emit_plain_element(
                 // v-model .trim / .number: rewrite handler body `$event`
                 let body = if is_vmodel_event && (has_trim || has_number) {
                     let replacement = match (has_trim, has_number) {
-                        (true, true) => "Number($event.trim())",
-                        (true, false) => "$event.trim()",
-                        (false, true) => "Number($event)",
+                        (true, true) => number_model_cast("$event.trim()"),
+                        (true, false) => "$event.trim()".to_string(),
+                        (false, true) => number_model_cast("$event"),
                         (false, false) => unreachable!(),
                     };
                     body.replace("= $event)", &format!("= {replacement})"))
@@ -1669,6 +1669,14 @@ fn collect_key_candidates(mods: &[String]) -> Option<Vec<&'static str>> {
         }
     }
     if out.is_empty() { None } else { Some(out) }
+}
+
+/// `v-model.number` cast shared with native model lowering: empty and
+/// non-numeric values stay strings and only real numbers are converted.
+fn number_model_cast(value: &str) -> String {
+    format!(
+        "((__vmzV) => {{ const __vmzN = Number(__vmzV); return __vmzV === \"\" || Number.isNaN(__vmzN) ? __vmzV : __vmzN; }})({value})"
+    )
 }
 
 fn emit_component(
