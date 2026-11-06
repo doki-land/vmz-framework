@@ -38,6 +38,9 @@ function rewriteFlatDeliveryImports(text: string): string {
 
 function rewriteNestedSsrDelivery(text: string): string {
     let out = text;
+    // `shared/` is flattened to the delivery root, so nested SSR files must
+    // reach the root copy one level up.
+    out = replaceImportPath(out, '../shared/dom-attr-normalize.js', '../dom-attr-normalize.js');
     for (const [from, to] of [
         ['../browser/dom-core.js', '../dom-core.js'],
         ['../browser/direct-host-box.js', '../direct-host-box.js'],

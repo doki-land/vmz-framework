@@ -802,6 +802,9 @@ fn rewrite_flat_delivery_imports(text: &str) -> String {
 
 fn rewrite_nested_ssr_delivery(text: &str) -> String {
     let mut out = text.to_string();
+    // `shared/` is flattened to the delivery root, so nested SSR files must
+    // reach the root copy one level up.
+    out = replace_import_path(&out, "../shared/dom-attr-normalize.js", "../dom-attr-normalize.js");
     for (from, to) in [
         ("../browser/dom-core.js", "../dom-core.js"),
         ("../browser/direct-host-box.js", "../direct-host-box.js"),
