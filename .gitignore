@@ -40,8 +40,7 @@ runtimes/*/dist/
 compilers/*/dist/
 
 # Local probe outputs (build experiments, never part of the deliverable)
-packages/homepage/dist-probe/
-packages/homepage/dist-probe2/
+packages/homepage/dist-probe*/
 
 # Placeholder npm status / trust list cache (OTP window)
 .placeholder-npm-cache.json
