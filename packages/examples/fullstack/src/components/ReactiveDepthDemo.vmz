@@ -63,6 +63,9 @@
         <button type="button" id="root-index" @click="setRootIndex">
             index
         </button>
+        <button type="button" id="root-grow" @click="growRoot">
+            grow
+        </button>
         <button type="button" id="root-length" @click="truncateRoot">
             length
         </button>
@@ -212,6 +215,9 @@ export default class ReactiveDepthDemo {
     }
     setRootIndex() {
         this.rows[2] = { id: "r3", text: "R3X" };
+    }
+    growRoot() {
+        this.rows[4] = { id: "r9", text: "R9" };
     }
     truncateRoot() {
         this.rows.length = 1;

@@ -181,6 +181,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Nested writes inside callbacks, `for…of`, `switch`, `try` and `while` stay on the barrier',
         pre: ['build:runtimes'],
     },
+    'reactive-depth-sparse-index': {
+        file: 'runtime/reactive-depth-sparse-index.ts',
+        description: 'Sparse index writes (`rows[4] = row`) skip holes instead of throwing in the keyed kernel',
+        pre: ['build:runtimes'],
+    },
     'write-barrier-suite': {
         description: 'WriteBarrier static + array + shared + logical + root update + mutator args',
         composite: [
@@ -777,6 +782,7 @@ export const CHECK_ALL = [
     'write-barrier-suite',
     'reactive-depth-root-length',
     'reactive-depth-nested-writes',
+    'reactive-depth-sparse-index',
     'async-graph',
     'motion-ir',
     'resume',

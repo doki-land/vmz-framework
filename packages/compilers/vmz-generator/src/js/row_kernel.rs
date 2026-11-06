@@ -352,7 +352,7 @@ fn emit_create_js(
         None => "  var k = keyOf(item, i);\n".to_string(),
     };
     let mut body = format!(
-        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n{key_head}  if (keyed.has(k)) continue;\n  var root = null;\n  var adopt = api._resumeAdopt;\n  if (adopt && typeof adopt.claimKeyed === 'function') root = adopt.claimKeyed({tag:?}, k);\n  if (root) {{\n    hydrate(root, item);\n  }} else {{\n  root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
+        "{hv_init}for (var i = startIdx; i < list.length; i++) {{\n  var item = list[i];\n  if (item == null) continue;\n{key_head}  if (keyed.has(k)) continue;\n  var root = null;\n  var adopt = api._resumeAdopt;\n  if (adopt && typeof adopt.claimKeyed === 'function') root = adopt.claimKeyed({tag:?}, k);\n  if (root) {{\n    hydrate(root, item);\n  }} else {{\n  root = tpl.cloneNode(true);\n  root.__vmzBox = item;\n"
     );
     // Text writes target the sole Text child via nodeValue (vanillajs-style).
     // Acts are baked into html (`data-vmz-act`) and copied by cloneNode.

@@ -87,6 +87,9 @@ fn keyed_static_row_emits_row_kernel() {
     assert!(js.contains("create"), "{js}");
     assert!(js.contains("insertBefore"), "{js}");
     assert!(js.contains("cloneNode"), "{js}");
+    // A sparse hole (`rows[4] = x` on a shorter array) is not a row: skip it
+    // before reading `item.id` or `item.label`.
+    assert!(js.contains("if (item == null) continue;"), "{js}");
     assert!(js.contains("itemFields"), "{js}");
     assert!(js.contains("keyField"), "{js}");
     assert!(js.contains("actArgField"), "{js}");
