@@ -53,6 +53,13 @@ export const BOOLEAN_HTML_ATTRS = new Set([
 const pendingSelectValues = new WeakMap<object, unknown>();
 /** First `value` write seeds a textarea's default value once. */
 const seededTextareaDefaults = new WeakSet<object>();
+/**
+ * `form.reset()` restores the *default* state, which browsers derive from the
+ * `selected` attribute. The first write therefore records the initial model
+ * there, and later model updates move only `option.selected` instead of
+ * rewriting the defaults.
+ */
+const seededSelectDefaults = new WeakSet<object>();
 const pendingSelectReplays = new WeakSet<object>();
 
 function replaySelectValue(el) {
@@ -128,6 +135,15 @@ export function applyDomAttr(el, name, value) {
                 return;
             }
             pendingSelectValues.delete(el);
+            // The `selected` attribute is the option's default state, the value
+            // `form.reset()` restores. Seed it with the initial model once and
+            // move only `option.selected` afterwards. Attribute writes run after
+            // the IDL pass: setting selectedness marks the option dirty, so the
+            // later attribute write records the default without moving the
+            // visible selection.
+            const seed = !seededSelectDefaults.has(el);
+            if (seed) seededSelectDefaults.add(el);
+            const selections: [any, boolean][] = [];
             for (const opt of opts) {
                 // Match SSR `markSelectSelection`: an option without a `value`
                 // attribute contributes its trimmed text. Reading IDL `.value`
@@ -137,7 +153,14 @@ export function applyDomAttr(el, name, value) {
                     typeof opt.hasAttribute === 'function' && opt.hasAttribute('value')
                         ? String(opt.getAttribute('value') ?? '')
                         : String(opt.textContent ?? opt.value ?? '').trim();
-                opt.selected = listed ? listed.includes(optionValue) : optionValue === next;
+                selections.push([opt, listed ? listed.includes(optionValue) : optionValue === next]);
+            }
+            for (const [opt, on] of selections) opt.selected = on;
+            if (seed) {
+                for (const [opt, on] of selections) {
+                    if (on) opt.setAttribute('selected', '');
+                    else if (typeof opt.removeAttribute === 'function') opt.removeAttribute('selected');
+                }
             }
         } else if (el.value !== next) {
             el.value = next;
@@ -149,7 +172,9 @@ export function applyDomAttr(el, name, value) {
             seededTextareaDefaults.add(el);
             el.defaultValue = next;
         }
-        if (listed) return;
+        // A select carries its value as option selectedness: a `value` attribute
+        // on the select itself has no meaning and SSR never emits one.
+        if (listed || el.tagName === 'SELECT') return;
         if (value == null || value === false) el.removeAttribute('value');
         else el.setAttribute('value', next);
         return;
