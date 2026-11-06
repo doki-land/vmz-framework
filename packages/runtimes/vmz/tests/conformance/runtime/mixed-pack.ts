@@ -89,11 +89,16 @@ try {
     }
 
     const entryClient = fs.readFileSync(path.join(dist, 'entry-client.js'), 'utf8');
-    if (/EventButton\.client\.js/.test(entryClient) && /import\s+EventButton\s+from/.test(entryClient)) {
-        fail('entry-client.js must not statically import EventButton.client.js');
+    // Component modules load through the literal `import()` table so pack sees every
+    // edge at build time. The entry itself must not add static component imports.
+    if (/import\s+EventButton\s+from/.test(entryClient) || /import\s+LikeButton\s+from/.test(entryClient)) {
+        fail('entry-client.js must not statically import component modules');
     }
-    if (!/import\s+LikeButton\s+from/.test(entryClient)) {
-        fail('entry-client.js must statically import LikeButton (idle)');
+    if (!/"LikeButton":\s*\(\)\s*=>\s*import\("\.\/components\/LikeButton\.client\.js"\)/.test(entryClient)) {
+        fail('entry-client.js must expose a literal import() entry for LikeButton (idle)');
+    }
+    if (!/"EventButton":\s*\(\)\s*=>\s*import\("\.\/components\/EventButton\.client\.js"\)/.test(entryClient)) {
+        fail('entry-client.js must expose a literal import() entry for EventButton');
     }
     if (!entryClient.includes('__vmzLoadComponent')) {
         fail('entry-client.js must set __vmzLoadComponent for event islands');
@@ -103,7 +108,7 @@ try {
     }
 
     console.log('resume-MIXED-PACK GATE PASS');
-    console.log(' idle static + event lazy (__vmzLoadComponent)');
+    console.log(' literal page-module table keeps idle and event modules loadable by key');
 } finally {
     killChild();
 }
