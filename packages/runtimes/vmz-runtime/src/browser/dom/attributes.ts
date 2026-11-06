@@ -53,7 +53,10 @@ export function applyDomAttr(el, name, value) {
     }
     if (BOOLEAN_HTML_ATTRS.has(String(key).toLowerCase())) {
         const on = value === true || value === '';
-        if (key === 'checked' && el && el.tagName === 'INPUT' && String(el.type || '').toLowerCase() === 'checkbox') {
+        // Reflect `checked` through its IDL property. Once the user has interacted
+        // with a radio, attribute writes only reach its default state, so a later
+        // model update would otherwise leave the visible control stale.
+        if (key === 'checked' && el && el.tagName === 'INPUT') {
             if (el.checked !== on) el.checked = on;
         }
         if (value === false || value == null || value === '') {
