@@ -79,6 +79,33 @@ export default class HostAttrsPage {
 }
 
 #[test]
+fn key_modifiers_and_exact_emit_guards() {
+    let src = r#"
+export default class KeyDemo {
+  enterHits = 0;
+  exactHits = 0;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<input @keyup.enter="(() => enterHits++)" @keyup.delete="(() => enterHits++)" @keyup.ctrl.exact="(() => exactHits++)" />"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains(r#"["enter"].indexOf(__vmzKey) < 0"#), "`.enter` unfiltered: {js}");
+    assert!(
+        js.contains(r#"["delete","backspace"].indexOf(__vmzKey) < 0"#),
+        "`.delete` should accept backspace: {js}"
+    );
+    assert!(js.contains("if (!ev.ctrlKey) return;"), "`.ctrl` not required: {js}");
+    assert!(js.contains("if (ev.altKey) return;"), "`.exact` allows alt: {js}");
+    assert!(js.contains("if (ev.shiftKey) return;"), "`.exact` allows shift: {js}");
+    assert!(js.contains("if (ev.metaKey) return;"), "`.exact` allows meta: {js}");
+}
+
+#[test]
 fn if_else_emits_if_block() {
     let src = r#"
 export default class BranchDemo {

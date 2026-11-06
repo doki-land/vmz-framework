@@ -1408,6 +1408,7 @@ fn emit_plain_element(
                 let has_once = mods.iter().any(|m| m == "once");
                 let has_trim = mods.iter().any(|m| m == "trim");
                 let has_number = mods.iter().any(|m| m == "number");
+                let has_exact = mods.iter().any(|m| m == "exact");
 
                 // v-model: @update:xxx → input (default) / change (.lazy)
                 let is_vmodel_event = a.name.strip_prefix("@update:").is_some();
@@ -1482,6 +1483,28 @@ fn emit_plain_element(
                     }
                     if has_prevent {
                         guards.push_str("ev.preventDefault(); ");
+                    }
+                    // System modifiers: requested keys must be held, and `.exact`
+                    // rejects every other system key (Vue `withModifiers`).
+                    for (mod_name, flag) in [
+                        ("ctrl", "ctrlKey"),
+                        ("alt", "altKey"),
+                        ("shift", "shiftKey"),
+                        ("meta", "metaKey"),
+                    ] {
+                        if mods.iter().any(|m| m == mod_name) {
+                            guards.push_str(&format!("if (!ev.{flag}) return; "));
+                        } else if has_exact {
+                            guards.push_str(&format!("if (ev.{flag}) return; "));
+                        }
+                    }
+                    // Key modifiers filter after the modifier guards (Vue `withKeys`
+                    // hyphenates `event.key` and skips events without a key).
+                    if let Some(keys) = collect_key_candidates(mods) {
+                        let list = keys.iter().map(|k| q(k)).collect::<Vec<_>>().join(",");
+                        guards.push_str(&format!(
+                            r"if ('key' in ev) {{ var __vmzKey = String(ev.key).replace(/\B([A-Z])/g, '-$1').toLowerCase(); if ([{list}].indexOf(__vmzKey) < 0) return; }} "
+                        ));
                     }
                     let wrapped = if guards.is_empty() {
                         handler
@@ -1619,6 +1642,33 @@ fn emit_plain_element(
 /// camelized into instance props (`data-testid` → `dataTestid`).
 fn is_component_host_attr(name: &str) -> bool {
     name == "id" || name.starts_with("data-") || name.starts_with("aria-")
+}
+
+/// Vue key-modifier aliases mapped to the hyphenated `KeyboardEvent.key` names
+/// they accept (`delete` also covers backspace, `esc` covers escape).
+fn key_modifier_candidates(modifier: &str) -> Option<&'static [&'static str]> {
+    match modifier {
+        "enter" => Some(&["enter"]),
+        "tab" => Some(&["tab"]),
+        "esc" => Some(&["escape", "esc"]),
+        "space" => Some(&[" ", "space"]),
+        "delete" => Some(&["delete", "backspace"]),
+        _ => None,
+    }
+}
+
+fn collect_key_candidates(mods: &[String]) -> Option<Vec<&'static str>> {
+    let mut out: Vec<&'static str> = Vec::new();
+    for m in mods {
+        if let Some(candidates) = key_modifier_candidates(m) {
+            for k in candidates {
+                if !out.contains(k) {
+                    out.push(*k);
+                }
+            }
+        }
+    }
+    if out.is_empty() { None } else { Some(out) }
 }
 
 fn emit_component(
