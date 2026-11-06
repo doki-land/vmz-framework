@@ -1,4 +1,4 @@
-import { applyDirectHostBox, directHostBoxStyleAttr } from '../browser/direct-host-box.js';
+import { applyDirectHostBox, directHostBoxStyleAttr, resolveDirectHostTag } from '../browser/direct-host-box.js';
 import {
     applyDomAttr,
     applyPreservedState,
@@ -876,7 +876,7 @@ const serializeApi = {
             }
             return {
                 __kind: 'el',
-                tag: 'div',
+                tag: resolveDirectHostTag(name, Ctor),
                 attrs,
                 children: body ? [body] : [],
                 appendChild(c) {
@@ -903,7 +903,7 @@ const serializeApi = {
                 if (key != null) attrs['data-vmz-key'] = String(key);
                 return {
                     __kind: 'el',
-                    tag: 'div',
+                    tag: resolveDirectHostTag(name, Ctor),
                     attrs,
                     children: node ? [node] : [],
                     appendChild(c) {

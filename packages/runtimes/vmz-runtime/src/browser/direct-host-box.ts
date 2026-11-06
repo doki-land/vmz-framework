@@ -26,3 +26,17 @@ export function applyDirectHostBox(host: HTMLElement, name: string, Ctor: Compon
 export function directHostBoxStyleAttr(name: string, Ctor: ComponentCtor | null | undefined): string | null {
     return resolveDirectHostBox(name, Ctor) === 'contents' ? 'display:contents' : null;
 }
+
+/**
+ * Host element tag (`div` vs `span`).
+ *
+ * `display: contents` chips are phrasing content, so a `<div>` host is invalid
+ * HTML inside `<p>`. The browser parser then closes the `<p>` early and moves
+ * the host (and its trailing text) out of it, which desynchronizes the SSR tree
+ * from the client tree and makes resume rebuild those nodes. Emitting a `<span>`
+ * host keeps the SSR markup parse-stable: the parsed tree matches the tree the
+ * client `__vmzCreate` builds.
+ */
+export function resolveDirectHostTag(name: string, Ctor: ComponentCtor | null | undefined): 'div' | 'span' {
+    return resolveDirectHostBox(name, Ctor) === 'contents' ? 'span' : 'div';
+}

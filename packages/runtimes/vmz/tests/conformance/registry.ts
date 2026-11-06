@@ -302,6 +302,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: 'Pass-through `<slot/>` layouts hydrate the SSR route in place instead of wiping it',
         pre: ['build:runtimes'],
     },
+    'ssr-slot-projection-resume': {
+        file: 'runtime/ssr-slot-projection-resume.ts',
+        description: 'Multi-root slot projection and projected component hosts are reclaimed without scope drift',
+        pre: ['build:runtimes'],
+    },
     'ssr-keyed-non-kernel': {
         file: 'runtime/ssr-keyed-non-kernel.ts',
         description: 'Keyed component and `v-once` rows carry `data-vmz-key` and reclaim SSR nodes after reorder',
@@ -847,6 +852,7 @@ export const CHECK_ALL = [
     'ssr-resume-identity',
     'ssr-keyed-resume',
     'ssr-route-slot-layout',
+    'ssr-slot-projection-resume',
     'ssr-keyed-non-kernel',
     'ssr-keyed-row-fragment',
     'v-pre',

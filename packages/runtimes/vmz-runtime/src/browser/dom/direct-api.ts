@@ -1,7 +1,7 @@
 import { mergeClassParts, mergeStyleParts } from '../../shared/dom-attr-normalize.js';
 import { HTML_HASH_ATTR, htmlDigest } from '../../shared/html-digest.js';
 import type { BindingId, DirectInstance, PatchFn } from '../direct-api.types.js';
-import { applyDirectHostBox } from '../direct-host-box.js';
+import { applyDirectHostBox, resolveDirectHostTag } from '../direct-host-box.js';
 import type {
     ComponentCtor,
     EachCtx,
@@ -562,7 +562,7 @@ export const directApi = {
         }
         if (!host) {
             noteDomCreate();
-            host = document.createElement('div');
+            host = document.createElement(resolveDirectHostTag(name, nameOrCtor));
             host.setAttribute('data-vmz', name);
         }
         if (key != null) (host as any).__vmzKey = key;
@@ -590,7 +590,7 @@ export const directApi = {
         }
         if (!host) {
             noteDomCreate();
-            host = document.createElement('div');
+            host = document.createElement(resolveDirectHostTag(name, initial));
             host.setAttribute('data-vmz', name);
         }
         if (key != null) (host as any).__vmzKey = key;

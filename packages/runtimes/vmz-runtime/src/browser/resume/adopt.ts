@@ -62,6 +62,15 @@ function createResumeAdopt(pool, rootEl) {
         return n;
     };
 
+    /**
+     * Component hosts are claimed only by `componentHost`, never by plain element
+     * adoption. Hosts may be `<span>` (phrasing inline chips) or `<div>` (block
+     * surfaces), so tag matching alone would let a page `<span>` steal a chip host
+     * and force a rebuild.
+     */
+    const isComponentHost = (el) =>
+        typeof el.getAttribute === 'function' && el.getAttribute('data-vmz') != null;
+
     function* elementCandidates() {
         const scope = currentScope();
         if (scope === pool && rootEl && !used.has(rootEl)) yield rootEl;
@@ -106,7 +115,7 @@ function createResumeAdopt(pool, rootEl) {
             return fresh;
         }
         for (const el of elementCandidates()) {
-            if (String(el.tagName).toLowerCase() === want) return markElement(el);
+            if (String(el.tagName).toLowerCase() === want && !isComponentHost(el)) return markElement(el);
         }
         noteDomCreate();
         const fresh = svg ? document.createElementNS(SVG_NS, tag || 'svg') : document.createElement(tag || 'div');
@@ -173,7 +182,6 @@ function createResumeAdopt(pool, rootEl) {
         const want = String(name || '');
         const wanted = key == null ? null : String(key);
         for (const el of elementCandidates()) {
-            if (String(el.tagName).toLowerCase() !== 'div') continue;
             if (el.getAttribute('data-vmz') !== want) continue;
             if (wanted != null && el.getAttribute('data-vmz-key') !== wanted) continue;
             return markElement(el);
@@ -204,8 +212,14 @@ function createResumeAdopt(pool, rootEl) {
                 return true;
             }
         }
-        if (!node.__vmzResumePool) return false;
-        scopeStack.push(node.__vmzResumePool);
+        // Emitted `adoptEnter` is always paired with `adoptLeave`, but a node that
+        // has no SSR counterpart (fresh element or fresh component host) has no
+        // parked pool. Returning without pushing made that paired leave pop the
+        // caller's scope instead, so each rebuilt node drifted the stack one level
+        // up and later projection siblings (slot roots 2..n) lost their pool.
+        // Push an isolated empty scope: the rebuilt subtree has no SSR counterpart
+        // to reclaim, and its children must not steal the enclosing siblings.
+        scopeStack.push(node.__vmzResumePool || document.createDocumentFragment());
         return true;
     };
 
