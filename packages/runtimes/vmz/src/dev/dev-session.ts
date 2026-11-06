@@ -515,6 +515,34 @@ export function createDevSession(options: DevSessionOptions) {
             throw new Error(`vmz dev: missing src/ under ${project}`);
         }
 
+        // Snapshot watch roots and their fingerprints **before** the initial build.
+        // A save that lands while `vmz dev` boots must still be detected by the first
+        // poll. Taking the baseline after the initial reload absorbs that edit into the
+        // baseline, so the host serves the pre-edit bytes until the next save.
+        const docsRoot = path.join(project, 'documents');
+        const localesRoot = path.join(project, 'locales');
+        const designsRoot = path.join(project, 'designs');
+        const watched = collectDevWatchRoots({ project, outDir });
+        const publicRoot = watched.publicRoot;
+        /** Candidate config files plus their local reachable deps; refreshed after each cycle. */
+        const refreshConfigPaths = () => {
+            const deps = configCandidates
+                .filter((p) => existsSync(p))
+                .flatMap((p) => collectConfigDependencies(p, project));
+            return [...new Set([...configCandidates, ...deps])];
+        };
+        let configPaths = refreshConfigPaths();
+        /** @type {string[]} */
+        const watchRoots = [...watched.roots];
+        /** @type {string[]} */
+        let dependencyRoots: string[] = [...watched.dependencyRoots];
+        /** @type {Map<string, Map<string, string>>} */
+        const fingerprints = new Map();
+        for (const root of watchRoots) {
+            fingerprints.set(root, fileFingerprintMap(root));
+        }
+        let configFingerprints = configFingerprintMap(configPaths);
+
         // Config evaluation + plugin contributions run in a detached build process.
         // Functions/plugin objects never cross the boundary; only the data report does.
         if (configCandidates.some((p) => existsSync(p))) {
@@ -568,23 +596,6 @@ export function createDevSession(options: DevSessionOptions) {
             });
             if (initialKind !== 'soft') log.warn('initial serve-host reload failed — fix the error and save');
         }
-        const docsRoot = path.join(project, 'documents');
-        const localesRoot = path.join(project, 'locales');
-        const designsRoot = path.join(project, 'designs');
-        const watched = collectDevWatchRoots({ project, outDir });
-        const publicRoot = watched.publicRoot;
-        /** Candidate config files plus their local reachable deps; refreshed after each cycle. */
-        const refreshConfigPaths = () => {
-            const deps = configCandidates
-                .filter((p) => existsSync(p))
-                .flatMap((p) => collectConfigDependencies(p, project));
-            return [...new Set([...configCandidates, ...deps])];
-        };
-        let configPaths = refreshConfigPaths();
-        /** @type {string[]} */
-        const watchRoots = [...watched.roots];
-        /** @type {string[]} */
-        let dependencyRoots: string[] = [...watched.dependencyRoots];
         if (wechatPreview) {
             log.info(`dev → WeChat DevTools (watching ${watchRoots.join(', ')}; keep dist/wechat open)`);
         } else {
@@ -594,12 +605,6 @@ export function createDevSession(options: DevSessionOptions) {
             log.info(`dev dependency watch roots (${dependencyRoots.length}): ${dependencyRoots.join(', ')}`);
         }
 
-        /** @type {Map<string, Map<string, string>>} */
-        const fingerprints = new Map();
-        for (const root of watchRoots) {
-            fingerprints.set(root, fileFingerprintMap(root));
-        }
-        let configFingerprints = configFingerprintMap(configPaths);
         const signal = options.signal;
 
         const onAbort = () => {
