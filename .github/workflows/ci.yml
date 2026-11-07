@@ -6,18 +6,24 @@ on:
   pull_request:
     branches: [dev, master]
 
-# One Rust/native build, then parallel required gates (no continue-on-error on gates):
-#   build-runtimes — sole cargo/napi + JS runtime dist artifact
-#   fmt            — `pnpm fmt:check` after artifact restore (native must be built first)
-#   build-test     — pack smoke already done upstream; unit + examples
+# One Rust/native build produces the runtime artifact. Every gate below depends only
+# on that artifact and never on another gate's conclusion, so one failure cannot hide
+# unrelated failures: format, Rust pack tests, unit/example tests, browser production
+# and runtime gates all report in the same run instead of queueing behind each other.
+# The only unavoidable dependency is compilation, since the gates execute the release
+# native built here.
+#   build-native   — release cargo/napi + JS runtime dist artifact (compile + pack only)
+#   fmt            — `pnpm fmt:check` after artifact restore
+#   build-runtimes — `vmz-pack` / `vmz-napi` cargo tests + dist pack asserts
+#   build-test     — unit + examples + browser smoke
 #   ui-browser     — ui-automation + direct host box + radio checkedness + chart hydration + browser-production (Chrome)
 #   runtime-gates  — Slim + runtime-quality-baseline + authoring/hydration gates + dev pack input skip
 # Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
 # After artifact restore, each consumer runs `pnpm verify -- skip-native-pre` first.
 
 jobs:
-  build-runtimes:
-    name: Build Runtimes
+  build-native:
+    name: Build Native
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -56,18 +62,6 @@ jobs:
           node scripts/build/napi.mjs --release
           VMZ_SKIP_NAPI=1 pnpm build:runtimes
 
-      - name: Test vmz-pack artifact gates
-        run: cargo test -p vmz-pack -p vmz-napi
-
-      - name: Assert @vmz/vmz dist pack contract
-        run: node scripts/ci/assert-vmz-pack.mjs
-
-      - name: Verify @doki-land/davinci facade pack
-        run: node scripts/ci/verify-davinci-facade.mjs
-
-      - name: Verify @vmz/ui-charts pack surface
-        run: node scripts/ci/verify-ui-charts-pack.mjs
-
       - name: Pack runtime artifact
         shell: bash
         run: |
@@ -102,7 +96,7 @@ jobs:
 
   fmt:
     name: Format Check
-    needs: [build-runtimes]
+    needs: [build-native]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -142,9 +136,64 @@ jobs:
       - name: Check format (`vmz format --check --rust .` on the explicit repo root; same as `pnpm fmt:check`)
         run: pnpm fmt:check
 
+  build-runtimes:
+    name: Build Runtimes
+    needs: [build-native]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-build-test
+          cache-on-failure: true
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download runtime artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: runtime-build
+          path: .
+
+      - name: Restore runtime artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf runtime-build.tar.gz
+          test -f packages/runtimes/vmz/dist/cli/cli.js
+          ls packages/runtimes/vmz-linux-x64/vmz.*.node
+
+      - name: Test vmz-pack artifact gates
+        run: cargo test -p vmz-pack -p vmz-napi
+
+      - name: Assert @vmz/vmz dist pack contract
+        run: node scripts/ci/assert-vmz-pack.mjs
+
+      - name: Verify @doki-land/davinci facade pack
+        run: node scripts/ci/verify-davinci-facade.mjs
+
+      - name: Verify @vmz/ui-charts pack surface
+        run: node scripts/ci/verify-ui-charts-pack.mjs
+
   build-test:
     name: Build and Test
-    needs: [build-runtimes]
+    needs: [build-native]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -276,7 +325,7 @@ jobs:
 
   ui-browser:
     name: UI and Browser Production
-    needs: [build-test]
+    needs: [build-native]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -330,7 +379,7 @@ jobs:
 
   runtime-gates:
     name: Slim and Runtime Quality
-    needs: [ui-browser]
+    needs: [build-native]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
