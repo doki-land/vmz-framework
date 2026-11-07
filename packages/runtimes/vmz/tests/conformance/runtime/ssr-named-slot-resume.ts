@@ -45,12 +45,14 @@ const rowsHref = pathToFileURL(path.join(dist, 'pages', 'rows.client.js')).href;
 const dynamicHref = pathToFileURL(path.join(dist, 'pages', 'dynamic.client.js')).href;
 const loopHref = pathToFileURL(path.join(dist, 'pages', 'loop.client.js')).href;
 const nestedHref = pathToFileURL(path.join(dist, 'pages', 'nested.client.js')).href;
+const deepHref = pathToFileURL(path.join(dist, 'pages', 'deep.client.js')).href;
 const { renderToString, hydrate, flushPending } = await import(domHref);
 const { default: IndexPage } = await import(pageHref);
 const { default: RowsPage } = await import(rowsHref);
 const { default: DynamicPage } = await import(dynamicHref);
 const { default: LoopPage } = await import(loopHref);
 const { default: NestedPage } = await import(nestedHref);
+const { default: DeepPage } = await import(deepHref);
 
 const pageHtml = await renderToString(IndexPage, { props: {} });
 if (!pageHtml.includes('id="named-title"')) fail(`SSR page missing the named projection: ${pageHtml}`);
@@ -259,7 +261,41 @@ if (nestedReorderedTails[0] !== nestedTailsBefore[1] || nestedReorderedTails[1] 
     fail('nested keyed rows did not move their original tail nodes');
 }
 
+// 6. Named outlet nested inside another named outlet: the inner host is claimed
+// from the outer named pool and must open its own named pool in turn.
+const deepHtml = await renderToString(DeepPage, { props: {} });
+if (!deepHtml.includes('deep-title')) fail(`SSR deep page missing the nested named projection: ${deepHtml}`);
+
+const { window: deepWindow } = parseHTML(
+    `<!DOCTYPE html><html><body><div id="app">${deepHtml}</div></body></html>`,
+);
+globalThis.window = deepWindow;
+globalThis.document = deepWindow.document;
+globalThis.HTMLElement = deepWindow.HTMLElement;
+globalThis.Node = deepWindow.Node;
+globalThis.DocumentFragment = deepWindow.DocumentFragment;
+globalThis.Text = deepWindow.Text;
+globalThis.Comment = deepWindow.Comment;
+
+const deepApp = deepWindow.document.getElementById('app');
+const deepTitleBefore = deepApp.querySelector('.deep-title');
+if (!deepTitleBefore) fail('nested named projection is missing before hydrate');
+if (deepTitleBefore.closest('#named-header') == null) fail('nested named projection left its outlet');
+
+const deepInst = await hydrate(DeepPage, deepApp, {});
+const deepTitleAfter = deepApp.querySelector('.deep-title');
+if (deepTitleAfter !== deepTitleBefore) fail('named outlet nested in a named outlet was rebuilt');
+
+deepInst.title = 'Deep updated';
+await flushPending(deepInst);
+if (deepApp.querySelector('.deep-title') !== deepTitleAfter) {
+    fail('state update rebuilt the nested named projection node');
+}
+if (!String(deepTitleAfter.textContent).includes('Deep updated')) {
+    fail('state update did not patch the nested named projection');
+}
+
 console.log(
-    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows, dynamic names and nested projection',
+    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows, dynamic names, nested projection and named-in-named nesting',
 );
 
