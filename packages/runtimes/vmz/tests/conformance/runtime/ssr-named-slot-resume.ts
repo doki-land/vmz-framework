@@ -44,11 +44,13 @@ const pageHref = pathToFileURL(path.join(dist, 'pages', 'index.client.js')).href
 const rowsHref = pathToFileURL(path.join(dist, 'pages', 'rows.client.js')).href;
 const dynamicHref = pathToFileURL(path.join(dist, 'pages', 'dynamic.client.js')).href;
 const loopHref = pathToFileURL(path.join(dist, 'pages', 'loop.client.js')).href;
+const nestedHref = pathToFileURL(path.join(dist, 'pages', 'nested.client.js')).href;
 const { renderToString, hydrate, flushPending } = await import(domHref);
 const { default: IndexPage } = await import(pageHref);
 const { default: RowsPage } = await import(rowsHref);
 const { default: DynamicPage } = await import(dynamicHref);
 const { default: LoopPage } = await import(loopHref);
+const { default: NestedPage } = await import(nestedHref);
 
 const pageHtml = await renderToString(IndexPage, { props: {} });
 if (!pageHtml.includes('id="named-title"')) fail(`SSR page missing the named projection: ${pageHtml}`);
@@ -213,7 +215,51 @@ if (reorderedChips[0] !== ssrChips[1] || reorderedChips[1] !== ssrChips[0]) {
     fail('keyed rows inside the named outlet did not move their original nodes');
 }
 
+// 5. Keyed component rows inside a named outlet whose slot content projects
+// again: the outer named pool must hand the inner host its own default pool.
+const nestedHtml = await renderToString(NestedPage, { props: {} });
+if (!nestedHtml.includes('chip-tray')) fail(`SSR nested page missing the inner host: ${nestedHtml}`);
+if (!nestedHtml.includes('nested-chip')) fail(`SSR nested page missing the inner projection: ${nestedHtml}`);
+
+const { window: nestedWindow } = parseHTML(
+    `<!DOCTYPE html><html><body><div id="app">${nestedHtml}</div></body></html>`,
+);
+globalThis.window = nestedWindow;
+globalThis.document = nestedWindow.document;
+globalThis.HTMLElement = nestedWindow.HTMLElement;
+globalThis.Node = nestedWindow.Node;
+globalThis.DocumentFragment = nestedWindow.DocumentFragment;
+globalThis.Text = nestedWindow.Text;
+globalThis.Comment = nestedWindow.Comment;
+
+const nestedApp = nestedWindow.document.getElementById('app');
+const nestedChipsBefore = [...nestedApp.querySelectorAll('.nested-chip')];
+const nestedTailsBefore = [...nestedApp.querySelectorAll('.nested-tail')];
+if (nestedChipsBefore.length !== 2 || nestedTailsBefore.length !== 2) fail('nested page SSR shape is wrong');
+
+const nestedInst = await hydrate(NestedPage, nestedApp, {});
+const nestedChipsAfter = [...nestedApp.querySelectorAll('.nested-chip')];
+const nestedTailsAfter = [...nestedApp.querySelectorAll('.nested-tail')];
+for (const chip of nestedChipsAfter) {
+    if (!nestedChipsBefore.includes(chip)) fail(`nested named projection was rebuilt: ${String(chip.textContent)}`);
+    if (chip.closest('#named-header') == null) fail('nested projection left the outer named outlet');
+}
+for (const tail of nestedTailsAfter) {
+    if (!nestedTailsBefore.includes(tail)) fail(`nested projection tail was rebuilt: ${String(tail.textContent)}`);
+}
+
+nestedInst.trays = [nestedInst.trays[1], nestedInst.trays[0]];
+await flushPending(nestedInst);
+const nestedReorderedChips = [...nestedApp.querySelectorAll('.nested-chip')];
+const nestedReorderedTails = [...nestedApp.querySelectorAll('.nested-tail')];
+if (nestedReorderedChips[0] !== nestedChipsBefore[1] || nestedReorderedChips[1] !== nestedChipsBefore[0]) {
+    fail('nested keyed rows did not move their original chip nodes');
+}
+if (nestedReorderedTails[0] !== nestedTailsBefore[1] || nestedReorderedTails[1] !== nestedTailsBefore[0]) {
+    fail('nested keyed rows did not move their original tail nodes');
+}
+
 console.log(
-    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows and dynamic names',
+    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows, dynamic names and nested projection',
 );
 

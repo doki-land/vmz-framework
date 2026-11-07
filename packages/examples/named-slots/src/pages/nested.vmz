@@ -1,0 +1,26 @@
+<template>
+    <main id="nested-page">
+        <NamedPanel>
+            <template #header>
+                <template v-for="tray in trays" :key="tray.id">
+                    <ChipTray :key="tray.id">
+                        <span class="nested-chip">
+                            {{ tray.label }}
+                        </span>
+                        <span class="nested-tail">
+                            {{ tray.tail }}
+                        </span>
+                    </ChipTray>
+                </template>
+            </template>
+        </NamedPanel>
+    </main>
+</template>
+<script client>
+export default class NestedPage {
+    public trays = [
+        { id: "a", label: "Tray A", tail: "tail A" },
+        { id: "b", label: "Tray B", tail: "tail B" },
+    ];
+}
+</script>

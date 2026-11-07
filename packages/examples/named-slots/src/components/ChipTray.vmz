@@ -1,0 +1,8 @@
+<template>
+    <div class="chip-tray" data-fixture="chip-tray">
+        <slot />
+    </div>
+</template>
+<script client>
+export default class ChipTray {}
+</script>
