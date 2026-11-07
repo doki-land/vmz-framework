@@ -19,6 +19,7 @@ use crate::diag::PackDiagnostic;
 
 use super::EmitPlan;
 
+/// 全量写出：每个产物都落盘，等价于 `write_emit_incremental(plan, out_dir, false)`。
 pub fn write_emit(plan: &EmitPlan, out_dir: &Path) -> Result<(), Vec<PackDiagnostic>> {
     write_emit_incremental(plan, out_dir, false)
 }

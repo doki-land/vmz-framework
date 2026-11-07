@@ -1,39 +1,55 @@
 //! GitHub Actions monitoring over the GitHub REST API. Never spawns `gh`.
 
+#![deny(missing_docs)]
+
 use std::time::{Duration, Instant};
 
 use boost_http::{HttpTransport, Method, Request, Transport, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Whether the monitor returns as soon as it resolves a run or waits for completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum MonitorMode {
+    /// Report the resolved run immediately.
     Status,
+    /// Poll until the run reports a conclusion or the timeout expires.
     Wait,
 }
 
+/// One monitor invocation: repository identity, target run selection, and wait policy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MonitorRequest {
+    /// Repository owner, for example an organization or user name.
     pub owner: String,
+    /// Repository name without the owner prefix.
     pub repo: String,
+    /// GitHub token used for authenticated requests. Anonymous access is rate limited.
     #[serde(default)]
     pub token: Option<String>,
+    /// Monitor behaviour for this request.
     pub mode: MonitorMode,
+    /// Workflow file name or id used when selecting the newest matching run.
     #[serde(default)]
     pub workflow: Option<String>,
+    /// Exact run id. Takes precedence over every other selector.
     #[serde(default)]
     pub run_id: Option<u64>,
     /// Commit SHA filter (`head_sha`) when listing runs.
     #[serde(default)]
     pub head_sha: Option<String>,
+    /// Branch filter when listing runs.
     #[serde(default)]
     pub branch: Option<String>,
+    /// Total wait budget in seconds for `wait` mode.
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
+    /// Poll interval in seconds for `wait` mode.
     #[serde(default = "default_interval_secs")]
     pub interval_secs: u64,
+    /// Conclusion that `wait` mode treats as success.
     #[serde(default = "default_required_conclusion")]
     pub required_conclusion: String,
 }
@@ -50,29 +66,40 @@ fn default_required_conclusion() -> String {
     "success".into()
 }
 
+/// Snapshot of the resolved run reported back to the caller.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MonitorResult {
+    /// GitHub Actions run id.
     pub run_id: u64,
+    /// Raw run status such as `queued`, `in_progress` or `completed`.
     pub status: String,
+    /// Conclusion once the run completed (`success`, `failure`, …).
     #[serde(default)]
     pub conclusion: Option<String>,
+    /// Browser URL for the run.
     pub html_url: String,
+    /// Workflow display name when GitHub reports one.
     #[serde(default)]
     pub name: Option<String>,
 }
 
+/// Failure modes of a monitor call.
 #[derive(Debug, Error)]
 pub enum MonitorError {
+    /// Caller-facing message, including a missing token or an unmatched run.
     #[error("{0}")]
     Message(String),
+    /// Transport-level request failure.
     #[error(transparent)]
     Request(#[from] boost_http::RequestError),
+    /// Response body that did not match the expected REST shape.
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
 }
 
 impl MonitorError {
+    /// Build a message error from anything string-like.
     pub fn msg(s: impl Into<String>) -> Self {
         Self::Message(s.into())
     }

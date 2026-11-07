@@ -13,6 +13,7 @@ on:
 # The only unavoidable dependency is compilation, since the gates execute the release
 # native built here.
 #   build-native   — release cargo/napi + JS runtime dist artifact (compile + pack only)
+#   lint           — `pnpm lint` (`nifty check`); no `needs`, so it reports even when the build is red
 #   fmt            — `pnpm fmt:check` after artifact restore
 #   build-runtimes — `vmz-pack` / `vmz-napi` cargo tests + dist pack asserts
 #   build-test     — unit + examples + browser smoke
@@ -93,6 +94,34 @@ jobs:
           path: runtime-build.tar.gz
           if-no-files-found: error
           retention-days: 2
+
+  lint:
+    name: Lint
+    # Deliberately no `needs`: `nifty check` reads manifests and git history only, so it costs
+    # a minute and must report even when the native build is red.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run lint (`nifty check`)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm lint | tee "$RUNNER_TEMP/lint-report.txt"
+          { echo '### `nifty check`'; echo '```'; tail -n 1 "$RUNNER_TEMP/lint-report.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   fmt:
     name: Format Check

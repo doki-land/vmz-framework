@@ -6,6 +6,8 @@
 //! Projects `.vmz` scripts into `NyarAnalysisInput` for Nyar analysis.
 //! Conformance: `pnpm verify -- oak-frontend-smoke`.
 
+#![deny(missing_docs)]
+
 mod contract;
 mod nyar_contract;
 mod oak_ast;

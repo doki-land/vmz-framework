@@ -9,6 +9,7 @@
 //! filesystem I/O.
 
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 
 use std::collections::BTreeMap;
 

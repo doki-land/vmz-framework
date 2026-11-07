@@ -25,8 +25,8 @@ const TIMEOUT_MS = Number(process.env.CI_WAIT_TIMEOUT_MS || 45 * 60 * 1000);
 const INTERVAL_MS = Number(process.env.CI_WAIT_INTERVAL_MS || 20 * 1000);
 
 // Every job that proves the release artifacts are usable. `Build Runtimes` alone
-// is not enough: format, unit/example/browser and runtime gates all ship evidence.
-export const REQUIRED_JOBS = ['Build Runtimes', 'Format Check', 'Build and Test', 'UI and Browser Production', 'Slim and Runtime Quality'];
+// is not enough: lint, format, unit/example/browser and runtime gates all ship evidence.
+export const REQUIRED_JOBS = ['Lint', 'Build Runtimes', 'Format Check', 'Build and Test', 'UI and Browser Production', 'Slim and Runtime Quality'];
 
 const ACTIVE_STATUSES = new Set(['queued', 'in_progress', 'pending', 'requested', 'waiting']);
 

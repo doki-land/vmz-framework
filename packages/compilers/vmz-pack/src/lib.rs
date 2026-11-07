@@ -16,6 +16,8 @@
 //! 用文本表达或事实不完整的语义一律显式诊断拒绝，不得据本 crate 现状
 //! 宣称 code splitting 已成立。
 
+#![deny(missing_docs)]
+
 pub mod chunk;
 pub mod diag;
 pub mod emit;
