@@ -7,11 +7,14 @@
  * revisions instead of the local checkouts. Build output never shows which source
  * won, which is how an overlay can be declared but inactive for months.
  *
- *   pnpm check:overlay
+ *   pnpm check:overlay                     # local: the overlay must be applied
+ *   pnpm check:overlay --expect-no-overlay # CI: nothing may come from a local path
  *
- * Exit 0: no overlay file (CI or a clean clone), or every declared patch resolves
- *         to its declared path. Exit 1: the path is missing, or the declaration
- *         does not take effect.
+ * Exit 0: local mode — no overlay file (clean clone), or every declared patch
+ *         resolves to its declared path. CI mode — no overlay file and every
+ *         dependency resolves from a pinned revision.
+ * Exit 1: the path is missing, the declaration does not take effect, or CI would
+ *         build from an unpinned local checkout.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -20,6 +23,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CONFIG = path.join(ROOT, '.cargo', 'config.toml');
+// CI has no checkout of the sibling repositories, so a local path dependency
+// there means resolution drifted away from the pinned revisions.
+const EXPECT_NO_OVERLAY = process.argv.includes('--expect-no-overlay');
 
 const PATCH_HEADER = /^\s*\[patch\."([^"]+)"\]\s*$/;
 const PATCH_ENTRY = /^\s*([A-Za-z0-9_-]+)\s*=\s*\{\s*path\s*=\s*"([^"]+)"\s*\}\s*$/;
@@ -66,11 +72,11 @@ function assertPaths(declarations) {
     }
 }
 
-function resolveSources() {
+function resolveSources(locked) {
     // `cwd` is pinned to the repository root, which is the only place Cargo loads
-    // this config from. `--locked` is deliberately not used: the overlay rewrites
-    // the resolution, so a git-form lock would fail for the wrong reason.
-    const result = spawnSync('cargo', ['metadata', '--format-version', '1'], {
+    // this config from. Local mode deliberately skips `--locked`: the overlay
+    // rewrites the resolution, so a git-form lock fails for the wrong reason.
+    const result = spawnSync('cargo', ['metadata', '--format-version', '1', ...(locked ? ['--locked'] : [])], {
         cwd: ROOT,
         encoding: 'utf8',
         shell: false,
@@ -88,8 +94,39 @@ function resolveSources() {
     }
 }
 
+function isInsideRoot(file) {
+    const target = path.resolve(file);
+    const root = path.resolve(ROOT) + path.sep;
+    return process.platform === 'win32'
+        ? target.toLowerCase().startsWith(root.toLowerCase())
+        : target.startsWith(root);
+}
+
+function assertPinnedResolution(packages) {
+    // Workspace members live inside the repository and legitimately have no
+    // `source`. Anything else without a `source` is a path dependency.
+    const local = packages.filter((pkg) => pkg.source === null && !isInsideRoot(pkg.manifest_path));
+    if (local.length > 0) {
+        fail(
+            `dependencies resolve from local checkouts instead of pinned revisions:\n${local
+                .map((pkg) => `  ${pkg.name} -> ${pkg.manifest_path}`)
+                .join('\n')}`,
+        );
+    }
+    console.log(`check-local-overlay: ${packages.length} packages, all dependencies pinned`);
+}
+
 function main() {
     const declarations = readDeclarations();
+
+    if (EXPECT_NO_OVERLAY) {
+        if (declarations && declarations.length > 0) {
+            fail(`a local overlay is declared (${CONFIG}) but this run requires pinned revisions`);
+        }
+        assertPinnedResolution(resolveSources(true));
+        return;
+    }
+
     if (!declarations || declarations.length === 0) {
         console.log('check-local-overlay: no local overlay declared, nothing to verify');
         return;
@@ -97,7 +134,7 @@ function main() {
 
     assertPaths(declarations);
 
-    const packages = resolveSources();
+    const packages = resolveSources(false);
     for (const { crate, dir } of declarations) {
         const applied = packages.some(
             (pkg) => pkg.name === crate && pkg.source === null && sameDir(path.dirname(pkg.manifest_path), dir),

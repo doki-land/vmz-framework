@@ -54,10 +54,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Verify `Cargo.lock` matches the manifests
-        # `--locked` proves the committed resolution is what CI and release builds use.
-        # Local `[patch]` overrides are git ignored, so a stale lock only shows up here.
-        run: cargo metadata --locked --format-version 1 > /dev/null
+      - name: Verify dependency resolution is pinned
+        # CI has no sibling checkouts, so every dependency must come from a pinned
+        # revision and the committed `Cargo.lock` must match it. `check:overlay`
+        # runs `cargo metadata --locked` and rejects packages resolved from any
+        # local path, which is the only symptom of a stray `[patch]` override.
+        run: pnpm check:overlay -- --expect-no-overlay
 
       - name: Build runtimes (native + JS)
         # 门禁必须跑发布同款 native：`publish-npm.yml` 用 `--release` 构建 `.node`，
