@@ -43,10 +43,12 @@ const domHref = pathToFileURL(path.join(dist, 'vmz-dom.js')).href;
 const pageHref = pathToFileURL(path.join(dist, 'pages', 'index.client.js')).href;
 const rowsHref = pathToFileURL(path.join(dist, 'pages', 'rows.client.js')).href;
 const dynamicHref = pathToFileURL(path.join(dist, 'pages', 'dynamic.client.js')).href;
+const loopHref = pathToFileURL(path.join(dist, 'pages', 'loop.client.js')).href;
 const { renderToString, hydrate, flushPending } = await import(domHref);
 const { default: IndexPage } = await import(pageHref);
 const { default: RowsPage } = await import(rowsHref);
 const { default: DynamicPage } = await import(dynamicHref);
+const { default: LoopPage } = await import(loopHref);
 
 const pageHtml = await renderToString(IndexPage, { props: {} });
 if (!pageHtml.includes('id="named-title"')) fail(`SSR page missing the named projection: ${pageHtml}`);
@@ -175,7 +177,43 @@ if (!String(dynamicTitle.textContent).includes('Dynamic updated')) {
     fail('state update did not patch the dynamic named projection');
 }
 
+// 4. Keyed `v-for` rows inside a named outlet: the row scope must stay nested
+// under the named outlet pool so the rows reclaim their own SSR nodes.
+const loopHtml = await renderToString(LoopPage, { props: {} });
+if (!loopHtml.includes('loop-chip')) fail(`SSR loop page missing the named projection: ${loopHtml}`);
+
+const { window: loopWindow } = parseHTML(
+    `<!DOCTYPE html><html><body><div id="app">${loopHtml}</div></body></html>`,
+);
+globalThis.window = loopWindow;
+globalThis.document = loopWindow.document;
+globalThis.HTMLElement = loopWindow.HTMLElement;
+globalThis.Node = loopWindow.Node;
+globalThis.DocumentFragment = loopWindow.DocumentFragment;
+globalThis.Text = loopWindow.Text;
+globalThis.Comment = loopWindow.Comment;
+
+const loopApp = loopWindow.document.getElementById('app');
+const ssrChips = [...loopApp.querySelectorAll('.loop-chip')];
+if (ssrChips.length !== 2) fail(`loop page SSR shape is wrong: ${ssrChips.length} chips`);
+for (const chip of ssrChips) {
+    if (chip.closest('#named-header') == null) fail('looped named projection left its outlet');
+}
+
+const loopInst = await hydrate(LoopPage, loopApp, {});
+const hydratedChips = [...loopApp.querySelectorAll('.loop-chip')];
+for (const chip of hydratedChips) {
+    if (!ssrChips.includes(chip)) fail(`keyed row inside the named outlet was rebuilt: ${String(chip.textContent)}`);
+}
+
+loopInst.chips = [loopInst.chips[1], loopInst.chips[0]];
+await flushPending(loopInst);
+const reorderedChips = [...loopApp.querySelectorAll('.loop-chip')];
+if (reorderedChips[0] !== ssrChips[1] || reorderedChips[1] !== ssrChips[0]) {
+    fail('keyed rows inside the named outlet did not move their original nodes');
+}
+
 console.log(
-    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates and keyed row reorder',
+    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows and dynamic names',
 );
 

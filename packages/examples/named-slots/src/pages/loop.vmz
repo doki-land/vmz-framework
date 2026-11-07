@@ -1,0 +1,21 @@
+<template>
+    <main id="loop-page">
+        <NamedPanel>
+            <template #header>
+                <template v-for="chip in chips" :key="chip.id">
+                    <span class="loop-chip">
+                        {{ chip.label }}
+                    </span>
+                </template>
+            </template>
+        </NamedPanel>
+    </main>
+</template>
+<script client>
+export default class LoopPage {
+    public chips = [
+        { id: "a", label: "One" },
+        { id: "b", label: "Two" },
+    ];
+}
+</script>
