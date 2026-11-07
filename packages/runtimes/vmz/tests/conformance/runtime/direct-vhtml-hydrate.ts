@@ -63,8 +63,7 @@ class HtmlFixture {
                 } catch {
                     __v = null;
                 }
-                var __s = __v == null ? '' : String(__v);
-                api.html(target, __s);
+                api.html(target, __v);
             },
             null,
         );
@@ -73,13 +72,59 @@ class HtmlFixture {
     }
 }
 
-registerComponents({ HtmlFixture });
+/**
+ * Same host shape, but the client create has no payload yet (the environment
+ * difference models an async highlighter: SSR resolves it, the browser does not).
+ * A resumed host must keep the SSR payload instead of clearing it, and a later
+ * patch must still own the host (a null patch clears it like `v-html`).
+ */
+class DeferredHtmlFixture {
+    static __vmzDirect = true;
+    static __vmzState = ['markup'];
+    markup = initialHtml;
+
+    static __vmzCreate(api) {
+        const rootEl = api.el('div');
+        api.attr(rootEl, 'data-fixture', 'deferred-root');
+        const target = api.el('div');
+        api.attr(target, 'data-fixture', 'deferred-target');
+        var __v;
+        try {
+            __v = typeof document === 'undefined' ? this.markup : null;
+        } catch {
+            __v = null;
+        }
+        api.html(target, __v);
+        api.trackPatch(
+            this,
+            ['markup'],
+            function () {
+                var __w;
+                try {
+                    __w = this.markup;
+                } catch {
+                    __w = null;
+                }
+                api.html(target, __w);
+            },
+            null,
+        );
+        rootEl.appendChild(target);
+        return rootEl;
+    }
+}
+
+registerComponents({ HtmlFixture, DeferredHtmlFixture });
 
 const ssrHtml = await renderToString(HtmlFixture, { props: {} });
+const deferredHtml = await renderToString(DeferredHtmlFixture, { props: {} });
+if (!deferredHtml.includes('data-vmz-html-hash="')) fail(`SSR deferred payload lacks the digest marker: ${deferredHtml}`);
 if (!ssrHtml.includes('<path d="M0 0"/>')) fail(`SSR v-html raw payload missing: ${ssrHtml}`);
 if (!ssrHtml.includes('data-vmz-html-hash="')) fail(`SSR v-html host lacks the digest marker: ${ssrHtml}`);
 
-const { window } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${ssrHtml}</div></body></html>`);
+const { window } = parseHTML(
+    `<!DOCTYPE html><html><body><div id="app">${ssrHtml}</div><div id="deferred">${deferredHtml}</div></body></html>`,
+);
 installDom(window);
 const app = window.document.getElementById('app');
 const target = app.querySelector('[data-fixture="html-target"]');
@@ -131,3 +176,43 @@ await flushPending(inst);
 const replaced = kept.filter((n) => !target.contains(n));
 if (replaced.length) fail(`unchanged re-run re-parsed ${replaced.length} node(s)`);
 console.log('direct-vhtml-hydrate: data changes still repaint, unchanged re-runs keep nodes');
+
+// 4. No payload yet: a client create that cannot produce the payload must keep
+//    the SSR subtree instead of clearing it. This is the async-highlighter shape
+//    where the browser grammar set cannot reproduce the server payload.
+const deferredApp = window.document.getElementById('deferred');
+const deferredTarget = deferredApp.querySelector('[data-fixture="deferred-target"]');
+if (!deferredTarget) fail('SSR deferred target missing');
+const deferredStamp = deferredTarget.getAttribute('data-vmz-html-hash');
+const deferredNodes = [];
+{
+    const walk = (n) => {
+        for (let c = n.firstChild; c; c = c.nextSibling) {
+            deferredNodes.push(c);
+            if (c.nodeType === 1) walk(c);
+        }
+    };
+    walk(deferredTarget);
+}
+if (!deferredNodes.length) fail('SSR deferred payload rendered no nodes');
+const deferredInst = await hydrate(DeferredHtmlFixture, deferredApp, {});
+const deferredLive = deferredApp.querySelector('[data-fixture="deferred-target"]');
+if (deferredLive !== deferredTarget) fail('deferred target element was recreated');
+const deferredDrift = deferredNodes.filter((n) => !deferredTarget.contains(n));
+if (deferredDrift.length) {
+    fail(`${deferredDrift.length}/${deferredNodes.length} SSR payload node(s) were dropped when the create had no payload`);
+}
+if (deferredTarget.getAttribute('data-vmz-html-hash') !== deferredStamp) {
+    fail('digest marker changed without a payload change');
+}
+console.log(`direct-vhtml-hydrate: no-payload create kept ${deferredNodes.length}/${deferredNodes.length} SSR nodes`);
+
+// 5. Ownership is resolved by the no-payload create: later patches still write,
+//    and a null patch clears the host (Vue `v-html` semantics).
+deferredInst.markup = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>';
+await flushPending(deferredInst);
+if (!deferredTarget.innerHTML.includes('circle')) fail(`deferred v-html did not update: ${deferredTarget.innerHTML}`);
+deferredInst.markup = null;
+await flushPending(deferredInst);
+if (deferredTarget.innerHTML !== '') fail(`null v-html patch must clear the host: ${deferredTarget.innerHTML}`);
+console.log('direct-vhtml-hydrate: later patches still own the host after a no-payload create');

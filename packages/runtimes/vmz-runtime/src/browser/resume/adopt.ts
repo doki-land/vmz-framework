@@ -308,6 +308,27 @@ function createResumeAdopt(pool, rootEl) {
     };
 
     /**
+     * `v-html` create with no payload yet (e.g. an async highlighter that has
+     * not produced one). The host may still own the SSR payload: hand the parked
+     * subtree back and leave the SSR stamp untouched so a later authoritative
+     * patch can still match it. The host keeps that payload until a real payload
+     * lands; once one does, a null patch clears it like `v-html` always has.
+     */
+    const keepHtml = (el) => {
+        if (!used.has(el)) return false;
+        // The emitted `v-html` create and its tracked patch both run with a null
+        // payload (the patch applies once right after create), so the hold must
+        // outlive the resume pass: one restore is enough until a payload lands.
+        if (el.__vmzHtmlKeep) return true;
+        const childPool = el.__vmzResumePool;
+        if (!childPool || !childPool.firstChild) return false;
+        while (childPool.firstChild) el.appendChild(childPool.firstChild);
+        el.__vmzResumePool = null;
+        el.__vmzHtmlKeep = true;
+        return true;
+    };
+
+    /**
      * Scope adoption to one multi-root `<template v-for>` row.
      *
      * The row has no element root to carry `data-vmz-key`, so SSR wrote a
@@ -387,6 +408,7 @@ function createResumeAdopt(pool, rootEl) {
         rewindScope,
         beginBranchScope,
         reclaimHtml,
+        keepHtml,
     };
 }
 

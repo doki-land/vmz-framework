@@ -257,9 +257,18 @@ export async function highlight(code: string, lang = 'text', theme: string | nul
     }
 }
 
-/** Sync highlight when prewarmed; otherwise escaped `<pre><code>`. */
-export function highlightSync(code: string, lang = 'text', theme: string | null = DEFAULT_THEME): string {
-    if (!cached) return fallbackPre(code);
+/**
+ * Sync highlight when the runtime is prewarmed.
+ *
+ * `null` means "this runtime has no payload for this language yet". The server
+ * never has a better source than one it cannot resolve, so it degrades to the
+ * escaped shell. A browser with a cold cache (or a grammar the shipped generic
+ * path cannot resolve) must not invent one: the host may already hold the
+ * server's tokenized payload, and replacing it with an un-tokenized shell
+ * throws that payload away.
+ */
+export function highlightSync(code: string, lang = 'text', theme: string | null = DEFAULT_THEME): string | null {
+    if (!cached) return isServerRuntime() ? fallbackPre(code) : null;
     try {
         return cached.codeToHtml(code ?? '', {
             lang: normalizeLang(lang),
@@ -267,8 +276,13 @@ export function highlightSync(code: string, lang = 'text', theme: string | null 
             transformers: [stripPreInlineStyle],
         });
     } catch {
-        return fallbackPre(code);
+        return isServerRuntime() ? fallbackPre(code) : null;
     }
+}
+
+/** No `document` means the serialize path (SSR) — see {@link highlightSync}. */
+function isServerRuntime(): boolean {
+    return typeof document === 'undefined';
 }
 
 /**

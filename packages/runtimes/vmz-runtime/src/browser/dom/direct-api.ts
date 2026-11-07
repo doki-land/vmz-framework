@@ -228,7 +228,24 @@ export const directApi = {
      * new payload and refreshes the marker for later identical runs.
      */
     html(el, value) {
-        const next = value == null ? '' : String(value);
+        let next: string;
+        if (value == null) {
+            // `null` is "this create has no payload yet", not "the payload is
+            // empty": a resumed host may still own the SSR payload, so hand the
+            // parked subtree back instead of clearing the server's markup. After
+            // the resume pass ends `_resumeAdopt` is gone and a null patch
+            // clears the host like Vue's `v-html` does.
+            const adopt = directApi._resumeAdopt;
+            if (adopt && typeof adopt.keepHtml === 'function' && adopt.keepHtml(el as Element)) return;
+            // Already holding the SSR payload from an earlier null create: the
+            // create and its tracked patch both pass null, and only a real payload
+            // (or a host without one) may release the server's markup.
+            if ((el as { __vmzHtmlKeep?: boolean }).__vmzHtmlKeep) return;
+            next = '';
+        } else {
+            (el as { __vmzHtmlKeep?: boolean }).__vmzHtmlKeep = false;
+            next = String(value);
+        }
         const digest = htmlDigest(next);
         const adopt = directApi._resumeAdopt;
         if (adopt && typeof adopt.reclaimHtml === 'function' && adopt.reclaimHtml(el as Element, digest)) return;
@@ -534,9 +551,11 @@ export const directApi = {
                 try {
                     raw = get.call(inst);
                 } catch {
-                    raw = '';
+                    raw = null;
                 }
-                el.innerHTML = raw == null ? '' : String(raw);
+                // Same payload contract as the emitted `v-html` call: digest
+                // matching and resume adoption must not be bypassed here.
+                directApi.html(el, raw);
             },
             bindingId,
         );

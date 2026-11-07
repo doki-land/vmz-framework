@@ -2421,9 +2421,11 @@ fn emit_bind_html(
     // `v-once`: write raw HTML once at create, never register a patch.
     // `api.html` compares the SSR payload digest before writing, so a hydrate
     // whose SSR markup matches keeps the reclaimed subtree instead of reparsing it.
+    // The raw value is passed through: `null` means "this create has no payload"
+    // (a resumed host keeps its SSR payload) rather than an empty payload.
     if once {
         stmts.push(format!(
-            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} var __s = __v == null ? '' : String(__v); api.html({el}, __s); }}"
+            "{{ var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.html({el}, __v); }}"
         ));
         return;
     }
@@ -2444,8 +2446,7 @@ fn emit_bind_html(
   function {patch_name}() {{
     {memo_gate}var __raw;
     try {{ __raw = {body}; }} catch {{ __raw = null; }}
-    var __s = __raw == null ? '' : String(__raw);
-    api.html({el}, __s);
+    api.html({el}, __raw);
     if (!__cf || !__cf.branches) return;
     var __next = -1;
     for (var __i = 0; __i < __cf.branches.length; __i++) {{
@@ -2479,7 +2480,7 @@ fn emit_bind_html(
         ));
     } else {
         stmts.push(format!(
-            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} var __s = __v == null ? '' : String(__v); api.html({el}, __s); }}, {id_arg});",
+            "api.trackPatch(this, [{deps_js}], function {patch_name}() {{ {memo_gate}var __v; try {{ __v = {body}; }} catch {{ __v = null; }} api.html({el}, __v); }}, {id_arg});",
             deps_js = deps_js,
             memo_gate = memo_gate,
             body = body,

@@ -92,6 +92,8 @@ export type ResumeAdoptCtx = {
     rowEnd?: () => void;
     /** Keep the parked SSR subtree when its SSR payload digest equals `digest`. */
     reclaimHtml?: (el: Element, digest: string) => boolean;
+    /** Keep the parked SSR subtree when this create has no payload yet. */
+    keepHtml?: (el: Element) => boolean;
     _enterBalance?: number;
     inst?: DirectInstance;
 };

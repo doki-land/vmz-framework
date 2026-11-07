@@ -9,11 +9,18 @@ export default class Shiki {
     public lang: string = "text";
     public theme: string = "vitesse-dark";
 
-    /** null → sync fallback / prewarm cache; set after async highlight. */
+    /**
+     * `null` means "no client payload": the sync path only fills it on the
+     * server (or after prewarm). Keeping it null lets the resumed host keep the
+     * SSR payload instead of replacing tokenized markup with a fallback shell.
+     */
     html: string | null = null;
 
     async onMount() {
-        this.html = await highlight(this.code, this.lang, this.theme);
+        const next = await highlight(this.code, this.lang, this.theme);
+        // A degraded payload must not replace the server's tokenized markup:
+        // only an actual highlight is an improvement over what SSR wrote.
+        if (!next.includes('shiki-fallback')) this.html = next;
     }
 }
 </script>

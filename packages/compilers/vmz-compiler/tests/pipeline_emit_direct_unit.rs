@@ -868,10 +868,13 @@ export default class HtmlDemo {
     let js = emit_client_js(src, &client, &tpl, None).unwrap();
     assert!(js.contains("api.trackPatch(this,"), "{js}");
     // Re-assigning the same string re-parses the SSR subtree that hydrate adopted.
+    // The raw value (including `null`) reaches the runtime: `null` is "no payload
+    // yet" and must not clear an adopted SSR payload by coercing it to `''`.
     assert!(
-        js.contains("api.html(e0, __s)"),
-        "v-html must go through the digest-aware write: {js}"
+        js.contains("api.html(e0, __v)"),
+        "v-html must go through the digest-aware write with the raw value: {js}"
     );
+    assert!(!js.contains("__s = __v"), "v-html must not coerce null to an empty string: {js}");
     assert!(!js.contains("api.bindHtml(this,"), "{js}");
     assert!(!js.contains("api.bindAttr(this,"), "{js}");
     assert!(!js.contains("api.bindText(this,"), "{js}");
@@ -1447,9 +1450,10 @@ export default class HtmlPaths {
         let tpl = parse_template(tpl_src).unwrap();
         let js = emit_client_js(src, &client, &tpl, None).unwrap();
         assert!(
-            js.contains("api.html(e0, __s)"),
-            "{tpl_src} must go through the digest-aware write: {js}"
+            js.contains("api.html(e0, __"),
+            "{tpl_src} must go through the digest-aware write with the raw value: {js}"
         );
+        assert!(!js.contains("__s = __"), "{tpl_src} still coerces null to an empty string: {js}");
         assert!(!js.contains("e0.innerHTML ="), "{tpl_src} still writes unconditionally: {js}");
     }
 }
