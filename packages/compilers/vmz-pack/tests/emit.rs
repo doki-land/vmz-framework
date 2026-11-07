@@ -3312,11 +3312,29 @@ fn isolated_opaque_module_emits_whole_file() {
     assert!(code.contains("function dead"), "{code}");
     assert!(code.contains("eval('1')"), "{code}");
     assert!(code.contains("export const alpha"), "{code}");
-    // 跨 chunk 说明符原地重写为目标 chunk 的产物文件。
+    // 跨 chunk 说明符原地重写为目标 chunk 的产物文件。opaque 的可达依赖被提升为
+    // `split/…` 单元，成为 opaque 与消费入口 chunk 的共同上游；整文件发射保留
+    // 全部 import，所以 `lib` 与只在死语句里出现的 `ghost` 都必须指向各自上游
+    // chunk，而不是重新指回依赖 opaque 的消费入口 chunk（那会重建 chunk 级环）。
     let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/main").unwrap();
-    assert!(code.contains(&format!("from \"./{}\"", entry.file_name)), "{code}");
-    // 剪除目标：整条 import 语句删除。
-    assert!(!code.contains("ghost.js"), "{code}");
+    let artifact_of = |path: std::path::PathBuf| {
+        let node = graph.index_of(&path).unwrap();
+        let chunk = chunks
+            .chunks
+            .iter()
+            .find(|chunk| chunk.modules.contains(&node))
+            .expect("chunk owning module");
+        assert!(chunk.id.starts_with("split/"), "{}", chunk.id);
+        plan.artifacts
+            .iter()
+            .find(|artifact| artifact.chunk_id == chunk.id)
+            .expect("artifact for chunk")
+    };
+    let lib_artifact = artifact_of(root.join("src/lib.js"));
+    let ghost_artifact = artifact_of(root.join("src/ghost.js"));
+    assert!(code.contains(&format!("from \"./{}\"", lib_artifact.file_name)), "{code}");
+    assert!(code.contains(&format!("from \"./{}\"", ghost_artifact.file_name)), "{code}");
+    assert!(!code.contains(&format!("from \"./{}\"", entry.file_name)), "{code}");
     // 死语句里的资产仍按整文件存活重写。
     assert!(code.contains("new URL(\"./assets/logo-"), "{code}");
     assert_eq!(plan.assets.len(), 1);
