@@ -1,5 +1,5 @@
 <template>
-    <div class="chip-tray" data-fixture="chip-tray">
+    <div data-fixture="chip-tray" class="chip-tray">
         <slot />
     </div>
 </template>
