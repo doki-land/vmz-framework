@@ -16,11 +16,12 @@ Root automation for **build**, **CI publish**, and **dev sync** only.
 scripts/
   build/   napi + post-tsc asset copy
   ci/      npm publish (publish-npm.yml) / Actions status
-  dev/     editor TextMate sync + tidy (deps/git/tags)
+  dev/     editor TextMate sync + tidy (deps/git/tags) + local path overlay check
   test/    tiny shared helpers only (expect, TS-from-JS resolve hook)
 ```
 
 `pnpm tidy` → `dev/tidy.mjs` (deps / git gc / tag sync). Not the same as bare `pnpm prune`.
+`pnpm check:overlay` → `dev/check-local-overlay.mjs` (proves the git-ignored `[patch]` paths resolve locally).
 `pnpm ci:status` → `ci/status.mjs` (GitHub Actions runs/jobs for current or `--branch` / `--sha` / `--run`).
 
 ## npm placeholder (0.0.0)
