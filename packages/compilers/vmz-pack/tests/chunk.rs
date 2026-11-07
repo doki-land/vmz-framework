@@ -7,7 +7,7 @@ use vmz_pack::PackDiagnostic;
 use vmz_pack::chunk::{Chunk, ChunkOrigin, ChunkPlan, plan_chunks};
 use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind};
 use vmz_pack::link::{LinkPlan, LinkedModule};
-use vmz_pack::module::ModuleRecord;
+use vmz_pack::module::{ModuleRecord, ScopeIncompleteReason};
 use vmz_pack::resolve::{Resolved, Target};
 
 fn node(path: &str) -> ModuleNode {
@@ -225,6 +225,65 @@ fn cycle_shares_one_chunk_ordered_before_importer() {
     // 循环单元 {1,2} 先于入口 0；单元内成员升序。
     assert_eq!(out.chunks[0].modules, vec![1, 2, 0]);
     assert_eq!(out.chunks[0].depends_on, Vec::<usize>::new());
+}
+
+/// opaque 模块拆出时，它依赖的分组模块必须成为独立上游 chunk。
+#[test]
+fn opaque_dependency_becomes_upstream_split_chunk() {
+    // 形状取自真实链路：异步根 → 中间模块 → {opaque 模块, 共享 helper}，
+    // opaque 模块在求值期读取 helper 的绑定。若 helper 留在分组 chunk 而
+    // opaque 单元独立成 isolated chunk，两个 chunk 互相依赖，opaque 文件
+    // 会读到尚未初始化的绑定（浏览器里表现为 ReferenceError: TDZ）。
+    let mut app = node("/virtual/app.js");
+    app.dynamic_edges.push(dynamic_edge("./engine.js", "/virtual/engine.js"));
+    let mut engine = node("/virtual/engine.js");
+    engine.static_edges.push(static_edge("./internals.js", "/virtual/internals.js"));
+    let mut internals = node("/virtual/internals.js");
+    internals.static_edges.push(static_edge("./atomic.js", "/virtual/atomic.js"));
+    internals.static_edges.push(static_edge("./helpers.js", "/virtual/helpers.js"));
+    let mut atomic = node("/virtual/atomic.js");
+    // 模板插值让 scope 事实不完整，触发 singleton 隔离。
+    atomic.record.scope_incomplete_reasons.push(ScopeIncompleteReason::TemplateInterpolation);
+    atomic.static_edges.push(static_edge("./helpers.js", "/virtual/helpers.js"));
+    let helpers = node("/virtual/helpers.js");
+    let graph = graph(&[("app", "/virtual/app.js")], vec![app, engine, internals, atomic, helpers]);
+    let link = plan(&[0, 1, 2, 3, 4], &[(0, vec![0])]);
+
+    let out = plan_chunks(&graph, &link);
+    let ids: Vec<&str> = out.chunks.iter().map(|chunk| chunk.id.as_str()).collect();
+    assert!(ids.contains(&"isolated/virtual/atomic.js"), "{ids:?}");
+    // helper 不再留在分组 chunk，而是成为两者的共同上游。
+    let split = chunk(&out, "split/virtual/helpers.js");
+    assert_eq!(split.modules, vec![4]);
+    assert_eq!(split.depends_on, Vec::<usize>::new());
+    let isolated = chunk(&out, "isolated/virtual/atomic.js");
+    assert_eq!(isolated.modules, vec![3]);
+    let grouped = chunk(&out, "async/virtual/engine.js");
+    assert_eq!(grouped.modules, vec![2, 1]);
+    let split_index = out.chunks.iter().position(|chunk| chunk.id == "split/virtual/helpers.js").unwrap();
+    let isolated_index = out.chunks.iter().position(|chunk| chunk.id == "isolated/virtual/atomic.js").unwrap();
+    assert_eq!(isolated.depends_on, vec![split_index]);
+    let mut expected_deps = vec![isolated_index, split_index];
+    expected_deps.sort_unstable();
+    assert_eq!(grouped.depends_on, expected_deps);
+
+    // chunk 依赖图必须无环：有环时发射顺序无法同时满足双方初始化。
+    let count = out.chunks.len();
+    for start in 0..count {
+        let mut seen = vec![false; count];
+        let mut stack = vec![start];
+        while let Some(index) = stack.pop() {
+            for &next in &out.chunks[index].depends_on {
+                if next == start {
+                    panic!("chunk 依赖成环: {}", out.chunks[start].id);
+                }
+                if !seen[next] {
+                    seen[next] = true;
+                    stack.push(next);
+                }
+            }
+        }
+    }
 }
 
 /// 未保留节点不进入任何 chunk。

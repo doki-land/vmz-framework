@@ -24,7 +24,8 @@ enum RootId {
 /// 一个 chunk：稳定 id、来源、执行序内的节点与跨 chunk 依赖。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chunk {
-    /// 稳定 chunk id（`entry/…`、`async/…`、`shared/…`、`isolated/…`），同输入必同输出。
+    /// 稳定 chunk id（`entry/…`、`async/…`、`shared/…`、`isolated/…`、
+    /// `split/…`），同输入必同输出。
     pub id: String,
     /// chunk 的来源根形态。
     pub origin: ChunkOrigin,
@@ -135,9 +136,10 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
 
     // 强连通收缩：单元按 min 成员节点号重编号，成员内部升序。
     // opaque 成员从单元拆出为独立 singleton 单元：隔离模块不与任何其它模块
-    // 共享 chunk。拆分只删边不造环——同 chunk 内仍无环；跨 chunk 的环由产物
-    // 层占位符两遍法解决，独立发射的真 ESM 文件天然保持 live binding 与
-    // 求值顺序，不需要同 chunk 平铺来维持。
+    // 共享 chunk。拆分本身不删边：被 opaque 单元依赖的普通单元由下方 `split`
+    // 规则提升为独立上游 chunk，避免 chunk 级环让 opaque 文件在求值期读取
+    // 未初始化绑定。独立发射的真 ESM 文件天然保持 live binding 与求值顺序，
+    // 不需要同 chunk 平铺来维持。
     let raw_units = strong_components(node_count, &retained, &forward, &reverse);
     let mut units: Vec<Vec<usize>> = Vec::with_capacity(raw_units.len());
     let mut unit_isolated: Vec<bool> = Vec::with_capacity(raw_units.len());
@@ -228,13 +230,100 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
         }
     }
 
+    // 孤立拆分修复：opaque 单元拆成 singleton 后，它依赖的普通单元若仍留在某个
+    // 依赖它的 chunk 里，就形成 chunk 级环：opaque 文件在求值期读取的绑定可能仍
+    // 处 TDZ（浏览器报 `Cannot access … before initialization`）。可达签名单调性
+    // 保证环只能由分组造成，因此把 opaque 单元依赖闭包中、位于「反向依赖它」的
+    // chunk 里的普通单元提升为独立 chunk（`split/…`）。提取会改变 chunk 图，所以
+    // 按闭包反复求到不动点；opaque 单元自身的隔离约束不变。单元级真实环无法靠
+    // 拆分消除，继续按真 ESM 语义处理。
+    let mut split: Vec<bool> = vec![false; units.len()];
+    loop {
+        // 当前 split 下的 chunk 划分：isolated 与 split 单元各自成 chunk，
+        // 其余按签名分组。
+        let mut group_of: BTreeMap<BTreeSet<RootId>, usize> = BTreeMap::new();
+        let mut chunk_units: Vec<Vec<usize>> = Vec::new();
+        let mut unit_chunk: Vec<usize> = vec![usize::MAX; units.len()];
+        for unit in 0..units.len() {
+            if unit_isolated[unit] || split[unit] {
+                unit_chunk[unit] = chunk_units.len();
+                chunk_units.push(vec![unit]);
+                continue;
+            }
+            let signature = &signatures[unit];
+            let index = *group_of.entry(signature.clone()).or_insert_with(|| {
+                chunk_units.push(Vec::new());
+                chunk_units.len() - 1
+            });
+            chunk_units[index].push(unit);
+            unit_chunk[unit] = index;
+        }
+        let chunk_count = chunk_units.len();
+        let mut chunk_deps: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); chunk_count];
+        for unit in 0..units.len() {
+            let from = unit_chunk[unit];
+            for &target in &unit_forward[unit] {
+                let to = unit_chunk[target];
+                if to != from {
+                    chunk_deps[from].insert(to);
+                }
+            }
+        }
+        let mut chunk_reverse: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); chunk_count];
+        for (from, deps) in chunk_deps.iter().enumerate() {
+            for &to in deps {
+                chunk_reverse[to].insert(from);
+            }
+        }
+        let mut changed = false;
+        for unit in 0..units.len() {
+            if !unit_isolated[unit] {
+                continue;
+            }
+            let own = unit_chunk[unit];
+            // 反向可达：所有（传递）依赖 own 的 chunk。
+            let mut dependents = vec![false; chunk_count];
+            let mut stack: Vec<usize> = chunk_reverse[own].iter().copied().collect();
+            while let Some(chunk) = stack.pop() {
+                if dependents[chunk] {
+                    continue;
+                }
+                dependents[chunk] = true;
+                stack.extend(chunk_reverse[chunk].iter().copied());
+            }
+            // opaque 单元的依赖闭包。
+            let mut seen = vec![false; units.len()];
+            seen[unit] = true;
+            let mut stack = vec![unit];
+            while let Some(current) = stack.pop() {
+                for &target in &unit_forward[current] {
+                    if seen[target] {
+                        continue;
+                    }
+                    seen[target] = true;
+                    stack.push(target);
+                    if !unit_isolated[target] && !split[target] && dependents[unit_chunk[target]] {
+                        split[target] = true;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
     // 签名相同的单元合成一个 chunk 分区；isolated 单元禁止合并，各自成组，
     // id 以模块相对路径标签派生，保证唯一稳定。
     let mut groups: BTreeMap<BTreeSet<RootId>, Vec<usize>> = BTreeMap::new();
     let mut solos: Vec<(usize, BTreeSet<RootId>)> = Vec::new();
+    let mut split_solos: Vec<(usize, BTreeSet<RootId>)> = Vec::new();
     for (unit, signature) in signatures.iter().enumerate() {
         if unit_isolated[unit] {
             solos.push((unit, signature.clone()));
+        } else if split[unit] {
+            split_solos.push((unit, signature.clone()));
         } else {
             groups.entry(signature.clone()).or_default().push(unit);
         }
@@ -255,6 +344,11 @@ pub fn plan_chunks(graph: &ModuleGraph, plan: &LinkPlan) -> ChunkPlan {
         let origin = chunk_origin(graph, signature);
         let label = relative_label(graph, &graph.nodes[units[*unit][0]].resolved.path);
         drafts.push(Draft { id: format!("isolated/{label}"), origin, units: vec![*unit] });
+    }
+    for (unit, signature) in &split_solos {
+        let origin = chunk_origin(graph, signature);
+        let label = relative_label(graph, &graph.nodes[units[*unit][0]].resolved.path);
+        drafts.push(Draft { id: format!("split/{label}"), origin, units: vec![*unit] });
     }
     drafts.sort_by(|a, b| a.id.cmp(&b.id));
 
