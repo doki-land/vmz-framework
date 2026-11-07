@@ -97,6 +97,24 @@ pub enum SemanticNode {
     },
 }
 
+impl SemanticNode {
+    /// Body-local span of this node.
+    ///
+    /// Callers that need the authored bytes (opaque printing) slice the template
+    /// body with this range rather than rebuilding text from the lowered tree.
+    pub fn span(&self) -> TemplateSpan {
+        match self {
+            SemanticNode::Text { span, .. }
+            | SemanticNode::Interpolation { span, .. }
+            | SemanticNode::Element { span, .. }
+            | SemanticNode::IfChain { span, .. }
+            | SemanticNode::ForNode { span, .. }
+            | SemanticNode::SlotOutlet { span, .. }
+            | SemanticNode::SlotTemplate { span, .. } => *span,
+        }
+    }
+}
+
 /// One branch of an [`SemanticNode::IfChain`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IfBranch {

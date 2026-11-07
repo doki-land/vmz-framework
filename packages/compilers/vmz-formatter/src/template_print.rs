@@ -2,8 +2,8 @@
 
 use oak_typescript::formatter::{FormatOptions, format_source};
 use vmz_compiler::{
-    Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, TemplateBlock,
-    parse_template_semantic_primary,
+    Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, TemplateBlock, TemplateSpan,
+    is_preformatted_tag, parse_template_semantic_primary,
 };
 
 use crate::editorconfig::EditorSettings;
@@ -14,7 +14,7 @@ use crate::editorconfig::EditorSettings;
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
     let block = TemplateBlock { content: body.to_string(), content_start: 0 };
     let semantic = parse_template_semantic_primary(&block).map_err(|e| e.render_plain())?;
-    print_semantic(&semantic, settings)
+    print_semantic(&semantic, body, settings)
 }
 
 /// Canonical expression text for Vue attr / interpolation slots.
@@ -64,11 +64,15 @@ fn vue_attr_assignment(expr: &str) -> Result<String, String> {
     Ok(format!("={}", delimit_vue_attr_value(&oak_expr(expr)?)))
 }
 
-fn print_semantic(sem: &SemanticIr, settings: &EditorSettings) -> Result<String, String> {
+fn print_semantic(
+    sem: &SemanticIr,
+    source: &str,
+    settings: &EditorSettings,
+) -> Result<String, String> {
     let nl = settings.newline();
     let mut lines = Vec::new();
     for root in &sem.roots {
-        print_node(root, 0, settings, &mut lines)?;
+        print_node(root, 0, source, settings, &mut lines)?;
     }
     while lines.last().is_some_and(|l| l.is_empty()) {
         lines.pop();
@@ -79,6 +83,7 @@ fn print_semantic(sem: &SemanticIr, settings: &EditorSettings) -> Result<String,
 fn print_node(
     node: &SemanticNode,
     depth: usize,
+    source: &str,
     settings: &EditorSettings,
     lines: &mut Vec<String>,
 ) -> Result<(), String> {
@@ -95,8 +100,8 @@ fn print_node(
             let e = oak_expr(expr)?;
             lines.push(format!("{pad}{{{{ {e} }}}}"));
         }
-        SemanticNode::Element { tag, props, children, .. } => {
-            print_element(tag, props, children, depth, settings, lines, &[])?;
+        SemanticNode::Element { tag, props, children, span } => {
+            print_element(tag, props, children, *span, depth, source, settings, lines, &[])?;
         }
         SemanticNode::IfChain { branches, .. } => {
             for (i, b) in branches.iter().enumerate() {
@@ -105,11 +110,17 @@ fn print_node(
                     Some(test) => vec![format!("v-else-if{}", vue_attr_assignment(test)?)],
                     None => vec!["v-else".to_string()],
                 };
-                print_node_with_control(b.body.as_ref(), depth, settings, lines, &cf)?;
+                print_node_with_control(b.body.as_ref(), depth, source, settings, lines, &cf)?;
             }
         }
         SemanticNode::ForNode {
-            source, value_alias, key_alias, index_alias, key, body, ..
+            source: iterable,
+            value_alias,
+            key_alias,
+            index_alias,
+            key,
+            body,
+            ..
         } => {
             let alias = match (key_alias, index_alias) {
                 (Some(k), Some(i)) => format!("({value_alias}, {k}, {i})"),
@@ -119,12 +130,12 @@ fn print_node(
             };
             let mut cf = vec![format!(
                 "v-for={}",
-                delimit_vue_attr_value(&format!("{alias} in {}", oak_expr(source)?))
+                delimit_vue_attr_value(&format!("{alias} in {}", oak_expr(iterable)?))
             )];
             if let Some(k) = key {
                 cf.push(format!(":key{}", vue_attr_assignment(k)?));
             }
-            print_node_with_control(body.as_ref(), depth, settings, lines, &cf)?;
+            print_node_with_control(body.as_ref(), depth, source, settings, lines, &cf)?;
         }
         SemanticNode::SlotOutlet { name, props, children, .. } => {
             let pad = settings.indent_unit().repeat(depth);
@@ -140,7 +151,7 @@ fn print_node(
                 open.push('>');
                 lines.push(open);
                 for c in children {
-                    print_node(c, depth + 1, settings, lines)?;
+                    print_node(c, depth + 1, source, settings, lines)?;
                 }
                 lines.push(format!("{pad}</slot>"));
             }
@@ -157,7 +168,7 @@ fn print_node(
             }
             open.push('>');
             lines.push(open);
-            print_node(body.as_ref(), depth + 1, settings, lines)?;
+            print_node(body.as_ref(), depth + 1, source, settings, lines)?;
             lines.push(format!("{pad}</template>"));
         }
     }
@@ -167,37 +178,50 @@ fn print_node(
 fn print_node_with_control(
     node: &SemanticNode,
     depth: usize,
+    source: &str,
     settings: &EditorSettings,
     lines: &mut Vec<String>,
     control: &[String],
 ) -> Result<(), String> {
     match node {
-        SemanticNode::Element { tag, props, children, .. } => {
-            print_element(tag, props, children, depth, settings, lines, control)
+        SemanticNode::Element { tag, props, children, span } => {
+            print_element(tag, props, children, *span, depth, source, settings, lines, control)
         }
         other => {
             if !control.is_empty() {
                 let pad = settings.indent_unit().repeat(depth);
                 lines.push(format!("{pad}<!-- {} -->", control.join(" ")));
             }
-            print_node(other, depth, settings, lines)
+            print_node(other, depth, source, settings, lines)
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn print_element(
     tag: &str,
     props: &[SemanticProp],
     children: &[SemanticNode],
+    span: TemplateSpan,
     depth: usize,
+    source: &str,
     settings: &EditorSettings,
     lines: &mut Vec<String>,
     control: &[String],
 ) -> Result<(), String> {
     let pad = settings.indent_unit().repeat(depth);
+    // `<pre>` / `<textarea>` content is rendered as authored: HTML has no dedent
+    // concept, so reflowing these children onto indented lines would change the
+    // rendered bytes. Print the authored source range instead of the Semantic tree.
+    if is_preformatted_tag(tag) {
+        if let Some(raw) = source.get(span.start as usize..span.end as usize) {
+            lines.push(format!("{pad}{raw}"));
+            return Ok(());
+        }
+    }
     if tag == "template" && props.is_empty() && control.is_empty() {
         for c in children {
-            print_node(c, depth, settings, lines)?;
+            print_node(c, depth, source, settings, lines)?;
         }
         return Ok(());
     }
@@ -215,7 +239,7 @@ fn print_element(
     open.push('>');
     lines.push(open);
     for c in children {
-        print_node(c, depth + 1, settings, lines)?;
+        print_node(c, depth + 1, source, settings, lines)?;
     }
     lines.push(format!("{pad}</{tag}>"));
     Ok(())
@@ -375,6 +399,23 @@ mod tests {
             out.contains("vmz-ui-select") && out.contains("is-opened"),
             "expression must survive print: {out}"
         );
+        let twice = format_template_body(&out, &settings()).unwrap();
+        assert_eq!(out, twice, "idempotent: {out}");
+    }
+
+    #[test]
+    fn preformatted_subtrees_keep_authored_whitespace() {
+        // `<pre>` / `<textarea>` render their text as authored; a formatter that
+        // reflows them onto indented lines changes the rendered bytes.
+        let src = concat!(
+            "<div>\n",
+            "  <pre><code>pnpm add @vmz/ui</code></pre>\n",
+            "  <textarea>  keep  </textarea>\n",
+            "</div>"
+        );
+        let out = format_template_body(src, &settings()).unwrap();
+        assert!(out.contains("<pre><code>pnpm add @vmz/ui</code></pre>"), "{out}");
+        assert!(out.contains("<textarea>  keep  </textarea>"), "{out}");
         let twice = format_template_body(&out, &settings()).unwrap();
         assert_eq!(out, twice, "idempotent: {out}");
     }

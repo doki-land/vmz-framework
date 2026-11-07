@@ -18,8 +18,10 @@ pub fn lower_concrete_to_ir(concrete: &ConcreteIr) -> Result<TemplateIr, Templat
 /// HTML hosts whose text is rendered as authored: `<pre>` and `<textarea>`.
 ///
 /// A `<pre>` has no dedent concept in HTML, so the author's indentation is part
-/// of the result. Text under these hosts is neither folded nor dropped.
-pub(crate) fn is_preformatted_tag(tag: &str) -> bool {
+/// of the result. Text under these hosts is neither folded nor dropped. The
+/// formatter shares this predicate so its opaque printing cannot drift from the
+/// compiler's text handling.
+pub fn is_preformatted_tag(tag: &str) -> bool {
     tag.eq_ignore_ascii_case("pre") || tag.eq_ignore_ascii_case("textarea")
 }
 
