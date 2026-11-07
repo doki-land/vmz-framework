@@ -5,10 +5,16 @@
                 <h2 v-if="showTitle" class="cond-title">
                     {{ title }}
                 </h2>
-                <p v-else class="cond-fallback">no title</p>
-                <span v-show="visible" class="cond-toggle">toggle</span>
+                <p v-else class="cond-fallback">
+                    no title
+                </p>
+                <span v-show="visible" class="cond-toggle">
+                    toggle
+                </span>
             </template>
-            <p id="cond-body">{{ body }}</p>
+            <p id="cond-body">
+                {{ body }}
+            </p>
         </NamedPanel>
     </main>
 </template>

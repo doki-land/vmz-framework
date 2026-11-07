@@ -2,9 +2,11 @@
     <main id="raw-page">
         <NamedPanel>
             <template #header>
-                <div id="raw-html" v-html="markup"></div>
+                <div id="raw-html" v-html="markup" />
             </template>
-            <p id="raw-body">{{ body }}</p>
+            <p id="raw-body">
+                {{ body }}
+            </p>
         </NamedPanel>
     </main>
 </template>
