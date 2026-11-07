@@ -59,6 +59,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: '0.1.22: locale/document policy only via N-API Plan loaders',
     },
     'node-cli': { file: 'toolchain/node-cli.ts', description: 'Node CLI / Workspace host' },
+    'pre-whitespace': {
+        file: 'toolchain/pre-whitespace.ts',
+        description:
+            'Real build keeps `<pre>` / `<textarea>` authored whitespace while a normal element still folds',
+    },
     plugin: {
         file: 'toolchain/plugin.ts',
         description: 'Plugin contribution protocol',
@@ -815,6 +820,7 @@ export const CHECK_ALL = [
     'span-context-conversion',
     'no-duplicate-manifest-parse',
     'node-cli',
+    'pre-whitespace',
     'plugin',
     'plugin-shiki',
     'affected',

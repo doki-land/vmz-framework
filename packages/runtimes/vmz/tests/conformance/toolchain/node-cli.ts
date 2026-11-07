@@ -23,9 +23,16 @@ function fail(msg) {
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmz-n2-'));
 const src = path.join(dir, 'src');
-fs.mkdirSync(src);
+const pages = path.join(src, 'pages');
+fs.mkdirSync(pages, { recursive: true });
 const vmzFile = path.join(src, 'Application.vmz');
 fs.writeFileSync(vmzFile, `<template><p>n2</p></template>\n<script client>\nexport default class Application {}\n</script>\n`);
+// The route catalog needs at least one page unit with a path pattern, otherwise
+// `emitRouteCatalog` rejects the build. A single application unit is not a page.
+fs.writeFileSync(
+    path.join(pages, 'index.vmz'),
+    `<template><p>index</p></template>\n<script client>\nexport default class IndexPage {}\n</script>\n`,
+);
 const outDir = path.join(dir, 'dist');
 
 console.log(' gate: vmz build via Node bin…');
@@ -36,7 +43,12 @@ const build = spawnSync(process.execPath, [bin, 'build', dir, '--out-dir', outDi
 if (build.status !== 0) {
     fail(`vmz build exit ${build.status}\n${build.stderr}\n${build.stdout}`);
 }
-if (!fs.existsSync(path.join(outDir, 'Application.program.json'))) {
+// The assembly subdirectory depends on delivery (`web-ssr/`, `web-static/`, …),
+// so locate the emitted program instead of pinning one layout.
+const emitted = (
+    fs.readdirSync(outDir, { recursive: true, encoding: 'utf8' }) as string[]
+).filter((p) => p.endsWith('Application.program.json'));
+if (emitted.length === 0) {
     fail('missing Application.program.json after Node build');
 }
 
