@@ -21,7 +21,7 @@ fn attr_interp(name: &str, expr: &str) -> ViewAttr {
 }
 
 fn el(tag: &str, attrs: Vec<ViewAttr>, children: Vec<ViewNode>) -> ViewNode {
-    ViewNode::Element { tag: tag.into(), attrs, children, each: None }
+    ViewNode::Element { tag: tag.into(), attrs, children, each: None, verbatim: false }
 }
 
 /// Representative keyed table row: texts + selected class + item-id actions.

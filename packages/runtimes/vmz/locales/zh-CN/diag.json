@@ -6,7 +6,7 @@
     "vmz::template::illegal_directive": "`<template>` 中存在非法或不支持的指令：{detail}",
     "vmz::template::parse_failed": "解析 `<template>` 失败：{detail}",
     "vmz::template::invalid_expr": "模板表达式无效：{detail}",
-    "vmz::template::v_pre_unsupported": "`<{tag}>` 上的 `v-pre` 在当前 `.vmz` 编译链中不生效：子树仍会被编译和求值。请移除该指令或改写该区域。",
+
     "vmz::template::v_model_invalid_target": "`v-model` 的目标必须是可赋值的标识符或成员表达式：`{expr}`",
     "vmz::template::v_model_on_file_input": "`v-model` 不能绑定到 `<input type=\"file\">`",
     "vmz::template::each_missing_key": "`<{tag}>` 上的 `v-for` 应声明 `:key`",

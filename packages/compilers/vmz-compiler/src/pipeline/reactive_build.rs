@@ -67,6 +67,9 @@ fn walk_ir_expr_errors(nodes: &[TemplateNode], out: &mut Vec<TemplateExprError>)
                 }
                 walk_ir_expr_errors(children, out);
             }
+            // Verbatim text is literal (`{{ x }}` included), so it is not an
+            // expression and must not be validated as one.
+            TemplateNode::Verbatim { .. } => {}
         }
     }
 }
@@ -899,6 +902,9 @@ fn walk_node(
         TemplateNode::Element { .. } => {
             walk_element_stripping(node, fields, scope, each_frames, b, region, &[], true);
         }
+        // `v-pre` produces no bindings: every attribute value and text run is the
+        // author's literal text, so nothing is correlated against Reactive.
+        TemplateNode::Verbatim { .. } => {}
     }
 }
 
@@ -910,6 +916,8 @@ fn walk_element_branch(
     b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
 ) {
+    // Only called for branch roots that `walk_nodes` already matched as
+    // `Element`; a `Verbatim` root has no branch condition, so no binding.
     let TemplateNode::Element { attrs, .. } = node else {
         return;
     };
@@ -934,6 +942,8 @@ fn walk_element_stripping(
     strip: &[&str],
     allow_each: bool,
 ) {
+    // `Verbatim` never reaches this function: its callers only route `Element`
+    // nodes here, and verbatim attrs/text carry no expressions to bind.
     let TemplateNode::Element { tag, attrs, children } = node else {
         return;
     };

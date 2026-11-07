@@ -14,7 +14,7 @@ pub use super::template_common::{TemplateParseError, decode_html_entities};
 pub use super::template_concrete::{
     ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, classify_concrete_attr,
 };
-pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
+pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, VerbatimChild};
 pub use super::template_lower::lower_concrete_to_ir;
 pub use super::template_oak::{
     lower_vue_root_to_semantic, parse_template_concrete_body_primary,

@@ -21,6 +21,7 @@ fn builds_if_and_dispose_region() {
                     attrs: vec![],
                     children: vec![ViewNode::Text { value: "hi".into() }],
                     each: None,
+                    verbatim: false,
                 }),
             }],
         }],
@@ -61,8 +62,10 @@ fn builds_each_with_key_binding_and_slot_projection_id() {
                     key_binding: Some(vmz_types::BindingId(3)),
                     region: Some(vmz_types::RegionId(1)),
                 }),
+                verbatim: false,
             }],
             each: None,
+            verbatim: false,
         }],
     };
     let plan = build_execution_plan(&view);

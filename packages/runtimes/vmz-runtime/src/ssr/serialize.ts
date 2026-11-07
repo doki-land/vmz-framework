@@ -161,20 +161,29 @@ function serializeStyleAttr(node) {
 function serializeOpenTag(node) {
     const tag = node.tag || 'div';
     const lowerTag = String(tag).toLowerCase();
+    // `v-pre`: the authored attribute names are the output. Skipping the four
+    // special branches here is what keeps `className` / `style` / `value` /
+    // `data-vmz-html-hash` literal inside a verbatim subtree.
+    const verbatim = node.__vmzVerbatim === true;
     let attrs = '';
     for (const [k, v] of Object.entries(node.attrs || {})) {
         if (v == null || v === false) continue;
-        // `textarea` value renders as text content and `select` value as a
-        // selected option, so the raw attribute must not be emitted.
-        if (k === 'value' && (lowerTag === 'textarea' || lowerTag === 'select')) continue;
-        if (k === 'style') continue;
-        // Always replaced by the digest of the payload written below, so an
-        // author-supplied marker can never mask a different payload.
-        if (k === HTML_HASH_ATTR) continue;
-        if (k === 'className') attrs += ` class="${escapeHtml(v)}"`;
-        else attrs += ` ${k}="${escapeHtml(v)}"`;
+        if (!verbatim) {
+            // `textarea` value renders as text content and `select` value as a
+            // selected option, so the raw attribute must not be emitted.
+            if (k === 'value' && (lowerTag === 'textarea' || lowerTag === 'select')) continue;
+            if (k === 'style') continue;
+            // Always replaced by the digest of the payload written below, so an
+            // author-supplied marker can never mask a different payload.
+            if (k === HTML_HASH_ATTR) continue;
+            if (k === 'className') {
+                attrs += ` class="${escapeHtml(v)}"`;
+                continue;
+            }
+        }
+        attrs += ` ${k}="${escapeHtml(v)}"`;
     }
-    const style = serializeStyleAttr(node);
+    const style = verbatim ? '' : serializeStyleAttr(node);
     if (style) attrs += ` style="${escapeHtml(style)}"`;
     // `v-html` hosts carry the digest of the exact string SSR wrote, so the
     // client can keep the SSR subtree without DOM-serializing its payload.
@@ -633,6 +642,13 @@ const serializeApi = {
     },
     attr(el, name, value) {
         if (!el || el.__kind !== 'el') return;
+        // `v-pre`: keep the authored name and value — no `className` → `class`
+        // rewrite, no class/style merge, no boolean-attribute normalization.
+        if (el.__vmzVerbatim) {
+            if (value == null || value === false) delete el.attrs[name];
+            else el.attrs[name] = value === true ? '' : String(value);
+            return;
+        }
         applySerializeAttr(el, name, value);
     },
     mergeClass(...parts) {

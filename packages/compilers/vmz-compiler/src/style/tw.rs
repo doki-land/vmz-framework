@@ -103,6 +103,9 @@ fn register_style_tw_nodes(nodes: &[TemplateNode], path: &Path, out: &mut Vec<Tw
                 register_style_tw_nodes(children, path, out);
             }
             TemplateNode::Text(_) | TemplateNode::Interp(_) => {}
+            // `style:tw` inside `v-pre` is the author's literal attribute text, not a
+            // utility registration, so the subtree is not scanned for classes.
+            TemplateNode::Verbatim { .. } => {}
         }
     }
 }

@@ -36,3 +36,9 @@ pub fn is_empty_string(s: &String) -> bool {
 pub fn is_none_or_empty_string(s: &Option<String>) -> bool {
     s.as_ref().is_none_or(|v| v.is_empty())
 }
+
+/// True when the flag is `false` (skip the default `false` on the wire).
+#[inline]
+pub fn is_false(v: &bool) -> bool {
+    !*v
+}

@@ -48,6 +48,7 @@ fn home_unit() -> ProgramUnit {
                         binding: Some(BindingId(0)),
                     }],
                     each: None,
+                    verbatim: false,
                 },
                 ViewNode::Element {
                     tag: "div".into(),
@@ -69,6 +70,7 @@ fn home_unit() -> ProgramUnit {
                         key_binding: None,
                         region: None,
                     }),
+                    verbatim: false,
                 },
                 ViewNode::If {
                     region: None,
@@ -80,6 +82,7 @@ fn home_unit() -> ProgramUnit {
                 },
             ],
             each: None,
+            verbatim: false,
         }],
     };
     let reactive = ReactiveComponent {

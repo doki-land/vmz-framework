@@ -56,6 +56,7 @@ pub fn try_emit_row_kernel_js(
         scope,
         aliases,
         &mut slots,
+        false,
     )?;
     if slots.is_empty() {
         return None;
@@ -179,15 +180,19 @@ fn emit_html_element(
     scope: &[String],
     aliases: &[(String, String)],
     slots: &mut Vec<Slot>,
+    verbatim: bool,
 ) -> Option<String> {
     let mut open = format!("<{tag}");
     for a in attrs {
-        if a.name == "style:tw" {
+        // `v-pre`: authored names and values go out untouched, so the marker skip
+        // and the `className` → `class` rewrite do not apply.
+        if !verbatim && a.name == "style:tw" {
             continue;
         }
         match &a.value {
             ViewAttrValue::Static { value: s } => {
-                let name = if a.name == "className" { "class" } else { a.name.as_str() };
+                let name =
+                    if !verbatim && a.name == "className" { "class" } else { a.name.as_str() };
                 open.push(' ');
                 open.push_str(name);
                 open.push_str("=\"");
@@ -262,7 +267,7 @@ fn emit_html_element(
                 inner.push(' ');
                 child_i += 1;
             }
-            ViewNode::Element { tag, attrs, children, each } => {
+            ViewNode::Element { tag, attrs, children, each, verbatim } => {
                 if each.is_some() {
                     return None;
                 }
@@ -278,6 +283,7 @@ fn emit_html_element(
                     scope,
                     aliases,
                     slots,
+                    *verbatim,
                 )?);
                 child_i += 1;
             }

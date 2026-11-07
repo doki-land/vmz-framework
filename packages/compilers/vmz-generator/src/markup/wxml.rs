@@ -154,7 +154,7 @@ fn emit_node(
             patch_bindings.insert(b.0, ());
             Ok(format!("{{{{b.B_{}}}}}", b.0))
         }
-        ViewNode::Element { tag, attrs, children, each } => {
+        ViewNode::Element { tag, attrs, children, each, verbatim } => {
             if each.is_some() && ctx.profile != MiniTemplateProfile::Structure {
                 push_err(
                     ctx,
@@ -185,6 +185,26 @@ fn emit_node(
                 }
             }
             for a in attrs {
+                // `v-pre`: write the authored name/value pair as-is instead of
+                // routing it through event wiring or marker handling.
+                if *verbatim {
+                    attr_s.push(' ');
+                    attr_s.push_str(&a.name);
+                    match &a.value {
+                        ViewAttrValue::Bare => {}
+                        ViewAttrValue::Static { value: s } => {
+                            attr_s.push_str("=\"");
+                            attr_s.push_str(&escape_xml_attr(s));
+                            attr_s.push('"');
+                        }
+                        ViewAttrValue::Interp { expr } => {
+                            attr_s.push_str("=\"");
+                            attr_s.push_str(&escape_xml_attr(expr));
+                            attr_s.push('"');
+                        }
+                    }
+                    continue;
+                }
                 if is_event_attr(&a.name) {
                     match ctx.profile {
                         MiniTemplateProfile::Static => continue,
@@ -543,6 +563,7 @@ mod tests {
                 key_binding: None,
                 region: None,
             }),
+            verbatim: false,
         }];
         let err =
             emit_mini_template_profile(&roots, MiniTemplateProfile::Static, None).unwrap_err();
@@ -567,6 +588,7 @@ mod tests {
                     key_binding: None,
                     region: None,
                 }),
+                verbatim: false,
             },
             ViewNode::If {
                 region: None,

@@ -11,7 +11,7 @@ use crate::emit::{attr_interp, attr_static, has_bare_attr, is_component_tag, is_
 use crate::emit_ir::IrDepCursor;
 use crate::parse::template_const::{fold_const_expr, fold_if_chain};
 use crate::pipeline::link::RouteTable;
-use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
+use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, VerbatimChild};
 
 /// Lift template structure onto the Program Graph view, correlating Reactive binding ids.
 pub fn build_native_view(
@@ -112,6 +112,15 @@ fn build_nodes(
                 continue;
             }
         }
+        if let TemplateNode::Verbatim { tag, children, .. } = &nodes[i] {
+            if tag.eq_ignore_ascii_case("template") {
+                // `<template v-pre>` renders no wrapper in Vue: its children become
+                // sibling roots, still verbatim.
+                out.extend(verbatim_children(children));
+                i += 1;
+                continue;
+            }
+        }
         out.push(build_node(&nodes[i], ir, routes));
         i += 1;
     }
@@ -149,7 +158,69 @@ fn build_node(
                 build_element(node, &[], true, ir, routes)
             }
         }
+        // `v-pre`: no Link resolution, no component/slot routing, no `each`/`if`
+        // detection, no class/style merge — the authored names are the output.
+        TemplateNode::Verbatim { .. } => build_verbatim(node),
     }
+}
+
+/// `v-pre` element → plain [`ViewNode::Element`] marked verbatim.
+///
+/// Bindings are never correlated here: the attrs are literal text, not
+/// expressions, so nothing may be looked up in Reactive.
+fn build_verbatim(node: &TemplateNode) -> ViewNode {
+    let TemplateNode::Verbatim { tag, attrs, children } = node else {
+        return ViewNode::Text { value: String::new() };
+    };
+    ViewNode::Element {
+        tag: tag.clone(),
+        attrs: verbatim_attrs(attrs),
+        children: verbatim_children(children),
+        each: None,
+        verbatim: true,
+    }
+}
+
+fn verbatim_children(children: &[VerbatimChild]) -> Vec<ViewNode> {
+    let mut out = Vec::new();
+    for c in children {
+        match c {
+            VerbatimChild::Text(t) => out.push(ViewNode::Text { value: t.clone() }),
+            // `template` renders no wrapper element, so its children splice into
+            // the parent list (multi-root verbatim regions included).
+            VerbatimChild::Element { tag, children, .. } if tag.eq_ignore_ascii_case("template") => {
+                out.extend(verbatim_children(children));
+            }
+            VerbatimChild::Element { tag, attrs, children } => out.push(ViewNode::Element {
+                tag: tag.clone(),
+                attrs: verbatim_attrs(attrs),
+                children: verbatim_children(children),
+                each: None,
+                verbatim: true,
+            }),
+        }
+    }
+    out
+}
+
+fn verbatim_attrs(attrs: &[TemplateAttr]) -> Vec<ViewAttr> {
+    attrs
+        .iter()
+        .map(|a| ViewAttr {
+            // Authored name kept: `:class`, `@click.stop`, `v-if`, `#header`.
+            name: a.name.clone(),
+            value: match &a.value {
+                AttrValue::Static(s) if s.is_empty() => ViewAttrValue::Bare,
+                AttrValue::Static(s) => ViewAttrValue::Static { value: s.clone() },
+                // Verbatim attributes are lowered as `Static`; an `Interp` here
+                // would mean the verbatim intercept leaked, so keep the expression
+                // text literal instead of binding it.
+                AttrValue::Interp(e) => ViewAttrValue::Static { value: e.clone() },
+            },
+            binding: None,
+            modifiers: Vec::new(),
+        })
+        .collect()
 }
 
 /// Same-app `<Link>` lowers to `<a href>` via RouteTable. Cross-app (`application=`) stays Component.
@@ -212,6 +283,7 @@ fn build_link(
             attrs: view_attrs,
             children: kids,
             each: None,
+            verbatim: false,
         };
     }
 
@@ -303,7 +375,7 @@ fn build_element(
 
     let view_attrs = build_attrs(tag, attrs, strip, allow_each, ir);
     let kids = build_nodes(children, ir, routes);
-    ViewNode::Element { tag: tag.clone(), attrs: view_attrs, children: kids, each }
+    ViewNode::Element { tag: tag.clone(), attrs: view_attrs, children: kids, each, verbatim: false }
 }
 
 /// Shared `v-for` extraction for elements and components: `each` / `as` /

@@ -23,6 +23,7 @@ fn counter_fixture() -> (ViewView, ReactiveComponent) {
             }],
             children: vec![ViewNode::Interp { expr: "n".into(), binding: Some(BindingId(1)) }],
             each: None,
+            verbatim: false,
         }],
     };
     let reactive = ReactiveComponent {

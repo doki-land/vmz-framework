@@ -30,6 +30,7 @@ fn sample_unit() -> ProgramUnit {
                     key_binding: None,
                     region: Some(vmz_types::RegionId(0)),
                 }),
+                verbatim: false,
             },
             ViewNode::Component {
                 tag: "Badge".into(),

@@ -9,6 +9,86 @@ use vmz_compiler::template::parse_template;
 use vmz_types::{ViewNode, ViewStatus};
 
 #[test]
+fn v_pre_subtree_emits_verbatim_without_binding() {
+    // Exhaustiveness guard, compiler half: the `Verbatim` node must survive every
+    // layer below lowering. Any layer that treats it as a normal element shows up
+    // here as a rewritten name, a binding id, or a merge/if branch.
+    let src = r#"
+export default class PrePage {
+  y = 'active';
+  z = true;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<div v-pre :class="y" @click="hit" v-if="z"><span>{{ x }}</span>&amp;</div><p>live {{ y }}</p>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    let roots = &program.units[0].view.roots;
+
+    let ViewNode::Element { tag, attrs, children, verbatim, .. } = &roots[0] else {
+        panic!("expected element root, got {:?}", roots[0]);
+    };
+    assert_eq!(tag, "div");
+    assert!(*verbatim, "v-pre root must stay verbatim");
+    let names: Vec<&str> = attrs.iter().map(|a| a.name.as_str()).collect();
+    assert_eq!(names, [":class", "@click", "v-if"], "authored names rewritten");
+    assert!(attrs.iter().all(|a| a.binding.is_none()), "verbatim attrs must not bind");
+
+    let ViewNode::Element { tag: inner_tag, children: inner, verbatim: inner_verbatim, .. } =
+        &children[0]
+    else {
+        panic!("expected nested element, got {:?}", children[0]);
+    };
+    assert_eq!(inner_tag, "span");
+    assert!(*inner_verbatim, "nested element must stay verbatim");
+    assert!(
+        matches!(&inner[0], ViewNode::Text { value } if value == "{{ x }}"),
+        "interpolation must stay one literal text run, got {:?}",
+        inner[0]
+    );
+    assert!(
+        matches!(&children[1], ViewNode::Text { value } if value == "&"),
+        "decoded entity must stay plain text, got {:?}",
+        children[1]
+    );
+
+    // Sibling outside the region keeps the normal pipeline (interp, bindings).
+    let ViewNode::Element { tag: sibling, verbatim: false, .. } = &roots[1] else {
+        panic!("expected sibling element, got {:?}", roots[1]);
+    };
+    assert_eq!(sibling, "p");
+
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains("__vmzVerbatim = true"), "verbatim marker missing: {js}");
+    assert!(js.contains(r#"":class", "y""#), "authored attribute name lost: {js}");
+    assert!(!js.contains("mergeClass"), "verbatim class must not merge: {js}");
+    assert!(!js.contains("createDirectIfBlock"), "verbatim `v-if` must not branch: {js}");
+}
+
+#[test]
+fn v_pre_template_lowers_to_sibling_roots() {
+    // `<template v-pre>` renders no wrapper; its children become sibling roots.
+    let src = r#"
+export default class PreTemplatePage {
+  y = 1;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<template v-pre><b>a</b><i>b</i></template>"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    let roots = &program.units[0].view.roots;
+    assert_eq!(roots.len(), 2, "expected two sibling roots, got {roots:?}");
+    for root in roots {
+        assert!(
+            matches!(root, ViewNode::Element { verbatim: true, .. }),
+            "template children must stay verbatim: {root:?}"
+        );
+    }
+}
+
+#[test]
 fn leaf_button_emits_vmz_create() {
     let src = r#"
 export default class CounterButton {

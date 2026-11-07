@@ -18,12 +18,14 @@ fn lowers_hello_counter_static_view() {
                 attrs: vec![],
                 children: vec![ViewNode::Text { value: "hello".into() }],
                 each: None,
+                verbatim: false,
             },
             ViewNode::Element {
                 tag: "button".into(),
                 attrs: vec![],
                 children: vec![ViewNode::Interp { expr: "n".into(), binding: Some(BindingId(0)) }],
                 each: None,
+                verbatim: false,
             },
         ],
     };

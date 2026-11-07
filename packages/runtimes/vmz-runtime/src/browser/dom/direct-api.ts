@@ -376,6 +376,13 @@ export const directApi = {
         disposeDomTree(root);
     },
     attr(el, name, value) {
+        // `v-pre`: the authored pair goes out untouched — no `className` → `class`
+        // rewrite, no class/style merge, no property special-casing.
+        if ((el as VmzDomElement).__vmzVerbatim) {
+            if (value == null || value === false) el.removeAttribute(name);
+            else el.setAttribute(name, value === true ? '' : String(value));
+            return;
+        }
         applyDomAttr(el, name, value);
     },
     mergeClass(...parts) {

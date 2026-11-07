@@ -25,6 +25,41 @@ pub enum TemplateNode {
     Text(String),
     /// `{{ expr }}` mustache body (trimmed), without the braces.
     Interp(String),
+    /// `v-pre` subtree: no node inside it is lowered, validated, folded, or bound.
+    ///
+    /// Produced only by the `v-pre` intercept in
+    /// [`super::template_lower::lower_concrete_to_ir`]. Nested elements are
+    /// `Verbatim` too, so every consumer decides once, on this variant, instead
+    /// of re-checking attributes per node.
+    Verbatim {
+        /// Tag name exactly as written (`Link` stays `Link`).
+        tag: String,
+        /// Attributes in authored order, names kept in directive spelling
+        /// (`:class`, `@click.stop`, `v-if`, `#header`).
+        attrs: Vec<TemplateAttr>,
+        /// Children: raw text or nested verbatim elements.
+        children: Vec<VerbatimChild>,
+    },
+}
+
+/// Child of a [`TemplateNode::Verbatim`] element.
+///
+/// A separate type keeps the subtree honest: nothing here can hold an
+/// interpolation or a lowered element, so a consumer cannot accidentally hand a
+/// verbatim descendant back to the normal pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerbatimChild {
+    /// Author text (entities decoded, `{{ … }}` kept literal).
+    Text(String),
+    /// Nested element, verbatim all the way down.
+    Element {
+        /// Tag name exactly as written.
+        tag: String,
+        /// Attributes in authored order.
+        attrs: Vec<TemplateAttr>,
+        /// Nested verbatim children.
+        children: Vec<VerbatimChild>,
+    },
 }
 
 /// One attribute on a [`TemplateNode::Element`].

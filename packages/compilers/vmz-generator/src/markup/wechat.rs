@@ -73,8 +73,8 @@ fn emit_node(
     match node {
         ViewNode::Text { value } => Ok(escape_xml_text(value)),
         ViewNode::Interp { expr, binding } => Ok(interp_text(expr, *binding, patch_bindings, ctx)),
-        ViewNode::Element { tag, attrs, children, each } => {
-            emit_element(tag, attrs, children, each.as_ref(), patch_bindings, ctx)
+        ViewNode::Element { tag, attrs, children, each, verbatim } => {
+            emit_element(tag, attrs, children, each.as_ref(), *verbatim, patch_bindings, ctx)
         }
         ViewNode::If { region: _, binding, branches } => {
             let mut out = String::new();
@@ -183,6 +183,7 @@ fn emit_element(
     attrs: &[ViewAttr],
     children: &[ViewNode],
     each: Option<&vmz_types::ViewEach>,
+    verbatim: bool,
     patch_bindings: &mut BTreeMap<u32, ()>,
     ctx: &mut WechatCtx<'_>,
 ) -> Result<String, ()> {
@@ -204,6 +205,26 @@ fn emit_element(
         attr_s.push_str(&format!(" wx:key=\"{}\"", wx_key(&e.as_name, e.key_expr.as_deref())));
     }
     for a in attrs {
+        // `v-pre`: write the authored name/value pair as-is instead of routing it
+        // through event wiring, tag-specific name mapping, or marker skipping.
+        if verbatim {
+            attr_s.push(' ');
+            attr_s.push_str(&a.name);
+            match &a.value {
+                ViewAttrValue::Bare => {}
+                ViewAttrValue::Static { value: s } => {
+                    attr_s.push_str("=\"");
+                    attr_s.push_str(&escape_xml_attr(s));
+                    attr_s.push('"');
+                }
+                ViewAttrValue::Interp { expr } => {
+                    attr_s.push_str("=\"");
+                    attr_s.push_str(&escape_xml_attr(expr));
+                    attr_s.push('"');
+                }
+            }
+            continue;
+        }
         if is_event_attr(&a.name) {
             emit_event(a, &mut attr_s, ctx)?;
             continue;
@@ -465,8 +486,10 @@ mod tests {
                             binding: Some(BindingId(0)),
                         }],
                         each: None,
+                        verbatim: false,
                     }],
                     each: None,
+                    verbatim: false,
                 },
                 ViewNode::Element {
                     tag: "div".into(),
@@ -496,6 +519,7 @@ mod tests {
                         key_binding: None,
                         region: None,
                     }),
+                    verbatim: false,
                 },
                 ViewNode::If {
                     region: None,
@@ -507,6 +531,7 @@ mod tests {
                 },
             ],
             each: None,
+            verbatim: false,
         }];
         let emit = emit_wechat_wxml(&roots, Some(&on_store_reactive())).expect("ok");
         assert!(emit.template.contains("<view class=\"page\">"), "{}", emit.template);

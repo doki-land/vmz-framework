@@ -10,7 +10,7 @@
     "vmz::template::illegal_directive": "Illegal or unsupported directive in `<template>`: {detail}",
     "vmz::template::parse_failed": "Failed to parse `<template>`: {detail}",
     "vmz::template::invalid_expr": "Invalid template expression: {detail}",
-    "vmz::template::v_pre_unsupported": "`v-pre` on `<{tag}>` is ignored by the current `.vmz` compile path: the subtree is still compiled and evaluated. Remove the directive or rewrite that region.",
+
     "vmz::template::v_model_invalid_target": "`v-model` target must be an assignable identifier or member expression: `{expr}`",
     "vmz::template::v_model_on_file_input": "`v-model` cannot bind an `<input type=\"file\">`",
     "vmz::template::each_missing_key": "`v-for` on `<{tag}>` should declare a `:key`",

@@ -180,6 +180,11 @@ pub enum ViewNode {
         children: Vec<ViewNode>,
         /// Optional `each` metadata when this element iterates a list.
         each: Option<ViewEach>,
+        /// `v-pre` subtree marker: every attribute is written exactly as authored
+        /// (no `className` → `class` rewrite, no class/style merge plan) and SSR
+        /// skips its special attribute branches for this element.
+        #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+        verbatim: bool,
     },
     /// Conditional `if` / `else-if` / `else` tree.
     If {

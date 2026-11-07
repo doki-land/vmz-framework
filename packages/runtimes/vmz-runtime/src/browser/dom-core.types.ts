@@ -11,6 +11,8 @@ export type ComponentCtor = ComponentCtorLike & {
 };
 
 export type VmzDomElement = Element & {
+    /** `v-pre` subtree: attributes are written exactly as authored. */
+    __vmzVerbatim?: boolean;
     __vmzEvt?: Record<string, EventListener>;
     __vmzObjEvt?: Record<
         string,

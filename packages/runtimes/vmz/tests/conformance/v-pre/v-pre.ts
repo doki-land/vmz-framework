@@ -37,7 +37,10 @@ class VPreFixture {
         api.attr(root, 'data-fixture', 'v-pre');
 
         // --- v-pre 区域：全部为静态字面量，不求值、不绑定 ---
+        // 编译器在 `v-pre` 子树的每个元素上写 `__vmzVerbatim`（见 emit_direct），
+        // 运行时据此原样写出属性名；这里与生成的代码保持同一形状。
         const preDiv = api.el('div');
+        preDiv.__vmzVerbatim = true;
         api.attr(preDiv, 'data-vmz-pre', '');
 
         // 字面量插值 —— 必须保留 {{ x }}
@@ -45,25 +48,44 @@ class VPreFixture {
 
         // 字面量 :class 属性（原始属性名和值保留，不做动态绑定）
         const preSpan = api.el('span');
+        preSpan.__vmzVerbatim = true;
         api.attr(preSpan, ':class', 'y');
         preSpan.appendChild(api.text('static span'));
         preDiv.appendChild(preSpan);
 
         // 字面量 v-if 属性（原始属性保留，不做指令求值）
         const preVIf = api.el('span');
+        preVIf.__vmzVerbatim = true;
         api.attr(preVIf, 'v-if', 'z');
         preVIf.appendChild(api.text('v-if-literal'));
         preDiv.appendChild(preVIf);
 
         // 字面量 @click 属性（原始属性保留，不做事件绑定）
         const preClick = api.el('span');
+        preClick.__vmzVerbatim = true;
         api.attr(preClick, '@click', 'foo');
         preClick.appendChild(api.text('click literal'));
         preDiv.appendChild(preClick);
 
+        // A5：文本只转义一次 —— `&` / `<` / `{{ }}` 混在同一子树
+        preDiv.appendChild(api.text('a & b < c {{ x }}'));
+
+        // A3：四个运行时特殊属性名在 verbatim 子树内必须原样保留，
+        // 不能被改写为 `class`，也不能走 style/value/hash 的专用分支。
+        const preSpecials = api.el('span');
+        preSpecials.__vmzVerbatim = true;
+        api.attr(preSpecials, 'className', 'k');
+        api.attr(preSpecials, 'style', 'color:red');
+        api.attr(preSpecials, 'value', 'v');
+        api.attr(preSpecials, 'data-vmz-html-hash', 'h');
+        preSpecials.appendChild(api.text('specials'));
+        preDiv.appendChild(preSpecials);
+
         // 嵌套 HTML 结构保留（tag nesting + textContent）
         const nested = api.el('p');
+        nested.__vmzVerbatim = true;
         const em = api.el('em');
+        em.__vmzVerbatim = true;
         em.appendChild(api.text('nested content'));
         nested.appendChild(em);
         preDiv.appendChild(nested);
@@ -137,6 +159,18 @@ if (!html.includes('<p><em>nested content</em></p>')) {
 }
 if (!html.includes('data-vmz-pre')) fail(`SSR missing v-pre marker: ${html}`);
 
+// A5：文本只转义一次（`&` / `<` / `{{ }}` 混在同一子树）
+if (!html.includes('a &amp; b &lt; c {{ x }}')) {
+    fail(`SSR lost or over-escaped verbatim text: ${html}`);
+}
+if (html.includes('&amp;amp;')) fail(`SSR escaped verbatim text twice: ${html}`);
+
+// A3：四个运行时特殊属性名在 verbatim 子树内各自原样保留
+if (!html.includes(' className="k"')) fail(`SSR rewrote className: ${html}`);
+if (!html.includes(' style="color:red"')) fail(`SSR dropped literal style: ${html}`);
+if (!html.includes(' value="v"')) fail(`SSR dropped literal value: ${html}`);
+if (!html.includes(' data-vmz-html-hash="h"')) fail(`SSR dropped literal hash attr: ${html}`);
+
 // 兄弟节点：响应式区域 SSR 正常渲染
 if (!html.includes('class="sibling active"')) fail(`SSR sibling dynamic class wrong: ${html}`);
 if (!html.includes('data-fixture="sibling-if-true"')) fail(`SSR sibling v-if true branch missing: ${html}`);
@@ -170,6 +204,7 @@ console.log('v-pre: browser mount…');
     if (!mountHtml.includes('data-fixture="sibling-if-true"')) fail(`mount sibling v-if broken: ${mountHtml}`);
     if (!mountHtml.includes('data-fixture="sibling-btn"')) fail(`mount sibling button missing: ${mountHtml}`);
     if (!mountHtml.includes('<p><em>nested content</em></p>')) fail(`mount nested HTML broken: ${mountHtml}`);
+    if (!mountHtml.includes('a &amp; b &lt; c {{ x }}')) fail(`mount lost mixed literal: ${mountHtml}`);
 
     console.log('v-pre: browser mount DOM parity ok');
 }
@@ -199,6 +234,7 @@ console.log('v-pre: hydrate…');
     if (!afterHydrate.includes('@click="foo"')) fail(`hydrate lost @click="foo": ${afterHydrate}`);
     if (!afterHydrate.includes('data-vmz-pre')) fail(`hydrate lost v-pre marker: ${afterHydrate}`);
     if (!afterHydrate.includes('<p><em>nested content</em></p>')) fail(`hydrate nested HTML broken: ${afterHydrate}`);
+    if (!afterHydrate.includes('a &amp; b &lt; c {{ x }}')) fail(`hydrate lost mixed literal: ${afterHydrate}`);
 
     // hydrate 后兄弟节点响应式仍工作（v-if toggle）
     const ifTrue = app.querySelector('[data-fixture="sibling-if-true"]');

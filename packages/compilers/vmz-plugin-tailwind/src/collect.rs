@@ -137,46 +137,61 @@ fn walk_nodes(
     diagnostics: &mut Vec<ReportedDiagnostic>,
 ) {
     for node in nodes {
-        if let TemplateNode::Element { tag: _, attrs, children } = node {
-            for attr in attrs {
-                if attr.name != "style:tw" {
-                    continue;
-                }
-                match &attr.value {
-                    // `style:tw={expr}` arrives as a static string with the braces
-                    // intact: it is a dynamic class site, not a token list.
-                    AttrValue::Static(raw) => match brace_expression_body(raw) {
-                        Some(expr) => push_dynamic_site(
-                            path,
-                            template,
-                            template_start,
-                            expr,
-                            sites,
-                            diagnostics,
-                        ),
-                        None => {
-                            let span =
-                                locate_attr_value_span(template, template_start, "style:tw", raw)
-                                    .unwrap_or_else(|| {
-                                        template_start as u32..template_start as u32
-                                    });
-                            let tokens = split_tokens(raw, &span);
-                            sites.push(TwSite {
-                                kind: TwTokenKind::StyleTw,
-                                path: path.to_path_buf(),
-                                span,
-                                tokens,
-                                dynamic: false,
-                                raw: raw.clone(),
-                            });
+        match node {
+            // `v-pre` subtrees are literal author text: `style:tw` inside one is not
+            // a utility site, and nothing in it is collected or diagnosed.
+            TemplateNode::Verbatim { .. } => {}
+            TemplateNode::Element { tag: _, attrs, children } => {
+                for attr in attrs {
+                    if attr.name != "style:tw" {
+                        continue;
+                    }
+                    match &attr.value {
+                        // `style:tw={expr}` arrives as a static string with the braces
+                        // intact: it is a dynamic class site, not a token list.
+                        AttrValue::Static(raw) => match brace_expression_body(raw) {
+                            Some(expr) => push_dynamic_site(
+                                path,
+                                template,
+                                template_start,
+                                expr,
+                                sites,
+                                diagnostics,
+                            ),
+                            None => {
+                                let span = locate_attr_value_span(
+                                    template,
+                                    template_start,
+                                    "style:tw",
+                                    raw,
+                                )
+                                .unwrap_or_else(|| template_start as u32..template_start as u32);
+                                let tokens = split_tokens(raw, &span);
+                                sites.push(TwSite {
+                                    kind: TwTokenKind::StyleTw,
+                                    path: path.to_path_buf(),
+                                    span,
+                                    tokens,
+                                    dynamic: false,
+                                    raw: raw.clone(),
+                                });
+                            }
+                        },
+                        AttrValue::Interp(expr) => {
+                            push_dynamic_site(
+                                path,
+                                template,
+                                template_start,
+                                expr,
+                                sites,
+                                diagnostics,
+                            );
                         }
-                    },
-                    AttrValue::Interp(expr) => {
-                        push_dynamic_site(path, template, template_start, expr, sites, diagnostics);
                     }
                 }
+                walk_nodes(children, path, template, template_start, sites, diagnostics);
             }
-            walk_nodes(children, path, template, template_start, sites, diagnostics);
+            TemplateNode::Text(_) | TemplateNode::Interp(_) => {}
         }
     }
 }

@@ -15,13 +15,41 @@ fn multiline_text_before_interpolation_has_one_render_space() {
 }
 
 #[test]
-fn v_pre_is_rejected_when_lowering_to_template_ir() {
-    // TemplateIr cannot express a verbatim subtree. Keeping the attribute would compile
-    // the subtree and silently invert the Vue contract, so lowering must fail loudly.
-    let concrete = parse_template_concrete_body_primary(r#"<div v-pre>{{ x }}</div>"#).unwrap();
-    let err = lower_concrete_to_ir(&concrete).expect_err("v-pre must not lower silently");
-    assert_eq!(err.code, "vmz::template::v_pre_unsupported");
-    assert_eq!(err.args.get("tag").map(String::as_str), Some("div"));
+fn v_pre_lowers_to_verbatim_node() {
+    // TemplateIr now carries the region as `Verbatim`, so the subtree is stored
+    // structurally (tag, authored attribute spelling, literal text) instead of
+    // being compiled and silently inverting the Vue contract.
+    let concrete = parse_template_concrete_body_primary(
+        r#"<div v-pre :class="cls" @click="fn"><span>{{ x }}</span>&amp;</div>"#,
+    )
+    .unwrap();
+    let ir = lower_concrete_to_ir(&concrete).unwrap();
+    let TemplateNode::Verbatim { tag, attrs, children } = &ir.roots[0] else {
+        panic!("expected verbatim root, got {:?}", ir.roots[0]);
+    };
+    assert_eq!(tag, "div");
+    assert!(
+        attrs.iter().all(|a| a.name != "v-pre"),
+        "the opening marker is consumed, not rendered"
+    );
+    assert_eq!(attrs[0].name, ":class");
+    assert!(attrs.iter().any(|a| a.name == "@click"), "authored on spelling kept");
+
+    let nested = children
+        .iter()
+        .find_map(|c| match c {
+            VerbatimChild::Element { tag, children, .. } if tag == "span" => Some(children),
+            _ => None,
+        })
+        .expect("nested element stays verbatim");
+    assert!(
+        nested.iter().any(|c| matches!(c, VerbatimChild::Text(t) if t == "{{ x }}")),
+        "interpolation must stay literal text, got {nested:?}"
+    );
+    assert!(
+        children.iter().any(|c| matches!(c, VerbatimChild::Text(t) if t == "&")),
+        "decoded entity stays plain text, got {children:?}"
+    );
 }
 
 #[test]

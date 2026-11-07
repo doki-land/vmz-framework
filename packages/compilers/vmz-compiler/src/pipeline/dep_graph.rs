@@ -147,6 +147,9 @@ fn walk(
             }
         }
         TemplateNode::Text(_) | TemplateNode::Interp(_) => {}
+        // `v-pre` tags render as literal HTML; a PascalCase name inside one is not a
+        // component reference, so the subtree contributes no dependency edge.
+        TemplateNode::Verbatim { .. } => {}
     }
 }
 

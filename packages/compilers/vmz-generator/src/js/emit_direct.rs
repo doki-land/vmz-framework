@@ -1061,9 +1061,12 @@ fn emit_element(
     once: bool,
     memo: Option<&MemoCtx>,
 ) -> Result<String, String> {
-    let ViewNode::Element { tag, attrs, children, each } = node else {
+    let ViewNode::Element { tag, attrs, children, each, verbatim } = node else {
         return Ok("null".to_string());
     };
+    if *verbatim {
+        return emit_verbatim_element(tag, attrs, children, fields, scope, aliases, each_depth, handler_ctx, ir, stmts, next_id, child_ctors, once, memo);
+    }
     if let Some(each) = each {
         let row = if tag == "template" { RowEmit::Template } else { RowEmit::Element };
         return emit_each_block(
@@ -1663,6 +1666,66 @@ fn emit_plain_element(
         stmts,
         next_id,
     );
+    for child in emit_nodes(
+        children,
+        fields,
+        scope,
+        aliases,
+        each_depth,
+        handler_ctx,
+        ir,
+        stmts,
+        next_id,
+        child_ctors,
+        once,
+        memo,
+    )? {
+        stmts.push(format!("{el}.appendChild({child});"));
+    }
+    stmts.push("api.adoptLeave();".to_string());
+    Ok(el)
+}
+
+/// `v-pre` element: the author's spelling is the output.
+///
+/// Deliberately skips every named-attribute plan (`class`/`style` merge, `v-html`,
+/// `v-show`, `v-text`, `v-once`/`v-memo` markers, `className` → `class`) and binds
+/// nothing. The node carries `__vmzVerbatim` so SSR skips its special attribute
+/// branches for the same element instead of re-deriving the rule.
+#[allow(clippy::too_many_arguments)]
+fn emit_verbatim_element(
+    tag: &str,
+    attrs: &[ViewAttr],
+    children: &[ViewNode],
+    fields: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+    each_depth: u32,
+    handler_ctx: ComponentHandlerCtx<'_>,
+    ir: &mut IrDepCursor<'_>,
+    stmts: &mut Vec<String>,
+    next_id: &mut u32,
+    child_ctors: &HashMap<String, String>,
+    once: bool,
+    memo: Option<&MemoCtx>,
+) -> Result<String, String> {
+    let el = fresh("e", next_id);
+    stmts.push(format!("var {el} = api.el({});", q(tag)));
+    stmts.push(format!("{el}.__vmzVerbatim = true;"));
+    stmts.push(format!("api.adoptEnter({el});"));
+    for a in attrs {
+        match &a.value {
+            ViewAttrValue::Bare => stmts.push(format!("api.attr({el}, {}, true);", q(&a.name))),
+            ViewAttrValue::Static { value: s } => {
+                stmts.push(format!("api.attr({el}, {}, {});", q(&a.name), q(s)))
+            }
+            // Verbatim attrs are lowered as static text. Keeping the expression
+            // string literal is the only non-fabricating fallback.
+            ViewAttrValue::Interp { expr: e } => {
+                stmts.push(format!("api.attr({el}, {}, {});", q(&a.name), q(e)))
+            }
+        }
+    }
     for child in emit_nodes(
         children,
         fields,

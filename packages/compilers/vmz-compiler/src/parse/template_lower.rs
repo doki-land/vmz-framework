@@ -2,7 +2,7 @@
 
 use super::template_common::{TemplateParseError, is_assignable_model_target, native_model_bind};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg};
-use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode};
+use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, VerbatimChild};
 
 /// Lower Concrete AST into the pipeline IR consumed by structural/reactive/emit.
 pub fn lower_concrete_to_ir(concrete: &ConcreteIr) -> Result<TemplateIr, TemplateParseError> {
@@ -27,6 +27,9 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
         }
         ConcreteNode::Interpolation { expr, .. } => Ok(Some(TemplateNode::Interp(expr.clone()))),
         ConcreteNode::Element { tag, attrs, children, .. } => {
+            if attrs.iter().any(is_pre_directive) {
+                return Ok(Some(lower_verbatim_element(tag, attrs, children)));
+            }
             let mut ir_attrs = Vec::new();
             for attr in attrs {
                 ir_attrs.extend(lower_attr(attr, tag, attrs)?);
@@ -42,6 +45,131 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
                 attrs: ir_attrs,
                 children: ir_children,
             }))
+        }
+    }
+}
+
+// ——————————————————————————————————————————————————————————————————————————
+// `v-pre` verbatim lowering
+// ——————————————————————————————————————————————————————————————————————————
+
+fn is_pre_directive(attr: &ConcreteAttr) -> bool {
+    matches!(attr, ConcreteAttr::Directive { dir: Directive::Pre, .. })
+}
+
+/// Lower a `v-pre` element and its whole subtree without any semantic transform.
+///
+/// Text keeps the author's bytes (no [`normalize_render_text`], no whitespace-only
+/// drop) and `{{ expr }}` becomes literal text. Nested elements are `Verbatim`
+/// too, so a descendant never falls back to attribute lowering.
+fn lower_verbatim_element(
+    tag: &str,
+    attrs: &[ConcreteAttr],
+    children: &[ConcreteNode],
+) -> TemplateNode {
+    TemplateNode::Verbatim {
+        tag: tag.to_string(),
+        // The `v-pre` that opens the region is consumed by the region itself;
+        // emitting it would add an attribute Vue never renders. Every other
+        // attribute keeps its authored spelling.
+        attrs: attrs.iter().filter(|a| !is_pre_directive(a)).map(verbatim_attr).collect(),
+        children: children.iter().filter_map(verbatim_child).collect(),
+    }
+}
+
+/// Comments stay dropped (the IR has no comment node anywhere); everything else
+/// keeps its authored text.
+fn verbatim_child(node: &ConcreteNode) -> Option<VerbatimChild> {
+    match node {
+        ConcreteNode::Comment { .. } => None,
+        ConcreteNode::Text { value, .. } => Some(VerbatimChild::Text(value.clone())),
+        // Concrete keeps the parsed body; the delimiters are reconstruction, not
+        // re-serialized markup — the value stays plain text for the render path.
+        ConcreteNode::Interpolation { expr, .. } => {
+            Some(VerbatimChild::Text(format!("{{{{ {expr} }}}}")))
+        }
+        ConcreteNode::Element { tag, attrs, children, .. } => Some(VerbatimChild::Element {
+            tag: tag.clone(),
+            attrs: attrs.iter().map(verbatim_attr).collect(),
+            children: children.iter().filter_map(verbatim_child).collect(),
+        }),
+    }
+}
+
+/// Rebuild the authored attribute spelling. Concrete folds `:x` / `v-bind:x`
+/// into one variant, so the short spelling is what can be reconstructed without
+/// inventing source text; the directive name itself is never rewritten.
+fn verbatim_attr(attr: &ConcreteAttr) -> TemplateAttr {
+    match attr {
+        ConcreteAttr::Static { name, value, .. } => TemplateAttr {
+            name: name.clone(),
+            value: AttrValue::Static(value.clone()),
+            ..Default::default()
+        },
+        ConcreteAttr::Directive { dir, .. } => {
+            let (name, value) = verbatim_directive_spelling(dir);
+            TemplateAttr { name, value: AttrValue::Static(value), ..Default::default() }
+        }
+    }
+}
+
+fn verbatim_directive_spelling(dir: &Directive) -> (String, String) {
+    let arg = |a: &DirectiveArg| match a {
+        DirectiveArg::Static(s) => s.clone(),
+        DirectiveArg::Dynamic(e) => format!("[{e}]"),
+    };
+    let with_modifiers = |base: String, modifiers: &[String]| {
+        let mut out = base;
+        for m in modifiers {
+            out.push('.');
+            out.push_str(m);
+        }
+        out
+    };
+    match dir {
+        Directive::Pre => ("v-pre".into(), String::new()),
+        Directive::Once => ("v-once".into(), String::new()),
+        Directive::Memo { deps } => ("v-memo".into(), deps.clone()),
+        Directive::If { test } => ("v-if".into(), test.clone()),
+        Directive::ElseIf { test } => ("v-else-if".into(), test.clone()),
+        Directive::Else => ("v-else".into(), String::new()),
+        Directive::For { source, value_alias, key_alias, index_alias } => {
+            let mut aliases = vec![value_alias.clone()];
+            aliases.extend(key_alias.clone());
+            aliases.extend(index_alias.clone());
+            if aliases.len() == 1 {
+                ("v-for".into(), format!("{value_alias} in {source}"))
+            } else {
+                ("v-for".into(), format!("({}) in {source}", aliases.join(", ")))
+            }
+        }
+        Directive::Bind { arg: a, expr, modifiers } => {
+            (with_modifiers(format!(":{}", arg(a)), modifiers), expr.clone())
+        }
+        Directive::BindObject { expr } => ("v-bind".into(), expr.clone()),
+        Directive::On { arg: a, handler, modifiers } => {
+            (with_modifiers(format!("@{}", arg(a)), modifiers), handler.clone())
+        }
+        Directive::OnObject { expr } => ("v-on".into(), expr.clone()),
+        Directive::Slot { name, props } => {
+            (format!("#{}", arg(name)), props.clone().unwrap_or_default())
+        }
+        Directive::Html { expr } => ("v-html".into(), expr.clone()),
+        Directive::Text { expr } => ("v-text".into(), expr.clone()),
+        Directive::Show { expr } => ("v-show".into(), expr.clone()),
+        Directive::Model { arg: a, expr, modifiers } => {
+            let base = match a {
+                Some(a) => format!("v-model:{a}"),
+                None => "v-model".into(),
+            };
+            (with_modifiers(base, modifiers), expr.clone())
+        }
+        Directive::Custom { name, arg: a, expr, modifiers } => {
+            let base = match a {
+                Some(a) => format!("v-{name}:{}", arg(a)),
+                None => format!("v-{name}"),
+            };
+            (with_modifiers(base, modifiers), expr.clone().unwrap_or_default())
         }
     }
 }
@@ -272,12 +400,15 @@ fn lower_directive(
             ])
         }
         Directive::Pre => {
-            // `v-pre` is consumed as a verbatim region marker on Semantic. TemplateIr
-            // has no verbatim subtree representation, so keeping the attribute would
-            // still compile the subtree and hand the author the opposite of the Vue
-            // contract without any signal. Reject instead of pretending it works.
-            Err(TemplateParseError::coded("vmz::template::v_pre_unsupported", offset)
-                .with_arg("tag", tag))
+            // `lower_node` intercepts every element carrying `v-pre` before any
+            // attribute lowering, so this arm is unreachable. Keep the authored
+            // marker rather than fabricating a value if that invariant ever breaks.
+            debug_assert!(false, "`v-pre` must be intercepted before attribute lowering");
+            Ok(vec![TemplateAttr {
+                name: "v-pre".into(),
+                value: AttrValue::Static(String::new()),
+                ..Default::default()
+            }])
         }
         Directive::Once => {
             // `v-once` is carried to emit as a bare region marker attribute so Direct

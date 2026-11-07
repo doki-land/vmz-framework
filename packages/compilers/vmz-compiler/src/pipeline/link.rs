@@ -549,6 +549,8 @@ pub fn check_template_links(ir: &TemplateIr, table: &RouteTable) -> Vec<String> 
 
 fn walk_links(nodes: &[TemplateNode], table: &RouteTable, out: &mut Vec<String>) {
     for node in nodes {
+        // `v-pre` subtrees keep `Link` as a literal tag name, so there is no route
+        // reference to validate inside them.
         let TemplateNode::Element { tag, attrs, children } = node else {
             continue;
         };
