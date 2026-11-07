@@ -15,6 +15,7 @@
 .cargo/config.toml.local
 target/
 *.node
+*.node.old
 *.wasm
 
 # Node
