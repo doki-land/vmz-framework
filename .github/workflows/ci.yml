@@ -54,6 +54,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Verify `Cargo.lock` matches the manifests
+        # `--locked` proves the committed resolution is what CI and release builds use.
+        # Local `[patch]` overrides are git ignored, so a stale lock only shows up here.
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
       - name: Build runtimes (native + JS)
         # 门禁必须跑发布同款 native：`publish-npm.yml` 用 `--release` 构建 `.node`，
         # 而 `pack`（graph/link/emit）在 debug 下比 release 慢一个数量级，会把
