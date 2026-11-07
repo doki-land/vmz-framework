@@ -1065,7 +1065,22 @@ fn emit_element(
         return Ok("null".to_string());
     };
     if *verbatim {
-        return emit_verbatim_element(tag, attrs, children, fields, scope, aliases, each_depth, handler_ctx, ir, stmts, next_id, child_ctors, once, memo);
+        return emit_verbatim_element(
+            tag,
+            attrs,
+            children,
+            fields,
+            scope,
+            aliases,
+            each_depth,
+            handler_ctx,
+            ir,
+            stmts,
+            next_id,
+            child_ctors,
+            once,
+            memo,
+        );
     }
     if let Some(each) = each {
         let row = if tag == "template" { RowEmit::Template } else { RowEmit::Element };

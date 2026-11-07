@@ -193,7 +193,9 @@ fn verbatim_children(children: &[VerbatimChild]) -> Vec<ViewNode> {
             VerbatimChild::Text(t) => out.push(ViewNode::Text { value: t.clone() }),
             // `template` renders no wrapper element, so its children splice into
             // the parent list (multi-root verbatim regions included).
-            VerbatimChild::Element { tag, children, .. } if tag.eq_ignore_ascii_case("template") => {
+            VerbatimChild::Element { tag, children, .. }
+                if tag.eq_ignore_ascii_case("template") =>
+            {
                 out.extend(verbatim_children(children));
             }
             VerbatimChild::Element { tag, attrs, children } => out.push(ViewNode::Element {
