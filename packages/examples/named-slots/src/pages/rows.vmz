@@ -1,0 +1,27 @@
+<template>
+    <main id="rows-page">
+        <template v-for="panel in panels" :key="panel.id">
+            <NamedPanel :key="panel.id">
+                <template #header>
+                    <h2 class="row-title">
+                        {{ panel.title }}
+                    </h2>
+                    <p class="row-subtitle">
+                        {{ panel.subtitle }}
+                    </p>
+                </template>
+                <p class="row-body">
+                    {{ panel.body }}
+                </p>
+            </NamedPanel>
+        </template>
+    </main>
+</template>
+<script client>
+export default class RowsPage {
+    public panels = [
+        { id: "a", title: "Alpha", subtitle: "alpha sub", body: "alpha body" },
+        { id: "b", title: "Bravo", subtitle: "bravo sub", body: "bravo body" },
+    ];
+}
+</script>

@@ -41,8 +41,10 @@ for (const rel of ['vmz-dom.js', 'pages/index.client.js']) {
 
 const domHref = pathToFileURL(path.join(dist, 'vmz-dom.js')).href;
 const pageHref = pathToFileURL(path.join(dist, 'pages', 'index.client.js')).href;
+const rowsHref = pathToFileURL(path.join(dist, 'pages', 'rows.client.js')).href;
 const { renderToString, hydrate, flushPending } = await import(domHref);
 const { default: IndexPage } = await import(pageHref);
+const { default: RowsPage } = await import(rowsHref);
 
 const pageHtml = await renderToString(IndexPage, { props: {} });
 if (!pageHtml.includes('id="named-title"')) fail(`SSR page missing the named projection: ${pageHtml}`);
@@ -91,4 +93,52 @@ const updated = app.querySelector('#named-title');
 if (updated !== title) fail('state update rebuilt the named projection node');
 if (!String(updated.textContent).includes('Header updated')) fail('state update did not patch the named projection');
 
-console.log('ssr-named-slot-resume GATE PASS: named projection keeps its SSR nodes through hydrate')
+// 2. Named projections inside keyed component rows: the row host is claimed by
+// key, so its named outlet pool must follow the host instead of the DOM order.
+const rowsHtml = await renderToString(RowsPage, { props: {} });
+if (!rowsHtml.includes('row-title')) fail(`SSR rows page missing the named projection: ${rowsHtml}`);
+if (!rowsHtml.includes('vmz-row:')) fail('keyed component rows lost their row marker in SSR');
+
+const { window: rowsWindow } = parseHTML(
+    `<!DOCTYPE html><html><body><div id="app">${rowsHtml}</div></body></html>`,
+);
+globalThis.window = rowsWindow;
+globalThis.document = rowsWindow.document;
+globalThis.HTMLElement = rowsWindow.HTMLElement;
+globalThis.Node = rowsWindow.Node;
+globalThis.DocumentFragment = rowsWindow.DocumentFragment;
+globalThis.Text = rowsWindow.Text;
+globalThis.Comment = rowsWindow.Comment;
+
+const rowsApp = rowsWindow.document.getElementById('app');
+const ssrTitles = [...rowsApp.querySelectorAll('.row-title')];
+const ssrBodies = [...rowsApp.querySelectorAll('.row-body')];
+if (ssrTitles.length !== 2 || ssrBodies.length !== 2) fail('rows page SSR shape is wrong');
+
+const rowsInst = await hydrate(RowsPage, rowsApp, {});
+const hydratedTitles = [...rowsApp.querySelectorAll('.row-title')];
+const hydratedBodies = [...rowsApp.querySelectorAll('.row-body')];
+for (const el of hydratedTitles) {
+    if (!ssrTitles.includes(el)) fail(`keyed row named projection was rebuilt: ${String(el.textContent)}`);
+    if (el.closest('#named-header') == null) fail('keyed row named projection left its outlet');
+}
+for (const el of hydratedBodies) {
+    if (!ssrBodies.includes(el)) fail(`keyed row default projection was rebuilt: ${String(el.textContent)}`);
+}
+if (hydratedTitles[0] !== ssrTitles[0] || hydratedTitles[1] !== ssrTitles[1]) {
+    fail('keyed rows did not keep their SSR order on hydrate');
+}
+
+rowsInst.panels = [rowsInst.panels[1], rowsInst.panels[0]];
+await flushPending(rowsInst);
+const reorderedTitles = [...rowsApp.querySelectorAll('.row-title')];
+const reorderedBodies = [...rowsApp.querySelectorAll('.row-body')];
+if (reorderedTitles[0] !== ssrTitles[1] || reorderedTitles[1] !== ssrTitles[0]) {
+    fail('reorder did not move the original named projection nodes');
+}
+if (reorderedBodies[0] !== ssrBodies[1] || reorderedBodies[1] !== ssrBodies[0]) {
+    fail('reorder did not move the original default projection nodes');
+}
+
+console.log('ssr-named-slot-resume GATE PASS: named projection keeps its SSR nodes through hydrate and keyed row reorder');
+
