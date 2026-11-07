@@ -42,9 +42,11 @@ for (const rel of ['vmz-dom.js', 'pages/index.client.js']) {
 const domHref = pathToFileURL(path.join(dist, 'vmz-dom.js')).href;
 const pageHref = pathToFileURL(path.join(dist, 'pages', 'index.client.js')).href;
 const rowsHref = pathToFileURL(path.join(dist, 'pages', 'rows.client.js')).href;
+const dynamicHref = pathToFileURL(path.join(dist, 'pages', 'dynamic.client.js')).href;
 const { renderToString, hydrate, flushPending } = await import(domHref);
 const { default: IndexPage } = await import(pageHref);
 const { default: RowsPage } = await import(rowsHref);
+const { default: DynamicPage } = await import(dynamicHref);
 
 const pageHtml = await renderToString(IndexPage, { props: {} });
 if (!pageHtml.includes('id="named-title"')) fail(`SSR page missing the named projection: ${pageHtml}`);
@@ -140,5 +142,40 @@ if (reorderedBodies[0] !== ssrBodies[1] || reorderedBodies[1] !== ssrBodies[0]) 
     fail('reorder did not move the original default projection nodes');
 }
 
-console.log('ssr-named-slot-resume GATE PASS: named projection keeps its SSR nodes through hydrate and keyed row reorder');
+// 3. Dynamic `#[expr]` names resolve at runtime and must reach the same named
+// outlet pool as the static form.
+const dynamicHtml = await renderToString(DynamicPage, { props: {} });
+if (!dynamicHtml.includes('dynamic-title')) fail(`SSR dynamic page missing the named projection: ${dynamicHtml}`);
+
+const { window: dynamicWindow } = parseHTML(
+    `<!DOCTYPE html><html><body><div id="app">${dynamicHtml}</div></body></html>`,
+);
+globalThis.window = dynamicWindow;
+globalThis.document = dynamicWindow.document;
+globalThis.HTMLElement = dynamicWindow.HTMLElement;
+globalThis.Node = dynamicWindow.Node;
+globalThis.DocumentFragment = dynamicWindow.DocumentFragment;
+globalThis.Text = dynamicWindow.Text;
+globalThis.Comment = dynamicWindow.Comment;
+
+const dynamicApp = dynamicWindow.document.getElementById('app');
+const ssrDynamicTitle = dynamicApp.querySelector('#dynamic-title');
+if (!ssrDynamicTitle) fail('dynamic named projection is missing before hydrate');
+if (ssrDynamicTitle.closest('#named-header') == null) fail('dynamic slot name did not resolve to the header outlet');
+
+const dynamicInst = await hydrate(DynamicPage, dynamicApp, {});
+const dynamicTitle = dynamicApp.querySelector('#dynamic-title');
+if (dynamicTitle !== ssrDynamicTitle) fail('dynamic named projection was rebuilt instead of reclaimed');
+dynamicInst.title = 'Dynamic updated';
+await flushPending(dynamicInst);
+if (dynamicApp.querySelector('#dynamic-title') !== dynamicTitle) {
+    fail('state update rebuilt the dynamic named projection node');
+}
+if (!String(dynamicTitle.textContent).includes('Dynamic updated')) {
+    fail('state update did not patch the dynamic named projection');
+}
+
+console.log(
+    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates and keyed row reorder',
+);
 

@@ -1,0 +1,17 @@
+<template>
+    <main id="dynamic-page">
+        <NamedPanel>
+            <template #[slotName]>
+                <h2 id="dynamic-title">
+                    {{ title }}
+                </h2>
+            </template>
+        </NamedPanel>
+    </main>
+</template>
+<script client>
+export default class DynamicPage {
+    public slotName = "header";
+    public title = "Dynamic title";
+}
+</script>
