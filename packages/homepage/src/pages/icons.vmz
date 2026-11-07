@@ -68,11 +68,7 @@
                         {{ currentColorSampleText }}
                     </span>
                 </div>
-                <pre class="icons-gallery__code">
-                    <code>
-                        {{ currentColorSnippet }}
-                    </code>
-                </pre>
+                <pre class="icons-gallery__code"><code>{{ currentColorSnippet }}</code></pre>
             </section>
             <section v-for="group in filteredGroups" :key="group.prefix" :aria-labelledby="'icons-group-' + group.prefix" class="icons-group">
                 <h2 :id="'icons-group-' + group.prefix">
@@ -136,16 +132,8 @@
                         </dd>
                     </dl>
                     <div class="icons-gallery__detail-snippets">
-                        <pre class="icons-gallery__code">
-                            <code>
-                                {{ usageSnippet }}
-                            </code>
-                        </pre>
-                        <pre class="icons-gallery__code">
-                            <code>
-                                {{ registrySnippet }}
-                            </code>
-                        </pre>
+                        <pre class="icons-gallery__code"><code>{{ usageSnippet }}</code></pre>
+                        <pre class="icons-gallery__code"><code>{{ registrySnippet }}</code></pre>
                     </div>
                 </div>
             </section>

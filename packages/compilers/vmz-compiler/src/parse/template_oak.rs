@@ -1,12 +1,14 @@
 //! Lower Oak Vue AST → VMZ Concrete / Semantic Template IR (stage C primary).
 
 use core::range::Range;
+use std::borrow::Cow;
 
 use oak_vue::{VueAttribute, VueElement, VueNode, VueRoot};
 use vmz_oak_frontend_adapter::{TemplateShellInput, parse_template_ast};
 
 use super::template_common::{TemplateParseError, decode_html_entities};
 use super::template_concrete::{ConcreteAttr, ConcreteIr, ConcreteNode, classify_concrete_attr};
+use super::template_lower::is_preformatted_tag;
 use super::template_semantic::{
     ControlFlowKind, IfBranch, SemanticIr, SemanticNode, SemanticProp, control_flow_kind,
     for_directive, if_chain_from_branches, semantic_from_element_parts,
@@ -337,6 +339,16 @@ fn source_attr_name(shell: &str, attr: &VueAttribute) -> String {
 }
 
 fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, TemplateParseError> {
+    lower_node_in(shell, node, false)
+}
+
+/// `preformatted` carries the host context: inside `<pre>` / `<textarea>` every
+/// descendant keeps the whitespace the author wrote.
+fn lower_node_in(
+    shell: &str,
+    node: &VueNode,
+    preformatted: bool,
+) -> Result<ConcreteNode, TemplateParseError> {
     match node {
         VueNode::Element(el) => {
             check_duplicate_attributes(shell, el)?;
@@ -346,12 +358,23 @@ fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, TemplateParse
                 .iter()
                 .map(|a| lower_attr(shell, a))
                 .collect::<Result<Vec<_>, _>>()?;
-            let children =
-                el.children.iter().map(|c| lower_node(shell, c)).collect::<Result<Vec<_>, _>>()?;
+            let relaxed = preformatted || is_preformatted_tag(&tag);
+            let children = if relaxed {
+                lower_preformatted_children(shell, el)?
+            } else {
+                el.children
+                    .iter()
+                    .map(|c| lower_node_in(shell, c, false))
+                    .collect::<Result<Vec<_>, _>>()?
+            };
             Ok(ConcreteNode::Element { tag, attrs, children, span: to_body_span(shell, el.span) })
         }
         VueNode::Text(t) => {
-            let value = decode_html_entities(slice(shell, t.span));
+            let raw = slice(shell, t.span);
+            // Preformatted text reaches the product as written, so it is the one
+            // place where the checkout's line endings would leak into output.
+            let text = if preformatted { normalize_authored_line_endings(raw) } else { raw.into() };
+            let value = decode_html_entities(&text);
             Ok(ConcreteNode::Text { value, span: to_body_span(shell, t.span) })
         }
         VueNode::Interpolation(i) => {
@@ -361,6 +384,120 @@ fn lower_node(shell: &str, node: &VueNode) -> Result<ConcreteNode, TemplateParse
         VueNode::Comment(text) => {
             Ok(ConcreteNode::Comment { value: text.clone(), span: TemplateSpan::point(0) })
         }
+    }
+}
+
+/// Oak's AST builder drops whitespace-only text runs. Under `<pre>` / `<textarea>`
+/// that whitespace is the rendered result, so it is restored from the source
+/// between child spans instead of from the already trimmed AST text.
+fn lower_preformatted_children(
+    shell: &str,
+    el: &VueElement,
+) -> Result<Vec<ConcreteNode>, TemplateParseError> {
+    let content_start = open_tag_end(shell, el);
+    let content_end = close_tag_start(shell, el).max(content_start);
+    let mut out: Vec<ConcreteNode> = Vec::new();
+    let mut cursor = content_start;
+    for child in &el.children {
+        match node_span(child) {
+            Some(span) if span.start >= cursor && span.start <= content_end => {
+                let gap = normalize_authored_line_endings(&shell[cursor..span.start]);
+                let lowered = lower_node_in(shell, child, true)?;
+                push_with_gap(&mut out, &gap, lowered);
+                cursor = span.end.min(content_end);
+            }
+            Some(_) => {
+                // A child span outside its parent's content range means the AST and
+                // the source disagree: keep the child and do not invent a gap.
+                out.push(lower_node_in(shell, child, true)?);
+            }
+            // Comments carry no span, so the whitespace before them cannot be
+            // located. The comment itself renders nothing.
+            None => out.push(lower_node_in(shell, child, true)?),
+        }
+    }
+    if cursor < content_end {
+        let gap = normalize_authored_line_endings(&shell[cursor..content_end]);
+        push_with_gap(
+            &mut out,
+            &gap,
+            ConcreteNode::Text { value: String::new(), span: TemplateSpan::point(0) },
+        );
+    }
+    Ok(out)
+}
+
+/// Line endings are a property of the checkout, not of the document.
+///
+/// Authored text becomes a JS string literal and then HTML bytes, so it must not
+/// inherit `CRLF` from one machine and `LF` from another: the same source has to
+/// produce the same product everywhere. Normalization stays at this extraction
+/// boundary (and runs before entity decoding, so an authored `&#13;` is still a
+/// character reference, not a line ending). Upstream spans keep indexing the raw
+/// source, so nothing is shifted.
+fn normalize_authored_line_endings(text: &str) -> Cow<'_, str> {
+    if !text.contains('\r') {
+        return Cow::Borrowed(text);
+    }
+    Cow::Owned(text.replace("\r\n", "\n").replace('\r', "\n"))
+}
+
+/// Attach the restored gap to an adjacent text node so the result keeps the same
+/// node count the source had (adjacent runs would otherwise desync adoption).
+fn push_with_gap(out: &mut Vec<ConcreteNode>, gap: &str, node: ConcreteNode) {
+    if gap.is_empty() {
+        out.push(node);
+        return;
+    }
+    if let Some(ConcreteNode::Text { value, .. }) = out.last_mut() {
+        value.push_str(gap);
+        out.push(node);
+        return;
+    }
+    match node {
+        ConcreteNode::Text { value, span } => {
+            out.push(ConcreteNode::Text { value: format!("{gap}{value}"), span });
+        }
+        other => {
+            out.push(ConcreteNode::Text { value: gap.to_string(), span: TemplateSpan::point(0) });
+            out.push(other);
+        }
+    }
+}
+
+/// Byte offset just past the start tag's `>`.
+fn open_tag_end(shell: &str, el: &VueElement) -> usize {
+    let mut from = el.tag_name.end;
+    for attr in &el.attributes {
+        let span = match attr {
+            VueAttribute::Attribute(a) => &a.span,
+            VueAttribute::Directive(d) => &d.span,
+        };
+        from = from.max(span.end);
+    }
+    let from = from.min(shell.len());
+    match shell[from..].find('>') {
+        Some(i) => from + i + 1,
+        // Malformed start tag: the parser already reported it, so no gap is restored.
+        None => el.span.start,
+    }
+}
+
+/// Byte offset of this element's own closing tag (or the span end when it has none).
+fn close_tag_start(shell: &str, el: &VueElement) -> usize {
+    let end = el.span.end.min(shell.len());
+    match shell[..end].rfind("</") {
+        Some(lt) if lt >= el.span.start => lt,
+        _ => end,
+    }
+}
+
+fn node_span(node: &VueNode) -> Option<Range<usize>> {
+    match node {
+        VueNode::Element(n) => Some(n.span.clone()),
+        VueNode::Text(n) => Some(n.span.clone()),
+        VueNode::Interpolation(n) => Some(n.span.clone()),
+        VueNode::Comment(_) => None,
     }
 }
 

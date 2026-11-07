@@ -10,6 +10,7 @@ use vmz_types::{
 use crate::emit::{attr_interp, attr_static, has_bare_attr, is_component_tag, is_event_attr};
 use crate::emit_ir::IrDepCursor;
 use crate::parse::template_const::{fold_const_expr, fold_if_chain};
+use crate::parse::template_lower::is_preformatted_tag;
 use crate::pipeline::link::RouteTable;
 use crate::template::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, VerbatimChild};
 
@@ -20,7 +21,7 @@ pub fn build_native_view(
     routes: Option<&RouteTable>,
 ) -> ViewView {
     let mut cursor = IrDepCursor::new(reactive);
-    let roots = build_nodes(&template.roots, &mut cursor, routes);
+    let roots = build_nodes(&template.roots, &mut cursor, routes, false);
     ViewView {
         status: ViewStatus::Native,
         binding_ids: reactive.bindings.iter().map(|b| b.id()).collect(),
@@ -33,11 +34,14 @@ fn build_nodes(
     nodes: &[TemplateNode],
     ir: &mut IrDepCursor<'_>,
     routes: Option<&RouteTable>,
+    preformatted: bool,
 ) -> Vec<ViewNode> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < nodes.len() {
-        if matches!(&nodes[i], TemplateNode::Text(t) if t.trim().is_empty()) {
+        // Whitespace-only text is layout noise except under `<pre>` / `<textarea>`,
+        // where it is the rendered result and must survive as a text node.
+        if !preformatted && matches!(&nodes[i], TemplateNode::Text(t) if t.trim().is_empty()) {
             i += 1;
             continue;
         }
@@ -48,6 +52,7 @@ fn build_nodes(
                 let mut j = i + 1;
                 loop {
                     while j < nodes.len()
+                        && !preformatted
                         && matches!(&nodes[j], TemplateNode::Text(t) if t.trim().is_empty())
                     {
                         j += 1;
@@ -277,7 +282,7 @@ fn build_link(
                 },
             );
         }
-        let kids = build_nodes(children, ir, routes);
+        let kids = build_nodes(children, ir, routes, false);
         return ViewNode::Element {
             tag: "a".into(),
             attrs: view_attrs,
@@ -332,7 +337,7 @@ fn build_component_stripped(
     // metadata lives on the node, never as leaked props.
     let each = take_each(attrs, ir);
     let view_attrs = build_attrs(tag, attrs, strip, true, ir);
-    let kids = build_nodes(children, ir, routes);
+    let kids = build_nodes(children, ir, routes, false);
     ViewNode::Component { tag: tag.clone(), attrs: view_attrs, children: kids, each }
 }
 
@@ -356,7 +361,7 @@ fn build_slot(
     };
     let name = attr_static(attrs, "name");
     let view_attrs = build_attrs("slot", attrs, &["name"], false, ir);
-    let kids = build_nodes(children, ir, routes);
+    let kids = build_nodes(children, ir, routes, false);
     ViewNode::Slot { name, attrs: view_attrs, children: kids }
 }
 
@@ -374,7 +379,7 @@ fn build_element(
     let each = if allow_each { take_each(attrs, ir) } else { None };
 
     let view_attrs = build_attrs(tag, attrs, strip, allow_each, ir);
-    let kids = build_nodes(children, ir, routes);
+    let kids = build_nodes(children, ir, routes, is_preformatted_tag(tag));
     ViewNode::Element { tag: tag.clone(), attrs: view_attrs, children: kids, each, verbatim: false }
 }
 

@@ -37,11 +37,7 @@
                         <span class="welcome__start-label">
                             {{ installLabel }}
                         </span>
-                        <pre>
-                            <code>
-                                pnpm add @vmz/ui
-                            </code>
-                        </pre>
+                        <pre><code>pnpm add @vmz/ui</code></pre>
                     </div>
                     <p class="welcome__start-note">
                         {{ installNote }}
@@ -50,11 +46,7 @@
                         <span class="welcome__start-label">
                             {{ exampleLabel }}
                         </span>
-                        <pre>
-                            <code>
-                                {{ exampleCode }}
-                            </code>
-                        </pre>
+                        <pre><code>{{ exampleCode }}</code></pre>
                     </div>
                     <nav :aria-label="docsLabel" class="welcome__docs">
                         <a :href="guideHref">

@@ -19,11 +19,7 @@
                 </span>
             </Button>
         </div>
-        <pre class="vmz-ui-code-block__pre">
-            <code class="vmz-ui-code-block__code">
-                {{ code }}
-            </code>
-        </pre>
+        <pre class="vmz-ui-code-block__pre"><code class="vmz-ui-code-block__code">{{ code }}</code></pre>
     </figure>
 </template>
 <style>

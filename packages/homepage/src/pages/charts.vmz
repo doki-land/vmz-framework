@@ -59,19 +59,11 @@
                             <h3>
                                 {{ specTitleLabel }}
                             </h3>
-                            <pre class="chart-card__code">
-                                <code>
-                                    {{ item.specText }}
-                                </code>
-                            </pre>
+                            <pre class="chart-card__code"><code>{{ item.specText }}</code></pre>
                             <h3>
                                 {{ dataTitleLabel }}
                             </h3>
-                            <pre class="chart-card__code">
-                                <code>
-                                    {{ item.dataText }}
-                                </code>
-                            </pre>
+                            <pre class="chart-card__code"><code>{{ item.dataText }}</code></pre>
                         </div>
                     </div>
                 </section>
@@ -95,11 +87,7 @@
                         <h3>
                             {{ diagramSpecTitleLabel }}
                         </h3>
-                        <pre class="chart-card__code">
-                            <code>
-                                {{ diagramSpecText }}
-                            </code>
-                        </pre>
+                        <pre class="chart-card__code"><code>{{ diagramSpecText }}</code></pre>
                     </div>
                 </div>
             </section>
@@ -110,19 +98,11 @@
                 <p>
                     {{ themingPropLead }}
                 </p>
-                <pre class="chart-card__code">
-                    <code>
-                        {{ themePropSnippet }}
-                    </code>
-                </pre>
+                <pre class="chart-card__code"><code>{{ themePropSnippet }}</code></pre>
                 <p>
                     {{ themingTokenLead }}
                 </p>
-                <pre class="chart-card__code">
-                    <code>
-                        {{ themeTokenSnippet }}
-                    </code>
-                </pre>
+                <pre class="chart-card__code"><code>{{ themeTokenSnippet }}</code></pre>
             </section>
         </main>
     </SiteShell>

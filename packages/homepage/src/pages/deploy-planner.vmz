@@ -237,11 +237,7 @@
                     <h3>
                         {{ promptHeading }}
                     </h3>
-                    <pre class="planner__code planner__code--prompt">
-                        <code>
-                            {{ agentPrompt }}
-                        </code>
-                    </pre>
+                    <pre class="planner__code planner__code--prompt"><code>{{ agentPrompt }}</code></pre>
                     <details class="planner__summary">
                         <summary>
                             {{ summary }}
@@ -293,11 +289,7 @@
                         <h4>
                             {{ deliveryHeading }}
                         </h4>
-                        <pre class="planner__code">
-                            <code>
-                                {{ vmzConfigSnippet }}
-                            </code>
-                        </pre>
+                        <pre class="planner__code"><code>{{ vmzConfigSnippet }}</code></pre>
                     </details>
                     <h3>
                         {{ docsHeading }}

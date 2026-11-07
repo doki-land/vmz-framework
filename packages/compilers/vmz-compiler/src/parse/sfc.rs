@@ -391,7 +391,10 @@ struct RawBlock {
 fn extract_blocks(path: &Path, source: &str) -> Result<Vec<RawBlock>, SfcError> {
     let mut blocks = Vec::new();
     let bytes = source.as_bytes();
-    let mut i = 0;
+    // A UTF-8 BOM is an encoding marker, not document content: skip it at offset
+    // zero without shifting any span, so blocks below still address raw file bytes
+    // (source maps and span-based edits keep working on BOM files).
+    let mut i = if source.starts_with('\u{feff}') { '\u{feff}'.len_utf8() } else { 0 };
 
     while i < bytes.len() {
         skip_ws_and_comments(bytes, &mut i);

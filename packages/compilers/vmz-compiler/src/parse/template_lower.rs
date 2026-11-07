@@ -8,17 +8,34 @@ use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, Verb
 pub fn lower_concrete_to_ir(concrete: &ConcreteIr) -> Result<TemplateIr, TemplateParseError> {
     let mut roots = Vec::new();
     for node in &concrete.roots {
-        if let Some(n) = lower_node(node)? {
+        if let Some(n) = lower_node(node, false)? {
             roots.push(n);
         }
     }
     Ok(TemplateIr { roots })
 }
 
-fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParseError> {
+/// HTML hosts whose text is rendered as authored: `<pre>` and `<textarea>`.
+///
+/// A `<pre>` has no dedent concept in HTML, so the author's indentation is part
+/// of the result. Text under these hosts is neither folded nor dropped.
+pub(crate) fn is_preformatted_tag(tag: &str) -> bool {
+    tag.eq_ignore_ascii_case("pre") || tag.eq_ignore_ascii_case("textarea")
+}
+
+fn lower_node(
+    node: &ConcreteNode,
+    preformatted: bool,
+) -> Result<Option<TemplateNode>, TemplateParseError> {
     match node {
         ConcreteNode::Comment { .. } => Ok(None),
         ConcreteNode::Text { value, .. } => {
+            if value.is_empty() {
+                return Ok(None);
+            }
+            if preformatted {
+                return Ok(Some(TemplateNode::Text(value.clone())));
+            }
             if value.trim().is_empty() {
                 Ok(None)
             } else {
@@ -35,8 +52,9 @@ fn lower_node(node: &ConcreteNode) -> Result<Option<TemplateNode>, TemplateParse
                 ir_attrs.extend(lower_attr(attr, tag, attrs)?);
             }
             let mut ir_children = Vec::new();
+            let child_preformatted = is_preformatted_tag(tag);
             for child in children {
-                if let Some(c) = lower_node(child)? {
+                if let Some(c) = lower_node(child, child_preformatted)? {
                     ir_children.push(c);
                 }
             }

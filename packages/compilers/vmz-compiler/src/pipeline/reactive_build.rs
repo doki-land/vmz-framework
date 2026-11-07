@@ -16,6 +16,7 @@ use vmz_types::{
 use crate::field_rw::{collect_each_alias_prop_paths, collect_template_dep_ctx};
 use crate::parse::template_common::native_model_bind;
 use crate::parse::template_const::{fold_const_expr, fold_if_chain};
+use crate::parse::template_lower::is_preformatted_tag;
 use crate::template::{
     AttrValue, ConcreteAttr, ConcreteIr, ConcreteNode, Directive, DirectiveArg, SemanticIr,
     SemanticNode, SemanticProp, TemplateAttr, TemplateIr, TemplateNode, TemplateSpan,
@@ -252,7 +253,7 @@ pub fn build_reactive_module(
         b.add_field(f.name.clone(), FieldKind::State);
     }
 
-    walk_nodes(&template.roots, &deps.fields, &[], &[], &mut b, None);
+    walk_nodes(&template.roots, &deps.fields, &[], &[], &mut b, None, false);
     finish_effects(&mut b, decl, &deps.fields);
 
     ReactiveModule {
@@ -765,10 +766,13 @@ fn walk_nodes(
     each_frames: &[EachFrame],
     b: &mut WalkCtx<'_>,
     region: Option<RegionId>,
+    preformatted: bool,
 ) {
     let mut i = 0;
     while i < nodes.len() {
-        if matches!(&nodes[i], TemplateNode::Text(t) if t.trim().is_empty()) {
+        // Only `<pre>` / `<textarea>` keep whitespace-only text: elsewhere it is
+        // authored layout noise and contributes no binding.
+        if !preformatted && matches!(&nodes[i], TemplateNode::Text(t) if t.trim().is_empty()) {
             i += 1;
             continue;
         }
@@ -780,6 +784,7 @@ fn walk_nodes(
                 let mut j = i + 1;
                 loop {
                     while j < nodes.len()
+                        && !preformatted
                         && matches!(&nodes[j], TemplateNode::Text(t) if t.trim().is_empty())
                     {
                         j += 1;
@@ -1051,7 +1056,15 @@ fn walk_element_stripping(
         }
     }
 
-    walk_nodes(children, fields, &child_scope, &child_frames, b, child_region);
+    walk_nodes(
+        children,
+        fields,
+        &child_scope,
+        &child_frames,
+        b,
+        child_region,
+        is_preformatted_tag(tag),
+    );
 }
 
 fn add_text_binding(
