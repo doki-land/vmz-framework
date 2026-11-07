@@ -260,8 +260,10 @@ fn opaque_dependency_becomes_upstream_split_chunk() {
     assert_eq!(isolated.modules, vec![3]);
     let grouped = chunk(&out, "async/virtual/engine.js");
     assert_eq!(grouped.modules, vec![2, 1]);
-    let split_index = out.chunks.iter().position(|chunk| chunk.id == "split/virtual/helpers.js").unwrap();
-    let isolated_index = out.chunks.iter().position(|chunk| chunk.id == "isolated/virtual/atomic.js").unwrap();
+    let split_index =
+        out.chunks.iter().position(|chunk| chunk.id == "split/virtual/helpers.js").unwrap();
+    let isolated_index =
+        out.chunks.iter().position(|chunk| chunk.id == "isolated/virtual/atomic.js").unwrap();
     assert_eq!(isolated.depends_on, vec![split_index]);
     let mut expected_deps = vec![isolated_index, split_index];
     expected_deps.sort_unstable();
