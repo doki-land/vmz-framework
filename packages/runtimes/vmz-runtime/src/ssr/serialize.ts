@@ -650,6 +650,9 @@ const serializeApi = {
     adoptEnter() {
         return false;
     },
+    adoptEnterSlot() {
+        return false;
+    },
     adoptLeave() {
         /* resume scope only */
     },

@@ -1,0 +1,13 @@
+<template>
+    <section id="named-panel" data-fixture="named-panel">
+        <header id="named-header" data-fixture="named-header">
+            <slot name="header" />
+        </header>
+        <div id="named-body" data-fixture="named-body">
+            <slot />
+        </div>
+    </section>
+</template>
+<script client>
+export default class NamedPanel {}
+</script>

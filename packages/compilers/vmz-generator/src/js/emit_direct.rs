@@ -2045,6 +2045,21 @@ fn emit_component(
             // ignored instead of dropped, and a dynamic name is evaluated once at create
             // time — a name change later does not move already projected nodes.
             if let Some((slot_name, body)) = slot_template(child) {
+                // Named projections live under their own `<slot name="…">` outlet,
+                // which resume reaches through a different parked pool than the
+                // default outlet. Scope the subset to that outlet so the SSR nodes
+                // are reclaimed instead of rebuilt.
+                let named_scope = !matches!(slot_name, SlotName::Default);
+                if named_scope {
+                    stmts.push(adopt_slot_stmt(
+                        &v,
+                        &slot_name,
+                        fields,
+                        handler_ctx.methods,
+                        scope,
+                        aliases,
+                    ));
+                }
                 // `<template v-for #name>`: the loop lives on the wrapper, so the
                 // slot receives the whole keyed list fragment instead of one static
                 // copy of the body (which left the item alias unbound and dropped
@@ -2079,6 +2094,9 @@ fn emit_component(
                         scope,
                         aliases,
                     ));
+                    if named_scope {
+                        stmts.push("api.adoptLeave();".to_string());
+                    }
                     continue;
                 }
                 let kids = emit_nodes(
@@ -2105,6 +2123,9 @@ fn emit_component(
                         scope,
                         aliases,
                     ));
+                }
+                if named_scope {
+                    stmts.push("api.adoptLeave();".to_string());
                 }
                 continue;
             }
@@ -2198,6 +2219,25 @@ fn project_slot_stmt(
         SlotName::Dynamic(expr) => {
             let body = bind_template_expr(expr, fields, methods, scope, aliases);
             format!("api.projectNamedSlot({host}, ({body}), {kid});")
+        }
+    }
+}
+
+/// Resume scope for one named `<template #name>` projection group.
+fn adopt_slot_stmt(
+    host: &str,
+    slot: &SlotName,
+    fields: &[String],
+    methods: &[String],
+    scope: &[String],
+    aliases: &[(String, String)],
+) -> String {
+    match slot {
+        SlotName::Default => format!("api.adoptEnter({host});"),
+        SlotName::Static(name) => format!("api.adoptEnterSlot({host}, {});", q(name)),
+        SlotName::Dynamic(expr) => {
+            let body = bind_template_expr(expr, fields, methods, scope, aliases);
+            format!("api.adoptEnterSlot({host}, ({body}));")
         }
     }
 }

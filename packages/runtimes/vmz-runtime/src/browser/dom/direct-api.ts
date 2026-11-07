@@ -259,6 +259,16 @@ export const directApi = {
         }
         return false;
     },
+    adoptEnterSlot(hostEl, name) {
+        nsStack.push(isSvgNode(hostEl));
+        const adopt = directApi._resumeAdopt;
+        if (adopt && typeof adopt.enterSlot === 'function') {
+            const ok = adopt.enterSlot(hostEl, name);
+            if (ok) adopt._enterBalance = (adopt._enterBalance || 0) + 1;
+            return ok;
+        }
+        return false;
+    },
     adoptLeave() {
         nsStack.pop();
         const adopt = directApi._resumeAdopt;

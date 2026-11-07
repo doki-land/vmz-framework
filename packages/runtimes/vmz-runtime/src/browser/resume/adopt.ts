@@ -8,6 +8,7 @@ import {
     directApi,
     eventPropHandlerName,
     findOwnedDefaultSlot,
+    findOwnedNamedSlot,
     getRegisteredComponent,
     hasMeaningfulChild,
     isEventEntryStrategy,
@@ -223,6 +224,33 @@ function createResumeAdopt(pool, rootEl) {
         return true;
     };
 
+    /**
+     * Push the parked pool of an owned named `<slot name="…">` outlet.
+     *
+     * SSR inlines named projections exactly like the default outlet, so the nodes
+     * a page projects into `#header` sit under the named outlet and stay
+     * unreachable from the default pool that `enter(host)` pushes. Without this
+     * scope the named projection is rebuilt on every load while the default
+     * projection is reclaimed. A host without that outlet (fresh component or a
+     * name the component never declares) gets an isolated empty scope so the
+     * emitted enter/leave pair always stays balanced.
+     */
+    const enterSlot = (hostEl, name) => {
+        if (!hostEl) return false;
+        const wanted = name == null ? '' : String(name);
+        if (!wanted || wanted === 'default') return enter(hostEl);
+        const owner = hostEl.__vmzInst;
+        const root = (owner && owner.__vmzDomRoot) || hostEl;
+        const slot = root && root.nodeType === 1 ? findOwnedNamedSlot(root, wanted) : null;
+        const slotPool = slot && slot.__vmzResumePool;
+        if (slotPool && hasUnusedNode(slotPool)) {
+            scopeStack.push(slotPool);
+            return true;
+        }
+        scopeStack.push(document.createDocumentFragment());
+        return true;
+    };
+
     const leave = () => {
         if (scopeStack.length <= 1) return;
         scopeStack.pop();
@@ -353,6 +381,7 @@ function createResumeAdopt(pool, rootEl) {
         text: adoptText,
         componentHost,
         enter,
+        enterSlot,
         leave,
         scopeDepth,
         rewindScope,

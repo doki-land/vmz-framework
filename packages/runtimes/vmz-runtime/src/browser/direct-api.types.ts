@@ -138,6 +138,7 @@ export type DirectApi = {
     onMethod: (el: Element, type: string, method: string) => void;
     onComponentEvent: (el: Element, type: string, method: string) => void;
     adoptEnter: (node: Element) => boolean;
+    adoptEnterSlot: (hostEl: Element, name: string) => boolean;
     adoptLeave: () => void;
     projectDefaultSlot: (hostEl: HTMLElement, node: Node) => void;
     projectNamedSlot: (hostEl: HTMLElement, name: string, node: Node) => void;

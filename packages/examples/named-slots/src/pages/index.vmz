@@ -1,0 +1,28 @@
+<template>
+    <main id="named-page">
+        <NamedPanel>
+            <template #header>
+                <h2 id="named-title">
+                    {{ title }}
+                </h2>
+                <p id="named-subtitle">
+                    {{ subtitle }}
+                </p>
+            </template>
+            <p id="named-copy">
+                {{ body }}
+            </p>
+            <span id="named-foot">
+                {{ foot }}
+            </span>
+        </NamedPanel>
+    </main>
+</template>
+<script client>
+export default class IndexPage {
+    public title = "Header title";
+    public subtitle = "Header subtitle";
+    public body = "Body copy";
+    public foot = "Foot copy";
+}
+</script>
