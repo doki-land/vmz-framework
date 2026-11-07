@@ -227,9 +227,10 @@ fn rejects_side_effect_tags_in_templates() {
 
 #[test]
 fn accepts_v_pre() {
-    // `v-pre` is valid Vue syntax. VMZ accepts it and treats it as a **verbatim region**
-    // rather than a custom directive — see `verbatim_v_pre_skips_interpolation` and
-    // `verbatim_v_pre_skips_directives` for semantic coverage.
+    // `v-pre` is valid Vue syntax and the Concrete/Semantic layers treat it as a
+    // **verbatim region** (see the two tests below). The `.vmz` compile path lowers
+    // through TemplateIr, which cannot express that region and rejects the directive
+    // with `vmz::template::v_pre_unsupported` instead of silently compiling it.
     assert_accepted(r#"<div v-pre>{{ x }}</div>"#);
     assert_accepted(r#"<div v-pre>plain</div>"#);
     assert_accepted(r#"<p v-pre :id="x">{{ y }}</p>"#);

@@ -15,6 +15,16 @@ fn multiline_text_before_interpolation_has_one_render_space() {
 }
 
 #[test]
+fn v_pre_is_rejected_when_lowering_to_template_ir() {
+    // TemplateIr cannot express a verbatim subtree. Keeping the attribute would compile
+    // the subtree and silently invert the Vue contract, so lowering must fail loudly.
+    let concrete = parse_template_concrete_body_primary(r#"<div v-pre>{{ x }}</div>"#).unwrap();
+    let err = lower_concrete_to_ir(&concrete).expect_err("v-pre must not lower silently");
+    assert_eq!(err.code, "vmz::template::v_pre_unsupported");
+    assert_eq!(err.args.get("tag").map(String::as_str), Some("div"));
+}
+
+#[test]
 fn on_modifiers_structured_and_ir_strips() {
     let src = r#"<button @click.stop.prevent="save">x</button>"#;
     let concrete = parse_template_concrete_body_primary(src).unwrap();

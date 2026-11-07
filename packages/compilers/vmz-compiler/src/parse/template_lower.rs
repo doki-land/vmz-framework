@@ -272,13 +272,12 @@ fn lower_directive(
             ])
         }
         Directive::Pre => {
-            // `v-pre` is consumed as a verbatim region marker on Semantic; legacy
-            // TemplateIr keeps it as a static-ish attribute for round-trip parity.
-            Ok(vec![TemplateAttr {
-                name: "v-pre".into(),
-                value: AttrValue::Static(String::new()),
-                ..Default::default()
-            }])
+            // `v-pre` is consumed as a verbatim region marker on Semantic. TemplateIr
+            // has no verbatim subtree representation, so keeping the attribute would
+            // still compile the subtree and hand the author the opposite of the Vue
+            // contract without any signal. Reject instead of pretending it works.
+            Err(TemplateParseError::coded("vmz::template::v_pre_unsupported", offset)
+                .with_arg("tag", tag))
         }
         Directive::Once => {
             // `v-once` is carried to emit as a bare region marker attribute so Direct
