@@ -1,0 +1,16 @@
+<template>
+    <main id="raw-page">
+        <NamedPanel>
+            <template #header>
+                <div id="raw-html" v-html="markup"></div>
+            </template>
+            <p id="raw-body">{{ body }}</p>
+        </NamedPanel>
+    </main>
+</template>
+<script client>
+export default class RawPage {
+    public markup = '<b id="raw-inner">bold</b>';
+    public body = "Raw body";
+}
+</script>

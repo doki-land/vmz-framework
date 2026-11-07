@@ -1,0 +1,22 @@
+<template>
+    <main id="conditional-off-page">
+        <NamedPanel>
+            <template #header>
+                <h2 v-if="showTitle" class="cond-title">
+                    {{ title }}
+                </h2>
+                <p v-else class="cond-fallback">no title</p>
+                <span v-show="visible" class="cond-toggle">toggle</span>
+            </template>
+            <p id="cond-body">{{ body }}</p>
+        </NamedPanel>
+    </main>
+</template>
+<script client>
+export default class ConditionalOffPage {
+    public showTitle = false;
+    public visible = false;
+    public title = "Conditional title";
+    public body = "Conditional body";
+}
+</script>

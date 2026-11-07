@@ -46,6 +46,9 @@ const dynamicHref = pathToFileURL(path.join(dist, 'pages', 'dynamic.client.js'))
 const loopHref = pathToFileURL(path.join(dist, 'pages', 'loop.client.js')).href;
 const nestedHref = pathToFileURL(path.join(dist, 'pages', 'nested.client.js')).href;
 const deepHref = pathToFileURL(path.join(dist, 'pages', 'deep.client.js')).href;
+const conditionalHref = pathToFileURL(path.join(dist, 'pages', 'conditional.client.js')).href;
+const conditionalOffHref = pathToFileURL(path.join(dist, 'pages', 'conditional-off.client.js')).href;
+const rawHref = pathToFileURL(path.join(dist, 'pages', 'raw.client.js')).href;
 const { renderToString, hydrate, flushPending } = await import(domHref);
 const { default: IndexPage } = await import(pageHref);
 const { default: RowsPage } = await import(rowsHref);
@@ -53,6 +56,9 @@ const { default: DynamicPage } = await import(dynamicHref);
 const { default: LoopPage } = await import(loopHref);
 const { default: NestedPage } = await import(nestedHref);
 const { default: DeepPage } = await import(deepHref);
+const { default: ConditionalPage } = await import(conditionalHref);
+const { default: ConditionalOffPage } = await import(conditionalOffHref);
+const { default: RawPage } = await import(rawHref);
 
 const pageHtml = await renderToString(IndexPage, { props: {} });
 if (!pageHtml.includes('id="named-title"')) fail(`SSR page missing the named projection: ${pageHtml}`);
@@ -295,7 +301,124 @@ if (!String(deepTitleAfter.textContent).includes('Deep updated')) {
     fail('state update did not patch the nested named projection');
 }
 
+function openApp(html: string): any {
+    const { window: win } = parseHTML(`<!DOCTYPE html><html><body><div id="app">${html}</div></body></html>`);
+    globalThis.window = win;
+    globalThis.document = win.document;
+    globalThis.HTMLElement = win.HTMLElement;
+    globalThis.Node = win.Node;
+    globalThis.DocumentFragment = win.DocumentFragment;
+    globalThis.Text = win.Text;
+    globalThis.Comment = win.Comment;
+    return win.document.getElementById('app');
+}
+
+// 7. Conditional root inside a named projection, SSR truthy: the `v-if` branch
+// is present in the page and must be reclaimed, and flipping the branch must
+// keep the newly created node inside the named outlet. A `v-show` node never
+// leaves the DOM, so only its identity and display state can prove adoption.
+const condHtml = await renderToString(ConditionalPage, { props: {} });
+if (!condHtml.includes('cond-title')) fail(`SSR conditional page missing the truthy branch: ${condHtml}`);
+if (condHtml.includes('cond-fallback')) fail(`SSR conditional page rendered both branches: ${condHtml}`);
+
+const condApp = openApp(condHtml);
+const ssrCondTitle = condApp.querySelector('.cond-title');
+const ssrCondToggle = condApp.querySelector('.cond-toggle');
+if (!ssrCondTitle || !ssrCondToggle) fail('conditional page SSR shape is wrong');
+if (ssrCondTitle.closest('#named-header') == null) fail('conditional root left its named outlet');
+const ssrCondText = ssrCondTitle.firstChild;
+if (ssrCondText == null) fail('conditional root lost its text node');
+
+const condInst = await hydrate(ConditionalPage, condApp, {});
+if (condApp.querySelector('.cond-title') !== ssrCondTitle) fail('conditional named projection was rebuilt on hydrate');
+if (condApp.querySelector('.cond-title').firstChild !== ssrCondText) fail('hydrate rebuilt the conditional text node');
+if (condApp.querySelector('.cond-toggle') !== ssrCondToggle) fail('v-show node was rebuilt on hydrate');
+if (condApp.querySelector('.cond-toggle').style.display === 'none') fail('v-show true lost its display state on hydrate');
+if (condApp.querySelector('.cond-fallback') !== null) fail('hydrate created the absent v-else branch');
+
+condInst.showTitle = false;
+await flushPending(condInst);
+if (condApp.querySelector('.cond-title') !== null) fail('v-if branch survived a false condition');
+const condFallback = condApp.querySelector('.cond-fallback');
+if (!condFallback) fail('v-if false did not create the v-else branch');
+if (condFallback.closest('#named-header') == null) fail('v-else branch was not projected into the named outlet');
+
+condInst.showTitle = true;
+await flushPending(condInst);
+const condRecreated = condApp.querySelector('.cond-title');
+if (!condRecreated) fail('v-if true did not recreate the branch');
+if (condRecreated.closest('#named-header') == null) fail('recreated v-if branch left the named outlet');
+if (condApp.querySelector('.cond-fallback') !== null) fail('v-else branch survived a true condition');
+if (condApp.querySelectorAll('.cond-title').length !== 1) fail('v-if branch is duplicated after a conditional flip');
+
+condInst.visible = false;
+await flushPending(condInst);
+if (condApp.querySelector('.cond-toggle') !== ssrCondToggle) fail('v-show false rebuilt the node');
+if (ssrCondToggle.style.display !== 'none') fail(`v-show false did not hide the node: ${ssrCondToggle.style.display}`);
+condInst.visible = true;
+await flushPending(condInst);
+if (condApp.querySelector('.cond-toggle') !== ssrCondToggle) fail('v-show true rebuilt the node');
+if (ssrCondToggle.style.display === 'none') fail('v-show true left the node hidden');
+
+// 8. Conditional root, SSR falsy: the page carries only the `v-else` branch, so
+// resume must reclaim it and must not conjure the absent branch. Flipping to
+// true then has to land inside the named outlet, which proves the adopt scope
+// survived a projection group that started with no conditional node.
+const offHtml = await renderToString(ConditionalOffPage, { props: {} });
+if (!offHtml.includes('cond-fallback')) fail(`SSR falsy page missing the v-else branch: ${offHtml}`);
+if (offHtml.includes('cond-title')) fail(`SSR falsy page rendered the absent branch: ${offHtml}`);
+
+const offApp = openApp(offHtml);
+const ssrOffFallback = offApp.querySelector('.cond-fallback');
+const ssrOffToggle = offApp.querySelector('.cond-toggle');
+if (!ssrOffFallback || !ssrOffToggle) fail('falsy conditional page SSR shape is wrong');
+if (ssrOffFallback.closest('#named-header') == null) fail('SSR v-else branch left its named outlet');
+
+const offInst = await hydrate(ConditionalOffPage, offApp, {});
+if (offApp.querySelector('.cond-fallback') !== ssrOffFallback) fail('v-else branch was rebuilt on hydrate');
+if (offApp.querySelector('.cond-title') !== null) fail('hydrate created the absent v-if branch');
+if (offApp.querySelector('.cond-toggle') !== ssrOffToggle) fail('hidden v-show node was rebuilt on hydrate');
+if (ssrOffToggle.style.display !== 'none') fail('v-show false state was lost on hydrate');
+
+offInst.showTitle = true;
+await flushPending(offInst);
+const offCreated = offApp.querySelector('.cond-title');
+if (!offCreated) fail('flipping to true did not create the v-if branch');
+if (offCreated.closest('#named-header') == null) fail('created v-if branch left the named outlet');
+if (offApp.querySelector('.cond-fallback') !== null) fail('v-else branch survived the flip');
+
+// 9. Content that bypasses template compilation inside a named projection: a
+// `v-html` payload leaves the element with no compiled children, so resume must
+// still recognise the owner. A fail-closed that silently stops projecting would
+// rebuild the node and read as "correct" without the identity checks below.
+// `v-pre` is not covered here: the `.vmz` build path keeps the attribute but
+// still compiles the subtree, so the case cannot pass until that is fixed.
+const rawHtml = await renderToString(RawPage, { props: {} });
+if (!rawHtml.includes('raw-inner')) fail(`SSR raw page missing the v-html payload: ${rawHtml}`);
+
+const rawApp = openApp(rawHtml);
+const ssrRawHtml = rawApp.querySelector('#raw-html');
+const ssrRawBody = rawApp.querySelector('#raw-body');
+if (!ssrRawHtml || !ssrRawBody) fail('raw page SSR shape is wrong');
+if (ssrRawHtml.closest('#named-header') == null) fail('v-html node left its named outlet');
+if (ssrRawBody.closest('#named-body') == null) fail('raw default projection left its outlet');
+const ssrRawInner = rawApp.querySelector('#raw-inner');
+if (!ssrRawInner) fail('SSR v-html payload is missing');
+
+const rawInst = await hydrate(RawPage, rawApp, {});
+if (rawApp.querySelector('#raw-html') !== ssrRawHtml) fail('v-html node was rebuilt instead of reclaimed');
+if (rawApp.querySelector('#raw-body') !== ssrRawBody) fail('raw default projection was rebuilt instead of reclaimed');
+if (rawApp.querySelector('#raw-inner') !== ssrRawInner) fail('hydrate rewrote the v-html payload');
+
+rawInst.markup = '<b id="raw-inner">next</b>';
+rawInst.body = 'Raw body updated';
+await flushPending(rawInst);
+if (rawApp.querySelector('#raw-html') !== ssrRawHtml) fail('v-html update replaced the projection node');
+if (!String(ssrRawHtml.textContent).includes('next')) fail('v-html update did not replace the payload');
+if (rawApp.querySelector('#raw-body') !== ssrRawBody) fail('default projection update replaced the node');
+if (!String(ssrRawBody.textContent).includes('Raw body updated')) fail('default projection update did not patch the text');
+
 console.log(
-    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows, dynamic names, nested projection and named-in-named nesting',
+    'ssr-named-slot-resume GATE PASS: named projections keep their SSR nodes through hydrate, updates, keyed rows, dynamic names, nested projection, named-in-named nesting, conditional roots in both states and uncompiled v-html content',
 );
 
