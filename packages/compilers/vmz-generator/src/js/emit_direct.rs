@@ -2692,25 +2692,10 @@ fn emit_each_block(
 ) -> Result<String, String> {
     // `v-once` on the list element (or an ancestor) freezes the rendered rows.
     let once = once || has_once_marker(attrs);
-    // `v-memo` on the list element gates the list patch and its rows: v-once 优先。
-    // 快照落在列表外层作用域，即整张列表共享一份（逐行快照不在本次范围内）。
-    let memo_owned;
-    let memo = if once {
-        memo
-    } else if let Some(deps_expr) = memo_marker_expr(attrs) {
-        memo_owned = emit_memo_gate(
-            deps_expr,
-            fields,
-            handler_ctx.methods,
-            outer_scope,
-            outer_aliases,
-            stmts,
-            next_id,
-        );
-        Some(&memo_owned)
-    } else {
-        memo
-    };
+    // `v-memo` on the list element belongs to every row (Vue semantics: it is documented
+    // on the `v-for` row itself), so each row create builds its own snapshot in row scope.
+    // A list-level gate would evaluate the row-scoped expression outside that scope and
+    // freeze the whole list, so the list patch only inherits an ancestor memo here.
     let depth = each_depth + 1;
     let box_id = format!("box{depth}");
     let mut child_scope = outer_scope.to_vec();

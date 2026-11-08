@@ -1,0 +1,116 @@
+<template>
+    <main id="memo">
+        <p id="outside">
+            {{ inner }}
+        </p>
+        <div id="gated" v-memo="[dep]">
+            <p id="gated-text">
+                {{ inner }}
+            </p>
+            <p id="gated-attr" :title="inner">
+                {{ inner }}
+            </p>
+        </div>
+        <div id="gated-empty" v-memo="[]">
+            <p id="empty-text">
+                {{ inner }}
+            </p>
+        </div>
+        <div id="gated-nested" v-memo="[outer]">
+            <p id="nested-outer">
+                {{ outer }}
+            </p>
+            <div id="nested-inner" v-memo="[inner]">
+                <p id="nested-inner-text">
+                    {{ inner }}
+                </p>
+                <p id="nested-inner-outer">
+                    {{ outer }}
+                </p>
+            </div>
+        </div>
+        <div id="gated-once" v-memo="[dep]">
+            <p id="once" v-once>
+                {{ inner }}
+            </p>
+            <p id="once-sibling">
+                {{ inner }}
+            </p>
+        </div>
+        <div v-if="show" id="branch-host">
+            <div id="gated-branch" v-memo="[dep]">
+                <p id="branch-text">
+                    {{ inner }}
+                </p>
+            </div>
+        </div>
+        <p id="rows-live">
+            {{ rows[0].text }}
+        </p>
+        <ul id="rows">
+            <li v-for="row in rows" :key="row.id" v-memo="[row.dep]">
+                {{ row.text + "-d" + row.dep }}
+            </li>
+        </ul>
+        <button type="button" id="bump-inner" @click="bumpInner">
+            inner
+        </button>
+        <button type="button" id="bump-dep" @click="bumpDep">
+            dep
+        </button>
+        <button type="button" id="bump-outer" @click="bumpOuter">
+            outer
+        </button>
+        <button type="button" id="toggle-show" @click="toggleShow">
+            show
+        </button>
+        <button type="button" id="bump-row-text" @click="bumpRowText">
+            row text
+        </button>
+        <button type="button" id="bump-row-dep" @click="bumpRowDep">
+            row dep
+        </button>
+    </main>
+</template>
+<script client>
+export default class MemoPage {
+    public inner = 0;
+    public dep = 0;
+    public outer = 0;
+    public show = false;
+    public rows = [
+        { id: "a", dep: 0, text: "row-a-0" },
+        { id: "b", dep: 0, text: "row-b-0" },
+    ];
+
+    public bumpInner() {
+        this.inner++;
+    }
+
+    public bumpDep() {
+        this.dep++;
+    }
+
+    public bumpOuter() {
+        this.outer++;
+    }
+
+    public toggleShow() {
+        this.show = !this.show;
+    }
+
+    public bumpRowText() {
+        this.rows = this.rows.map((row) => ({ ...row, text: `${row.text}-plus` }));
+    }
+
+    public bumpRowDep() {
+        this.rows = this.rows.map((row) => ({ ...row, dep: row.dep + 1 }));
+    }
+
+    public onMount() {
+        if (typeof window !== "undefined") {
+            (window as any).__memoReady = true;
+        }
+    }
+}
+</script>

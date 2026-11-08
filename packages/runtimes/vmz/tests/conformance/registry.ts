@@ -411,6 +411,11 @@ export const CHECKS: Record<string, CheckEntry> = {
         description: '`/charts` responsive bodies stay client-owned while fixed-size SSR SVG is adopted',
         pre: ['build:runtimes'],
     },
+    'v-memo-browser': {
+        file: 'ui/v-memo-browser.ts',
+        description: '`v-memo` dependency gating, `[]`, memo roots, `v-once`, nesting and row snapshots in Chrome',
+        pre: ['build:runtimes'],
+    },
     'component-event-wire': {
         file: 'ui/component-event-wire.ts',
         description: 'Component @event → onComponentEvent subscribe; :on-* stays prop (orthogonal)',
@@ -925,6 +930,7 @@ export const CHECK_ALL = [
     'ui-direct-host-box',
     'radio-checked-dirty',
     'chart-hydration-stability',
+    'v-memo-browser',
     'component-event-wire',
     'highlighter-wasm',
     'highlighter-ce-binding',

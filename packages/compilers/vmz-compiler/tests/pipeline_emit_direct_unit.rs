@@ -637,6 +637,43 @@ export default class NestedMemo {
 }
 
 #[test]
+fn v_memo_on_v_for_row_binds_snapshot_inside_the_row() {
+    let src = r#"
+export default class MemoRows {
+  rows = [];
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(
+        r#"<ul><li v-for="row in rows" :key="row.id" v-memo="[row.dep]">{{ row.text }}</li></ul>"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // 行 memo 的依赖数组在行作用域内绑定到行 box，快照随 createItem 逐行实例化。
+    assert!(js.contains("[box1.item.dep]"), "row memo must bind to the row box: {js}");
+    assert!(!js.contains("[row.dep]"), "row memo must not keep the bare row alias: {js}");
+    // 列表补丁只发布列表根依赖，不得携带行作用域的 memo 门控（旧实现会让整表冻结）。
+    let apply_fn = js
+        .split("function apply() {")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected list apply: {js}"));
+    let apply_body = apply_fn.split("api.trackPatch(inst, [").next().unwrap_or(apply_fn);
+    assert!(
+        !apply_body.contains("__memoNext"),
+        "list apply must not gate on a row-scoped memo: {js}"
+    );
+    let list_patch = js
+        .split("api.trackPatch(inst, [")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected list patch: {js}"));
+    let deps = list_patch.split(']').next().unwrap_or("");
+    assert!(deps.contains("\"rows\""), "list root dep expected: {js}");
+    assert!(!deps.contains("row."), "list deps must not carry the row alias: {js}");
+}
+
+#[test]
 fn v_once_if_freeze_keeps_structure_but_drops_condition_patch() {
     let src = r#"
 export default class OnceBranch {

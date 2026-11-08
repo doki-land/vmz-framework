@@ -17,7 +17,7 @@ on:
 #   fmt            — `pnpm fmt:check` after artifact restore
 #   build-runtimes — `vmz-pack` / `vmz-napi` cargo tests + dist pack asserts
 #   build-test     — unit + examples + browser smoke
-#   ui-browser     — ui-automation + direct host box + radio checkedness + chart hydration + browser-production (Chrome)
+#   ui-browser     — ui-automation + direct host box + radio checkedness + chart hydration + v-memo + browser-production (Chrome)
 #   runtime-gates  — Slim + runtime-quality-baseline + authoring/hydration gates + dev pack input skip
 # Downstream jobs set VMZ_SKIP_NATIVE_BUILD=1 so verify `pre: build:runtimes` is a no-op.
 # After artifact restore, each consumer runs `pnpm verify -- skip-native-pre` first.

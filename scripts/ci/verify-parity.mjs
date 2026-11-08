@@ -51,6 +51,7 @@ const PRESETS = {
         'ui-direct-host-box',
         'radio-checked-dirty',
         'chart-hydration-stability',
+        'v-memo-browser',
         'browser-production',
     ],
 };
