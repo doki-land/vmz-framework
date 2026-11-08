@@ -1118,10 +1118,19 @@ export default class Chart {
         return [...next];
     }
 
-    /** 选择事件外抛。传入提议集时发该集合，省略时发当前生效集合。 */
-    public _emitSelectionChange(selection?: readonly string[]): void {
-        const sel = selection ? [...selection] : this._currentSelection();
-        this._emitChartEvent("vmz-chart-selection-change", { selection: sel });
+    /** 选择集比较（忽略顺序）：没有变化的交互不重复发事件。 */
+    public _sameSelection(a: readonly string[], b: readonly string[]): boolean {
+        if (a.length !== b.length) return false;
+        const set = new Set(a);
+        return b.every((id) => set.has(id));
+    }
+
+    /** 选择事件外抛。发提议集之前先与生效选择集比对，无变化视为幂等噪音，
+     *  例如选择已空时再点空白、已清空时再按 `Escape`。 */
+    public _emitSelectionChange(selection: readonly string[]): void {
+        const cur = this._currentSelection();
+        if (this._sameSelection(cur, selection)) return;
+        this._emitChartEvent("vmz-chart-selection-change", { selection: [...selection] });
     }
 
     public _emitZoomChange(): void {

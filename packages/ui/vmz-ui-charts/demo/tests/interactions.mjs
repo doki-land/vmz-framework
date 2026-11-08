@@ -569,6 +569,11 @@ async function blankPointIn(page, hostSelector, hitSelector) {
             JSON.stringify(afterBlank.events),
         );
         check('select.blank click clears the selected attributes', afterBlank.selected === 0, `selected=${afterBlank.selected}`);
+        // 选择已空时再点空白没有任何变化，不发幂等噪音事件。
+        await page.mouse.click(blank.x, blank.y);
+        await new Promise((r) => setTimeout(r, 450));
+        const idleEvents = await page.evaluate(() => window.__selEvents.length);
+        check('select.blank click with nothing selected emits nothing', idleEvents === 2, `events=${idleEvents}`);
     }
     await page.close();
 }
