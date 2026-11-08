@@ -443,6 +443,9 @@ export default class Chart {
      *  渲染期写入它们不得再触发 patch，否则形成自激回路。 */
     #semanticScene: SemanticScene | null = null;
     #plan: ChartCompilePlan | null = null;
+    /** treemap 父链缓存（key → 父 key），跟随 `#plan` 一起失效。 */
+    #treemapParents: ReadonlyMap<string, string> | null = null;
+    #treemapParentsPlan: ChartCompilePlan | null = null;
     /** 只读公开句柄：demo / 宿主核对编译产物用，不参与响应式。 */
     public get _plan(): ChartCompilePlan | null {
         return this.#plan;
@@ -1410,6 +1413,50 @@ export default class Chart {
         return false;
     }
 
+    /** key → 父 key（读 parentField）；按 plan 缓存，重绘不重算。 */
+    public _treemapParents(): ReadonlyMap<string, string> {
+        const cached = this.#treemapParents;
+        if (cached !== null && this.#treemapParentsPlan === this.#plan) return cached;
+        const map = new Map<string, string>();
+        const plan = this.#plan;
+        const field = this.spec ? this.spec.parentField : undefined;
+        if (plan && field) {
+            for (const mark of plan.marks) {
+                const pv = readCell(plan.resolvedData, field, mark.rowIndex);
+                if (pv === null || pv === undefined) continue;
+                if (typeof pv === "number" && !Number.isFinite(pv)) continue;
+                map.set(mark.key, String(pv));
+            }
+        }
+        this.#treemapParents = map;
+        this.#treemapParentsPlan = plan;
+        return map;
+    }
+
+    /**
+     * 双击下钻目标：命中节点自身可下钻就用它，否则沿父链上溯到最近的可下钻节点。
+     *
+     * 子级总画在父级之上，命中测试又取最深矩形，所以中间层自己的那块永远被
+     * 子级覆盖。只认「命中节点有子级」等于任何中间层都下钻不到；这里上溯到
+     * 最近的有子级节点，并停在当前下钻根之前，避免原地重钻或跨层跳跃。
+     */
+    public _treemapDrillTarget(key: string): string | null {
+        const root = this._drillRoot();
+        if (root === null || key !== root) {
+            if (this._treemapHasChildren(key)) return key;
+        }
+        const parents = this._treemapParents();
+        let cursor: string | undefined = key;
+        for (let guard = 0; cursor !== undefined && guard < 64; guard += 1) {
+            const parent: string | undefined = parents.get(cursor);
+            if (parent === undefined) break;
+            if (root !== null && parent === root) break;
+            if (this._treemapHasChildren(parent)) return parent;
+            cursor = parent;
+        }
+        return null;
+    }
+
     /** 下钻：只记录节点身份，重绘仍走 `_effectiveSpec` → compile → scene。 */
     public _drillTo(key: string): void {
         if (this._drillRoot() === key) return;
@@ -1433,10 +1480,13 @@ export default class Chart {
         if (!point) return;
         if (this.spec && String(this.spec.mark) === "treemap") {
             const key = this._treemapKeyOf(this._hitTest(point.x, point.y));
-            if (key !== null && this._treemapHasChildren(key)) {
-                ev.preventDefault();
-                this._drillTo(key);
-                return;
+            if (key !== null) {
+                const target = this._treemapDrillTarget(key);
+                if (target !== null) {
+                    ev.preventDefault();
+                    this._drillTo(target);
+                    return;
+                }
             }
             if (key === null && this._drillRoot() !== null) {
                 ev.preventDefault();

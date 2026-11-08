@@ -106,7 +106,7 @@ Categories missing from the map fall back to `seriesPalette`, indexed by **sorte
 - Hover / focus shows real cell values; line and area charts get a crosshair that snaps to the nearest data x across all series.
 - Arrow keys walk marks (line/area walk per-vertex values), `Enter` selects, `Escape` clears.
 - Drag empty plot space to brush-select marks; shift+drag pans a quantitative x axis; the wheel zooms around the pointer; `+` / `-` / `0` zoom and reset from the keyboard.
-- Treemap only: double-click a node to drill into it as the new root, double-click empty space (the top-left button, or `Escape`) to go back one level. Node ids stay `treemap:<key>`, so selection and palette survive reordering and redraws.
+- Treemap only: double-click a cell to drill into the nearest ancestor that has children (the matching rect is covered by its own children, so the target resolves up the `parentField` chain), double-click empty space (the top-left button, or `Escape`) to go back one level. Node ids stay `treemap:<key>`, so selection and palette survive reordering and redraws.
 - Host events: `onchartHover({ rowKey, x, y })`, `onchartSelect({ rowKey })`, `onchartBrush({ keys })` — override them on the instance. The same interactions bubble as `vmz-chart-selection-change`, `vmz-chart-zoom-change`, `vmz-chart-legend-change` and `vmz-chart-drilldown-change` (`{ root, path }`).
 
 ### Disk-usage boards
