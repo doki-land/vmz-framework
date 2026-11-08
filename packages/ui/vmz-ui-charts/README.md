@@ -149,7 +149,7 @@ const spec = {
 
 ## Accessibility
 
-Every chart is `role="img"` with a derived or explicit `label`, plus a visually hidden data table linked via `aria-describedby` — screen readers get the actual numbers, not just a summary sentence. Selected marks carry `data-selected="true"` and `aria-selected="true"`, so selection is observable from attributes rather than only from inline opacity. `tableView` swaps the SVG for that table for users who prefer it, and switches the container to `role="group"`. Tables render at most 1000 rows with an explicit truncation note. All motion respects `prefers-reduced-motion`.
+Every chart is `role="img"` with a derived or explicit `label`, plus a visually hidden data table linked via `aria-describedby` — screen readers get the actual numbers, not just a summary sentence. Selected marks carry `data-selected="true"` and `aria-selected="true"` in the SVG markup itself, so server-rendered output for an explicit `width` / `height` matches the client DOM instead of only gaining the state after an interaction. `tableView` swaps the SVG for that table for users who prefer it, and switches the container to `role="group"`. Tables render at most 1000 rows with an explicit truncation note. All motion respects `prefers-reduced-motion`.
 
 ## Diagnostics, not blank charts
 

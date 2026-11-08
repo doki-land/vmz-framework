@@ -584,7 +584,31 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await page.evaluate(() => {
         window.__ctrlSel = [];
         document.addEventListener('vmz-chart-selection-change', (e) => window.__ctrlSel.push(e.detail));
+        // Instance handle: later steps simulate a controlled parent re-feeding `selection`.
+        const host = document.querySelector('#controlled-bar [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        window.__ctrlInst = [...all].find((m) => m && m.__vmzDomRoot === host) ?? null;
     });
+    const pickMark = (id) =>
+        page.evaluate((markId) => {
+            const el = document.querySelector(`#controlled-bar [data-dvz-id="${markId}"]`);
+            return el ? { selected: el.getAttribute('data-selected'), aria: el.getAttribute('aria-selected') } : null;
+        }, id);
+    const initial = { bar0: await pickMark('bar:0'), bar1: await pickMark('bar:1') };
+    check(
+        'controlled.first frame paints the selection without interaction',
+        initial.bar0?.selected === 'true' && initial.bar0?.aria === 'true' && initial.bar1?.selected === null,
+        JSON.stringify(initial),
+    );
+
     const clickMark = async (markId) => {
         const pt = await page.evaluate((id) => {
             const el = document.querySelector(`#controlled-bar [data-dvz-id="${id}"]`);
@@ -636,10 +660,55 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await new Promise((r) => setTimeout(r, 350));
     const e4 = await events();
     check('controlled.Escape proposes an empty set', e4.length === 4 && JSON.stringify(e4[3]) === JSON.stringify([]), JSON.stringify(e4));
+
+    // 宿主回灌新数组：受控选择必须立即反映到 DOM，不等下一次交互。
+    const refed = await page.evaluate(() => {
+        if (!window.__ctrlInst) return false;
+        window.__ctrlInst.selection = ['bar:4'];
+        return true;
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    const afterRefeed = { bar0: await pickMark('bar:0'), bar4: await pickMark('bar:4') };
+    check(
+        'controlled.host prop write repaints the selection immediately',
+        refed && afterRefeed.bar4?.selected === 'true' && afterRefeed.bar4?.aria === 'true' && afterRefeed.bar0?.selected === null,
+        JSON.stringify({ refed, afterRefeed }),
+    );
     await page.close();
 }
 
-// ─── 13. brush reroutes selection and bubbles it ─────────────────────────
+// ─── 13. SSR markup carries the selected attributes ──────────────────────
+{
+    const page = await openPage();
+    const html = await (await fetch(BASE)).text();
+    const start = html.indexOf('id="ssr-selected"');
+    const end = start >= 0 ? html.indexOf('</section>', start) : -1;
+    const section = start >= 0 && end > start ? html.slice(start, end) : '';
+    check(
+        'ssr.markup paints the controlled selection',
+        section.includes('data-dvz-id="bar:2" data-selected="true" aria-selected="true"'),
+        `section=${section.length}`,
+    );
+    check('ssr.markup dims the unselected marks', section.includes('data-dvz-id="bar:1" opacity="0.35"'), `section=${section.length}`);
+    const client = await page.evaluate(() => {
+        const sel = document.querySelector('#ssr-selected [data-dvz-id="bar:2"]');
+        const other = document.querySelector('#ssr-selected [data-dvz-id="bar:1"]');
+        if (!sel) return null;
+        return {
+            selected: sel.getAttribute('data-selected'),
+            aria: sel.getAttribute('aria-selected'),
+            otherDim: other ? (other.getAttribute('opacity') ?? other.style.opacity) : null,
+        };
+    });
+    check(
+        'ssr.client keeps the same attributes after mount',
+        client?.selected === 'true' && client?.aria === 'true' && client?.otherDim === '0.35',
+        JSON.stringify(client),
+    );
+    await page.close();
+}
+
+// ─── 14. brush reroutes selection and bubbles it ─────────────────────────
 {
     const page = await openPage();
     await page.evaluate(() => {

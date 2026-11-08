@@ -93,6 +93,19 @@
                 <Chart :spec="ctrlBarSpec" :data="ctrlBarRows" :height="280" :selection="ctrlSelection" :theme="dark ? 'dark' : 'light'" label="controlled selection bar" />
             </div>
         </section>
+        <section id="ssr-selected" class="card">
+            <header class="card__head">
+                <h2>
+                    SSR · 选中属性
+                </h2>
+                <p>
+                    显式 width/height 下服务端就输出 data-selected / aria-selected,客户端挂载后保持同一份 DOM。
+                </p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="ctrlBarSpec" :data="ctrlBarRows" :width="640" :height="280" :selection="ssrSelection" :theme="dark ? 'dark' : 'light'" label="server-rendered selection bar" />
+            </div>
+        </section>
         <section class="card">
             <header class="card__head">
                 <h2>
@@ -444,6 +457,7 @@ export default class IndexPage {
     public ctrlBarSpec: any = null;
     public ctrlBarRows: any[] = [];
     public ctrlSelection: string[] = ["bar:0"];
+    public ssrSelection: string[] = ["bar:2"];
     public darkPieSpec: any = null;
     public darkPieRows: any[] = [];
     public darkRadarSpec: any = null;

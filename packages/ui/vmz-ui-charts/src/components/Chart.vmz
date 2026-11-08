@@ -660,7 +660,32 @@ export default class Chart {
             this._scheduleCanvasPaint(scene);
             return "";
         }
-        return renderSvg(scene, { resourceIdPrefix: this._resourcePrefix() });
+        return this._replaySelectionInMarkup(renderSvg(scene, { resourceIdPrefix: this._resourcePrefix() }));
+    }
+
+    /** 选中态回放进 markup：SSR 与客户端首帧由同一份 scene 与选择集生成，
+     *  两端 DOM 一致；交互期的高亮/变暗仍由 `_applyDomState` 覆写。 */
+    public _replaySelectionInMarkup(svg: string): string {
+        const selected = this._currentSelection();
+        const markNodes = this._markNodes();
+        if (markNodes.length === 0) return svg;
+        const selectedEscaped = new Set(selected.map((id) => this._attrEscape(id)));
+        const markEscaped = new Set(markNodes.map((n) => this._attrEscape(n.id)));
+        return svg.replace(/ data-dvz-id="([^"]*)"/g, (whole: string, id: string) => {
+            if (selectedEscaped.has(id)) return `${whole} data-selected="true" aria-selected="true"`;
+            if (selectedEscaped.size > 0 && markEscaped.has(id)) return `${whole} opacity="0.35"`;
+            return whole;
+        });
+    }
+
+    /** 与 `renderSvg` 写 `data-dvz-id` 时相同的属性转义，保证比对命中。 */
+    public _attrEscape(text: string): string {
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
 
     // ---- Canvas 后端（>50k 点或显式 canvas；SVG 仍是默认与 SSR 降级） ----
@@ -811,6 +836,8 @@ export default class Chart {
         // canvas 模式的首帧：markup 在挂载前已跑，此时元素已存在，补一次绘制。
         const pending = (this as any).__pendingScene as DisplayScene | null | undefined;
         if (this._useCanvas() && pending) this._scheduleCanvasPaint(pending);
+        // 首帧状态应用：受控 selection 在挂载时就要可见，不依赖后续交互触发。
+        this._applyDomState();
     }
 
     onUnmount() {
