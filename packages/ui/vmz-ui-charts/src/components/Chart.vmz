@@ -2568,7 +2568,7 @@ export default class Chart {
             this._announce(this._tooltip.text);
         }
         this.dispatch({ kind: "hover", nodeId: target.id });
-        this._emitChartEvent("vmz-chart-focus", { id: target.id, key: target.key });
+        this._emitChartEvent("vmz-chart-focus", { rowKey: this._rowKeyForMark(target.id), markId: target.id });
         this._applyDomState();
     }
 
