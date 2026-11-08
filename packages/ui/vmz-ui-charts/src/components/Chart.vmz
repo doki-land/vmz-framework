@@ -381,6 +381,17 @@ interface NavTarget {
 
 const FALLBACK_WIDTH = 640;
 const FALLBACK_HEIGHT = 360;
+
+/** 尺寸 prop 归一：宿主经 attribute 传参时数字会变成字符串，两者都算显式
+ *  尺寸，其余（null / 空串 / 非正 / 非有限）一律视为未给，交回测量。 */
+function sizeProp(value: unknown): number | null {
+    if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : null;
+    if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+    return null;
+}
 const HIT_TOLERANCE_PX = 8;
 /** 数据表视图的最大渲染行数（超出截断并标注）。 */
 const TABLE_MAX_ROWS = 1000;
@@ -507,13 +518,15 @@ export default class Chart {
     // ---- 尺寸与主题 ----
 
     public _effWidth(): number {
-        if (this.width !== null && Number.isFinite(this.width) && this.width > 0) return this.width;
+        const explicit = sizeProp(this.width);
+        if (explicit !== null) return explicit;
         if (this._measuredWidth !== null && this._measuredWidth > 0) return this._measuredWidth;
         return FALLBACK_WIDTH;
     }
 
     public _effHeight(): number {
-        if (this.height !== null && Number.isFinite(this.height) && this.height > 0) return this.height;
+        const explicit = sizeProp(this.height);
+        if (explicit !== null) return explicit;
         if (this._measuredHeight !== null && this._measuredHeight > 0) return this._measuredHeight;
         return FALLBACK_HEIGHT;
     }
@@ -537,8 +550,8 @@ export default class Chart {
      * 显式 width 与 height 都在场时尺寸已知，SSR SVG 可水合复用。
      */
     public _bodyAwaitingMeasure(): boolean {
-        const widthPending = this.width === null && this._measuredWidth === null;
-        const heightPending = this.height === null && this._measuredHeight === null;
+        const widthPending = sizeProp(this.width) === null && this._measuredWidth === null;
+        const heightPending = sizeProp(this.height) === null && this._measuredHeight === null;
         return widthPending || heightPending;
     }
 
@@ -743,7 +756,7 @@ export default class Chart {
     public get hostStyle(): string {
         const w = this._effWidth();
         const h = this._effHeight();
-        const widthCss = this.width !== null ? `width:${w}px;` : "width:100%;";
+        const widthCss = sizeProp(this.width) !== null ? `width:${w}px;` : "width:100%;";
         return `${widthCss}height:${h}px;position:relative;`;
     }
 
@@ -862,8 +875,8 @@ export default class Chart {
     /** 无 ResizeObserver 的浏览器不会回写测量值，落回默认尺寸避免主体永久为空。 */
     public _seedFallbackSizeWhenUnmeasurable(): void {
         if (typeof window === "undefined" || typeof ResizeObserver !== "undefined") return;
-        if (this.width === null && this._measuredWidth === null) this._measuredWidth = FALLBACK_WIDTH;
-        if (this.height === null && this._measuredHeight === null) this._measuredHeight = FALLBACK_HEIGHT;
+        if (sizeProp(this.width) === null && this._measuredWidth === null) this._measuredWidth = FALLBACK_WIDTH;
+        if (sizeProp(this.height) === null && this._measuredHeight === null) this._measuredHeight = FALLBACK_HEIGHT;
     }
 
     public _attachResizeObserver(): void {
@@ -877,8 +890,8 @@ export default class Chart {
                 const w = Math.round(cr.width);
                 const h = Math.round(cr.height);
                 // 只有 auto 维度跟随容器；显式 prop 永远优先。
-                if (this.width === null && w > 0 && w !== this._measuredWidth) this._measuredWidth = w;
-                if (this.height === null && h > 0 && h !== this._measuredHeight) this._measuredHeight = h;
+                if (sizeProp(this.width) === null && w > 0 && w !== this._measuredWidth) this._measuredWidth = w;
+                if (sizeProp(this.height) === null && h > 0 && h !== this._measuredHeight) this._measuredHeight = h;
                 if (this.state) {
                     this.state = reduce(this.state, { kind: "container-resize", w, h });
                 }
