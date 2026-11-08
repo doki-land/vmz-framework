@@ -27,6 +27,9 @@
         <button v-if="_zoomResetVisible()" type="button" @click="_resetZoom" aria-label="重置缩放" class="vmz-ui-charts__zoom-reset">
             重置缩放
         </button>
+        <button v-if="_drillBackVisible()" type="button" @click="_drillUp" aria-label="返回上一级" class="vmz-ui-charts__drill-up">
+            返回上一级
+        </button>
         <div :id="_liveId()" aria-live="polite" class="vmz-ui-charts__sr">
             {{ _liveText }}
         </div>
@@ -51,7 +54,8 @@
     touch-action: pan-y;
     position: relative;
 }
-.vmz-ui-charts__zoom-reset {
+.vmz-ui-charts__zoom-reset,
+.vmz-ui-charts__drill-up {
     position: absolute;
     top: 6px;
     right: 6px;
@@ -64,11 +68,18 @@
     font: 500 11px/1.4 var(--vmz-font-sans, system-ui, sans-serif);
     cursor: pointer;
 }
-.vmz-ui-charts__zoom-reset:hover {
+/* 返回按钮在左上角，和右上的重置缩放分开，互不遮挡。 */
+.vmz-ui-charts__drill-up {
+    right: auto;
+    left: 6px;
+}
+.vmz-ui-charts__zoom-reset:hover,
+.vmz-ui-charts__drill-up:hover {
     color: var(--vmz-text-ink, #111827);
     border-color: var(--vmz-text-steel, #4b5563);
 }
-.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__zoom-reset {
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__zoom-reset,
+.vmz-ui-charts__chart[data-theme="dark"] .vmz-ui-charts__drill-up {
     background: var(--vmz-surface-paper, #0b1220);
     border-color: var(--vmz-line-default, #1f2937);
     color: var(--vmz-text-steel, #9ca3af);
@@ -474,6 +485,9 @@ export default class Chart {
     public _hiddenSeries: string[] = [];
     /** 图例单独聚焦的系列名（非 null 时只显示它）。 */
     public _isolatedSeries: string | null = null;
+    /** treemap 下钻路径：栈尾是当前作为根的节点 key（空 = 文档根）。
+     *  只存节点身份，不存几何，重排 / 重绘后仍然有效。 */
+    public _drillPath: string[] = [];
     /** 钉住的 tooltip（Enter / 长按产生，Esc 或再次 Enter 解除）。 */
     public _pinnedTooltip: { x: number; y: number; text: string } | null = null;
     /** aria-live 播报文本（焦点 / 钉住 / 图例变化时更新）。 */
@@ -864,10 +878,15 @@ export default class Chart {
     public _effectiveSpec(): ChartSpec | null {
         const spec = this.spec;
         if (!spec) return null;
-        if (!this._viewDomainEffective() || !this._baseXKind) return spec;
+        // treemap 下钻：把当前根节点注入 spec，渲染仍然是同一条管线。
+        const drilled =
+            this._drillRoot() !== null && String(spec.mark) === "treemap"
+                ? { ...spec, treemapRoot: this._drillRoot() as string }
+                : spec;
+        if (!this._viewDomainEffective() || !this._baseXKind) return drilled;
         const scales = new Map<string, Scale>();
-        if (spec.scales) {
-            for (const entry of Array.from(spec.scales.entries())) {
+        if (drilled.scales) {
+            for (const entry of Array.from(drilled.scales.entries())) {
                 scales.set(entry[0], entry[1]);
             }
         }
@@ -877,7 +896,7 @@ export default class Chart {
         } else {
             scales.set("x", { kind: "linear", domain, range: [0, 1] });
         }
-        return { ...spec, scales };
+        return { ...drilled, scales };
     }
 
     // ---- 图例显隐（过滤快照，比例尺按可见数据重算） ----
@@ -1359,10 +1378,72 @@ export default class Chart {
         this._clearLongPress();
     }
 
-    /** 双击 plot 区复位缩放（图例区不触发）。 */
+    // ---- treemap 下钻（进入节点作为根 / 返回上一级） ----
+
+    /** 下钻栈顶：当前作为根的节点 key，空栈 = 文档根。 */
+    public _drillRoot(): string | null {
+        return this._drillPath.length > 0 ? this._drillPath[this._drillPath.length - 1] : null;
+    }
+
+    /** 返回按钮可见性：treemap 且已下钻。 */
+    public _drillBackVisible(): boolean {
+        return this._drillRoot() !== null && this.spec !== null && String(this.spec.mark) === "treemap";
+    }
+
+    /** mark id → treemap 节点 key（非 treemap id 返回 null）。 */
+    public _treemapKeyOf(id: string | null): string | null {
+        if (id === null || !id.startsWith("treemap:")) return null;
+        return id.slice("treemap:".length);
+    }
+
+    /** 节点是否有子行：父子关系读 parentField，与几何和绘制深度无关。 */
+    public _treemapHasChildren(key: string): boolean {
+        const plan = this.#plan;
+        const field = this.spec ? this.spec.parentField : undefined;
+        if (!plan || !field) return false;
+        for (const mark of plan.marks) {
+            const pv = readCell(plan.resolvedData, field, mark.rowIndex);
+            if (pv !== null && pv !== undefined && !(typeof pv === "number" && !Number.isFinite(pv)) && String(pv) === key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 下钻：只记录节点身份，重绘仍走 `_effectiveSpec` → compile → scene。 */
+    public _drillTo(key: string): void {
+        if (this._drillRoot() === key) return;
+        this._drillPath = [...this._drillPath, key];
+        this._announce(`下钻到 ${key}`);
+        this._emitChartEvent("vmz-chart-drilldown-change", { root: key, path: [...this._drillPath] });
+    }
+
+    /** 返回上一级；弹出最后一级后回到文档根。 */
+    public _drillUp(): void {
+        if (this._drillPath.length === 0) return;
+        this._drillPath = this._drillPath.slice(0, -1);
+        const root = this._drillRoot();
+        this._announce(root === null ? "已返回顶层" : `已返回 ${root}`);
+        this._emitChartEvent("vmz-chart-drilldown-change", { root, path: [...this._drillPath] });
+    }
+
+    /** 双击：treemap 下钻 / 返回，其它 mark 复位缩放（图例区不触发）。 */
     public _onDblClick(ev: MouseEvent): void {
         const point = this._toScenePoint(ev);
         if (!point) return;
+        if (this.spec && String(this.spec.mark) === "treemap") {
+            const key = this._treemapKeyOf(this._hitTest(point.x, point.y));
+            if (key !== null && this._treemapHasChildren(key)) {
+                ev.preventDefault();
+                this._drillTo(key);
+                return;
+            }
+            if (key === null && this._drillRoot() !== null) {
+                ev.preventDefault();
+                this._drillUp();
+            }
+            return;
+        }
         if (this._zoomResetVisible()) {
             ev.preventDefault();
             this._resetView();
@@ -1589,18 +1670,22 @@ export default class Chart {
         return this.#semanticScene.root.children.filter((n) => n.role === "chart.mark");
     }
 
-    /** 命中测试：返回最近的 mark 稳定 id，未命中返回 null。 */
+    /** 命中测试：返回最近的 mark 稳定 id，未命中返回 null。重叠 rect（嵌套
+     *  treemap）同样距离时取面积更小的那个 —— 最深节点才代表点到的格子。 */
     public _hitTest(px: number, py: number): string | null {
         let bestId: string | null = null;
         let bestDist: number = Number.POSITIVE_INFINITY;
+        let bestArea: number = Number.POSITIVE_INFINITY;
         for (const node of this._markNodes()) {
             const dist = this._distanceTo(node, px, py);
             if (dist === null || dist > HIT_TOLERANCE_PX) {
                 continue;
             }
-            if (bestId === null || dist < bestDist) {
+            const area = node.kind === "rect" ? node.w * node.h : Number.POSITIVE_INFINITY;
+            if (bestId === null || dist < bestDist || (dist === bestDist && area < bestArea)) {
                 bestId = node.id;
                 bestDist = dist;
+                bestArea = area;
             }
         }
         return bestId;
@@ -2285,6 +2370,12 @@ export default class Chart {
                 this._applyDomState();
             }
         } else if (ev.key === "Escape") {
+            // treemap 已下钻时，Escape 先返回上一级（再按一次才清选择）。
+            if (this._drillBackVisible()) {
+                ev.preventDefault();
+                this._drillUp();
+                return;
+            }
             this._hoverId = null;
             this._focusIndex = -1;
             this._pinnedTooltip = null;
