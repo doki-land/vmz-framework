@@ -13,9 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # 工具链 pin 只写在仓根 `rust-toolchain.toml`。
+      # Windows runner 默认 pwsh，`$GITHUB_OUTPUT` 只在 bash 下是输出文件通道。
       - name: Resolve pinned Rust toolchain
         id: rust-toolchain
-        run: echo "channel=$(node scripts/ci/rust-toolchain.mjs)" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(node scripts/ci/rust-toolchain.mjs)"
+          test -n "$channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.rust-toolchain.outputs.channel }}
