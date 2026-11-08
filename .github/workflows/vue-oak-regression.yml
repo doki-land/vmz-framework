@@ -12,7 +12,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@nightly
+      # 工具链 pin 只写在仓根 `rust-toolchain.toml`。
+      - name: Resolve pinned Rust toolchain
+        id: rust-toolchain
+        run: echo "channel=$(node scripts/ci/rust-toolchain.mjs)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
+      - name: Record and verify Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -Vv
+          rustup show active-toolchain | grep -F "$(node scripts/ci/rust-toolchain.mjs)"
       - uses: Swatinem/rust-cache@v2
       - name: Compile isolated regression
         run: cargo test -p vmz-oak-frontend-adapter --test vue_directive_regression --no-run --message-format=json > regression-build.json

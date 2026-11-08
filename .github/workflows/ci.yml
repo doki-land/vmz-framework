@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Release gate and publish preflight fixtures
-        run: node --test scripts/ci/require-ci-success.test.mjs scripts/ci/preflight-publish.test.mjs
+        run: node --test scripts/ci/require-ci-success.test.mjs scripts/ci/preflight-publish.test.mjs scripts/ci/rust-toolchain.test.mjs
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -42,8 +42,22 @@ jobs:
           node-version: '24.12.0'
           package-manager-cache: false
 
+      # 工具链 pin 只写在仓根 `rust-toolchain.toml`：工作流不得出现浮动 channel。
+      - name: Resolve pinned Rust toolchain
+        id: rust-toolchain
+        run: echo "channel=$(node scripts/ci/rust-toolchain.mjs)" >> "$GITHUB_OUTPUT"
+
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
+
+      - name: Record and verify Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -Vv
+          rustup show active-toolchain | grep -F "$(node scripts/ci/rust-toolchain.mjs)"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
@@ -147,10 +161,23 @@ jobs:
           node-version: '24.12.0'
           package-manager-cache: false
 
+      # 工具链 pin 只写在仓根 `rust-toolchain.toml`：工作流不得出现浮动 channel。
+      - name: Resolve pinned Rust toolchain
+        id: rust-toolchain
+        run: echo "channel=$(node scripts/ci/rust-toolchain.mjs)" >> "$GITHUB_OUTPUT"
+
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
           components: rustfmt
+
+      - name: Record and verify Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -Vv
+          rustup show active-toolchain | grep -F "$(node scripts/ci/rust-toolchain.mjs)"
 
       - name: Install dependencies
         run: pnpm install
@@ -189,8 +216,22 @@ jobs:
           node-version: '24.12.0'
           package-manager-cache: false
 
+      # 工具链 pin 只写在仓根 `rust-toolchain.toml`：工作流不得出现浮动 channel。
+      - name: Resolve pinned Rust toolchain
+        id: rust-toolchain
+        run: echo "channel=$(node scripts/ci/rust-toolchain.mjs)" >> "$GITHUB_OUTPUT"
+
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
+
+      - name: Record and verify Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -Vv
+          rustup show active-toolchain | grep -F "$(node scripts/ci/rust-toolchain.mjs)"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
