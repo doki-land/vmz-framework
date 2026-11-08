@@ -158,3 +158,5 @@ Unknown fields, negative pie slices, unsupported marks, and invalid scale domain
 ## Render backends
 
 SVG is the default and the SSR path. `renderer="canvas"` paints the same resolved scene onto a canvas — measured on a 60k-point line: SVG serialization ~10 ms producing ~1 MiB of markup, canvas paint ~2 ms with no DOM weight. `renderer="auto"` switches to canvas past 50k rows. Hit-testing, crosshair, brush, and keyboard navigation read the semantic scene geometry and work identically on canvas; only the hover/selection opacity replay is SVG-specific (it maps `data-dvz-id` DOM hooks).
+
+`data-selected` / `aria-selected` are SVG-only as well: the canvas backend draws pixels and has no per-mark DOM node to carry an attribute. On canvas the selection is observable through `vmz-chart-selection-change`, the pinned-tooltip live region, and `tableView` for the underlying numbers. Adding a DOM mirror of the display list just to hold attributes would put a second scene representation inside the component, which the renderer boundary forbids — the renderer serializes the scene, it does not re-derive it.
