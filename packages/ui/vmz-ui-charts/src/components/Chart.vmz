@@ -565,7 +565,10 @@ export default class Chart {
     public _isEmpty(): boolean {
         if (!this.spec) return true;
         const hasData = !!(this.snapshot || (this.data && this.data.length > 0));
-        return !hasData;
+        if (hasData) return false;
+        // 空态不渲染 SVG，markup() 不会被调用；在这里补上选择集收敛的调度。
+        this._scheduleSelectionReconcile();
+        return true;
     }
 
     /** 编译错误判断 —— diagnostics 中存在 severity="error"。 */
@@ -669,6 +672,8 @@ export default class Chart {
         if (this._zeroSize()) return "";
         const scene = this.scene();
         if (!scene) return "";
+        // 数据刷新可能删掉已选中的 mark：渲染已经不再画它，这里排一次选择集收敛。
+        this._scheduleSelectionReconcile();
         // canvas 模式：SVG 输出为空，绘制调度到 microtask（此时 canvas 已挂载）。
         if (this._useCanvas()) {
             this._scheduleCanvasPaint(scene);
@@ -1174,6 +1179,66 @@ export default class Chart {
         const cur = this._currentSelection();
         if (this._sameSelection(cur, selection)) return;
         this._emitChartEvent("vmz-chart-selection-change", { selection: [...selection] });
+    }
+
+    /** 选中集里当前画面没有对应 mark 的 id（下钻、图例过滤、行被删都会让它消失）。 */
+    public _selectionOutsideScene(): string[] {
+        const current = this._currentSelection();
+        if (current.length === 0) return [];
+        const present = new Set(this._markNodes().map((n) => n.id));
+        return current.filter((id) => !present.has(id));
+    }
+
+    /** 基础数据（未下钻、未过滤）能产出的 mark id 集合。数据行还在，选择就仍然
+     *  有效，只是暂时不可见；行真的没了才从选择集里剪掉。按 spec + 数据源缓存，
+     *  缓存键与 `__markIdSet` 一样走非响应式 expando。 */
+    public _baseMarkIds(): Set<string> {
+        const bag = this as any;
+        const source = this.snapshot !== null ? this.snapshot : this.data;
+        if (bag.__selBaseSpec === this.spec && bag.__selBaseSource === source && bag.__selBaseIds) {
+            return bag.__selBaseIds as Set<string>;
+        }
+        const ids = new Set<string>();
+        const snap = this._baseSnapshot();
+        if (this.spec && snap) {
+            const plan = compile(this.spec, snap);
+            const semantic = buildScene(plan, { width: this._effWidth(), height: this._effHeight() }, { theme: this._chartTheme() });
+            for (const node of semantic.root.children) {
+                if (node.role === "chart.mark") ids.add(node.id);
+            }
+        }
+        bag.__selBaseSpec = this.spec;
+        bag.__selBaseSource = source;
+        bag.__selBaseIds = ids;
+        return ids;
+    }
+
+    /** 数据刷新让选中的 mark 消失时收敛选择集并通知宿主。受控模式宿主是真相源，
+     *  这里不改；渲染期只读响应式字段，收敛放在 microtask（与下钻同一套去重）。 */
+    public _scheduleSelectionReconcile(): void {
+        if (this.selection !== null) return;
+        if (this._currentSelection().length === 0) return;
+        const bag = this as any;
+        if (bag.__selQueued) return;
+        bag.__selQueued = true;
+        queueMicrotask(this._flushSelectionReconcile.bind(this));
+    }
+
+    public _flushSelectionReconcile(): void {
+        const bag = this as any;
+        bag.__selQueued = false;
+        if (!bag.__vmzDomRoot) return;
+        if (this.selection !== null) return;
+        const current = this._currentSelection();
+        if (current.length === 0) return;
+        if (this._selectionOutsideScene().length === 0) return;
+        const valid = this._baseMarkIds();
+        const next = current.filter((id) => valid.has(id));
+        if (next.length === current.length) return;
+        this.dispatch({ kind: "selection-set", nodeIds: next });
+        this._announce(next.length === 0 ? "选中的数据项已移除" : "选择已随数据更新");
+        this._emitChartEvent("vmz-chart-selection-change", { selection: [...next] });
+        this._applyDomState();
     }
 
     public _emitZoomChange(): void {
@@ -1863,9 +1928,10 @@ export default class Chart {
         };
     }
 
-    /** 收集 mark 节点（直接子级，role=chart.mark）。 */
+    /** 收集 mark 节点（直接子级，role=chart.mark）。空态下模板不渲染图表，
+     *  上一次的 scene 不能继续当作可交互目标。 */
     public _markNodes(): SemanticNode[] {
-        if (!this.#semanticScene) {
+        if (!this.#semanticScene || this._isEmpty()) {
             return [];
         }
         return this.#semanticScene.root.children.filter((n) => n.role === "chart.mark");

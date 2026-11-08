@@ -112,7 +112,7 @@ Categories missing from the map fall back to `seriesPalette`, indexed by **sorte
 
 ### Controlled selection
 
-`selection` is the list of mark ids the chart should treat as selected. With the default `null` the component owns the selection: clicks, keyboard, and brush mutate it and bubble the result. Pass an array and the host owns it instead:
+`selection` is the list of mark ids the chart should treat as selected. With the default `null` the component owns the selection: clicks, keyboard, and brush mutate it and bubble the result. An owned selection also follows data updates: mark ids the new rows can no longer produce are dropped, `vmz-chart-selection-change` bubbles the surviving set (an empty array when nothing survives), and restoring the rows does not resurrect a dropped id. Rows that are merely hidden by legend filtering or by a drill level keep their selection — the data still has them. Pass an array and the host owns it instead:
 
 ```vue
 <Chart :spec="spec" :data="rows" :selection="selected" />

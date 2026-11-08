@@ -32,6 +32,7 @@ export function deriveInvalidation(action: import("./event.js").Action): Invalid
     switch (action.kind) {
         case "hover":
         case "select-toggle":
+        case "selection-set":
         case "clear-selection":
             return { categories: new Set(["overlay"]) };
         case "viewport-pan":

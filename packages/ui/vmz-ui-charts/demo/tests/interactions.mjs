@@ -866,6 +866,144 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await page.close();
 }
 
+// ─── 18. treemap selection follows data updates ─────────────────────────
+{
+    const page = await openPage();
+    const hasInst = await page.evaluate(() => {
+        const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        const inst = [...all].find((m) => m && m.__vmzDomRoot === host);
+        if (!inst) return false;
+        window.__selLifeInst = inst;
+        window.__selLifeRows = inst.data.map((r) => ({ ...r }));
+        window.__selLifeEvents = [];
+        document.addEventListener('vmz-chart-selection-change', (e) => window.__selLifeEvents.push(e.detail));
+        return true;
+    });
+    check('selectLife.instance reachable from the treemap host', hasInst);
+
+    const probe = () =>
+        page.evaluate(() => {
+            const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+            return {
+                selection: window.__selLifeInst._currentSelection(),
+                drawn: [...host.querySelectorAll('rect[data-dvz-id^="treemap:"]')]
+                    .filter((r) => r.getAttribute('data-selected') === 'true')
+                    .map((r) => r.getAttribute('data-dvz-id')),
+                events: window.__selLifeEvents.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)),
+                targets: window.__selLifeInst._navTargets().length,
+                diag: [...host.querySelectorAll('.vmz-ui-charts__diag-item')].map((n) => n.textContent.trim()),
+            };
+        });
+
+    const clickMark = async (markId) => {
+        const pt = await page.evaluate((id) => {
+            const el = document.querySelector(`#treemap-disk [data-dvz-id="${id}"]`);
+            if (!el) return null;
+            el.scrollIntoView({ block: 'center' });
+            const b = el.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        }, markId);
+        if (!pt) return false;
+        await page.mouse.click(pt.x, pt.y);
+        await new Promise((r) => setTimeout(r, 450));
+        return true;
+    };
+
+    await clickMark('treemap:视频');
+    const selected = await probe();
+    check(
+        'selectLife.click selects the leaf',
+        JSON.stringify(selected.selection) === JSON.stringify(['treemap:视频']) && JSON.stringify(selected.drawn) === JSON.stringify(['treemap:视频']),
+        JSON.stringify(selected),
+    );
+
+    await page.evaluate(() => {
+        window.__selLifeInst.data = window.__selLifeRows.filter((r) => r.id !== '视频');
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    const pruned = await probe();
+    check(
+        'selectLife.data update that removes the selected row prunes the selection',
+        pruned.selection.length === 0 && pruned.drawn.length === 0 && pruned.diag.length === 0,
+        JSON.stringify(pruned),
+    );
+    check(
+        'selectLife.prune bubbles one selection-change with an empty set',
+        pruned.events.length === 2 && JSON.stringify(pruned.events.at(-1)) === JSON.stringify([]),
+        JSON.stringify(pruned.events),
+    );
+
+    await new Promise((r) => setTimeout(r, 500));
+    const settled = await probe();
+    check('selectLife.prune settles without a render loop', settled.events.length === pruned.events.length && settled.selection.length === 0, JSON.stringify(settled.events));
+
+    await page.evaluate(() => {
+        window.__selLifeInst.data = window.__selLifeRows;
+    });
+    await new Promise((r) => setTimeout(r, 600));
+    const restored = await probe();
+    check(
+        'selectLife.restoring the row does not resurrect the selection',
+        restored.selection.length === 0 && restored.drawn.length === 0 && restored.events.length === 2,
+        JSON.stringify(restored),
+    );
+
+    // 下钻只是视图变换：数据行还在，选择不应被当成失效。
+    await clickMark('treemap:视频');
+
+    // 数据整体清空：空态不画图表，旧 scene 也不能继续当作可交互目标。
+    await page.evaluate(() => {
+        window.__selLifeInst.data = [];
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    const empty = await probe();
+    check(
+        'selectLife.clearing the data drops the selection and the nav targets',
+        empty.selection.length === 0 && empty.drawn.length === 0 && empty.targets === 0 && JSON.stringify(empty.events.at(-1)) === JSON.stringify([]),
+        JSON.stringify(empty),
+    );
+    await page.evaluate(() => {
+        window.__selLifeInst.data = window.__selLifeRows;
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    const refilled = await probe();
+    check(
+        'selectLife.refilling the data does not resurrect the selection',
+        refilled.selection.length === 0 && refilled.drawn.length === 0 && refilled.targets > 0,
+        JSON.stringify(refilled),
+    );
+
+    await clickMark('treemap:视频');
+    await page.evaluate(() => window.__selLifeInst._drillTo('文档'));
+    await new Promise((r) => setTimeout(r, 500));
+    const hidden = await probe();
+    check(
+        'selectLife.selection survives navigating away from the mark',
+        JSON.stringify(hidden.selection) === JSON.stringify(['treemap:视频']) && hidden.drawn.length === 0 && hidden.events.length === 5,
+        JSON.stringify(hidden),
+    );
+
+    await page.evaluate(() => window.__selLifeInst._drillUp());
+    await new Promise((r) => setTimeout(r, 500));
+    const returned = await probe();
+    check(
+        'selectLife.returning to the document root repaints the surviving selection',
+        JSON.stringify(returned.selection) === JSON.stringify(['treemap:视频']) &&
+            JSON.stringify(returned.drawn) === JSON.stringify(['treemap:视频']) &&
+            returned.events.length === 5,
+        JSON.stringify(returned),
+    );
+    await page.close();
+}
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);

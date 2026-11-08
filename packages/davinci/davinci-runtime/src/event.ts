@@ -33,6 +33,7 @@ export type NormalizedEvent = NormalizedPointerEvent | NormalizedKeyboardEvent;
 export type Action =
     | { readonly kind: "hover"; readonly nodeId: string | null }
     | { readonly kind: "select-toggle"; readonly nodeId: string; readonly additive?: boolean }
+    | { readonly kind: "selection-set"; readonly nodeIds: readonly string[] }
     | { readonly kind: "clear-selection" }
     | { readonly kind: "viewport-pan"; readonly dx: number; readonly dy: number }
     | { readonly kind: "viewport-zoom"; readonly delta: number }
@@ -51,6 +52,8 @@ export function reduce(state: RuntimeState, action: Action): RuntimeState {
             else ids.add(action.nodeId);
             return { ...state, selection: { nodeIds: ids } };
         }
+        case "selection-set":
+            return { ...state, selection: { nodeIds: new Set(action.nodeIds) } };
         case "clear-selection":
             return { ...state, selection: { nodeIds: new Set() } };
         case "viewport-pan":
