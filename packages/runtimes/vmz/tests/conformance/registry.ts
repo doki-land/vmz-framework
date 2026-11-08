@@ -331,6 +331,10 @@ export const CHECKS: Record<string, CheckEntry> = {
         file: 'runtime/ssr-keyed-row-update.ts',
         description: 'Hydrated multi-root rows keep their DOM nodes across reorder, edit, remove and add',
     },
+    'ssr-delivery-imports': {
+        file: 'runtime/ssr-delivery-imports.ts',
+        description: 'Emitted SSR delivery modules only import files that exist and the serve host renders `/`',
+    },
     'v-pre': {
         file: 'v-pre/v-pre.ts',
         description: 'SSR ↔ mount ↔ hydrate: v-pre region preserves Vue literals, siblings stay reactive',
@@ -882,6 +886,7 @@ export const CHECK_ALL = [
     'ssr-keyed-non-kernel',
     'ssr-keyed-row-fragment',
     'ssr-keyed-row-update',
+    'ssr-delivery-imports',
     'v-pre',
     'v-once',
     'ssr-select-multiple',

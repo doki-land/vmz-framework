@@ -36,6 +36,7 @@ const PRESETS = {
         'ssr-keyed-non-kernel',
         'ssr-keyed-row-fragment',
         'ssr-keyed-row-update',
+        'ssr-delivery-imports',
         'ssr-slot-projection-resume',
         'ssr-named-slot-resume',
         'ssr-pre-textarea-leading-newline',
