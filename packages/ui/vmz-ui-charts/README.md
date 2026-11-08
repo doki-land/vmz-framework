@@ -63,6 +63,7 @@ Stat-driven marks (`histogram`, `boxplot`, `ridgeline`, `bump`, `violin`, `calen
 | `tableView` | `boolean` | `false` | render the data table instead of the SVG |
 | `renderer` | `"svg" \| "canvas" \| "auto"` | `"svg"` | output backend; `auto` switches to canvas past 50k rows |
 | `resourceIdPrefix` | `string \| null` | derived | SVG resource id prefix for edge cases |
+| `selection` | `string[] \| null` | `null` | controlled selected mark ids; `null` leaves the selection owned by the component |
 
 ## Theming by token
 
@@ -108,6 +109,24 @@ Categories missing from the map fall back to `seriesPalette`, indexed by **sorte
 - Drag empty plot space to brush-select marks; shift+drag pans a quantitative x axis; the wheel zooms around the pointer; `+` / `-` / `0` zoom and reset from the keyboard.
 - Treemap only: double-click a cell to drill into the nearest ancestor that has children (the matching rect is covered by its own children, so the target resolves up the `parentField` chain), double-click empty space (the top-left button, or `Escape`) to go back one level. Node ids stay `treemap:<key>`, so selection and palette survive reordering and redraws.
 - Host events: `onchartHover({ rowKey, markId, x, y })`, `onchartSelect({ rowKey, markId })`, `onchartBrush({ keys })` — override them on the instance. `rowKey` is the hit row's `keyField` value and is what you look the record up with; it is `null` when the hit mark aggregates a whole series (one line path, one area band). `markId` is the scene node id (`treemap:视频`, `bar:0`) — the identity carried by `vmz-chart-selection-change` and by brush `keys`. `rowKey` and `markId` are never interchangeable: the first indexes data, the second indexes marks. The same interactions bubble as `vmz-chart-selection-change`, `vmz-chart-zoom-change`, `vmz-chart-legend-change` and `vmz-chart-drilldown-change` (`{ root, path }`).
+
+### Controlled selection
+
+`selection` is the list of mark ids the chart should treat as selected. With the default `null` the component owns the selection: clicks, keyboard, and brush mutate it and bubble the result. Pass an array and the host owns it instead:
+
+```vue
+<Chart :spec="spec" :data="rows" :selection="selected" />
+```
+
+In controlled mode the component never applies a selection of its own. Each selection interaction instead bubbles the **proposed** set as `vmz-chart-selection-change` (`detail.selection`), and the host decides whether to store it:
+
+| Interaction | Proposed set |
+|-------------|--------------|
+| click a mark, `Space` | the current `selection` with that mark toggled |
+| click empty plot space, `Escape` | `[]` |
+| brush drag | mark ids whose anchors fall inside the rect |
+
+`onchartSelect({ rowKey, markId })` still fires per click in both modes — it reports the hit, not the resulting selection. Feeding the proposal back into `selection` is what makes the selection stick, so a host that ignores the event simply leaves the chart unchanged.
 
 ### Disk-usage boards
 
