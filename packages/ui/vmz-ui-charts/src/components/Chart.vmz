@@ -1101,8 +1101,26 @@ export default class Chart {
         root.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
     }
 
-    public _emitSelectionChange(): void {
-        const sel = this.state ? [...this.state.selection.nodeIds] : [];
+    /** 当前生效选择集：受控读宿主回灌的 `selection`，非受控读 runtime state。 */
+    public _currentSelection(): string[] {
+        if (this.selection !== null) return [...this.selection];
+        return this.state ? [...this.state.selection.nodeIds] : [];
+    }
+
+    /** 提议选择集：在生效选择上应用一次点击 / 切换（null 表示点空白 → 清空）。
+     *  受控模式把返回值发出去由宿主回灌，非受控模式照同样口径发事件后再落状态。 */
+    public _proposeSelection(hit: string | null): string[] {
+        const base = this._currentSelection();
+        if (hit === null) return [];
+        const next = new Set(base);
+        if (next.has(hit)) next.delete(hit);
+        else next.add(hit);
+        return [...next];
+    }
+
+    /** 选择事件外抛。传入提议集时发该集合，省略时发当前生效集合。 */
+    public _emitSelectionChange(selection?: readonly string[]): void {
+        const sel = selection ? [...selection] : this._currentSelection();
         this._emitChartEvent("vmz-chart-selection-change", { selection: sel });
     }
 
@@ -2318,26 +2336,14 @@ export default class Chart {
         }
         const point = this._toScenePoint(ev);
         const hit = point ? this._hitTest(point.x, point.y) : null;
-        if (!hit) {
-            if (this.selection === null) {
-                this.dispatch({ kind: "clear-selection" });
-            }
-            this._emitSelectionChange();
-            this._applyDomState();
-            return;
-        }
+        // 提议集对两种模式同口径：受控只发提议不落状态，非受控先发提议再落状态。
+        const proposed = this._proposeSelection(hit);
+        this._emitSelectionChange(proposed);
         if (this.selection === null) {
-            this.dispatch({ kind: "select-toggle", nodeId: hit });
-            // 非受控：状态已落地，事件必须带新选择集，宿主才能对选中项拼装状态栏。
-            this._emitSelectionChange();
-        } else {
-            // 受控选择集：只提议，不落状态。
-            const proposed = new Set(this.selection);
-            if (proposed.has(hit)) proposed.delete(hit);
-            else proposed.add(hit);
-            this._emitChartEvent("vmz-chart-selection-change", { selection: [...proposed] });
+            if (hit === null) this.dispatch({ kind: "clear-selection" });
+            else this.dispatch({ kind: "select-toggle", nodeId: hit });
         }
-        this.onchartSelect({ rowKey: hit });
+        if (hit !== null) this.onchartSelect({ rowKey: hit });
         this._applyDomState();
     }
 
@@ -2414,11 +2420,13 @@ export default class Chart {
         } else if (ev.key === " ") {
             if (this._hoverId) {
                 ev.preventDefault();
+                // 受控只提议切换后的集合，非受控先发提议再落状态。
+                const proposed = this._proposeSelection(this._hoverId);
+                this._emitSelectionChange(proposed);
                 if (this.selection === null) {
                     this.dispatch({ kind: "select-toggle", nodeId: this._hoverId });
                 }
                 this.onchartSelect({ rowKey: this._hoverId });
-                this._emitSelectionChange();
                 this._applyDomState();
             }
         } else if (ev.key === "Escape") {
@@ -2434,10 +2442,11 @@ export default class Chart {
             this._tooltip.visible = false;
             this._hideCrosshair();
             this._cancelDrag();
+            // 两种模式都发清空提议；受控不落状态，等待宿主回灌。
+            this._emitSelectionChange([]);
             if (this.selection === null) {
                 this.dispatch({ kind: "clear-selection" });
             }
-            this._emitSelectionChange();
             this._applyDomState();
         }
     }

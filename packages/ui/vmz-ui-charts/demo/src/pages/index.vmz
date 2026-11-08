@@ -80,6 +80,19 @@
                 <Chart :spec="tableSpec" :data="tableRows" :height="300" :theme="dark ? 'dark' : 'light'" :tableView="tableView" label="weekly visitors by product" />
             </div>
         </section>
+        <section id="controlled-bar" class="card">
+            <header class="card__head">
+                <h2>
+                    交互 · 受控选择
+                </h2>
+                <p>
+                    selection 固定为 ["bar:0"]:点击、Space、Escape 只发提议集,宿主不回灌就不改选中态。
+                </p>
+            </header>
+            <div class="card__canvas">
+                <Chart :spec="ctrlBarSpec" :data="ctrlBarRows" :height="280" :selection="ctrlSelection" :theme="dark ? 'dark' : 'light'" label="controlled selection bar" />
+            </div>
+        </section>
         <section class="card">
             <header class="card__head">
                 <h2>
@@ -333,6 +346,14 @@ export default class IndexPage {
                 ],
             },
             darkBarRows: galleryExample("bar-delta").rows,
+            ctrlBarSpec: {
+                mark: "bar",
+                encoding: [
+                    { field: "name", channel: "x" },
+                    { field: "delta", channel: "y" },
+                ],
+            },
+            ctrlBarRows: galleryExample("bar-delta").rows,
             darkPieSpec: galleryExample("donut-share").spec,
             darkPieRows: galleryExample("donut-share").rows,
             darkRadarSpec: galleryExample("radar-score").spec,
@@ -420,6 +441,9 @@ export default class IndexPage {
     public darkLineRows: any[] = [];
     public darkBarSpec: any = null;
     public darkBarRows: any[] = [];
+    public ctrlBarSpec: any = null;
+    public ctrlBarRows: any[] = [];
+    public ctrlSelection: string[] = ["bar:0"];
     public darkPieSpec: any = null;
     public darkPieRows: any[] = [];
     public darkRadarSpec: any = null;

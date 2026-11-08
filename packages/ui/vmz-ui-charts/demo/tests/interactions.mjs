@@ -51,6 +51,35 @@ const tooltipText = (page) =>
         return t ? t.textContent.trim() : null;
     });
 
+/** 图表宿主内离任何命中元素最远的点（点空白用）。 */
+async function blankPointIn(page, hostSelector, hitSelector) {
+    return page.evaluate(
+        (hostSel, hitSel) => {
+            const host = document.querySelector(hostSel);
+            const hits = [...document.querySelectorAll(`${hostSel} ${hitSel}`)];
+            if (!host || hits.length === 0) return null;
+            const hb = host.getBoundingClientRect();
+            const boxes = hits.map((el) => el.getBoundingClientRect());
+            const dist = (px, py, b) => Math.hypot(Math.max(b.left - px, 0, px - b.right), Math.max(b.top - py, 0, py - b.bottom));
+            let best = null;
+            let bestD = -1;
+            for (let x = hb.left + 1; x < hb.right; x += 3) {
+                for (let y = hb.top + 1; y < hb.bottom; y += 3) {
+                    let m = Infinity;
+                    for (const b of boxes) m = Math.min(m, dist(x, y, b));
+                    if (m > bestD) {
+                        bestD = m;
+                        best = { x, y };
+                    }
+                }
+            }
+            return best;
+        },
+        hostSelector,
+        hitSelector,
+    );
+}
+
 // ─── 1. tooltip: item + axis trigger ─────────────────────────────────────
 {
     const page = await openPage();
@@ -467,26 +496,7 @@ const tooltipText = (page) =>
         check('select.click paints other marks dimmed', afterClick.dimmed > 0, `dimmed=${afterClick.dimmed}`);
 
         // Blank point: the in-host point farthest from any treemap rect.
-        const blank = await page.evaluate(() => {
-            const rects = [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')];
-            const host = rects[0].closest('[data-vmz-ui-charts="chart"]');
-            const hb = host.getBoundingClientRect();
-            const boxes = rects.map((r) => r.getBoundingClientRect());
-            const dist = (px, py, b) => Math.hypot(Math.max(b.left - px, 0, px - b.right), Math.max(b.top - py, 0, py - b.bottom));
-            let best = null;
-            let bestD = -1;
-            for (let x = hb.left + 1; x < hb.right; x += 3) {
-                for (let y = hb.top + 1; y < hb.bottom; y += 3) {
-                    let m = Infinity;
-                    for (const b of boxes) m = Math.min(m, dist(x, y, b));
-                    if (m > bestD) {
-                        bestD = m;
-                        best = { x, y };
-                    }
-                }
-            }
-            return best;
-        });
+        const blank = await blankPointIn(page, '#treemap-disk [data-vmz-ui-charts="chart"]', 'rect[data-dvz-id^="treemap:"]');
         await page.mouse.click(blank.x, blank.y);
         await new Promise((r) => setTimeout(r, 450));
         const afterBlank = await page.evaluate(() => ({
@@ -500,6 +510,67 @@ const tooltipText = (page) =>
         );
         check('select.blank click restores full opacity', afterBlank.dimmed === 0, `dimmed=${afterBlank.dimmed}`);
     }
+    await page.close();
+}
+
+// ─── 12. controlled selection: interactions only propose ─────────────────
+{
+    const page = await openPage();
+    await page.evaluate(() => {
+        window.__ctrlSel = [];
+        document.addEventListener('vmz-chart-selection-change', (e) => window.__ctrlSel.push(e.detail));
+    });
+    const clickMark = async (markId) => {
+        const pt = await page.evaluate((id) => {
+            const el = document.querySelector(`#controlled-bar [data-dvz-id="${id}"]`);
+            if (!el) return null;
+            el.scrollIntoView({ block: 'center' });
+            const b = el.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        }, markId);
+        if (!pt) return null;
+        await page.mouse.click(pt.x, pt.y);
+        await new Promise((r) => setTimeout(r, 400));
+        return pt;
+    };
+    const events = () => page.evaluate(() => window.__ctrlSel.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)));
+    const markOpacity = (markId) =>
+        page.evaluate((id) => {
+            const el = document.querySelector(`#controlled-bar [data-dvz-id="${id}"]`);
+            return el ? el.style.opacity : null;
+        }, markId);
+
+    check('controlled.click leaf rect present', (await clickMark('bar:1')) !== null);
+    const e1 = await events();
+    check(
+        'controlled.click proposes the toggled set',
+        e1.length === 1 && JSON.stringify(e1[0]) === JSON.stringify(['bar:0', 'bar:1']),
+        JSON.stringify(e1),
+    );
+    // 宿主没回灌:提议不得落到组件自己的选中态。指针先移出图表,排除 hover 的
+    // 高亮影响,bar:1 仍应按未选中变暗。
+    await page.mouse.move(2, 2, { steps: 2 });
+    await new Promise((r) => setTimeout(r, 350));
+    check('controlled.click does not self-apply', (await markOpacity('bar:1')) === '0.35', await markOpacity('bar:1'));
+
+    const blank = await blankPointIn(page, '#controlled-bar [data-vmz-ui-charts="chart"]', 'rect[data-dvz-id^="bar:"]');
+    await page.mouse.click(blank.x, blank.y);
+    await new Promise((r) => setTimeout(r, 400));
+    const e2 = await events();
+    check('controlled.blank click proposes an empty set', e2.length === 2 && JSON.stringify(e2[1]) === JSON.stringify([]), JSON.stringify(e2));
+
+    await page.evaluate(() => document.querySelector('#controlled-bar [data-vmz-ui-charts="chart"]').focus());
+    await page.keyboard.press('ArrowRight');
+    await new Promise((r) => setTimeout(r, 300));
+    await page.keyboard.press('Space');
+    await new Promise((r) => setTimeout(r, 350));
+    const e3 = await events();
+    check('controlled.Space proposes the toggled set', e3.length === 3 && JSON.stringify(e3[2]) === JSON.stringify([]), JSON.stringify(e3));
+
+    await page.keyboard.press('Escape');
+    await new Promise((r) => setTimeout(r, 350));
+    const e4 = await events();
+    check('controlled.Escape proposes an empty set', e4.length === 4 && JSON.stringify(e4[3]) === JSON.stringify([]), JSON.stringify(e4));
     await page.close();
 }
 
