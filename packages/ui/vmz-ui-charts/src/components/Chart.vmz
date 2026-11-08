@@ -1680,15 +1680,19 @@ export default class Chart {
         if (x1 - x0 < 3 && y1 - y0 < 3) return;
         // brush 的 mouseup 之后浏览器还会补发一次 click——不清掉它，空命中会立刻清选择。
         this._suppressClick = true;
-        const keys: Array<string | number> = [];
-        this.dispatch({ kind: "clear-selection" });
+        const keys: string[] = [];
         for (const node of this._markNodes()) {
             const anchor = this._nodeAnchor(node.id);
             if (!anchor) continue;
             if (anchor.x >= x0 && anchor.x <= x1 && anchor.y >= y0 && anchor.y <= y1) {
-                this.dispatch({ kind: "select-toggle", nodeId: node.id });
                 keys.push(node.id);
             }
+        }
+        // brush 改选择与点击同口径：受控只发提议，非受控先发提议再落状态。
+        this._emitSelectionChange(keys);
+        if (this.selection === null) {
+            this.dispatch({ kind: "clear-selection" });
+            for (const id of keys) this.dispatch({ kind: "select-toggle", nodeId: id });
         }
         this.onchartBrush({ keys });
         this._applyDomState();

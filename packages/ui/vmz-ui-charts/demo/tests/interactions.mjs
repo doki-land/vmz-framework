@@ -608,6 +608,40 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await page.close();
 }
 
+// ─── 13. brush reroutes selection and bubbles it ─────────────────────────
+{
+    const page = await openPage();
+    await page.evaluate(() => {
+        window.__brushSel = [];
+        document.addEventListener('vmz-chart-selection-change', (e) => window.__brushSel.push(e.detail));
+    });
+    // Drag a rect over every bar: start above the tallest bar so mousedown is empty space.
+    const drag = await page.evaluate(() => {
+        const host = document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]');
+        host.scrollIntoView({ block: 'center' });
+        const rects = [...host.querySelectorAll('[data-dvz-id^="bar:"]')].map((el) => el.getBoundingClientRect());
+        return {
+            from: { x: Math.min(...rects.map((r) => r.left)) - 6, y: Math.min(...rects.map((r) => r.top)) - 20 },
+            to: { x: Math.max(...rects.map((r) => r.right)) + 6, y: Math.max(...rects.map((r) => r.bottom)) + 4 },
+        };
+    });
+    await page.mouse.move(drag.from.x, drag.from.y, { steps: 3 });
+    await page.mouse.down();
+    await page.mouse.move(drag.to.x, drag.to.y, { steps: 12 });
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 450));
+    const events = await page.evaluate(() => window.__brushSel.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)));
+    const brushed = events.at(-1);
+    check(
+        'brush.drag bubbles the brushed mark ids as selection-change',
+        brushed !== null && brushed !== undefined && brushed.length >= 4 && brushed.every((id) => id.startsWith('bar:')),
+        JSON.stringify(events),
+    );
+    const selected = await page.evaluate(() => [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')].filter((el) => el.style.opacity === '1').length);
+    check('brush.drag keeps the brushed marks lit', selected === brushed.length, `${selected}/${brushed.length}`);
+    await page.close();
+}
+
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);
