@@ -516,12 +516,14 @@ const CHART_INPUTS: ChartInput[] = [
     {
         id: 'treemap-disk',
         title: '矩形树图 · 存储占用',
-        note: 'squarified 布局,父级面积是叶值求和,单根下按顶层分组着色。',
+        note: 'squarified 布局,父级面积是叶值求和,顶层分组着色。双击下钻,左上角按钮或 Escape 退回上一级。选中项的体积与路径由应用按 `selection` 事件拼装,图表本身不出状态栏文案。',
         spec: {
             mark: 'treemap',
             keyField: 'id',
             parentField: 'parent',
             encoding: [{ field: 'gb', channel: 'size' }],
+            treemapDepth: 3,
+            treemapMinArea: 6,
         },
         rows: [
             { id: '根', parent: null, gb: 0 },
@@ -537,6 +539,9 @@ const CHART_INPUTS: ChartInput[] = [
             { id: '运行时', parent: '系统', gb: 180 },
             { id: '缓存', parent: '系统', gb: 120 },
             { id: '日志', parent: '系统', gb: 75 },
+            // 长尾：低于 treemapMinArea 的碎片被省略,不会画成看不见的细条。
+            { id: '缩略图缓存', parent: '系统', gb: 0.4 },
+            { id: '崩溃转储', parent: '系统', gb: 0.3 },
         ],
     },
     {
