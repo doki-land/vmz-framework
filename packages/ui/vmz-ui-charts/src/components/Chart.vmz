@@ -566,8 +566,9 @@ export default class Chart {
         if (!this.spec) return true;
         const hasData = !!(this.snapshot || (this.data && this.data.length > 0));
         if (hasData) return false;
-        // 空态不渲染 SVG，markup() 不会被调用；在这里补上选择集收敛的调度。
+        // 空态不渲染 SVG，markup() 不会被调用；在这里补上悬停/选择集收敛的调度。
         this._scheduleSelectionReconcile();
+        this._scheduleHoverReconcile();
         return true;
     }
 
@@ -674,6 +675,7 @@ export default class Chart {
         if (!scene) return "";
         // 数据刷新可能删掉已选中的 mark：渲染已经不再画它，这里排一次选择集收敛。
         this._scheduleSelectionReconcile();
+        this._scheduleHoverReconcile();
         // canvas 模式：SVG 输出为空，绘制调度到 microtask（此时 canvas 已挂载）。
         if (this._useCanvas()) {
             this._scheduleCanvasPaint(scene);
@@ -1238,6 +1240,50 @@ export default class Chart {
         this.dispatch({ kind: "selection-set", nodeIds: next });
         this._announce(next.length === 0 ? "选中的数据项已移除" : "选择已随数据更新");
         this._emitChartEvent("vmz-chart-selection-change", { selection: [...next] });
+        this._applyDomState();
+    }
+
+    /** 数据源换了才需要核对悬停状态：避免每次渲染（悬停本身也会触发渲染）
+     *  都跑一次 microtask。缓存键与 `__selBaseSource` 一致。 */
+    public _scheduleHoverReconcile(): void {
+        const source = this.snapshot !== null ? this.snapshot : this.data;
+        const bag = this as any;
+        if (bag.__hoverSpec === this.spec && bag.__hoverSource === source) return;
+        bag.__hoverSpec = this.spec;
+        bag.__hoverSource = source;
+        if (this._hoverId === null && !this._tooltip.visible) return;
+        if (bag.__hoverQueued) return;
+        bag.__hoverQueued = true;
+        queueMicrotask(this._flushHoverReconcile.bind(this));
+    }
+
+    /** 悬停的 mark 消失就收起 tooltip / crosshair / 高亮；还在就用新行值刷新文本。
+     *  指针没动过也会执行，所以不能依赖 pointermove 自然纠正。 */
+    public _flushHoverReconcile(): void {
+        const bag = this as any;
+        bag.__hoverQueued = false;
+        if (!bag.__vmzDomRoot) return;
+        // 用户钉住的 tooltip 由 Escape / 再次长按负责解除，数据刷新不替用户取消。
+        if (this._pinnedTooltip !== null) return;
+        const hoverId = this._hoverId;
+        const present = hoverId !== null && this._markNodes().some((n) => n.id === hoverId);
+        if (present) {
+            if (this._tooltip.visible) {
+                const text = this._tooltipTextFor(hoverId);
+                // microtask 里改嵌套字段不一定触发重渲染，整体替换对象让绑定失效。
+                if (text && text !== this._tooltip.text) this._tooltip = { ...this._tooltip, text };
+            }
+            // 数据刷新后的 DOM 是新建的，悬停高亮要重新落到新节点上。
+            this._applyDomState();
+            return;
+        }
+        if (hoverId === null && !this._tooltip.visible) return;
+        this._hoverId = null;
+        this._tooltip = { ...this._tooltip, visible: false };
+        this._crosshair = { ...this._crosshair, visible: false };
+        this._crosshairDots = [];
+        this.dispatch({ kind: "hover", nodeId: null });
+        this._focusIndex = -1;
         this._applyDomState();
     }
 

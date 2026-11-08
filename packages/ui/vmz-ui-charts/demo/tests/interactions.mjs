@@ -1004,6 +1004,99 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     );
     await page.close();
 }
+// ─── 19. treemap hover follows data updates ─────────────────────────────
+{
+    const page = await openPage();
+    const hasInst = await page.evaluate(() => {
+        const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        const inst = [...all].find((m) => m && m.__vmzDomRoot === host);
+        if (!inst) return false;
+        window.__hoverInst = inst;
+        window.__hoverRows = inst.data.map((r) => ({ ...r }));
+        return true;
+    });
+    check('hoverLife.instance reachable from the treemap host', hasInst);
+
+    const probe = () =>
+        page.evaluate(() => {
+            const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+            const tip = [...host.querySelectorAll('.vmz-ui-charts__tooltip')].find(
+                (n) => getComputedStyle(n).visibility !== 'hidden' && n.textContent.trim() !== '',
+            );
+            return {
+                hover: window.__hoverInst._hoverId,
+                tooltip: window.__hoverInst._tooltip.visible,
+                tipText: tip ? tip.textContent.trim() : null,
+                dimmed: [...host.querySelectorAll('rect[data-dvz-id^="treemap:"]')].filter((r) => Number(getComputedStyle(r).opacity) < 1).length,
+            };
+        });
+
+    const hoverMark = async (markId) => {
+        const pt = await page.evaluate((id) => {
+            const el = document.querySelector(`#treemap-disk [data-dvz-id="${id}"]`);
+            if (!el) return null;
+            el.scrollIntoView({ block: 'center' });
+            const b = el.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        }, markId);
+        if (!pt) return false;
+        await page.mouse.move(pt.x, pt.y, { steps: 5 });
+        await new Promise((r) => setTimeout(r, 500));
+        return true;
+    };
+
+    await hoverMark('treemap:视频');
+    const hovered = await probe();
+    check(
+        'hoverLife.hover shows the tooltip and dims the other marks',
+        hovered.hover === 'treemap:视频' && hovered.tooltip && hovered.tipText !== null && hovered.dimmed > 0,
+        JSON.stringify(hovered),
+    );
+
+    await page.evaluate(() => {
+        window.__hoverInst.data = window.__hoverRows.filter((r) => r.id !== '视频');
+    });
+    await new Promise((r) => setTimeout(r, 800));
+    const removed = await probe();
+    check(
+        'hoverLife.removing the hovered row dismisses the tooltip and the dimming',
+        removed.hover === null && removed.tooltip === false && removed.tipText === null && removed.dimmed === 0,
+        JSON.stringify(removed),
+    );
+
+    await page.evaluate(() => {
+        window.__hoverInst.data = window.__hoverRows;
+    });
+    await new Promise((r) => setTimeout(r, 800));
+    const restored = await probe();
+    check(
+        'hoverLife.restoring the row does not bring the tooltip back',
+        restored.hover === null && restored.tooltip === false && restored.tipText === null,
+        JSON.stringify(restored),
+    );
+
+    await hoverMark('treemap:视频');
+    await page.evaluate(() => {
+        window.__hoverInst.data = window.__hoverRows.map((r) => (r.id === '视频' ? { ...r, gb: 999 } : r));
+    });
+    await new Promise((r) => setTimeout(r, 800));
+    const refreshed = await probe();
+    check(
+        'hoverLife.value update refreshes the tooltip text in place',
+        refreshed.hover === 'treemap:视频' && refreshed.tooltip && refreshed.tipText !== null && refreshed.tipText.includes('999') && refreshed.dimmed > 0,
+        JSON.stringify(refreshed),
+    );
+    await page.close();
+}
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);
