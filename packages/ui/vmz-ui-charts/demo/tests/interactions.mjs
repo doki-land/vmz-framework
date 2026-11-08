@@ -437,6 +437,72 @@ const tooltipText = (page) =>
     await page.close();
 }
 
+// ─── 11. treemap selection: click emits to the host, blank click clears ──
+{
+    const page = await openPage();
+    await page.evaluate(() => {
+        window.__selEvents = [];
+        document.addEventListener('vmz-chart-selection-change', (e) => window.__selEvents.push(e.detail));
+    });
+    const leaf = await page.evaluate(() => {
+        const el = document.querySelector('#treemap-disk [data-dvz-id="treemap:视频"]');
+        if (!el) return null;
+        el.scrollIntoView({ block: 'center' });
+        const b = el.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    });
+    check('select.leaf rect present', leaf !== null);
+    if (leaf) {
+        await page.mouse.click(leaf.x, leaf.y);
+        await new Promise((r) => setTimeout(r, 450));
+        const afterClick = await page.evaluate(() => ({
+            events: window.__selEvents.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)),
+            dimmed: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')].filter((r) => r.style.opacity === '0.35').length,
+        }));
+        check(
+            'select.click emits selection-change with the clicked mark id',
+            afterClick.events.length === 1 && JSON.stringify(afterClick.events[0]) === JSON.stringify(['treemap:视频']),
+            JSON.stringify(afterClick.events),
+        );
+        check('select.click paints other marks dimmed', afterClick.dimmed > 0, `dimmed=${afterClick.dimmed}`);
+
+        // Blank point: the in-host point farthest from any treemap rect.
+        const blank = await page.evaluate(() => {
+            const rects = [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')];
+            const host = rects[0].closest('[data-vmz-ui-charts="chart"]');
+            const hb = host.getBoundingClientRect();
+            const boxes = rects.map((r) => r.getBoundingClientRect());
+            const dist = (px, py, b) => Math.hypot(Math.max(b.left - px, 0, px - b.right), Math.max(b.top - py, 0, py - b.bottom));
+            let best = null;
+            let bestD = -1;
+            for (let x = hb.left + 1; x < hb.right; x += 3) {
+                for (let y = hb.top + 1; y < hb.bottom; y += 3) {
+                    let m = Infinity;
+                    for (const b of boxes) m = Math.min(m, dist(x, y, b));
+                    if (m > bestD) {
+                        bestD = m;
+                        best = { x, y };
+                    }
+                }
+            }
+            return best;
+        });
+        await page.mouse.click(blank.x, blank.y);
+        await new Promise((r) => setTimeout(r, 450));
+        const afterBlank = await page.evaluate(() => ({
+            events: window.__selEvents.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)),
+            dimmed: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')].filter((r) => r.style.opacity === '0.35').length,
+        }));
+        check(
+            'select.blank click clears selection and emits an empty set',
+            afterBlank.events.length === 2 && JSON.stringify(afterBlank.events[1]) === JSON.stringify([]),
+            JSON.stringify(afterBlank.events),
+        );
+        check('select.blank click restores full opacity', afterBlank.dimmed === 0, `dimmed=${afterBlank.dimmed}`);
+    }
+    await page.close();
+}
+
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);

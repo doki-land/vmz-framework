@@ -2328,6 +2328,8 @@ export default class Chart {
         }
         if (this.selection === null) {
             this.dispatch({ kind: "select-toggle", nodeId: hit });
+            // 非受控：状态已落地，事件必须带新选择集，宿主才能对选中项拼装状态栏。
+            this._emitSelectionChange();
         } else {
             // 受控选择集：只提议，不落状态。
             const proposed = new Set(this.selection);
