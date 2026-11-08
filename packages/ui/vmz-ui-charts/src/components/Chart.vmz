@@ -2565,6 +2565,14 @@ export default class Chart {
             }
             const hot = id === this._hoverId || selected.has(id);
             el.style.opacity = !active || hot ? "1" : "0.35";
+            // 选中态同时写进属性，宿主与测试不必依赖内联透明度。
+            if (selected.has(id)) {
+                el.setAttribute("data-selected", "true");
+                el.setAttribute("aria-selected", "true");
+            } else {
+                el.removeAttribute("data-selected");
+                el.removeAttribute("aria-selected");
+            }
         }
     }
 }

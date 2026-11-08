@@ -505,14 +505,28 @@ async function blankPointIn(page, hostSelector, hitSelector) {
         await new Promise((r) => setTimeout(r, 450));
         const afterClick = await page.evaluate(() => ({
             events: window.__selEvents.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)),
-            dimmed: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')].filter((r) => r.style.opacity === '0.35').length,
+            selected: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')]
+                .filter((r) => r.getAttribute('data-selected') === 'true')
+                .map((r) => r.getAttribute('data-dvz-id')),
+            aria: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')]
+                .filter((r) => r.getAttribute('aria-selected') === 'true')
+                .map((r) => r.getAttribute('data-dvz-id')),
         }));
         check(
             'select.click emits selection-change with the clicked mark id',
             afterClick.events.length === 1 && JSON.stringify(afterClick.events[0]) === JSON.stringify(['treemap:视频']),
             JSON.stringify(afterClick.events),
         );
-        check('select.click paints other marks dimmed', afterClick.dimmed > 0, `dimmed=${afterClick.dimmed}`);
+        check(
+            'select.click marks the clicked rect with data-selected',
+            JSON.stringify(afterClick.selected) === JSON.stringify(['treemap:视频']),
+            JSON.stringify(afterClick.selected),
+        );
+        check(
+            'select.click mirrors the state in aria-selected',
+            JSON.stringify(afterClick.aria) === JSON.stringify(['treemap:视频']),
+            JSON.stringify(afterClick.aria),
+        );
 
         const payloads = await page.evaluate(() => ({
             hover: window.__hoverPayloads.at(-1) ?? null,
@@ -535,14 +549,16 @@ async function blankPointIn(page, hostSelector, hitSelector) {
         await new Promise((r) => setTimeout(r, 450));
         const afterBlank = await page.evaluate(() => ({
             events: window.__selEvents.map((d) => (d && Array.isArray(d.selection) ? d.selection : null)),
-            dimmed: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')].filter((r) => r.style.opacity === '0.35').length,
+            selected: [...document.querySelectorAll('#treemap-disk rect[data-dvz-id^="treemap:"]')].filter(
+                (r) => r.getAttribute('data-selected') === 'true' || r.getAttribute('aria-selected') === 'true',
+            ).length,
         }));
         check(
             'select.blank click clears selection and emits an empty set',
             afterBlank.events.length === 2 && JSON.stringify(afterBlank.events[1]) === JSON.stringify([]),
             JSON.stringify(afterBlank.events),
         );
-        check('select.blank click restores full opacity', afterBlank.dimmed === 0, `dimmed=${afterBlank.dimmed}`);
+        check('select.blank click clears the selected attributes', afterBlank.selected === 0, `selected=${afterBlank.selected}`);
     }
     await page.close();
 }
@@ -637,8 +653,10 @@ async function blankPointIn(page, hostSelector, hitSelector) {
         brushed !== null && brushed !== undefined && brushed.length >= 4 && brushed.every((id) => id.startsWith('bar:')),
         JSON.stringify(events),
     );
-    const selected = await page.evaluate(() => [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')].filter((el) => el.style.opacity === '1').length);
-    check('brush.drag keeps the brushed marks lit', selected === brushed.length, `${selected}/${brushed.length}`);
+    const selected = await page.evaluate(
+        () => [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')].filter((el) => el.getAttribute('data-selected') === 'true').length,
+    );
+    check('brush.drag marks the brushed rects as selected', selected === brushed.length, `${selected}/${brushed.length}`);
     await page.close();
 }
 
