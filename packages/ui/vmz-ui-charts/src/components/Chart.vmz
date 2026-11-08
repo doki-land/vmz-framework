@@ -1541,26 +1541,30 @@ export default class Chart {
         this._emitChartEvent("vmz-chart-drilldown-change", { root, path: [...this._drillPath] });
     }
 
-    /** 双击：treemap 下钻 / 返回，其它 mark 复位缩放（图例区不触发）。 */
+    /** 双击下钻：由 `_onClick` 的 `detail>=2` 分支调用，见该处关于 `dblclick` 失配的说明。 */
+    public _treemapDrillByClick(ev: MouseEvent): boolean {
+        const point = this._toScenePoint(ev);
+        if (!point) return false;
+        const key = this._treemapKeyOf(this._hitTest(point.x, point.y));
+        if (key !== null) {
+            const target = this._treemapDrillTarget(key);
+            if (target === null) return false;
+            ev.preventDefault();
+            this._drillTo(target);
+            return true;
+        }
+        if (this._drillRoot() !== null) {
+            ev.preventDefault();
+            this._drillUp();
+            return true;
+        }
+        return false;
+    }
+
+    /** 双击：非 treemap 的缩放复位（treemap 下钻见 `_treemapDrillByClick`）。 */
     public _onDblClick(ev: MouseEvent): void {
         const point = this._toScenePoint(ev);
         if (!point) return;
-        if (this.spec && String(this.spec.mark) === "treemap") {
-            const key = this._treemapKeyOf(this._hitTest(point.x, point.y));
-            if (key !== null) {
-                const target = this._treemapDrillTarget(key);
-                if (target !== null) {
-                    ev.preventDefault();
-                    this._drillTo(target);
-                    return;
-                }
-            }
-            if (key === null && this._drillRoot() !== null) {
-                ev.preventDefault();
-                this._drillUp();
-            }
-            return;
-        }
         if (this._zoomResetVisible()) {
             ev.preventDefault();
             this._resetView();
@@ -1685,7 +1689,13 @@ export default class Chart {
         // 默认空实现，宿主在组件实例上 override 即可接收事件。
     }
 
+    /** 图内浮层按钮：命中判断要跳过，否则按钮 click 会被当成画布点击。 */
+    public _isChromeTarget(target: Element | null): boolean {
+        return !!target && typeof target.closest === "function" && target.closest(".vmz-ui-charts__zoom-reset, .vmz-ui-charts__drill-up") !== null;
+    }
+
     public _onMouseDown(ev: MouseEvent): void {
+        if (this._isChromeTarget(ev.target as Element | null)) return;
         const point = this._toScenePoint(ev);
         if (!point) return;
         if (ev.shiftKey && this._zoomable()) {
@@ -2383,12 +2393,20 @@ export default class Chart {
             this._suppressClick = false;
             return;
         }
-        // 图例项优先：单击切换显隐（mark 命中逻辑不参与）。
+        // 图内按钮（重置缩放 / 返回上一级）的 click 会冒泡到根节点；它们不是
+        // 画布命中，不能顺带改选择。图例项另有自己的处理，放在下一段。
         const target = ev.target as Element | null;
+        if (this._isChromeTarget(target)) return;
         const legendEl = target && typeof target.closest === "function" ? target.closest('[data-dvz-id^="legend:swatch:"], [data-dvz-id^="legend:label:"]') : null;
         if (legendEl) {
             const name = this._legendNameFromId(legendEl.getAttribute("data-dvz-id") ?? "");
             if (name !== null) this._toggleLegendSeries(name);
+            return;
+        }
+        // 双击下钻走 click `detail`，不依赖 `dblclick`：首击的选择落状态会重绘
+        // 并替换命中的 rect，浏览器要求两次 click 命中同一元素才派发 `dblclick`，
+        // 于是 cell 上的 `dblclick` 实际收不到。detail>=2 的第二击在这里直接下钻。
+        if (ev.detail >= 2 && this.spec !== null && String(this.spec.mark) === "treemap" && this._treemapDrillByClick(ev)) {
             return;
         }
         // 钉住态 tooltip 存在时，点击只解除钉住，不改选择。触摸点按的解钉
