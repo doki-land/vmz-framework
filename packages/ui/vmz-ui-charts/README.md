@@ -128,6 +128,20 @@ In controlled mode the component never applies a selection of its own. Each sele
 
 `onchartSelect({ rowKey, markId })` still fires per click in both modes — it reports the hit, not the resulting selection. Feeding the proposal back into `selection` is what makes the selection stick, so a host that ignores the event simply leaves the chart unchanged.
 
+### What the markup carries and what it does not
+
+`markup()` is a pure function of the resolved scene plus the selection, so the SVG string always describes real geometry: size, `spec` / `data`, theme tokens, `selection`, the current zoom view (`zoomDomain` or the interaction view) and the current drill root (both override the compiled spec before the scene is built), and legend filtering (hidden or isolated series are dropped when the snapshot is rebuilt).
+
+Transient interaction presentation stays out of it by design:
+
+| State | Where it lives | Why not in the markup |
+|---|---|---|
+| hover emphasis | inline `opacity` on the hit mark, replayed by `_applyDomState()` after every re-render | it is a pointer affordance, not chart state |
+| legend entry dim | inline `opacity` on `legend:swatch:*` / `legend:label:*` | the legend keeps its node while the series is filtered, so the dim has no separate string form |
+| brush rectangle, crosshair, tooltip | overlay elements next to the SVG | they are interaction chrome, not scene content |
+
+Only `selection` gets a DOM attribute expression (`data-selected` / `aria-selected`); hover and legend dimming are presentation only. Server rendering starts from the declarative defaults — no zoom, no hidden series, the `treemapRoot` from the spec — so a fresh client hydrates the same markup as the server sent. After an interaction the client regenerates markup from runtime state and intentionally differs from the original SSR string; that is a post-hydration update, not a hydration mismatch, and re-rendering restores the state from the component, never from the old HTML.
+
 ### Disk-usage boards
 
 A WizTree-style board composes the chart and the status bar on the app side — the chart emits identity and value, never the copy:
