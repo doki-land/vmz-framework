@@ -337,6 +337,7 @@ import {
     DARK_CHART_THEME,
     DEFAULT_CHART_THEME,
     buildScene,
+    column,
     compile,
     fromRows,
     type ChartCompilePlan,
@@ -921,6 +922,8 @@ export default class Chart {
     public _effectiveSpec(): ChartSpec | null {
         const spec = this.spec;
         if (!spec) return null;
+        // 数据刷新后下钻栈可能指向已删除的节点：先排一次收敛（microtask 里写状态并通知宿主）。
+        this._scheduleDrillReconcile();
         // treemap 下钻：把当前根节点注入 spec，渲染仍然是同一条管线。
         const drilled =
             this._drillRoot() !== null && String(spec.mark) === "treemap"
@@ -1450,9 +1453,73 @@ export default class Chart {
 
     // ---- treemap 下钻（进入节点作为根 / 返回上一级） ----
 
-    /** 下钻栈顶：当前作为根的节点 key，空栈 = 文档根。 */
+    /** treemap 下钻栈顶：当前作为根的节点 key，空栈 = 文档根。
+     *  栈里可能留着数据刷新后已不存在的层级，渲染只认 `_validDrillPath()`。 */
     public _drillRoot(): string | null {
-        return this._drillPath.length > 0 ? this._drillPath[this._drillPath.length - 1] : null;
+        const path = this._validDrillPath();
+        return path.length > 0 ? path[path.length - 1] : null;
+    }
+
+    /** 当前数据里存在的层级 key；非 treemap、缺 keyField 或无数据时返回 null（不做裁剪）。 */
+    public _hierarchyKeys(): Set<string> | null {
+        const spec = this.spec;
+        if (!spec || String(spec.mark) !== "treemap" || !spec.keyField) return null;
+        const source = this.snapshot !== null ? this.snapshot : this.data;
+        const sig = `${spec.keyField}\u0000${spec.parentField ?? ""}`;
+        const bag = this as any;
+        if (source !== null && bag.__hierSource === source && bag.__hierSig === sig) {
+            return bag.__hierKeys as Set<string> | null;
+        }
+        const snap = this._baseSnapshot();
+        const col = snap ? column(snap, spec.keyField) : undefined;
+        let keys: Set<string> | null = null;
+        if (col) {
+            keys = new Set<string>();
+            for (const value of col.values) {
+                if (value === null || value === undefined) continue;
+                if (typeof value === "number" && !Number.isFinite(value)) continue;
+                keys.add(String(value));
+            }
+        }
+        bag.__hierSource = source;
+        bag.__hierSig = sig;
+        bag.__hierKeys = keys;
+        return keys;
+    }
+
+    /** 下钻栈中仍存在于当前数据的前缀：第一层消失就回到文档根，中间层消失就停在父层。 */
+    public _validDrillPath(): string[] {
+        const keys = this._hierarchyKeys();
+        if (keys === null) return this._drillPath;
+        let keep = 0;
+        for (const key of this._drillPath) {
+            if (!keys.has(key)) break;
+            keep += 1;
+        }
+        return keep === this._drillPath.length ? this._drillPath : this._drillPath.slice(0, keep);
+    }
+
+    /** 数据刷新把下钻根删掉时，渲染已经退回最深的存在层；这里把栈收敛并通知宿主。
+     *  渲染期只读响应式字段，收敛放在 microtask（与 canvas 绘制同一套去重）。 */
+    public _scheduleDrillReconcile(): void {
+        if (this._drillPath.length === 0) return;
+        if (this._validDrillPath().length === this._drillPath.length) return;
+        const bag = this as any;
+        if (bag.__drillQueued) return;
+        bag.__drillQueued = true;
+        queueMicrotask(this._flushDrillReconcile.bind(this));
+    }
+
+    public _flushDrillReconcile(): void {
+        const bag = this as any;
+        bag.__drillQueued = false;
+        if (!bag.__vmzDomRoot) return;
+        const valid = this._validDrillPath();
+        if (valid.length === this._drillPath.length) return;
+        this._drillPath = valid;
+        const root = this._drillRoot();
+        this._announce(root === null ? "已返回顶层" : `已返回 ${root}`);
+        this._emitChartEvent("vmz-chart-drilldown-change", { root, path: [...valid] });
     }
 
     /** 返回按钮可见性：treemap 且已下钻。 */
@@ -1524,18 +1591,20 @@ export default class Chart {
         return null;
     }
 
-    /** 下钻：只记录节点身份，重绘仍走 `_effectiveSpec` → compile → scene。 */
+    /** 下钻：只记录节点身份，重绘仍走 `_effectiveSpec` → compile → scene。
+     *  入栈前先按当前数据收敛，避免数据刷新后把过期层级带进新路径。 */
     public _drillTo(key: string): void {
         if (this._drillRoot() === key) return;
-        this._drillPath = [...this._drillPath, key];
+        this._drillPath = [...this._validDrillPath(), key];
         this._announce(`下钻到 ${key}`);
         this._emitChartEvent("vmz-chart-drilldown-change", { root: key, path: [...this._drillPath] });
     }
 
     /** 返回上一级；弹出最后一级后回到文档根。 */
     public _drillUp(): void {
-        if (this._drillPath.length === 0) return;
-        this._drillPath = this._drillPath.slice(0, -1);
+        const path = this._validDrillPath();
+        if (path.length === 0) return;
+        this._drillPath = path.slice(0, -1);
         const root = this._drillRoot();
         this._announce(root === null ? "已返回顶层" : `已返回 ${root}`);
         this._emitChartEvent("vmz-chart-drilldown-change", { root, path: [...this._drillPath] });
@@ -2471,25 +2540,10 @@ export default class Chart {
             }
             return;
         }
-        const targets = this._navTargets();
-        if (targets.length === 0) return;
-        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
-            ev.preventDefault();
-            this._focusIndex = (this._focusIndex + 1) % targets.length;
-            this._focusTarget(targets[this._focusIndex]);
-        } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
-            ev.preventDefault();
-            this._focusIndex = (this._focusIndex - 1 + targets.length) % targets.length;
-            this._focusTarget(targets[this._focusIndex]);
-        } else if (ev.key === "Home") {
-            ev.preventDefault();
-            this._focusIndex = 0;
-            this._focusTarget(targets[0]);
-        } else if (ev.key === "End") {
-            ev.preventDefault();
-            this._focusIndex = targets.length - 1;
-            this._focusTarget(targets[this._focusIndex]);
-        } else if (ev.key === "Enter") {
+        // 选择与关闭动作不依赖导航目标：没有可导航 mark 时（空场景、编译失败、
+        // 表格视图等）`Enter` / `Space` 仍要作用在当前悬停点，`Escape` 仍要解除
+        // 钉住、清空选择并收起交互层，否则焦点被困住且 tooltip 无法关闭。
+        if (ev.key === "Enter") {
             // Enter 选中当前 mark 并钉住 tooltip（再次 Enter 或 Esc 解除）。
             ev.preventDefault();
             if (this._hoverId) {
@@ -2509,7 +2563,9 @@ export default class Chart {
                 this._pinnedTooltip = { x: this._tooltip.x, y: this._tooltip.y, text: this._tooltip.text };
                 this._announce(`已钉住 ${this._tooltip.text}`);
             }
-        } else if (ev.key === " ") {
+            return;
+        }
+        if (ev.key === " ") {
             if (this._hoverId) {
                 ev.preventDefault();
                 // 受控只提议切换后的集合，非受控先发提议再落状态。
@@ -2521,7 +2577,9 @@ export default class Chart {
                 this.onchartSelect({ rowKey: this._rowKeyForMark(this._hoverId), markId: this._hoverId });
                 this._applyDomState();
             }
-        } else if (ev.key === "Escape") {
+            return;
+        }
+        if (ev.key === "Escape") {
             // treemap 已下钻时，Escape 先返回上一级（再按一次才清选择）。
             if (this._drillBackVisible()) {
                 ev.preventDefault();
@@ -2540,6 +2598,26 @@ export default class Chart {
                 this.dispatch({ kind: "clear-selection" });
             }
             this._applyDomState();
+            return;
+        }
+        const targets = this._navTargets();
+        if (targets.length === 0) return;
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+            ev.preventDefault();
+            this._focusIndex = (this._focusIndex + 1) % targets.length;
+            this._focusTarget(targets[this._focusIndex]);
+        } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+            ev.preventDefault();
+            this._focusIndex = (this._focusIndex - 1 + targets.length) % targets.length;
+            this._focusTarget(targets[this._focusIndex]);
+        } else if (ev.key === "Home") {
+            ev.preventDefault();
+            this._focusIndex = 0;
+            this._focusTarget(targets[0]);
+        } else if (ev.key === "End") {
+            ev.preventDefault();
+            this._focusIndex = targets.length - 1;
+            this._focusTarget(targets[this._focusIndex]);
         }
     }
 

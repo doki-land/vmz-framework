@@ -744,6 +744,128 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await page.close();
 }
 
+// ─── 15. treemap drill path follows data updates ─────────────────────────
+{
+    const page = await openPage();
+    const hasInst = await page.evaluate(() => {
+        const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        const inst = [...all].find((m) => m && m.__vmzDomRoot === host);
+        if (!inst) return false;
+        window.__drillInst = inst;
+        window.__drillRows = inst.data.map((r) => ({ ...r }));
+        window.__drillEvents = [];
+        document.addEventListener('vmz-chart-drilldown-change', (e) => window.__drillEvents.push(e.detail));
+        return true;
+    });
+    check('drill.instance reachable from the treemap host', hasInst);
+
+    const probe = () =>
+        page.evaluate(() => {
+            const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+            return {
+                root: window.__drillInst._drillRoot(),
+                path: [...window.__drillInst._drillPath],
+                back: !!host.querySelector('.vmz-ui-charts__drill-up'),
+                diag: [...host.querySelectorAll('.vmz-ui-charts__diag-item')].map((n) => n.textContent.trim()),
+                rects: [...host.querySelectorAll('svg rect[data-dvz-id]')].map((r) => r.getAttribute('data-dvz-id')),
+                events: window.__drillEvents.map((d) => d),
+            };
+        });
+
+    await page.evaluate(() => window.__drillInst._drillTo('媒体'));
+    await new Promise((r) => setTimeout(r, 400));
+    const drilled = await probe();
+    check(
+        'drill.enter shows a back affordance at the new root',
+        drilled.root === '媒体' && drilled.back && drilled.rects.length === 3 && drilled.diag.length === 0,
+        JSON.stringify(drilled),
+    );
+
+    await page.evaluate(() => {
+        window.__drillInst.data = window.__drillRows.filter((r) => r.id !== '媒体' && r.parent !== '媒体');
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    const pruned = await probe();
+    check(
+        'drill.data update that removes the root falls back without diagnostics',
+        pruned.root === null && pruned.path.length === 0 && !pruned.back && pruned.diag.length === 0 && pruned.rects.length === 9,
+        JSON.stringify(pruned),
+    );
+    check(
+        'drill.fallback bubbles one drilldown-change with a null root',
+        pruned.events.length === 2 && pruned.events.at(-1).root === null && JSON.stringify(pruned.events.at(-1).path) === '[]',
+        JSON.stringify(pruned.events),
+    );
+
+    await new Promise((r) => setTimeout(r, 500));
+    const settled = await probe();
+    check('drill.fallback settles without a render loop', settled.events.length === pruned.events.length && settled.root === null, JSON.stringify(settled.events));
+
+    await page.evaluate(() => {
+        window.__drillInst.data = window.__drillRows;
+    });
+    await new Promise((r) => setTimeout(r, 600));
+    const restored = await probe();
+    check(
+        'drill.restoring the rows does not resurrect the pruned level',
+        restored.root === null && !restored.back && restored.rects.length === 13 && restored.events.length === 2,
+        JSON.stringify(restored),
+    );
+
+    await page.evaluate(() => {
+        window.__drillInst._drillTo('媒体');
+    });
+    await new Promise((r) => setTimeout(r, 250));
+    await page.evaluate(() => {
+        window.__drillInst._drillTo('视频');
+    });
+    await new Promise((r) => setTimeout(r, 400));
+    const deep = await probe();
+    check(
+        'drill.second level stacks on the current root',
+        deep.root === '视频' && JSON.stringify(deep.path) === JSON.stringify(['媒体', '视频']),
+        JSON.stringify(deep),
+    );
+
+    await page.evaluate(() => {
+        window.__drillInst.data = window.__drillRows.filter((r) => r.id !== '视频');
+    });
+    await new Promise((r) => setTimeout(r, 700));
+    const partial = await probe();
+    check(
+        'drill.data update trims only the missing level',
+        partial.root === '媒体' && JSON.stringify(partial.path) === JSON.stringify(['媒体']) && partial.back && partial.diag.length === 0,
+        JSON.stringify(partial),
+    );
+    check(
+        'drill.trim bubbles the surviving root and path',
+        partial.events.length === 5 && partial.events.at(-1).root === '媒体' && JSON.stringify(partial.events.at(-1).path) === JSON.stringify(['媒体']),
+        JSON.stringify(partial.events),
+    );
+
+    await page.evaluate(() => {
+        window.__drillInst.data = window.__drillRows;
+        window.__drillInst._drillUp();
+    });
+    await new Promise((r) => setTimeout(r, 450));
+    const backed = await probe();
+    check(
+        'drill.back returns to the document root',
+        backed.root === null && !backed.back && backed.rects.length === 13,
+        JSON.stringify(backed),
+    );
+    await page.close();
+}
+
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);
