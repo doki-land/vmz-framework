@@ -20,7 +20,7 @@ const spec = {
     // keyField: "id"                               (stable row identity)
     // parentField: "parent"                        (treemap / sunburst / tree hierarchy)
     // treemapDepth: 3                              (levels drawn, frame root = 1)
-    // treemapMinArea: 6                            (px² below which slivers are omitted)
+    // treemapMinArea: 6                            (px² below which slivers are omitted, as are cells under 3px on either edge)
     // treemapRoot: "媒体"                           (drill-down root id)
     // valueDomain: [0, 100]                        (gauge)
     // spark: true                                  (strip all furniture)

@@ -2464,6 +2464,10 @@ interface TreemapItem {
 const TREEMAP_PAD = 2;
 /** Default smallest visible rect area, in px². */
 const TREEMAP_MIN_AREA = 4;
+/** Smallest drawn edge after the gutter, in px. Below this a slice is a
+ *  degenerate sliver: it paints nothing and cannot be hit, so it is dropped
+ *  instead of surviving as a zero-width rect. */
+const TREEMAP_MIN_EDGE = 3;
 
 /** Deterministic string order — palette slots and tie-breaks never depend on
  *  row order or locale. */
@@ -2653,6 +2657,8 @@ function buildTreemap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
             const y = r.y + TREEMAP_PAD / 2;
             const w = Math.max(0, r.w - TREEMAP_PAD);
             const h = Math.max(0, r.h - TREEMAP_PAD);
+            // 扣掉沟槽后不足一格的窄条不可见也不可命中，直接丢弃，不留 0 宽 rect。
+            if (w < TREEMAP_MIN_EDGE || h < TREEMAP_MIN_EDGE) continue;
             const base = colorOf(r.key, node.category);
             const alpha = depth === 1 ? 1 : Math.max(0.5, 1 - 0.12 * (depth - 1));
             nodes.push({
