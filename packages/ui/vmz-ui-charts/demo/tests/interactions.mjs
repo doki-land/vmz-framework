@@ -472,6 +472,25 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await page.evaluate(() => {
         window.__selEvents = [];
         document.addEventListener('vmz-chart-selection-change', (e) => window.__selEvents.push(e.detail));
+        // Override the host callbacks so the two identities stay distinguishable:
+        // `rowKey` indexes data rows, `markId` indexes scene marks.
+        const host = document.querySelector('#treemap-disk [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        const inst = [...all].find((m) => m && m.__vmzDomRoot === host);
+        window.__hoverPayloads = [];
+        window.__selectPayloads = [];
+        if (inst) {
+            inst.onchartHover = (p) => window.__hoverPayloads.push(p);
+            inst.onchartSelect = (p) => window.__selectPayloads.push(p);
+        }
     });
     const leaf = await page.evaluate(() => {
         const el = document.querySelector('#treemap-disk [data-dvz-id="treemap:视频"]');
@@ -494,6 +513,21 @@ async function blankPointIn(page, hostSelector, hitSelector) {
             JSON.stringify(afterClick.events),
         );
         check('select.click paints other marks dimmed', afterClick.dimmed > 0, `dimmed=${afterClick.dimmed}`);
+
+        const payloads = await page.evaluate(() => ({
+            hover: window.__hoverPayloads.at(-1) ?? null,
+            select: window.__selectPayloads.at(-1) ?? null,
+        }));
+        check(
+            'select.click reports the row key apart from the mark id',
+            payloads.select !== null && payloads.select.rowKey === '视频' && payloads.select.markId === 'treemap:视频',
+            JSON.stringify(payloads.select),
+        );
+        check(
+            'select.hover reports the row key apart from the mark id',
+            payloads.hover !== null && payloads.hover.rowKey === '视频' && payloads.hover.markId === 'treemap:视频',
+            JSON.stringify(payloads.hover),
+        );
 
         // Blank point: the in-host point farthest from any treemap rect.
         const blank = await blankPointIn(page, '#treemap-disk [data-vmz-ui-charts="chart"]', 'rect[data-dvz-id^="treemap:"]');

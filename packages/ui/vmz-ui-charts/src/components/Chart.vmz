@@ -1738,6 +1738,16 @@ export default class Chart {
         return this.#semanticScene.root.children.filter((n) => n.role === "chart.mark");
     }
 
+    /** mark id → 命中的数据行 key。scene 的 `source.path` 是 `["mark", <key>]`
+     *  （treemap 标签节点多一个 `label` 尾段）；系列级 mark（整条 line/area 等）
+     *  没有单一数据行，返回 null。 */
+    public _rowKeyForMark(markId: string): string | null {
+        const node = this._markNodes().find((n) => n.id === markId);
+        const path = node && node.source ? node.source.path : undefined;
+        if (!path || path.length < 2 || path[0] !== "mark") return null;
+        return String(path[1]);
+    }
+
     /** 命中测试：返回最近的 mark 稳定 id，未命中返回 null。重叠 rect（嵌套
      *  treemap）同样距离时取面积更小的那个 —— 最深节点才代表点到的格子。 */
     public _hitTest(px: number, py: number): string | null {
@@ -2166,8 +2176,9 @@ export default class Chart {
 
     // ---- Pointer 交互 ----
 
-    /** 宿主可 override 的 hover 回调（事件名 `chart-hover`）。 */
-    public onchartHover(payload: { rowKey: string | number; x: number; y: number }): void {
+    /** 宿主可 override 的 hover 回调（事件名 `chart-hover`）。`rowKey` 是命中的数据
+     *  行 key（`keyField`），`markId` 是 scene 节点 id（如 `treemap:视频`）。 */
+    public onchartHover(payload: { rowKey: string | null; markId: string; x: number; y: number }): void {
         // 默认空实现，宿主在组件实例上 override 即可接收事件。
     }
 
@@ -2252,7 +2263,7 @@ export default class Chart {
             this._tooltip.text = this._tooltipTextFor(hit);
             this._tooltip.visible = true;
             this.dispatch({ kind: "hover", nodeId: hit });
-            this.onchartHover({ rowKey: hit, x: this._tooltip.x, y: this._tooltip.y });
+            this.onchartHover({ rowKey: this._rowKeyForMark(hit), markId: hit, x: this._tooltip.x, y: this._tooltip.y });
         } else {
             this._hideCrosshair();
             this._tooltip.visible = false;
@@ -2305,8 +2316,9 @@ export default class Chart {
 
     // ---- Click → select dispatch + emit ----
 
-    /** 宿主可 override 的选择回调（事件名 `chart-select`）。 */
-    public onchartSelect(payload: { rowKey: string | number }): void {
+    /** 宿主可 override 的选择回调（事件名 `chart-select`）。`rowKey` 是命中的数据
+     *  行 key（`keyField`），`markId` 是 scene 节点 id（如 `treemap:视频`）。 */
+    public onchartSelect(payload: { rowKey: string | null; markId: string }): void {
         // 默认空实现，宿主在组件实例上 override 即可接收事件。
     }
 
@@ -2343,7 +2355,7 @@ export default class Chart {
             if (hit === null) this.dispatch({ kind: "clear-selection" });
             else this.dispatch({ kind: "select-toggle", nodeId: hit });
         }
-        if (hit !== null) this.onchartSelect({ rowKey: hit });
+        if (hit !== null) this.onchartSelect({ rowKey: this._rowKeyForMark(hit), markId: hit });
         this._applyDomState();
     }
 
@@ -2426,7 +2438,7 @@ export default class Chart {
                 if (this.selection === null) {
                     this.dispatch({ kind: "select-toggle", nodeId: this._hoverId });
                 }
-                this.onchartSelect({ rowKey: this._hoverId });
+                this.onchartSelect({ rowKey: this._rowKeyForMark(this._hoverId), markId: this._hoverId });
                 this._applyDomState();
             }
         } else if (ev.key === "Escape") {
