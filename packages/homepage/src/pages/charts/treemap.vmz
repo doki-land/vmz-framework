@@ -1,0 +1,344 @@
+<template>
+    <SiteShell page="charts" variant="treemap-preview-page">
+        <main id="main" class="treemap-preview">
+            <header class="treemap-preview__head">
+                <p class="kicker">
+                    <span aria-hidden="true" class="kicker__dot" />
+                    {{ kickerLabel }}
+                </p>
+                <h1>
+                    {{ titleLabel }}
+                </h1>
+                <p class="treemap-preview__lead">
+                    {{ leadLabel }}
+                </p>
+                <div class="treemap-preview__actions">
+                    <a class="treemap-preview__link" href="/charts">
+                        {{ backLabel }}
+                    </a>
+                    <button type="button" @click="toggleDark" :aria-pressed="dark ? 'true' : 'false'" class="treemap-preview__theme">
+                        {{ dark ? themeToLightLabel : themeToDarkLabel }}
+                    </button>
+                </div>
+            </header>
+            <section :aria-label="statusSectionLabel" class="treemap-preview__status">
+                <p role="status" aria-live="polite" class="treemap-preview__status-line">
+                    {{ statusText() }}
+                </p>
+                <p class="treemap-preview__status-hint">
+                    {{ statusHintLabel }}
+                </p>
+            </section>
+            <section :aria-label="chartSectionLabel" class="treemap-preview__stage" @vmz-chart-selection-change="onSelectionChange" @vmz-chart-drilldown-change="onDrilldownChange">
+                <Chart :spec="spec" :data="rows" :height="420" :theme="dark ? 'dark' : 'light'" :label="chartLabel" />
+            </section>
+            <section class="treemap-preview__notes">
+                <article class="treemap-preview__note">
+                    <h2>
+                        {{ ssrTitle }}
+                    </h2>
+                    <ul>
+                        <li v-for="item in ssrItems" :key="item.id">
+                            {{ item.text }}
+                        </li>
+                    </ul>
+                </article>
+                <article class="treemap-preview__note">
+                    <h2>
+                        {{ paletteTitle }}
+                    </h2>
+                    <p>
+                        {{ paletteLead }}
+                    </p>
+                </article>
+            </section>
+            <section class="treemap-preview__detail">
+                <h2>
+                    {{ usageTitle }}
+                </h2>
+                <pre class="treemap-preview__code"><code>{{ usageText }}</code></pre>
+                <h2>
+                    {{ specTitle }}
+                </h2>
+                <pre class="treemap-preview__code"><code>{{ specText }}</code></pre>
+            </section>
+        </main>
+    </SiteShell>
+</template>
+<style>
+/* 与 gallery 页一致：整页底板由页面自己声明，不依赖默认灰白底。 */
+.site.treemap-preview-page {
+    background: var(--vmz-surface-paper);
+}
+.treemap-preview {
+    width: min(calc(100% - var(--site-gutter) * 2), var(--vmz-layout-max-width));
+    margin: 0 auto;
+    padding: calc(var(--site-section-pad) * 0.9) 0 var(--site-section-pad);
+}
+.treemap-preview__head {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 46rem;
+    margin-bottom: 2rem;
+}
+.treemap-preview__head h1 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 clamp(2rem, 4vw, 2.75rem) / 1.2 var(--vmz-font-display);
+}
+.treemap-preview__lead {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 1rem / 1.7 var(--vmz-font-sans);
+}
+.treemap-preview__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.treemap-preview__link,
+.treemap-preview__theme {
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    color: var(--vmz-text-steel);
+    font: 500 0.85rem / 1 var(--vmz-font-sans);
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+.treemap-preview__link:hover,
+.treemap-preview__theme:hover {
+    border-color: var(--vmz-text-steel);
+    color: var(--vmz-text-ink);
+}
+.treemap-preview__theme[aria-pressed="true"] {
+    border-color: var(--vmz-text-ink);
+    color: var(--vmz-text-ink);
+    background: var(--vmz-surface-fill);
+}
+/* 状态栏文案全部由页面拼装：图表只发事件，不在图内出句子。 */
+.treemap-preview__status {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 1.25rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--vmz-line-default);
+    border-left: 3px solid var(--vmz-brand-primary);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-fill);
+}
+.treemap-preview__status-line {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 500 0.95rem / 1.6 var(--vmz-font-sans);
+}
+.treemap-preview__status-hint {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 0.85rem / 1.6 var(--vmz-font-sans);
+}
+/* 宽度跟随容器测量（组件内 ResizeObserver），窄屏不出现横向滚动。 */
+.treemap-preview__stage {
+    padding: 0.5rem;
+    border: 1px dashed var(--vmz-line-default);
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-paper);
+    min-width: 0;
+}
+.treemap-preview__notes {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+.treemap-preview__note {
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+    display: grid;
+    gap: 0.5rem;
+}
+.treemap-preview__note h2,
+.treemap-preview__detail h2 {
+    margin: 0;
+    color: var(--vmz-text-ink);
+    font: 600 1.05rem / 1.6 var(--vmz-font-display);
+}
+.treemap-preview__note ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.3rem;
+    color: var(--vmz-text-steel);
+    font: 400 0.95rem / 1.7 var(--vmz-font-sans);
+}
+.treemap-preview__note p {
+    margin: 0;
+    color: var(--vmz-text-steel);
+    font: 400 0.95rem / 1.7 var(--vmz-font-sans);
+}
+.treemap-preview__detail {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--vmz-line-default);
+    border-radius: var(--vmz-radius-lg);
+    background: var(--vmz-surface-paper);
+}
+.treemap-preview__code {
+    margin: 0;
+    padding: 0.8rem 1rem;
+    border-radius: var(--vmz-radius-md);
+    background: var(--vmz-surface-fill);
+    overflow-x: auto;
+    font: 400 0.78rem / 1.55 var(--vmz-font-mono);
+    color: var(--vmz-text-ink);
+    white-space: pre;
+}
+@media (max-width: 40rem) {
+    .treemap-preview__note,
+    .treemap-preview__detail {
+        padding: 1rem;
+    }
+}
+</style>
+<script client>
+/**
+ * 矩形树图预览页。
+ *
+ * 作者面只消费公开的 `@vmz/ui-charts` `<Chart />`，不导入
+ * `@doki-land/davinci/*` 内部模块、不引用 demo 私有路径、不自行拼 SVG。
+ * 数据是本页自己的真实磁盘占用行，spec / rows 与下方展示文本同源。
+ *
+ * 交互：图表只发 `vmz-chart-selection-change` 与 `vmz-chart-drilldown-change`，
+ * 状态栏文案、路径与体积合计全部由本页拼装。
+ */
+import type { ChartSpec } from "@doki-land/davinci/chart";
+import { pageMeta } from "../../page-meta.ts";
+import {
+    treemapPreviewRows,
+    treemapPreviewSpec,
+    treemapPreviewUsage,
+    type TreemapPreviewRow,
+} from "./treemap-preview-input.ts";
+
+export default class TreemapPreviewPage {
+    static meta = pageMeta(
+        "矩形树图预览 · VMZ",
+        "Treemap preview · VMZ",
+        "矩形树图预览：真实磁盘占用数据，公开作者面 @vmz/ui-charts 的 Chart，单击选中、双击下钻、返回，状态栏文案由页面拼装。",
+        "Treemap preview on the public @vmz/ui-charts Chart author surface with real disk usage rows, click selection, double-click drill-down, back and page-assembled status text.",
+    );
+
+    /** 构建期与 SSR 取数：静态预渲染直接读本页的真实输入。 */
+    static load() {
+        return {
+            spec: treemapPreviewSpec,
+            rows: treemapPreviewRows,
+            specText: JSON.stringify(treemapPreviewSpec, null, 2),
+            usageText: treemapPreviewUsage,
+        };
+    }
+
+    kickerLabel = "VMZ · DaVinci Charts";
+    titleLabel = "矩形树图预览";
+    leadLabel = "真实磁盘占用数据，公开作者面 @vmz/ui-charts 的 Chart 负责编译、场景与 SVG；状态栏由本页根据图表事件拼装。";
+    backLabel = "← 返回图表页";
+    themeToDarkLabel = "切换到暗色";
+    themeToLightLabel = "切换到浅色";
+    statusSectionLabel = "交互状态";
+    statusHintLabel = "单击选中格子，双击下钻到有子级的最近祖先；Esc 或图上左上角按钮返回上一级。";
+    chartSectionLabel = "矩形树图";
+    chartLabel = "磁盘存储占用矩形树图";
+    ssrTitle = "SSR 与客户端所有权";
+    ssrItems = [
+        { id: "html", text: "随 HTML 到达：页面壳、标题、状态栏初始文案、图表宿主容器（100% 宽 × 420px 高）、aria-label、摘要占位与隐藏数据表（同源 spec + data，不含几何）。" },
+        { id: "mount", text: "挂载后才有：SVG 主体。宽度由容器测量，SSR 不序列化一个会被测量推翻的尺寸；同源数据更新后才出现真实格子。" },
+        { id: "interaction", text: "交互后才有：选择高亮属性、tooltip、下钻后的几何，以及状态栏里的选中与路径文案。" },
+    ];
+    paletteTitle = "分类配色回落";
+    paletteLead = "本页不传 themeTokens，categoryColors 缺失时顶层分组按 sorted 分组名的 seriesPalette 槽位着色；换主题只换基础色板，槽位与格子的对应不变。";
+    usageTitle = "本页作者面";
+    specTitle = "ChartSpec";
+
+    dark = false;
+    /** 由 `static load` 注入（public = 页面 props）。 */
+    public spec: ChartSpec | null = null;
+    public rows: TreemapPreviewRow[] = [];
+    public specText = "";
+    public usageText = "";
+
+    /** 交互镜像：图表只发事件，状态栏文案在这里按数据拼装。 */
+    selected: string[] = [];
+    drillRoot: string | null = null;
+
+    toggleDark() {
+        this.dark = !this.dark;
+    }
+
+    onSelectionChange(ev: Event) {
+        const detail = (ev as CustomEvent).detail as { selection: string[] } | null;
+        this.selected = detail && Array.isArray(detail.selection) ? [...detail.selection] : [];
+    }
+
+    onDrilldownChange(ev: Event) {
+        const detail = (ev as CustomEvent).detail as { root: string | null } | null;
+        this.drillRoot = detail ? detail.root : null;
+    }
+
+    rowOf(key: string): TreemapPreviewRow | null {
+        for (const row of this.rows) {
+            if (row.id === key) return row;
+        }
+        return null;
+    }
+
+    /** 从 key 沿 parent 链回到根；循环或断链时按已走过的链截断。 */
+    pathOf(key: string): string {
+        const chain: string[] = [];
+        const seen = new Set<string>();
+        let cur: string | null = key;
+        while (cur !== null && !seen.has(cur)) {
+            seen.add(cur);
+            chain.unshift(cur);
+            const row = this.rowOf(cur);
+            cur = row ? row.parent : null;
+        }
+        return chain.join(" / ");
+    }
+
+    formatGb(value: number): string {
+        return value < 10 ? value.toFixed(1) : String(value);
+    }
+
+    selectionKeys(): string[] {
+        return this.selected.map((id) => (id.startsWith("treemap:") ? id.slice("treemap:".length) : id));
+    }
+
+    statusText(): string {
+        const root = this.drillRoot === null ? "根" : this.drillRoot;
+        const keys = this.selectionKeys();
+        if (keys.length === 0) return `当前根：${root} · 未选中`;
+        if (keys.length === 1) {
+            const row = this.rowOf(keys[0]);
+            if (!row) return `当前根：${root} · 已选中 ${keys[0]}`;
+            return `当前根：${root} · 已选中 ${keys[0]} · ${this.formatGb(row.gb)} GB · ${this.pathOf(keys[0])}`;
+        }
+        let total = 0;
+        for (const key of keys) {
+            const row = this.rowOf(key);
+            if (row) total += row.gb;
+        }
+        return `当前根：${root} · 已选中 ${keys.length} 个格子 · 合计 ${this.formatGb(total)} GB · 最近 ${keys[keys.length - 1]}`;
+    }
+}
+</script>
+<script server>
+/**
+ * 本页没有 `#server` RPC：静态预渲染与客户端取数都走 `static load` 的同一份输入。
+ */
+export default class TreemapPreviewPageServer {}
+</script>

@@ -13,6 +13,9 @@
                     {{ leadLabel }}
                 </p>
                 <div class="charts-gallery__actions">
+                    <a class="charts-gallery__preview-link" href="/charts/treemap">
+                        {{ treemapPreviewLabel }}
+                    </a>
                     <button type="button" @click="() => toggleDark()" :aria-pressed="dark ? 'true' : 'false'" class="charts-gallery__theme-toggle">
                         {{ dark ? themeToLightLabel : themeToDarkLabel }}
                     </button>
@@ -137,6 +140,7 @@
     display: flex;
     gap: 0.5rem;
 }
+.charts-gallery__preview-link,
 .charts-gallery__theme-toggle {
     padding: 0.4rem 0.85rem;
     border: 1px solid var(--vmz-line-default);
@@ -144,9 +148,11 @@
     background: var(--vmz-surface-paper);
     color: var(--vmz-text-steel);
     font: 500 0.85rem / 1 var(--vmz-font-sans);
+    text-decoration: none;
     cursor: pointer;
     transition: border-color 120ms ease, color 120ms ease;
 }
+.charts-gallery__preview-link:hover,
 .charts-gallery__theme-toggle:hover {
     border-color: var(--vmz-text-steel);
     color: var(--vmz-text-ink);
@@ -344,6 +350,7 @@ export default class ChartGalleryPage {
     leadLabel = "消费公开 UI 作者面 @vmz/ui-charts，由它绑定 @doki-land/davinci 引擎完成编译、场景解析与 SVG 呈现。每张卡片都是可交互的真实几何。";
     themeToDarkLabel = "切换到暗色";
     themeToLightLabel = "切换到浅色";
+    treemapPreviewLabel = "矩形树图预览 →";
     howtoTitle = "交互";
     howtoItems = [
         { id: "hover", text: "悬停：十字线定位，tooltip 读真实行值；扇形读数值与占比。" },
