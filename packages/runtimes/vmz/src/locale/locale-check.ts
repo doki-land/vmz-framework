@@ -38,6 +38,7 @@ export interface LocaleDiagnostic {
     severity: string;
     message: string;
     path?: string;
+    args?: Record<string, string>;
 }
 
 export interface MessageParam {

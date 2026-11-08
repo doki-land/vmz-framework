@@ -7,6 +7,7 @@ import { after, before, describe, it } from 'node:test';
 import { expect } from '../../../../../scripts/test/expect.mjs';
 import { clearLocalesCache, loadCatalog, loadLocalesManifest } from '@vmz/commander';
 import { formatDiagnostic, type DiagnosticInput } from '@vmz/diagnostic';
+import { mapPlanDiagnostics } from '../../src/workspace/author-input.js';
 
 const localesRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'locales');
 
@@ -51,6 +52,32 @@ describe('vmz diagnostic locale catalogs', () => {
         expect(PARSE_INPUT.code).toBe('vmz::template::parse_failed');
         expect(PARSE_INPUT.args).toEqual({ detail: 'single-brace is not allowed' });
         expect(PARSE_INPUT.span).toEqual({ start: 12, end: 18 });
+    });
+
+    it('plan diagnostic args survive the host projection and interpolate', () => {
+        // Rust 侧 `load_locale_plan` 只给 code + args，文案在 catalog 里：宿主投影
+        // 丢掉 args 就会把 `{detail}` 原样打进产物告警。
+        const [row] = mapPlanDiagnostics([
+            {
+                code: 'vmz::locale::manifest_missing',
+                severity: 'warning',
+                path: 'locales/locales.json5',
+                args: { detail: 'locales/locales.json5 missing' },
+            },
+        ]);
+        expect(row.args).toEqual({ detail: 'locales/locales.json5 missing' });
+
+        const zh = loadCatalog('zh-CN', localesRoot);
+        const line = formatDiagnostic({ ...row, severity: 'warning' }, { locale: 'zh-CN', catalog: zh });
+        expect(zh['vmz::locale::manifest_missing']).toBeTruthy();
+        expect(line).not.toContain('{detail}');
+        expect(line).toContain('locales/locales.json5 missing');
+        // 丢 args 的旧投影正是本次缺陷：模板里的 `{detail}` 会原样打进告警。
+        const dropped = formatDiagnostic(
+            { ...row, severity: 'warning', args: undefined },
+            { locale: 'zh-CN', catalog: zh },
+        );
+        expect(dropped).toContain('{detail}');
     });
 
     it('missing translation falls back without changing structured fields', () => {

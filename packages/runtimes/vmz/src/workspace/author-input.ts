@@ -11,6 +11,8 @@ export interface PlanDiagnostic {
     severity?: string;
     message?: string;
     path?: string;
+    /** 结构化消息参数：locale 目录模板靠它替换 `{name}` 占位。 */
+    args?: Record<string, string>;
 }
 
 export interface MappedPlanDiagnostic {
@@ -18,6 +20,7 @@ export interface MappedPlanDiagnostic {
     severity: string;
     message: string;
     path: string | undefined;
+    args?: Record<string, string>;
 }
 
 export interface LocalePlan {
@@ -70,12 +73,14 @@ export function loadDocumentRoutePlan(projectRoot: string): DocumentRoutePlan {
     return JSON.parse(native.loadDocumentRoutePlan(String(projectRoot))) as DocumentRoutePlan;
 }
 
-/** Map Rust ReportedDiagnostic rows into host `{ code, severity, message, path }` rows. */
+/** Map Rust ReportedDiagnostic rows into host `{ code, severity, message, path, args }` rows. */
 export function mapPlanDiagnostics(rows: PlanDiagnostic[] | null | undefined): MappedPlanDiagnostic[] {
     return (rows || []).map((d) => ({
         code: d.code || 'vmz::unknown',
         severity: d.severity === 'advice' ? 'warning' : d.severity || 'error',
         message: d.message || '',
         path: d.path || undefined,
+        // 结构化参数必须原样过桥：丢弃后 catalog 模板只剩字面 `{name}`。
+        args: d.args,
     }));
 }
