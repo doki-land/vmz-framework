@@ -393,6 +393,84 @@ fn dynamic_edges_follow_statement_activity() {
     assert_eq!(full.modules.iter().find(|m| m.node == entry_node).unwrap().dynamic_edges, vec![0]);
 }
 
+/// 同一模块两个调用点写同一说明符：调用点活跃性不得按说明符合并。
+/// 未使用的 `dead()` 在前、被消费的 `live()` 在后的最小复现，只有 `live()`
+/// 所在语句活跃时动态边必须存活，`lazy.js` 必须保留。
+#[test]
+fn dynamic_edges_are_judged_per_call_site() {
+    let site_case = |name: &str,
+                     source: &str,
+                     execution: EntryExecution,
+                     exports: EntryExports|
+     -> (Vec<usize>, bool) {
+        let root = temp_tree(
+            name,
+            &[
+                ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+                ("src/entry.js", source),
+                ("src/lazy.js", "export const later = 1;\n"),
+            ],
+        );
+        let entry = root.join("src/entry.js");
+        let graph = build_graph(&[("main".to_string(), entry.clone())], Target::Browser, &root);
+        assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+        let entry_node = graph.index_of(&entry).unwrap();
+        let lazy = graph.index_of(&root.join("src/lazy.js")).expect("lazy in graph");
+        let dynamic_edges = graph.nodes[entry_node].dynamic_edges.len();
+        assert_eq!(dynamic_edges, 2, "两个调用点各自建边");
+        let plan =
+            link(&graph, &[EntryUse { entry_logical: "main".to_string(), execution, exports }]);
+        assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+        let live = plan
+            .modules
+            .iter()
+            .find(|module| module.node == entry_node)
+            .map(|module| module.dynamic_edges.clone())
+            .unwrap_or_default();
+        let retained = plan.modules.iter().any(|module| module.node == lazy);
+        (live, retained)
+    };
+
+    // 死站点在前：边按第二个调用点（`live()`）存活。
+    let dead_first = "function dead(){ return import('./lazy.js'); }\nexport function live(){ return import('./lazy.js'); }\n";
+    let (live, retained) = site_case(
+        "dynamic-site-dead-first",
+        dead_first,
+        EntryExecution::SideEffects,
+        EntryExports::Named(vec!["live".into()]),
+    );
+    assert_eq!(live, vec![1], "活跃性必须落在 `live()` 的调用点");
+    assert!(retained, "活调用点的目标必须保留");
+
+    // 活站点在前：同一条边仍是第一个调用点存活。
+    let live_first = "export function live(){ return import('./lazy.js'); }\nfunction dead(){ return import('./lazy.js'); }\n";
+    let (live, retained) = site_case(
+        "dynamic-site-live-first",
+        live_first,
+        EntryExecution::SideEffects,
+        EntryExports::Named(vec!["live".into()]),
+    );
+    assert_eq!(live, vec![0]);
+    assert!(retained);
+
+    // 全死：两个调用点都不可达 → 无存活动态边，目标不保留。
+    let all_dead = "function deadA(){ return import('./lazy.js'); }\nfunction deadB(){ return import('./lazy.js'); }\n";
+    let (live, retained) = site_case(
+        "dynamic-site-all-dead",
+        all_dead,
+        EntryExecution::SideEffects,
+        EntryExports::Unconsumed,
+    );
+    assert!(live.is_empty(), "{live:?}");
+    assert!(!retained);
+
+    // 全活：两个调用点各自存活，目标只保留一份。
+    let (live, retained) =
+        site_case("dynamic-site-all-live", dead_first, EntryExecution::Full, EntryExports::All);
+    assert_eq!(live, vec![0, 1]);
+    assert!(retained);
+}
+
 /// TLA 形态：`has_tla` 由 Oak root 级事实置位，链接层按非纯语句
 /// 保守保留该模块（TLA 资格事实供后续产物层决定异步边界）。
 #[test]

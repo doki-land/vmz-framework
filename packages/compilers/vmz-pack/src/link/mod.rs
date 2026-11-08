@@ -44,6 +44,9 @@ use crate::module::{ExportFact, ImportKind, ImportedName, StatementEffect};
 /// 请求的导出名在模块导出事实中不存在。
 const UNKNOWN_EXPORT: &str = "vmz::pack::link::unknown_export";
 
+/// 动态边的调用点身份在事实表中找不到对应 import 事实（图与事实漂移）。
+const DYNAMIC_SITE_MISSING: &str = "vmz::pack::link::dynamic_site_missing";
+
 /// 入口的执行维度。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryExecution {
@@ -227,6 +230,8 @@ struct Linker<'g> {
     worklist: VecDeque<Demand>,
     seen_demands: HashSet<Demand>,
     unknown_reported: HashSet<(usize, String)>,
+    /// 已报告「调用点事实缺失」的动态边（节点索引，边下标）。
+    dynamic_site_reported: HashSet<(usize, usize)>,
     diagnostics: Vec<PackDiagnostic>,
 }
 
@@ -249,6 +254,7 @@ impl<'g> Linker<'g> {
             worklist: VecDeque::new(),
             seen_demands: HashSet::new(),
             unknown_reported: HashSet::new(),
+            dynamic_site_reported: HashSet::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -605,7 +611,11 @@ impl<'g> Linker<'g> {
         }
     }
 
-    /// 动态边存活判定：全量模块全活；否则按语句包含，找不到包含语句保守活。
+    /// 动态边存活判定：全量模块全活；否则按**该边自己的调用点**所在的语句
+    /// 判定，找不到包含语句保守活。
+    ///
+    /// 同一说明符可以出现在多个调用点：边携带 `EdgeSite` 身份，逐站点判定，
+    /// 不按说明符搜索第一个匹配——那会让源码顺序决定依赖是否存在。
     fn resolve_dynamic(&mut self, node: usize) {
         let full = self.full[node];
         let dynamic_count = self.graph.nodes[node].dynamic_edges.len();
@@ -617,11 +627,7 @@ impl<'g> Linker<'g> {
                 true
             } else {
                 let edge = &self.graph.nodes[node].dynamic_edges[edge_index];
-                let containing_import =
-                    self.graph.nodes[node].record.imports.iter().find(|import| {
-                        import.kind == ImportKind::Dynamic && import.specifier == edge.specifier
-                    });
-                match containing_import {
+                match edge.import_fact(&self.graph.nodes[node].record) {
                     Some(import) => {
                         let contained: Vec<usize> = self.graph.nodes[node]
                             .record
@@ -638,7 +644,24 @@ impl<'g> Linker<'g> {
                         contained.is_empty()
                             || contained.iter().any(|index| self.active[node].contains(index))
                     }
-                    None => true,
+                    None => {
+                        // 边与事实表漂移（只可能来自手工构造的图）：如实报告并
+                        // 保守活，不按说明符猜别的调用点。
+                        if self.dynamic_site_reported.insert((node, edge_index)) {
+                            let mut diagnostic = PackDiagnostic::new(
+                                DYNAMIC_SITE_MISSING,
+                                format!(
+                                    "动态边 `{}` 找不到对应调用点事实，按活处理",
+                                    edge.specifier
+                                ),
+                            );
+                            if let Some(path) = &self.graph.nodes[node].record.path {
+                                diagnostic = diagnostic.with_path(path.clone());
+                            }
+                            self.diagnostics.push(diagnostic);
+                        }
+                        true
+                    }
                 }
             };
             if !alive {

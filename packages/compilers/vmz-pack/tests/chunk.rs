@@ -5,7 +5,9 @@ use std::path::PathBuf;
 
 use vmz_pack::PackDiagnostic;
 use vmz_pack::chunk::{Chunk, ChunkOrigin, ChunkPlan, plan_chunks};
-use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind};
+use vmz_pack::graph::{
+    EdgeKind, EdgeSite, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind,
+};
 use vmz_pack::link::{LinkPlan, LinkedModule};
 use vmz_pack::module::{ModuleRecord, ScopeIncompleteReason};
 use vmz_pack::resolve::{Resolved, Target};
@@ -32,6 +34,8 @@ fn static_edge(specifier: &str, target: &str) -> ModuleEdge {
     ModuleEdge {
         specifier: specifier.to_string(),
         kind: EdgeKind::Static,
+        // 手工构造的纯分包图没有模块事实，分包层不消费调用点身份。
+        site: EdgeSite::Import(0),
         target: Ok(PathBuf::from(target)),
     }
 }
@@ -40,6 +44,7 @@ fn dynamic_edge(specifier: &str, target: &str) -> ModuleEdge {
     ModuleEdge {
         specifier: specifier.to_string(),
         kind: EdgeKind::Dynamic,
+        site: EdgeSite::Import(0),
         target: Ok(PathBuf::from(target)),
     }
 }

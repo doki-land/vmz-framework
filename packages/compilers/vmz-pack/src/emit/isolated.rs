@@ -25,7 +25,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::diag::PackDiagnostic;
-use crate::graph::{EdgeKind, NodeKind};
+use crate::graph::{EdgeKind, EdgeSite, NodeKind};
 use crate::module::{
     ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ScopeIncompleteReason,
 };
@@ -107,13 +107,14 @@ pub(crate) fn assemble_isolated(
     let mut json_texts: HashMap<usize, Option<String>> = HashMap::new();
 
     // import 事实：静态/副作用原地重写或删除，动态沿用平铺分类。
-    for import in &record.imports {
+    for (import_index, import) in record.imports.iter().enumerate() {
         match import.kind {
             ImportKind::Dynamic => {
                 plan_dynamic_import(
                     context,
                     node,
                     import,
+                    import_index,
                     &module_path,
                     &mut replacements,
                     errors,
@@ -130,15 +131,11 @@ pub(crate) fn assemble_isolated(
                     replacements.insert(import.span, String::new());
                     continue;
                 }
-                let edge_kind = if import.kind == ImportKind::Static {
-                    EdgeKind::Static
-                } else {
-                    EdgeKind::SideEffect
-                };
+                // 边按调用点身份取，不按说明符搜索：同一说明符可以有多个站点。
                 let Some(edge) = node
                     .static_edges
                     .iter()
-                    .find(|edge| edge.kind == edge_kind && edge.specifier == import.specifier)
+                    .find(|edge| edge.site == EdgeSite::Import(import_index))
                 else {
                     errors.push(
                         inconsistent(format!("import `{}` 找不到对应静态边", import.specifier))
@@ -774,12 +771,13 @@ fn assemble_cjs(
         }
     }
     // 动态 import：与 ESM 独立发射同一处置。
-    for import in &record.imports {
+    for (import_index, import) in record.imports.iter().enumerate() {
         if import.kind == ImportKind::Dynamic {
             plan_dynamic_import(
                 context,
                 node,
                 import,
+                import_index,
                 &module_path,
                 &mut replacements,
                 errors,
@@ -883,10 +881,14 @@ fn assemble_cjs(
 }
 
 /// 动态 import 的独立发射处置：与平铺路径同一分类，说明符原地重写。
+///
+/// `import_index` 是该动态 import 在 `record.imports` 中的下标，也是边的
+/// 调用点身份：同一说明符的多个调用点各自取自己的边，不按说明符搜索。
 fn plan_dynamic_import(
     context: &EmitContext<'_>,
     node: &crate::graph::ModuleNode,
     import: &crate::module::ImportFact,
+    import_index: usize,
     module_path: &str,
     replacements: &mut BTreeMap<(usize, usize), String>,
     errors: &mut Vec<PackDiagnostic>,
@@ -934,7 +936,8 @@ fn plan_dynamic_import(
         );
         return;
     }
-    let Some(edge) = node.dynamic_edges.iter().find(|edge| edge.specifier == import.specifier)
+    let Some(edge) =
+        node.dynamic_edges.iter().find(|edge| edge.site == EdgeSite::Import(import_index))
     else {
         errors.push(
             inconsistent(format!("动态 import `{}` 找不到对应动态边", import.specifier))

@@ -75,7 +75,11 @@ pub(crate) fn pack_digests(
                 Ok(id) => crate::chunk::relative_label(graph, id),
                 Err(diagnostic) => format!("err:{}", diagnostic.code),
             };
-            hasher.update(format!("edge {:?} {} {target}\0", edge.kind, edge.specifier).as_bytes());
+            // 摘要带调用点身份：同一说明符的多个站点是不同事实，缓存不得混用。
+            hasher.update(
+                format!("edge {:?} {:?} {} {target}\0", edge.kind, edge.site, edge.specifier)
+                    .as_bytes(),
+            );
         }
     }
     for module in &link.modules {

@@ -475,6 +475,90 @@ fn dynamic_import_rewrites_specifier() {
     assert!(!entry.code.contains("__vmz_chunk_"), "{}", entry.code);
 }
 
+/// 同一说明符两个调用点、只有后者活跃（`dead()` 在前的最小复现）：
+/// 死站点随语句剪除，活站点改写为同一个 async chunk，产物不残留原说明符。
+#[test]
+fn dynamic_call_site_liveness_survives_duplicate_specifier() {
+    let root = temp_tree(
+        "dynamic-site",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/app.js",
+                "function dead(){ return import('./lazy.js'); }\nexport function live(){ return import('./lazy.js'); }\n",
+            ),
+            ("src/lazy.js", "export const later = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::SideEffects,
+            exports: EntryExports::Named(vec!["live".into()]),
+        }],
+    );
+    assert!(link_plan.diagnostics.is_empty(), "{:?}", link_plan.diagnostics);
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    assert_eq!(plan.artifacts.len(), 2, "活调用点必须有真实 async chunk");
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/app").unwrap();
+    let lazy = plan.artifacts.iter().find(|a| a.chunk_id.starts_with("async/")).unwrap();
+    assert!(lazy.modules[0].ends_with("src/lazy.js"));
+    // 死语句整句剪除，活语句的说明符改写为目标文件名。
+    assert!(!entry.code.contains("dead"), "{}", entry.code);
+    assert!(entry.code.contains(&format!("import(\"./{}\")", lazy.file_name)), "{}", entry.code);
+    assert!(!entry.code.contains("./lazy.js"), "{}", entry.code);
+    // 目标去重：同一目标只登记一条动态边界。
+    assert_eq!(entry.dynamic, vec![lazy.file_name.clone()]);
+    assert_eq!(plan.dynamic_files.len(), 1);
+}
+
+/// 两个调用点都活跃：每个站点各自改写为同一 chunk，不把其中一个漏掉。
+#[test]
+fn dynamic_call_sites_all_live_rewrite_each_site() {
+    let root = temp_tree(
+        "dynamic-sites-live",
+        &[
+            ("package.json", r#"{"name":"app","version":"0.0.0"}"#),
+            (
+                "src/app.js",
+                "function dead(){ return import('./lazy.js'); }\nexport function live(){ return import('./lazy.js'); }\n",
+            ),
+            ("src/lazy.js", "export const later = 1;\n"),
+        ],
+    );
+    let graph =
+        build_graph(&[("app".to_string(), root.join("src/app.js"))], Target::Browser, &root);
+    assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
+
+    let link_plan = link(
+        &graph,
+        &[EntryUse {
+            entry_logical: "app".to_string(),
+            execution: EntryExecution::Full,
+            exports: EntryExports::All,
+        }],
+    );
+    assert!(link_plan.diagnostics.is_empty(), "{:?}", link_plan.diagnostics);
+    let chunks = plan_chunks(&graph, &link_plan);
+    let plan = plan_emit(&graph, &link_plan, &chunks, &options()).unwrap();
+    assert!(plan.diagnostics.is_empty(), "{:?}", plan.diagnostics);
+
+    let entry = plan.artifacts.iter().find(|a| a.chunk_id == "entry/app").unwrap();
+    let lazy = plan.artifacts.iter().find(|a| a.chunk_id.starts_with("async/")).unwrap();
+    let rewritten = format!("import(\"./{}\")", lazy.file_name);
+    assert_eq!(entry.code.matches(&rewritten).count(), 2, "{}", entry.code);
+    assert!(!entry.code.contains("./lazy.js"), "{}", entry.code);
+    assert_eq!(plan.dynamic_files.len(), 1);
+}
+
 /// 动态 `import("node:…")` 是 Node 宿主运行时解析的外部模块：说明符原文
 /// 保留、不重写为 chunk 文件，给非致命诊断 `dynamic_external_kept`。
 #[test]
@@ -2955,7 +3039,9 @@ fn placeholder_collision_is_rejected() {
 /// 不产出猜测文本。
 #[test]
 fn incomplete_facts_member_is_rejected() {
-    use vmz_pack::graph::{EdgeKind, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind};
+    use vmz_pack::graph::{
+        EdgeKind, EdgeSite, GraphEntry, ModuleEdge, ModuleGraph, ModuleNode, NodeKind,
+    };
     use vmz_pack::link::{LinkPlan, LinkedModule};
     use vmz_pack::module::ModuleRecord;
     use vmz_pack::resolve::Resolved;
@@ -2972,6 +3058,7 @@ fn incomplete_facts_member_is_rejected() {
         static_edges: vec![ModuleEdge {
             specifier: "./pending.js".to_string(),
             kind: EdgeKind::Static,
+            site: EdgeSite::Import(0),
             target: Ok(pending.clone()),
         }],
         dynamic_edges: Vec::new(),

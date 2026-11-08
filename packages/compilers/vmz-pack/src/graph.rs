@@ -23,7 +23,7 @@ use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
 use crate::diag::PackDiagnostic;
-use crate::module::{ModuleRecord, parse_module};
+use crate::module::{ImportFact, ModuleRecord, parse_module};
 use crate::resolve::{ResolveRequest, Resolved, Target, resolve};
 
 /// 模块节点身份：canonical 后的真实文件路径。
@@ -36,8 +36,37 @@ pub struct ModuleEdge {
     pub specifier: String,
     /// 边形态。
     pub kind: EdgeKind,
+    /// 源码调用点身份。
+    pub site: EdgeSite,
     /// 目标。`Err` 表示解析失败或动态不可静态解析，诊断保留在图中。
     pub target: Result<ModuleId, PackDiagnostic>,
+}
+
+impl ModuleEdge {
+    /// 按调用点身份取回本边对应的 import 事实。
+    ///
+    /// 同一说明符可以出现在多个调用点：目标模块身份按 canonical 路径去重，
+    /// 调用点活跃性必须逐站点判定。消费方一律经本方法取事实，不得按
+    /// `specifier` 搜索——那会把多个调用点折叠成一个。
+    pub fn import_fact<'a>(&self, record: &'a ModuleRecord) -> Option<&'a ImportFact> {
+        match self.site {
+            EdgeSite::Import(index) => record.imports.get(index),
+            EdgeSite::Require(_) | EdgeSite::Export(_) => None,
+        }
+    }
+}
+
+/// 边的源码调用点身份：边在模块事实表中的下标。
+///
+/// 边与事实一一对应，活跃传播、发射与诊断沿同一下标消费。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EdgeSite {
+    /// `ModuleRecord::imports` 下标。
+    Import(usize),
+    /// `ModuleRecord::requires` 下标。
+    Require(usize),
+    /// `ModuleRecord::exports` 下标（重导出）。
+    Export(usize),
 }
 
 /// 边的结构形态，与 `module` 层事实分类对齐。
@@ -335,7 +364,7 @@ fn expand(
     let mut static_edges = Vec::new();
     let mut dynamic_edges = Vec::new();
 
-    for import in &record.imports {
+    for (import_index, import) in record.imports.iter().enumerate() {
         let bindings_all_type =
             !import.bindings.is_empty() && import.bindings.iter().all(|b| b.inline_type_only);
         if import.type_only
@@ -352,6 +381,7 @@ fn expand(
         let edge = ModuleEdge {
             specifier: import.specifier.clone(),
             kind,
+            site: EdgeSite::Import(import_index),
             target: edge_target(
                 import.specifier.as_str(),
                 import.kind == crate::module::ImportKind::Dynamic,
@@ -373,10 +403,11 @@ fn expand(
     // CJS 模块的依赖边来自 `require` 事实（同步执行，与静态边同序）。
     // ESM import 语法在 CJS 模块里属于混合写法，import 边照常建立。
     if format == crate::resolve::ModuleFormat::Cjs {
-        for require in &record.requires {
+        for (require_index, require) in record.requires.iter().enumerate() {
             static_edges.push(ModuleEdge {
                 specifier: require.specifier.clone(),
                 kind: EdgeKind::Static,
+                site: EdgeSite::Require(require_index),
                 target: edge_target(
                     require.specifier.as_str(),
                     false,
@@ -391,7 +422,7 @@ fn expand(
         }
     }
 
-    for export in &record.exports {
+    for (export_index, export) in record.exports.iter().enumerate() {
         let (specifier, kind) = match export {
             crate::module::ExportFact::ReexportNamed { source, type_only, .. } => {
                 if *type_only {
@@ -413,6 +444,7 @@ fn expand(
         static_edges.push(ModuleEdge {
             specifier: specifier.to_string(),
             kind,
+            site: EdgeSite::Export(export_index),
             target: edge_target(
                 specifier,
                 false,

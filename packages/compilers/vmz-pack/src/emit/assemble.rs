@@ -66,7 +66,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::chunk::Chunk;
 use crate::diag::PackDiagnostic;
-use crate::graph::{EdgeKind, ModuleNode, NodeKind};
+use crate::graph::{EdgeKind, EdgeSite, ModuleNode, NodeKind};
 use crate::link::{LinkedModule, UsedReexport};
 use crate::module::{ExportFact, ImportKind, ImportedName, ModuleRecord};
 
@@ -245,8 +245,10 @@ pub(crate) fn assemble_chunk(
             }
         }
 
-        // 存活动态边分类：一次判定，避免按语句重复诊断。
-        let mut dynamic_replacements: Vec<(String, usize)> = Vec::new();
+        // 存活动态边分类：一次判定，避免按语句重复诊断。键是动态 import 在
+        // `record.imports` 中的下标（调用点身份），不是说明符——同一说明符的
+        // 多个调用点各自改写自己的站点。
+        let mut dynamic_replacements: Vec<(usize, usize)> = Vec::new();
         for &edge_index in &linked.dynamic_edges {
             let Some(edge) = node.dynamic_edges.get(edge_index) else {
                 errors.push(
@@ -255,58 +257,66 @@ pub(crate) fn assemble_chunk(
                 );
                 continue;
             };
+            let EdgeSite::Import(import_index) = edge.site else {
+                errors.push(
+                    inconsistent(format!(
+                        "动态边 `{}` 的调用点身份不是 import 事实",
+                        edge.specifier
+                    ))
+                    .with_path(module_path.clone()),
+                );
+                continue;
+            };
+            let Some(import) = record.imports.get(import_index) else {
+                errors.push(
+                    inconsistent(format!("动态 import 事实下标 {import_index} 越界"))
+                        .with_path(module_path.clone()),
+                );
+                continue;
+            };
             match edge.target.as_ref() {
                 Err(_) if edge.specifier.is_empty() => {
                     // 非字面量动态 import：文本原样保留，只给非致命诊断。
-                    let mut diagnostic = PackDiagnostic::new(
-                        "vmz::pack::emit::dynamic_unresolved_kept",
-                        "非字面量动态 import 说明符原样保留，产物层不保证运行时可解析",
-                    )
-                    .with_path(module_path.clone());
-                    if let Some(import) = record.imports.iter().find(|import| {
-                        import.kind == ImportKind::Dynamic && import.specifier.is_empty()
-                    }) {
-                        diagnostic = diagnostic.with_span(import.span);
-                    }
-                    warnings.push(diagnostic);
+                    warnings.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::dynamic_unresolved_kept",
+                            "非字面量动态 import 说明符原样保留，产物层不保证运行时可解析",
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(import.span),
+                    );
                 }
                 Err(_) if edge.specifier.starts_with('/') => {
                     // 根绝对 URL 动态 import（如运行时 face 加载 `/dom.browser.js`）：
                     // 文本原样保留，由站点 origin 运行时解析，与非字面量保留同构，
                     // 属非致命诊断。
-                    let mut diagnostic = PackDiagnostic::new(
-                        "vmz::pack::emit::dynamic_url_kept",
-                        format!(
-                            "根绝对 URL 动态 import `{}` 原样保留，由站点 origin 运行时解析",
-                            edge.specifier
-                        ),
-                    )
-                    .with_path(module_path.clone());
-                    if let Some(import) = record.imports.iter().find(|import| {
-                        import.kind == ImportKind::Dynamic && import.specifier == edge.specifier
-                    }) {
-                        diagnostic = diagnostic.with_span(import.span);
-                    }
-                    warnings.push(diagnostic);
+                    warnings.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::dynamic_url_kept",
+                            format!(
+                                "根绝对 URL 动态 import `{}` 原样保留，由站点 origin 运行时解析",
+                                edge.specifier
+                            ),
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(import.span),
+                    );
                 }
                 Err(diagnostic) if diagnostic.code == crate::resolve::CODE_NODE_BUILTIN => {
                     // `node:` 内建动态 import：无文件身份可重写，说明符原文保留，
                     // 由 Node 宿主在运行时解析（`vmz-runtime` 的 Node-only 延迟加载
                     // 即此形态）。
-                    let mut kept = PackDiagnostic::new(
-                        "vmz::pack::emit::dynamic_external_kept",
-                        format!(
-                            "动态 import `{}` 是 Node.js 内建模块，说明符原样保留，由运行时宿主解析",
-                            edge.specifier
-                        ),
-                    )
-                    .with_path(module_path.clone());
-                    if let Some(import) = record.imports.iter().find(|import| {
-                        import.kind == ImportKind::Dynamic && import.specifier == edge.specifier
-                    }) {
-                        kept = kept.with_span(import.span);
-                    }
-                    warnings.push(kept);
+                    warnings.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::dynamic_external_kept",
+                            format!(
+                                "动态 import `{}` 是 Node.js 内建模块，说明符原样保留，由运行时宿主解析",
+                                edge.specifier
+                            ),
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(import.span),
+                    );
                 }
                 Err(_) => errors.push(
                     PackDiagnostic::new(
@@ -316,7 +326,8 @@ pub(crate) fn assemble_chunk(
                             edge.specifier
                         ),
                     )
-                    .with_path(module_path.clone()),
+                    .with_path(module_path.clone())
+                    .with_span(import.span),
                 ),
                 Ok(id) => {
                     let Some(target) = context.graph.index_of(id) else {
@@ -335,7 +346,8 @@ pub(crate) fn assemble_chunk(
                                     edge.specifier
                                 ),
                             )
-                            .with_path(module_path.clone()),
+                            .with_path(module_path.clone())
+                            .with_span(import.span),
                         );
                         continue;
                     }
@@ -348,7 +360,8 @@ pub(crate) fn assemble_chunk(
                                     edge.specifier
                                 ),
                             )
-                            .with_path(module_path.clone()),
+                            .with_path(module_path.clone())
+                            .with_span(import.span),
                         );
                         continue;
                     }
@@ -369,10 +382,11 @@ pub(crate) fn assemble_chunk(
                                     edge.specifier
                                 ),
                             )
-                            .with_path(module_path.clone()),
+                            .with_path(module_path.clone())
+                            .with_span(import.span),
                         );
                     }
-                    dynamic_replacements.push((edge.specifier.clone(), target_chunk));
+                    dynamic_replacements.push((import_index, target_chunk));
                 }
             }
         }
@@ -412,32 +426,40 @@ pub(crate) fn assemble_chunk(
                 declared.push((renamed_local(&renames, name), module_path.clone()));
             }
             let mut replacements: BTreeMap<(usize, usize), String> = BTreeMap::new();
-            for (specifier, target_chunk) in &dynamic_replacements {
-                for import in record.imports.iter().filter(|import| {
-                    import.kind == ImportKind::Dynamic
-                        && &import.specifier == specifier
-                        && contains(statement.span, import.span)
-                }) {
-                    match import.specifier_span {
-                        Some(span) if contains(statement.span, span) => {
-                            replacements.insert(span, json_string(&placeholder(*target_chunk)));
-                        }
-                        Some(_) => errors.push(
-                            inconsistent(format!(
-                                "动态 import 说明符 span 不在语句内: `{specifier}`"
-                            ))
+            // 按调用点身份逐站点改写：同一说明符的其它调用点在这个语句里
+            // 没有被登记，不会被顺手改写。
+            for &(import_index, target_chunk) in &dynamic_replacements {
+                let Some(import) = record.imports.get(import_index) else {
+                    errors.push(
+                        inconsistent(format!("动态 import 事实下标 {import_index} 越界"))
                             .with_path(module_path.clone())
                             .with_span(statement.span),
-                        ),
-                        None => errors.push(
-                            PackDiagnostic::new(
-                                "vmz::pack::emit::dynamic_unresolved",
-                                format!("动态 import `{specifier}` 缺少字面量 span，无法重写"),
-                            )
-                            .with_path(module_path.clone())
-                            .with_span(import.span),
-                        ),
+                    );
+                    continue;
+                };
+                if !contains(statement.span, import.span) {
+                    continue;
+                }
+                match import.specifier_span {
+                    Some(span) if contains(statement.span, span) => {
+                        replacements.insert(span, json_string(&placeholder(target_chunk)));
                     }
+                    Some(_) => errors.push(
+                        inconsistent(format!(
+                            "动态 import 说明符 span 不在语句内: `{}`",
+                            import.specifier
+                        ))
+                        .with_path(module_path.clone())
+                        .with_span(statement.span),
+                    ),
+                    None => errors.push(
+                        PackDiagnostic::new(
+                            "vmz::pack::emit::dynamic_unresolved",
+                            format!("动态 import `{}` 缺少字面量 span，无法重写", import.specifier),
+                        )
+                        .with_path(module_path.clone())
+                        .with_span(import.span),
+                    ),
                 }
             }
             for asset in &record.assets {
