@@ -14,6 +14,11 @@ export interface ChartTheme {
     readonly seriesPalette: ReadonlyArray<RGBA>;
     /** Fill for ungrouped marks (no series / color / group encoding). */
     readonly markFill: RGBA;
+    /** Optional caller-supplied category → color map (treemap groups and
+     *  categorical marks keyed by a `color` field). Categories missing from
+     *  the map fall back to `seriesPalette`, indexed by sorted category order
+     *  so reordering rows never recolors a node. */
+    readonly categoryColors?: ReadonlyMap<string, RGBA>;
     /** Axis baseline and tick stroke. */
     readonly axisStroke: RGBA;
     readonly axisStrokeWidth: number;

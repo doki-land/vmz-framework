@@ -2454,6 +2454,23 @@ interface TreemapRect {
     readonly h: number;
 }
 
+/** One packed item at a hierarchy level (area in px² follows `value`). */
+interface TreemapItem {
+    readonly key: string;
+    readonly value: number;
+}
+
+/** Gutter between sibling rects, in logical pixels. */
+const TREEMAP_PAD = 2;
+/** Default smallest visible rect area, in px². */
+const TREEMAP_MIN_AREA = 4;
+
+/** Deterministic string order — palette slots and tie-breaks never depend on
+ *  row order or locale. */
+function compareKeys(a: string, b: string): number {
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /** Worst aspect ratio of a candidate squarify row (areas in px² along `side`). */
 function worstAspect(areas: ReadonlyArray<number>, side: number): number {
     const sum = areas.reduce((a, b) => a + b, 0);
@@ -2522,7 +2539,14 @@ function squarify(items: ReadonlyArray<{ key: string; value: number }>, rect: Pl
 }
 
 /** Treemap: hierarchy from keyField / parentField, areas from compile-time
- *  subtree sums, squarified layout, colored by top-level group. */
+ *  subtree sums, squarified layout, colored by category (a `color` encoding)
+ *  or by top-level group when the data carries no category field.
+ *
+ *  Three authoring knobs shape the result without touching the algorithm:
+ *  `treemapRoot` renders one node's subtree as the frame (drill-down),
+ *  `treemapDepth` caps the drawn levels, and `treemapMinArea` omits slivers
+ *  that would paint as invisible fragments. Node ids stay `treemap:<key>`,
+ *  so a reordered document keeps identical identities and palette slots. */
 function buildTreemap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme, idPrefix: string): SemanticNode[] {
     const keyField = plan.spec.keyField;
     const parentField = plan.spec.parentField;
@@ -2537,15 +2561,15 @@ function buildTreemap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
         parent: string | null;
         value: number;
         children: string[];
+        /** Category from the `color` encoding, null when ungrouped. */
+        category: string | null;
     }
     const nodesByKey = new Map<string, TNode>();
-    const markByKey = new Map<string, (typeof plan.marks)[number]>();
     for (const mark of plan.marks) {
         const pv = parentCol.values[mark.rowIndex];
         const parent = pv === null || pv === undefined || (typeof pv === "number" && !Number.isFinite(pv)) ? null : String(pv);
         const value = Number(mark.channels.get("subtree") ?? 0);
-        nodesByKey.set(mark.key, { key: mark.key, parent, value, children: [] });
-        markByKey.set(mark.key, mark);
+        nodesByKey.set(mark.key, { key: mark.key, parent, value, children: [], category: mark.series });
     }
     // Parent references that do not resolve to a node hang at the root
     // (compile already warned about the orphans).
@@ -2557,48 +2581,80 @@ function buildTreemap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
             roots.push(node.key);
         }
     }
-    // Top-level group per node (palette identity) and depth (fill alpha).
-    // With a single synthetic root, its children are the color groups —
-    // otherwise every rect collapses into one palette slot.
-    const depthOf = new Map<string, number>();
-    const topOf = new Map<string, string>();
-    const colorRoots = roots.length === 1 ? (nodesByKey.get(roots[0])?.children ?? roots) : roots;
-    const assign = (key: string, top: string, depth: number): void => {
-        topOf.set(key, top);
-        depthOf.set(key, depth);
-        for (const c of nodesByKey.get(key)?.children ?? []) assign(c, top, depth + 1);
-    };
-    for (const r of roots) assign(r, r, 1);
-    // Re-assign color identity: each color root is its own group.
-    if (roots.length === 1) {
-        const assignTop = (key: string, top: string): void => {
-            topOf.set(key, top);
-            for (const c of nodesByKey.get(key)?.children ?? []) assignTop(c, top);
-        };
-        for (const g of colorRoots) assignTop(g, g);
+
+    // Palette identity. Categories come from a `color` encoding and are
+    // ordered by name, never first appearance, so reordering rows cannot
+    // recolor a node. Without a category field the top-level groups below
+    // the effective root take the palette slots, also in sorted order. A
+    // single synthetic root contributes its children as groups — otherwise
+    // every rect would collapse into one slot.
+    const categoryOrder: string[] = [];
+    const hasCategory = plan.series.field !== null;
+    if (hasCategory) {
+        const seen = new Set<string>();
+        for (const node of nodesByKey.values()) {
+            if (node.category !== null && !seen.has(node.category)) {
+                seen.add(node.category);
+                categoryOrder.push(node.category);
+            }
+        }
+        categoryOrder.sort(compareKeys);
     }
-    const topOrder = colorRoots;
+    const requestedRoot = plan.spec.treemapRoot;
+    const effectiveRoot = requestedRoot !== undefined && nodesByKey.has(requestedRoot) ? requestedRoot : null;
+    const rootChildren = effectiveRoot !== null ? (nodesByKey.get(effectiveRoot)?.children ?? []) : [];
+    const groupRoots =
+        effectiveRoot !== null
+            ? rootChildren
+            : roots.length === 1
+              ? (nodesByKey.get(roots[0])?.children ?? roots)
+              : roots;
+    const groupOrder = [...groupRoots].sort(compareKeys);
+    const groupOf = new Map<string, string>();
+    const assignGroup = (key: string, group: string): void => {
+        groupOf.set(key, group);
+        for (const c of nodesByKey.get(key)?.children ?? []) assignGroup(c, group);
+    };
+    for (const g of groupOrder) assignGroup(g, g);
+
+    const colorOf = (key: string, category: string | null): RGBA => {
+        if (hasCategory && category !== null) {
+            return theme.categoryColors?.get(category) ?? seriesColor(theme, categoryOrder, category);
+        }
+        return seriesColor(theme, groupOrder, groupOf.get(key) ?? key);
+    };
+
+    const maxDepth =
+        plan.spec.treemapDepth !== undefined && plan.spec.treemapDepth > 0
+            ? Math.floor(plan.spec.treemapDepth)
+            : Number.POSITIVE_INFINITY;
+    const minArea = Math.max(0, plan.spec.treemapMinArea ?? TREEMAP_MIN_AREA);
+
+    // Pack one level: descending value, deterministic key tie-break, and
+    // slivers below `minArea` dropped (keeping the largest so a level never
+    // disappears entirely).
+    const pack = (keys: ReadonlyArray<string>, rect: PlotRect): TreemapItem[] => {
+        const items = keys
+            .map((key) => ({ key, value: nodesByKey.get(key)?.value ?? 0 }))
+            .filter((it) => it.value > 0)
+            .sort((a, b) => b.value - a.value || compareKeys(a.key, b.key));
+        if (items.length === 0) return items;
+        const total = items.reduce((sum, it) => sum + it.value, 0);
+        const areaScale = (rect.w * rect.h) / total;
+        const kept = items.filter((it) => it.value * areaScale >= minArea);
+        return kept.length > 0 ? kept : [items[0]];
+    };
 
     const nodes: SemanticNode[] = [];
-    const PAD = 2;
-    const lay = (parentKey: string | null, rect: PlotRect): void => {
-        const childKeys = parentKey === null ? roots : (nodesByKey.get(parentKey)?.children ?? []);
-        const items = childKeys
-            .map((key) => ({ key, value: nodesByKey.get(key)!.value }))
-            .filter((it) => it.value > 0)
-            .sort((a, b) => b.value - a.value);
-        if (items.length === 0) return;
+    const lay = (items: ReadonlyArray<TreemapItem>, rect: PlotRect, depth: number): void => {
         for (const r of squarify(items, rect)) {
             const node = nodesByKey.get(r.key)!;
-            const mark = markByKey.get(r.key)!;
-            const top = topOf.get(r.key) ?? r.key;
-            const depth = depthOf.get(r.key) ?? 1;
-            const base = seriesColor(theme, topOrder, top);
+            const x = r.x + TREEMAP_PAD / 2;
+            const y = r.y + TREEMAP_PAD / 2;
+            const w = Math.max(0, r.w - TREEMAP_PAD);
+            const h = Math.max(0, r.h - TREEMAP_PAD);
+            const base = colorOf(r.key, node.category);
             const alpha = depth === 1 ? 1 : Math.max(0.5, 1 - 0.12 * (depth - 1));
-            const x = r.x + PAD / 2;
-            const y = r.y + PAD / 2;
-            const w = Math.max(0, r.w - PAD);
-            const h = Math.max(0, r.h - PAD);
             nodes.push({
                 kind: "rect",
                 id: `treemap:${r.key}`,
@@ -2611,9 +2667,17 @@ function buildTreemap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
                 fill: { color: { ...base, a: alpha } },
                 ...(theme.pointStroke ? { stroke: { color: theme.pointStroke, width: 1 } } : {}),
             });
-            // Labels belong to leaves — a parent's label would collide with
-            // the labels of the children filling it.
-            const label = node.children.length === 0 ? truncateToWidth(r.key, Math.max(0, w - 8), theme.labelFont.sizePx) : "";
+            // Recurse into the padded content rect while levels remain.
+            const inner = { x: x + 2, y: y + 2, w: Math.max(0, w - 4), h: Math.max(0, h - 4) };
+            const innerItems =
+                depth < maxDepth && inner.w > 4 && inner.h > 4 ? pack(node.children, inner) : [];
+            if (innerItems.length > 0) {
+                lay(innerItems, inner, depth + 1);
+                continue;
+            }
+            // No drawn children means this rect is terminal: a parent label
+            // would collide with its children, so only terminals carry text.
+            const label = truncateToWidth(r.key, Math.max(0, w - 8), theme.labelFont.sizePx);
             const lw = estimateTextSize(label, theme.labelFont.sizePx).width;
             const lh = estimateTextSize(label, theme.labelFont.sizePx).height;
             if (label !== "" && lw + 8 <= w && lh + 4 <= h) {
@@ -2627,14 +2691,16 @@ function buildTreemap(plan: ChartCompilePlan, plot: PlotRect, theme: ChartTheme,
                     color: contrastText({ ...base, a: 1 }),
                 });
             }
-            // Recurse into the padded content rect.
-            if (node.children.length > 0 && w > 4 && h > 4) {
-                lay(r.key, { x: x + 2, y: y + 2, w: w - 4, h: h - 4 });
-            }
         }
     };
-    lay(null, plot);
-    void markByKey;
+
+    if (effectiveRoot !== null) {
+        const rootNode = nodesByKey.get(effectiveRoot)!;
+        // A drilled leaf fills the frame as a single rect.
+        lay(rootNode.children.length > 0 ? pack(rootNode.children, plot) : [{ key: effectiveRoot, value: rootNode.value }], plot, 1);
+    } else {
+        lay(pack(roots, plot), plot, 1);
+    }
     return nodes;
 }
 

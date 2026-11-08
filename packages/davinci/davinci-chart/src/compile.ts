@@ -93,6 +93,18 @@ export interface ChartSpec {
      *  row's own id). Rows whose parent is absent or unknown hang at the
      *  root level with a warning. */
     readonly parentField?: string;
+    /** Treemap only: how many levels get their own rect. The document root
+     *  (or, when drilled, the drill root's direct children) is level 1.
+     *  Omitted means every level is drawn. */
+    readonly treemapDepth?: number;
+    /** Treemap only: rects smaller than this many px² are omitted instead of
+     *  painted as invisible slivers. Defaults to 4 px² and always keeps the
+     *  largest item of a level, so a level never vanishes entirely. */
+    readonly treemapMinArea?: number;
+    /** Treemap only: id of the node rendered as the root — the drill-down
+     *  surface. An unknown id raises a diagnostic and the chart stays at the
+     *  document root. */
+    readonly treemapRoot?: string;
     /** Gauge only: the [min, max] the sweep spans; defaults to [0, 100]. */
     readonly valueDomain?: readonly [number, number];
     /** Sparkline mode: strip axes, grid and legend for tiny inline charts. */
@@ -724,6 +736,18 @@ export function compile(spec: ChartSpec, data: DataSnapshot): ChartCompilePlan {
             for (let r = 0; r < data.rowCount; r++) {
                 const id = idOf(r);
                 if (id !== null && !rowOfId.has(id)) rowOfId.set(id, r);
+            }
+            // Drill-down root: an id the data does not contain would silently
+            // fall back to the document root, so say so.
+            if (spec.mark === "treemap" && spec.treemapRoot !== undefined && !rowOfId.has(spec.treemapRoot)) {
+                diagnostics.push(
+                    diag(
+                        "warning",
+                        "davinci.chart.treemap-unknown-root",
+                        `treemapRoot "${spec.treemapRoot}" is not a row id; the chart stays at the document root`,
+                        "treemapRoot",
+                    ),
+                );
             }
             const parentOf = new Map<number, number | null>();
             let orphans = 0;

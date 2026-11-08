@@ -2725,6 +2725,184 @@ console.log('charts-render: treemap lays out squarified hierarchy with real subt
     }
 }
 
+console.log('charts-render: treemap honours area ratios, aspect bounds, depth, omission and drill-down…');
+{
+    const treeSpec = {
+        mark: 'treemap',
+        keyField: 'id',
+        parentField: 'parent',
+        encoding: [{ field: 'size', channel: 'size' }],
+    };
+    const treeRows = [
+        { id: 'root', parent: null, size: 0 },
+        { id: 'a', parent: 'root', size: 0 },
+        { id: 'b', parent: 'root', size: 0 },
+        { id: 'a1', parent: 'a', size: 300 },
+        { id: 'a2', parent: 'a', size: 100 },
+        { id: 'b1', parent: 'b', size: 200 },
+    ];
+    const findRect = (semantic, id) =>
+        semantic.root.children.find((n) => n.id === `treemap:${id}` && n.role === 'chart.mark');
+    const areaOf = (n) => n.w * n.h;
+
+    // 面积比例：同一父下 300 : 100，收缩后的绘制面积仍应保持 ≈ 3:1。
+    const base = pipeline(treeSpec, treeRows);
+    const a1 = findRect(base.semantic, 'a1');
+    const a2 = findRect(base.semantic, 'a2');
+    if (!a1 || !a2) fail('treemap must draw every leaf rect');
+    const ratio = areaOf(a1) / areaOf(a2);
+    if (Math.abs(ratio - 3) > 0.2) fail(`treemap areas must follow 300:100, got ${ratio.toFixed(2)}`);
+
+    // 长宽比退化：极扁视口下，子矩形也不得比整帧本身更细长（整帧比例由
+    // 视口决定，不属布局责任）。
+    const wide = buildScene(compile(treeSpec, fromRows(treeRows)), { width: 1200, height: 120 });
+    const frameAspect = 1168 / 88;
+    for (const n of wide.root.children.filter((c) => c.role === 'chart.mark' && c.id !== 'treemap:root')) {
+        if (!(n.w > 0 && n.h > 0)) continue;
+        const aspect = Math.max(n.w / n.h, n.h / n.w);
+        if (aspect > Math.max(4, frameAspect)) fail(`degenerate viewport produced a ${aspect.toFixed(1)}:1 sliver`);
+    }
+
+    // 空数据不产生矩形，单节点占满整帧。
+    const empty = buildScene(compile(treeSpec, fromRows([])), { width: WIDTH, height: HEIGHT });
+    if (empty.root.children.some((n) => n.role === 'chart.mark' && n.id.startsWith('treemap:'))) {
+        fail('an empty hierarchy must not emit treemap rects');
+    }
+    const single = buildScene(compile(treeSpec, fromRows([{ id: 'only', parent: null, size: 5 }])), {
+        width: WIDTH,
+        height: HEIGHT,
+    });
+    const only = single.root.children.filter((n) => n.id === 'treemap:only' && n.role === 'chart.mark');
+    if (only.length !== 1) fail('a single node must fill the frame as one rect');
+    if (!(only[0].w > 0 && only[0].h > 0)) fail('the single-node rect must carry real area');
+
+    // 深层嵌套：默认画到底，treemapDepth 按层截断。
+    const chain = [
+        { id: 'd0', parent: null, size: 0 },
+        { id: 'd1', parent: 'd0', size: 0 },
+        { id: 'd2', parent: 'd1', size: 0 },
+        { id: 'd3', parent: 'd2', size: 5 },
+    ];
+    const deep = buildScene(compile(treeSpec, fromRows(chain)), { width: WIDTH, height: HEIGHT });
+    if (!deep.root.children.some((n) => n.id === 'treemap:d3')) fail('deep nesting must draw to the leaves by default');
+    const capped = buildScene(compile({ ...treeSpec, treemapDepth: 2 }, fromRows(chain)), {
+        width: WIDTH,
+        height: HEIGHT,
+    });
+    if (!capped.root.children.some((n) => n.id === 'treemap:d0')) fail('treemapDepth 2 must draw level 1');
+    if (!capped.root.children.some((n) => n.id === 'treemap:d1')) fail('treemapDepth 2 must draw level 2');
+    if (capped.root.children.some((n) => n.id === 'treemap:d2')) fail('treemapDepth 2 must stop before level 3');
+    const frameOnly = buildScene(compile({ ...treeSpec, treemapDepth: 1 }, fromRows(chain)), {
+        width: WIDTH,
+        height: HEIGHT,
+    });
+    if (frameOnly.root.children.some((n) => n.id === 'treemap:d1')) fail('treemapDepth 1 must draw the frame only');
+    // 截断后父节点成为终端，标签应当补上而不是留白。
+    if (!capped.root.children.some((n) => n.role === 'text' && n.id.startsWith('treemap:label:'))) {
+        fail('a depth-capped parent must carry its own label');
+    }
+
+    // 极小节点：低于 treemapMinArea 省略，最大的那个永远保留。
+    const tinyRows = [
+        { id: 'root', parent: null, size: 0 },
+        { id: 'big', parent: 'root', size: 10000 },
+    ];
+    for (let i = 0; i < 40; i++) tinyRows.push({ id: `tiny${i}`, parent: 'root', size: 1 });
+    const cut = buildScene(compile({ ...treeSpec, treemapMinArea: 40 }, fromRows(tinyRows)), {
+        width: WIDTH,
+        height: HEIGHT,
+    });
+    const cutRects = cut.root.children.filter((n) => n.role === 'chart.mark' && n.id.startsWith('treemap:'));
+    if (cutRects.some((n) => n.id.startsWith('treemap:tiny'))) fail('treemapMinArea must drop sub-threshold slivers');
+    if (!cutRects.some((n) => n.id === 'treemap:big')) fail('the largest rect must survive omission');
+
+    // 重排：同一数据的节点身份与配色都不随行序漂移。
+    const reversed = buildScene(compile(treeSpec, fromRows([...treeRows].reverse())), {
+        width: WIDTH,
+        height: HEIGHT,
+    });
+    for (const id of ['a', 'b', 'a1', 'a2', 'b1']) {
+        const before = findRect(base.semantic, id);
+        const after = findRect(reversed, id);
+        if (!before || !after) fail(`reordering rows dropped treemap:${id}`);
+        if (
+            before.fill.color.r !== after.fill.color.r ||
+            before.fill.color.g !== after.fill.color.g ||
+            before.fill.color.b !== after.fill.color.b
+        ) {
+            fail(`reordering rows recolored treemap:${id}`);
+        }
+    }
+
+    // 下钻：treemapRoot 只画该子树，兄弟节点不再出现。
+    const drilled = buildScene(compile({ ...treeSpec, treemapRoot: 'a' }, fromRows(treeRows)), {
+        width: WIDTH,
+        height: HEIGHT,
+    });
+    if (drilled.root.children.some((n) => n.id === 'treemap:a')) fail('drilling must hide the root node itself');
+    if (drilled.root.children.some((n) => n.id === 'treemap:b1')) fail('drilling must hide the root sibling subtree');
+    const da1 = findRect(drilled, 'a1');
+    const da2 = findRect(drilled, 'a2');
+    if (!da1 || !da2) fail('the drilled subtree must draw its leaves');
+    if (!(areaOf(da1) > areaOf(da2))) fail('drilled areas must still follow value order');
+    const ghost = compile({ ...treeSpec, treemapRoot: 'ghost' }, fromRows(treeRows));
+    if (!ghost.diagnostics.items.some((d) => d.code === 'davinci.chart.treemap-unknown-root')) {
+        fail('an unknown treemapRoot must be diagnosed');
+    }
+
+    // 分类配色：调用方的 categoryColors 优先，同分类同色，跨分类不同色。
+    const catSpec = {
+        mark: 'treemap',
+        keyField: 'id',
+        parentField: 'parent',
+        encoding: [
+            { field: 'size', channel: 'size' },
+            { field: 'ext', channel: 'color' },
+        ],
+    };
+    const catRows = [
+        { id: 'root', parent: null, size: 0, ext: null },
+        { id: 'disk', parent: 'root', size: 0, ext: null },
+        { id: 'video', parent: 'disk', size: 100, ext: '视频' },
+        { id: 'song', parent: 'disk', size: 50, ext: '音频' },
+        { id: 'voice', parent: 'disk', size: 30, ext: '音频' },
+    ];
+    const mapped = rgb8(12, 34, 56);
+    const catTheme = { ...DEFAULT_CHART_THEME, categoryColors: new Map([['视频', mapped]]) };
+    const themed = buildScene(compile(catSpec, fromRows(catRows)), { width: WIDTH, height: HEIGHT }, { theme: catTheme });
+    const video = findRect(themed, 'video');
+    const song = findRect(themed, 'song');
+    const voice = findRect(themed, 'voice');
+    if (!video || !song || !voice) fail('category treemap must draw each leaf');
+    if (video.fill.color.r !== mapped.r || video.fill.color.g !== mapped.g || video.fill.color.b !== mapped.b) {
+        fail('categoryColors must win over the palette');
+    }
+    if (song.fill.color.r !== voice.fill.color.r || song.fill.color.g !== voice.fill.color.g) {
+        fail('one category must map to one color');
+    }
+    if (song.fill.color.r === video.fill.color.r && song.fill.color.g === video.fill.color.g && song.fill.color.b === video.fill.color.b) {
+        fail('different categories must not collapse onto one color');
+    }
+
+    // 标签：长名在窄矩形里只能截断，任何已发出的标签都不得溢出矩形。
+    const longName = '很长的文件名用于验证截断行为'.repeat(4);
+    const longRows = [
+        { id: 'r', parent: null, size: 0 },
+        { id: longName, parent: 'r', size: 100 },
+        { id: 'z', parent: 'r', size: 60 },
+    ];
+    const longScene = buildScene(compile(treeSpec, fromRows(longRows)), { width: WIDTH, height: HEIGHT });
+    const longLabel = longScene.root.children.find((n) => n.id === `treemap:label:${longName}`);
+    if (longLabel && longLabel.text === longName) fail('a label wider than its rect must be truncated');
+    for (const n of base.semantic.root.children.filter((x) => x.role === 'text' && x.id.startsWith('treemap:label:'))) {
+        const rect = findRect(base.semantic, n.id.slice('treemap:label:'.length));
+        if (!rect) continue;
+        if (estimateTextSize(n.text, n.font.sizePx).width + 8 > rect.w + 0.5) {
+            fail(`label "${n.text}" overflows its rect`);
+        }
+    }
+}
+
 console.log('charts-render: sankey lays out layered flows with ribbon polygons…');
 {
     const sankeySpec = {
