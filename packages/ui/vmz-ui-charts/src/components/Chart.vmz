@@ -1666,8 +1666,9 @@ export default class Chart {
 
     // ---- Brush 选区 / Shift+拖拽 pan ----
 
-    /** 宿主可 override 的 brush 回调（事件名 `chart-brush`）。 */
-    public onchartBrush(payload: { keys: Array<string | number> }): void {
+    /** 宿主可 override 的 brush 回调（事件名 `chart-brush`）。`markIds` 是框选
+     *  命中的 scene 节点 id，与 `vmz-chart-selection-change` 的载荷同一身份。 */
+    public onchartBrush(payload: { markIds: string[] }): void {
         // 默认空实现，宿主在组件实例上 override 即可接收事件。
     }
 
@@ -1730,7 +1731,7 @@ export default class Chart {
             this.dispatch({ kind: "clear-selection" });
             for (const id of keys) this.dispatch({ kind: "select-toggle", nodeId: id });
         }
-        this.onchartBrush({ keys });
+        this.onchartBrush({ markIds: keys });
         this._applyDomState();
     }
 
