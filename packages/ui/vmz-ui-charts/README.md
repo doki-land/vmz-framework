@@ -105,7 +105,7 @@ Categories missing from the map fall back to `seriesPalette`, indexed by **sorte
 ## Interaction
 
 - Hover / focus shows real cell values; line and area charts get a crosshair that snaps to the nearest data x across all series.
-- Arrow keys walk marks (line/area walk per-vertex values), `Enter` selects, `Escape` clears.
+- Arrow keys walk marks (line/area walk per-vertex values), `Enter` selects the focused mark and pins its tooltip, `Escape` unpins and clears the selection.
 - Drag empty plot space to brush-select marks; shift+drag pans a quantitative x axis; the wheel zooms around the pointer; `+` / `-` / `0` zoom and reset from the keyboard.
 - Treemap only: double-click a cell to drill into the nearest ancestor that has children (the matching rect is covered by its own children, so the target resolves up the `parentField` chain), double-click empty space (the top-left button, or `Escape`) to go back one level. Node ids stay `treemap:<key>`, so selection and palette survive reordering and redraws.
 - Host events: `onchartHover({ rowKey, markId, x, y })`, `onchartSelect({ rowKey, markId })`, `onchartBrush({ keys })` — override them on the instance. `rowKey` is the hit row's `keyField` value and is what you look the record up with; it is `null` when the hit mark aggregates a whole series (one line path, one area band). `markId` is the scene node id (`treemap:视频`, `bar:0`) — the identity carried by `vmz-chart-selection-change` and by brush `keys`. `rowKey` and `markId` are never interchangeable: the first indexes data, the second indexes marks. The same interactions bubble as `vmz-chart-selection-change`, `vmz-chart-zoom-change`, `vmz-chart-legend-change` and `vmz-chart-drilldown-change` (`{ root, path }`).
@@ -122,7 +122,7 @@ In controlled mode the component never applies a selection of its own. Each sele
 
 | Interaction | Proposed set |
 |-------------|--------------|
-| click a mark, `Space` | the current `selection` with that mark toggled |
+| click a mark, `Space`, `Enter` | the current `selection` with that mark toggled |
 | click empty plot space, `Escape` | `[]` |
 | brush drag | mark ids whose anchors fall inside the rect |
 

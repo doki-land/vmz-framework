@@ -2422,14 +2422,22 @@ export default class Chart {
             this._focusIndex = targets.length - 1;
             this._focusTarget(targets[this._focusIndex]);
         } else if (ev.key === "Enter") {
-            // Enter 展开 / 钉住 tooltip（再次 Enter 或 Esc 解除）。
+            // Enter 选中当前 mark 并钉住 tooltip（再次 Enter 或 Esc 解除）。
+            ev.preventDefault();
+            if (this._hoverId) {
+                const proposed = this._proposeSelection(this._hoverId);
+                this._emitSelectionChange(proposed);
+                if (this.selection === null) {
+                    this.dispatch({ kind: "select-toggle", nodeId: this._hoverId });
+                }
+                this.onchartSelect({ rowKey: this._rowKeyForMark(this._hoverId), markId: this._hoverId });
+                this._applyDomState();
+            }
             if (this._pinnedTooltip) {
-                ev.preventDefault();
                 this._pinnedTooltip = null;
                 this._tooltip.visible = false;
                 this._announce("tooltip 已关闭");
             } else if (this._hoverId && this._tooltip.visible) {
-                ev.preventDefault();
                 this._pinnedTooltip = { x: this._tooltip.x, y: this._tooltip.y, text: this._tooltip.text };
                 this._announce(`已钉住 ${this._tooltip.text}`);
             }

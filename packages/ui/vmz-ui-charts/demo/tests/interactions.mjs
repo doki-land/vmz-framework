@@ -158,11 +158,21 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await new Promise((r) => setTimeout(r, 300));
     const pinned = await tooltipText(page);
     check('kbd.Enter pins tooltip', pinned === tHome, pinned);
+    const kbdSelected = await page.evaluate(() =>
+        [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')]
+            .filter((el) => el.getAttribute('data-selected') === 'true')
+            .map((el) => el.getAttribute('data-dvz-id')),
+    );
+    check('kbd.Enter selects the focused mark', JSON.stringify(kbdSelected) === JSON.stringify(['bar:0']), JSON.stringify(kbdSelected));
     // Esc closes.
     await page.keyboard.press('Escape');
     await new Promise((r) => setTimeout(r, 250));
     const closed = await tooltipText(page);
     check('kbd.Esc closes tooltip', closed === null, String(closed));
+    const kbdCleared = await page.evaluate(
+        () => [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')].filter((el) => el.getAttribute('data-selected') === 'true').length,
+    );
+    check('kbd.Esc clears the selection', kbdCleared === 0, `selected=${kbdCleared}`);
     await page.close();
 }
 
