@@ -11,6 +11,8 @@ export interface ResolvedPackage {
     private?: boolean;
     hasSrc: boolean;
     version?: string;
+    /** Registry name when `publishConfig.name` differs from the workspace name. */
+    publishName?: string;
 }
 
 /** Resolve workspace packages under a project (package.json workspaces or pnpm-workspace.yaml). */
@@ -105,6 +107,10 @@ function readPkg(dir: string): ResolvedPackage | null {
             private: Boolean(pkg.private),
             hasSrc: existsSync(path.join(dir, 'src')),
             version: typeof pkg.version === 'string' ? pkg.version : undefined,
+            publishName:
+                typeof pkg.publishConfig?.name === 'string' && pkg.publishConfig.name !== pkg.name
+                    ? pkg.publishConfig.name
+                    : undefined,
         };
     } catch {
         return null;

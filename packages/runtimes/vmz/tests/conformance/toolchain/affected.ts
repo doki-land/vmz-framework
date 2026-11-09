@@ -185,8 +185,10 @@ ws4.dispose();
 console.log('session gate: workspace package resolution…');
 const root = repoRoot(import.meta.url);
 const pkgs = resolveWorkspacePackages(root);
-if (!pkgs.some((p) => p.name === '@vmz/vmz')) {
-    fail(`expected @vmz/vmz package in workspace, got ${pkgs.map((p) => p.name).join(',')}`);
+// The CLI lives under the workspace name `vmz` and publishes as `@vmz/vmz`, so the
+// publish face is what callers resolve — assert identity, not directory spelling.
+if (!pkgs.some((p) => (p.publishName ?? p.name) === '@vmz/vmz')) {
+    fail(`expected @vmz/vmz publish identity in workspace, got ${pkgs.map((p) => (p.publishName ?? p.name)).join(',')}`);
 }
 
 fs.rmSync(dir, { recursive: true, force: true });
