@@ -866,6 +866,100 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     await page.close();
 }
 
+// ─── 16. Escape closes a pinned tooltip even when nav targets vanish ─────
+{
+    const page = await openPage();
+    const hasInst = await page.evaluate(() => {
+        const host = document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        window.__keyInst = [...all].find((m) => m && m.__vmzDomRoot === host) ?? null;
+        return window.__keyInst !== null;
+    });
+    check('key.instance reachable from the bar host', hasInst);
+    if (hasInst) {
+        await page.evaluate(() => document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]').focus());
+        await page.keyboard.press('ArrowRight');
+        await new Promise((r) => setTimeout(r, 300));
+        await page.keyboard.press('Enter');
+        await new Promise((r) => setTimeout(r, 350));
+        const pinned = await tooltipText(page);
+        // 数据被清空后键盘导航目标为空，定位/关闭动作仍必须可用。
+        await page.evaluate(() => {
+            window.__keyInst.data = [];
+        });
+        await new Promise((r) => setTimeout(r, 800));
+        const empty = await page.evaluate(() => ({
+            targets: window.__keyInst._navTargets().length,
+            marks: window.__keyInst._markNodes().length,
+            tooltip: window.__keyInst._tooltip.visible,
+        }));
+        await page.evaluate(() => document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]').focus());
+        await page.keyboard.press('Escape');
+        await new Promise((r) => setTimeout(r, 350));
+        const closed = await tooltipText(page);
+        const cleared = await page.evaluate(() => window.__keyInst._pinnedTooltip === null);
+        check(
+            'key.Escape closes the pinned tooltip with no nav targets',
+            pinned !== null && empty.targets === 0 && empty.marks === 0 && empty.tooltip === true && closed === null && cleared === true,
+            JSON.stringify({ pinned, empty, closed, cleared }),
+        );
+    }
+    await page.close();
+}
+
+// ─── 17. selection attributes replay across a data redraw ────────────────
+{
+    const page = await openPage();
+    const hasInst = await page.evaluate(() => {
+        const host = document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]');
+        const all = new Set();
+        for (const h of document.querySelectorAll('[data-vmz-ui-charts="chart"]')) {
+            let cur = h;
+            while (cur && cur !== document.body) {
+                if (cur.__vmzInst) all.add(cur.__vmzInst);
+                if (Array.isArray(cur.__vmzLayoutInsts)) for (const m of cur.__vmzLayoutInsts) all.add(m);
+                cur = cur.parentElement;
+            }
+        }
+        window.__redrawInst = [...all].find((m) => m && m.__vmzDomRoot === host) ?? null;
+        return window.__redrawInst !== null;
+    });
+    const selected = () =>
+        page.evaluate(() =>
+            [...document.querySelectorAll('#bar-quarter [data-dvz-id^="bar:"]')]
+                .filter((el) => el.getAttribute('data-selected') === 'true')
+                .map((el) => el.getAttribute('data-dvz-id')),
+        );
+    check('redraw.instance reachable from the bar host', hasInst);
+    if (hasInst) {
+        await page.evaluate(() => document.querySelector('#bar-quarter [data-vmz-ui-charts="chart"]').focus());
+        await page.keyboard.press('ArrowRight');
+        await new Promise((r) => setTimeout(r, 300));
+        await page.keyboard.press('Enter');
+        await new Promise((r) => setTimeout(r, 400));
+        const before = await selected();
+        await page.evaluate(() => {
+            window.__redrawInst.data = window.__redrawInst.data.map((r) => ({ ...r }));
+        });
+        await new Promise((r) => setTimeout(r, 800));
+        const after = await selected();
+        check(
+            'select.redraw replays the selected attributes',
+            JSON.stringify(before) === JSON.stringify(['bar:0']) && JSON.stringify(after) === JSON.stringify(before),
+            JSON.stringify({ before, after }),
+        );
+    }
+    await page.close();
+}
+
 // ─── 18. treemap selection follows data updates ─────────────────────────
 {
     const page = await openPage();
@@ -1004,6 +1098,7 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     );
     await page.close();
 }
+
 // ─── 19. treemap hover follows data updates ─────────────────────────────
 {
     const page = await openPage();
@@ -1097,6 +1192,7 @@ async function blankPointIn(page, hostSelector, hitSelector) {
     );
     await page.close();
 }
+
 await browser.close();
 const failed = results.filter(([, ok]) => !ok);
 console.log(`\n${results.length - failed.length}/${results.length} interaction checks passed`);
