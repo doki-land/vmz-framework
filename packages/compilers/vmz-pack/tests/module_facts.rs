@@ -426,19 +426,12 @@ fn class_expression_facts_mirror_class_declaration() {
     assert_eq!(record.statements[0].declared_names, ["C"]);
     assert_eq!(record.statements[0].referenced_names, ["Base"]);
     assert_eq!(slice(extends_source, record.statements[0].span), extends_source);
-    // 同形态声明：成员事实同构；`extends` 引用暂缺是上游 builder 缺口
-    // （parser 从不产出 `HeritageClause` 节点，`ClassDeclaration.extends` 恒为 `None`），
-    // 上游补齐后本断言自动收紧为与表达式侧一致。
+    // 同形态声明：pinned 上游 builder 已提取 `ClassDeclaration.extends`，heritage
+    // 引用与表达式侧同构，不再依赖「上游恒为 `None`」的旧假设。
     let decl = ok("class C extends Base { static s = 1; m() {} }");
     assert!(statement_fact_incomplete(&decl).is_empty(), "{:?}", decl.diagnostics);
     assert_eq!(decl.statements[0].declared_names, ["C"]);
-    assert!(
-        decl.statements[0]
-            .referenced_names
-            .iter()
-            .all(|name| record.statements[0].referenced_names.contains(name)),
-        "声明侧引用必须是表达式侧引用的子集（上游 `extends` 缺口只会让声明侧少收）"
-    );
+    assert_eq!(decl.statements[0].referenced_names, ["Base"]);
 
     // 调用实参位置：匿名空类表达式是普通表达式事实，无缺口。
     let call_source = "f(class {});";
