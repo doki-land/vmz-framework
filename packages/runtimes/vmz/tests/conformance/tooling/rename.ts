@@ -78,7 +78,8 @@ console.log('rename: RouteId rename plan + apply…');
 const ws = createWorkspace({ root: dir, outDir });
 const intent = {
     schema: DX_RENAME_SCHEMA,
-    kind: 'route_id',
+    // Wire 值跟 Rust 的 kebab-case 枚举走，不写 snake_case 别名。
+    kind: 'route-id',
     from: 'home',
     to: 'landing',
 };
@@ -171,7 +172,7 @@ fs.writeFileSync(path.join(dir, 'src', 'Index.vmz'), `<template><Link to="landin
 const explainRaw = wsExplain.explainRenameChain(
     JSON.stringify({
         schema: DX_RENAME_SCHEMA,
-        kind: 'route_id',
+        kind: 'route-id',
         from: 'landing',
         to: 'home',
     }),
@@ -192,7 +193,7 @@ console.log('rename: CLI refactor rename --apply…');
 fs.writeFileSync(path.join(dir, 'src', 'Index.vmz'), `<template><Link to="home" /></template>\n`);
 const cli = spawnSync(
     process.execPath,
-    [vmzBin, 'refactor', 'rename', '--kind', 'route_id', '--from', 'home', '--to', 'landing', dir, '--apply', '--json'],
+    [vmzBin, 'refactor', 'rename', '--kind', 'route-id', '--from', 'home', '--to', 'landing', dir, '--apply', '--json'],
     { encoding: 'utf8', cwd: root },
 );
 if (cli.status !== 0) fail(`CLI rename --apply failed\n${cli.stdout}\n${cli.stderr}`);

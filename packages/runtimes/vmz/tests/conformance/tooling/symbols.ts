@@ -85,7 +85,8 @@ if (typeof ws.checkCrossSfc !== 'function') fail('checkCrossSfc missing');
 const report = JSON.parse(ws.checkCrossSfc());
 if (report.schema !== DX_CROSS_SFC_CHECK_SCHEMA) fail(`report schema ${report.schema}`);
 if (report.index?.schema !== DX_SYMBOL_INDEX_SCHEMA) fail('symbol_index schema');
-const kinds = new Set((report.index.symbols || []).map((s) => s.kind));
+// Surface kind lives on the `stable_id` tagged union; there is no parallel `kind`.
+const kinds = new Set((report.index.symbols || []).map((s) => s.stable_id?.kind));
 for (const k of ['component', 'field', 'method', 'capability']) {
     if (!kinds.has(k)) fail(`missing symbol kind ${k} in ${[...kinds]}`);
 }
@@ -149,7 +150,7 @@ const refs = JSON.parse(ws.queryReferences('component:Card'));
 if (!Array.isArray(refs)) fail('queryReferences not array');
 
 const actions = JSON.parse(ws.listCodeActions());
-const safe = actions.find((a) => a.kind === 'safe_fix');
+const safe = actions.find((a) => a.kind === 'safe-fix');
 if (!safe || safe.schema !== DX_CODE_ACTION_SCHEMA) fail('missing safe_fix CodeAction');
 if (!safe.edit || safe.edit.status !== 'ready' || !safe.edit.edits?.length) {
     fail('safe_fix must carry ready WorkspaceEditPlan');
