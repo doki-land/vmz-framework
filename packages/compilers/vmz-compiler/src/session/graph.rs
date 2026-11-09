@@ -134,6 +134,21 @@ impl SessionGraph {
         true
     }
 
+    /// Units declaring `capability`, stable-sorted by chunk id.
+    ///
+    /// Explain resolves capability selectors against the typed index instead of
+    /// scanning deployment JSON text: `capabilities` is a multi-line array, so a
+    /// line that contains the array key never contains a method name.
+    pub fn units_with_capability(&self, capability: &str) -> Vec<&SessionUnit> {
+        let mut units: Vec<&SessionUnit> = self
+            .units
+            .values()
+            .filter(|u| u.capabilities.iter().any(|c| c == capability))
+            .collect();
+        units.sort_by(|a, b| a.chunk_id.cmp(&b.chunk_id));
+        units
+    }
+
     /// Pretty JSON document for explain / verify.
     pub fn to_json(&self) -> String {
         let mut units: Vec<SessionUnit> = self.units.values().cloned().collect();

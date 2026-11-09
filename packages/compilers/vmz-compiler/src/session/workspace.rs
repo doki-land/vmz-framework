@@ -412,8 +412,22 @@ impl Workspace {
         }
         let deployment_path = self.options.out_dir.join("vmz-deployment.json");
         let deployment_text = fs::read_to_string(&deployment_path).ok();
-        let (kind, chunk_id, matched_unit, edge_sel) =
-            resolve_explain_target(target, deployment_text.as_deref(), &self.options.root);
+        // A fresh Workspace has no in-memory index yet: load it from the emitted
+        // deployment doc instead of mutating this workspace's generation.
+        let mut lazy_session = SessionGraph::default();
+        let session_index = if !self.session.units.is_empty() {
+            Some(&self.session)
+        } else if lazy_session.refresh_from_deployment(&self.options.out_dir) {
+            Some(&lazy_session)
+        } else {
+            None
+        };
+        let (kind, chunk_id, matched_unit, edge_sel) = resolve_explain_target(
+            target,
+            deployment_text.as_deref(),
+            session_index,
+            &self.options.root,
+        );
 
         let program_text = chunk_id.as_ref().and_then(|cid| {
             let p = self.options.out_dir.join(format!("{cid}.program.json"));
@@ -948,6 +962,7 @@ impl Workspace {
 fn resolve_explain_target(
     target: &str,
     deployment: Option<&str>,
+    session: Option<&SessionGraph>,
     root: &Path,
 ) -> (vmz_protocol::ExplainKind, Option<String>, Option<String>, Option<String>) {
     if target.starts_with("contribution:") {
@@ -956,7 +971,7 @@ fn resolve_explain_target(
 
     // `chunk#binding:0` | `chunk#effect:name` | `chunk#call:method`
     if let Some((head, edge)) = target.split_once('#') {
-        let (_kind, chunk, unit, _) = resolve_explain_target(head, deployment, root);
+        let (_kind, chunk, unit, _) = resolve_explain_target(head, deployment, session, root);
         let edge_kind = if edge.starts_with("binding:") {
             vmz_protocol::ExplainKind::Binding
         } else if edge.starts_with("effect:") {
@@ -970,19 +985,13 @@ fn resolve_explain_target(
     }
 
     if let Some(method) = target.strip_prefix("capability:") {
-        if let Some(dep) = deployment {
-            for line in dep.lines() {
-                if line.contains("\"capabilities\"") && line.contains(method) {
-                    if let Some(chunk) = extract_json_str_line(line, "chunkId") {
-                        return (
-                            vmz_protocol::ExplainKind::Capability,
-                            Some(chunk),
-                            Some(line.trim().trim_end_matches(',').to_string()),
-                            None,
-                        );
-                    }
-                }
-            }
+        if let Some(unit) = session.and_then(|s| s.units_with_capability(method).into_iter().next()) {
+            return (
+                vmz_protocol::ExplainKind::Capability,
+                Some(unit.chunk_id.clone()),
+                serde_json::to_string(unit).ok(),
+                None,
+            );
         }
         return (vmz_protocol::ExplainKind::Capability, None, None, None);
     }
