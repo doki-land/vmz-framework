@@ -13,7 +13,7 @@
                     {{ leadLabel }}
                 </p>
                 <div class="treemap-preview__actions">
-                    <a class="treemap-preview__link" href="/charts">
+                    <a href="/charts" class="treemap-preview__link">
                         {{ backLabel }}
                     </a>
                     <button type="button" @click="toggleDark" :aria-pressed="dark ? 'true' : 'false'" class="treemap-preview__theme">
@@ -29,7 +29,7 @@
                     {{ statusHintLabel }}
                 </p>
             </section>
-            <section :aria-label="chartSectionLabel" class="treemap-preview__stage" @vmz-chart-selection-change="onSelectionChange" @vmz-chart-drilldown-change="onDrilldownChange">
+            <section :aria-label="chartSectionLabel" @vmz-chart-selection-change="onSelectionChange" @vmz-chart-drilldown-change="onDrilldownChange" class="treemap-preview__stage">
                 <Chart :spec="spec" :data="rows" :height="420" :theme="dark ? 'dark' : 'light'" :label="chartLabel" />
             </section>
             <section class="treemap-preview__notes">

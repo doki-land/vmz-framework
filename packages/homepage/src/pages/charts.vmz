@@ -13,7 +13,7 @@
                     {{ leadLabel }}
                 </p>
                 <div class="charts-gallery__actions">
-                    <a class="charts-gallery__preview-link" href="/charts/treemap">
+                    <a href="/charts/treemap" class="charts-gallery__preview-link">
                         {{ treemapPreviewLabel }}
                     </a>
                     <button type="button" @click="() => toggleDark()" :aria-pressed="dark ? 'true' : 'false'" class="charts-gallery__theme-toggle">
