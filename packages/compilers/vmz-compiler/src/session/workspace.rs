@@ -985,7 +985,8 @@ fn resolve_explain_target(
     }
 
     if let Some(method) = target.strip_prefix("capability:") {
-        if let Some(unit) = session.and_then(|s| s.units_with_capability(method).into_iter().next()) {
+        if let Some(unit) = session.and_then(|s| s.units_with_capability(method).into_iter().next())
+        {
             return (
                 vmz_protocol::ExplainKind::Capability,
                 Some(unit.chunk_id.clone()),
