@@ -18,6 +18,7 @@ use vmz_compiler::{
 use vmz_inspector::append_convention_lints;
 use vmz_protocol::ApplicationProtocolCatalog;
 
+pub mod library;
 pub mod pack;
 
 /// Protocol version strings claimed by host and compiler (handshake payload).

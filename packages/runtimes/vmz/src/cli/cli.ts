@@ -16,6 +16,7 @@ import { createDevSession } from '../dev/dev-session.js';
 import { registerDocumentCommands } from '../document/document-cmd.js';
 import { buildIntegratedDocuments, projectHasDocuments } from '../document/document-integrate.js';
 import { registerExplainCommand } from './explain-cmd.js';
+import { registerLibraryCommand } from './lib-cmd.js';
 import { registerGithubActionsCommand } from './github-actions-cmd.js';
 import { registerInitCommands } from './init-cmd.js';
 import {
@@ -119,6 +120,7 @@ function buildProductCli(opts: { mode?: 'global' | 'project' } = {}): Cli {
     registerArtifactCommands(cli.command('artifact|artifacts|release', 'cli.cmd.artifact'));
     registerRefactorCommands(cli.command('refactor', 'cli.cmd.refactor'));
     registerExplainCommand(cli);
+    registerLibraryCommand(cli);
     registerGithubActionsCommand(cli);
     registerInitCommands(cli.command('init', 'cli.cmd.init'));
 
