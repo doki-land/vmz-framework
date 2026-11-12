@@ -2,6 +2,23 @@
 
 VMZ chart components backed by the DaVinci engine — the same `ChartSpec` + data rows drive SVG rendering, interaction, theming, and an accessible table fallback.
 
+## Install
+
+```sh
+pnpm add @vmz/ui-charts @doki-land/davinci @vmz/core
+```
+
+This package ships precompiled ESM (`.js`), types (`.d.ts`) and styles (`.css`) — no VMZ compiler is involved at install or runtime. Styles are **not** injected: import the entry you use.
+
+```ts
+import Chart from "@vmz/ui-charts/Chart";
+import "@vmz/ui-charts/Chart.css";
+import Diagram from "@vmz/ui-charts/Diagram";
+import "@vmz/ui-charts/Diagram.css";
+```
+
+`@vmz/core` is the runtime host the compiled components attach to; both components render into the host's DOM contract. Import specifiers inside the shipped modules stay bare (the `@vmz/core` runtime face and DaVinci facade subpaths), so a bundler resolves them from your dependency graph instead of a vendored copy.
+
 ```vue
 <Chart :spec="spec" :data="rows" label="Weekly visitors" />
 ```

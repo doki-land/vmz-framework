@@ -13,6 +13,7 @@
         "build:runtimes": "pnpm --filter @vmz/protocol --filter @vmz/commander --filter @vmz/diagnostic --filter vmz-fixtures --filter @vmz/core --filter @vmz/ui-icons --filter @vmz/plugin-shiki --filter @vmz/plugin-markdown-it --filter @vmz/plugin-katex --filter @doki-land/davinci --filter vmz --filter @vmz/test run build",
         "build:runtimes:js": "pnpm --filter @vmz/protocol --filter @vmz/commander --filter @vmz/diagnostic --filter vmz-fixtures --filter @vmz/core --filter @vmz/ui-icons --filter @vmz/plugin-shiki --filter @vmz/plugin-markdown-it --filter @vmz/plugin-katex --filter @vmz/test run build && pnpm --filter vmz run build:js",
         "build:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" --filter \"!@vmz-examples/documents-fixture\" --filter \"!@vmz-examples/analysis\" run build",
+        "build:ui-charts": "node scripts/build/ui-charts.mjs",
         "check:examples": "pnpm -r --filter \"./packages/examples/*\" --filter \"!@vmz-examples/test-utils\" run check",
         "check:overlay": "node scripts/dev/check-local-overlay.mjs",
         "verify": "node --import ./scripts/test/resolve-ts-from-js.mjs --experimental-strip-types packages/runtimes/vmz/tests/conformance/run.ts",

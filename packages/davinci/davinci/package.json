@@ -5,8 +5,7 @@
         "url": "git+https://github.com/doki-land/vmz-framework.git",
         "directory": "packages/davinci/davinci"
     },
-    "version": "0.0.0",
-    "private": true,
+    "version": "0.3.16",
     "type": "module",
     "description": "DaVinci engine facade — single public entry for chart/diagram/scene/types/runtime/motion. Tree-shakeable ESM.",
     "license": "MIT",

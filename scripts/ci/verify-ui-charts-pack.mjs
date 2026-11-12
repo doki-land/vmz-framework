@@ -22,7 +22,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const PACKAGE_DIR = path.join(ROOT, 'packages/ui/vmz-ui-charts');
 const FACADE_DIR = path.join(ROOT, 'packages/davinci/davinci');
 const PRIVATE_PREFIX = '@doki-land/davinci-';
-const EXPECTED_EXPORTS = ['./Chart', './Diagram'];
+const EXPECTED_EXPORTS = [
+    './Chart',
+    './Chart.css',
+    './Diagram',
+    './Diagram.css',
+    './package.json',
+];
 const TEXT_SUFFIXES = ['.json', '.js', '.mjs', '.cjs', '.ts', '.css', '.vmz', '.md'];
 const MANIFEST_FILES = ['package.json', 'README.md', 'LICENSE'];
 
@@ -47,6 +53,11 @@ function readJson(file) {
 /** Minimal npm `files` / `sideEffects` pattern matcher (`*` and `**` only). */
 function matchesPattern(pattern, relative) {
     const trimmed = pattern.replace(/^\.\//, '');
+    const target = relative.replace(/^\.\//, '');
+    // A bare directory entry ships its whole subtree (npm `files` semantics).
+    if (!trimmed.includes('*') && (target === trimmed || target.startsWith(`${trimmed}/`))) {
+        return true;
+    }
     let source = '';
     for (let i = 0; i < trimmed.length; i++) {
         const ch = trimmed[i];
@@ -117,8 +128,10 @@ for (const target of targets) {
 }
 
 // `files` has to keep every export target, otherwise a real npm publish drops it.
+// `package.json` is always shipped, so it is not part of the `files` contract.
 const files = Array.isArray(packedManifest.files) ? packedManifest.files : [];
 for (const target of targets) {
+    if (MANIFEST_FILES.includes(target)) continue;
     if (!files.some((pattern) => matchesPattern(pattern, target))) {
         fail(`files does not ship the export target ${target}`);
     }

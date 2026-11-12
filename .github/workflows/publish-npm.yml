@@ -295,5 +295,13 @@ jobs:
         # patch continuity is broken: a half-way publish cannot be undone.
         run: node scripts/ci/preflight-publish.mjs --version=${{ needs.provenance.outputs.version }}
 
+      - name: Build @vmz/ui-charts library artifacts
+        # Precompiled ESM + CSS + hand-written .d.ts: consumers never run the VMZ
+        # compiler and never resolve a `.vmz` source.
+        run: pnpm build:ui-charts
+
+      - name: Verify @vmz/ui-charts tarball
+        run: node scripts/ci/verify-ui-charts-pack.mjs
+
       - name: Publish packages to npm
         run: pnpm exec nifty publish --access public --version=${{ needs.provenance.outputs.version }}
