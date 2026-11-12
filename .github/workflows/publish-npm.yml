@@ -303,5 +303,8 @@ jobs:
       - name: Verify @vmz/ui-charts tarball
         run: node scripts/ci/verify-ui-charts-pack.mjs
 
+      - name: Verify @vmz/ui-charts isolated consumer
+        run: node scripts/ci/verify-ui-charts-consumer.mjs
+
       - name: Publish packages to npm
         run: pnpm exec nifty publish --access public --version=${{ needs.provenance.outputs.version }}
