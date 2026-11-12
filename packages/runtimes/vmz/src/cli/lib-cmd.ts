@@ -67,24 +67,31 @@ export function cmdLibrary(args: ParsedOptions): number {
 }
 
 /**
- * `exports` → entry list. Only string targets and `{ default }` objects that
- * resolve to a `.vmz` file participate; subpath `"."` is skipped (a package
- * root export is not a single-file component contract).
+ * Entry list: `vmz.library.entries` (name → source) is the authoritative form,
+ * because a published package exports precompiled `dist` targets, not `.vmz`.
+ * Packages that still export `.vmz` sources fall back to `exports`.
  */
 function collectEntries(packageDir: string, manifest: unknown): LibraryCompileEntry[] {
     if (!manifest || typeof manifest !== 'object') return [];
-    const exportsField = (manifest as { exports?: unknown }).exports;
-    if (!exportsField || typeof exportsField !== 'object' || Array.isArray(exportsField)) return [];
-    const entries: LibraryCompileEntry[] = [];
-    for (const [subpath, target] of Object.entries(exportsField as Record<string, unknown>)) {
-        if (!subpath.startsWith('./')) continue;
-        const targetPath = resolveTarget(target);
-        if (!targetPath || !targetPath.endsWith('.vmz')) continue;
-        const name = subpath.slice(2);
-        entries.push({ name, path: path.resolve(packageDir, targetPath) });
+    const entries = new Map<string, LibraryCompileEntry>();
+    const declared = (manifest as { vmz?: { library?: { entries?: unknown } } }).vmz?.library?.entries;
+    if (declared && typeof declared === 'object' && !Array.isArray(declared)) {
+        for (const [name, source] of Object.entries(declared as Record<string, unknown>)) {
+            if (typeof source !== 'string' || !source.endsWith('.vmz')) continue;
+            entries.set(name, { name, path: path.resolve(packageDir, source) });
+        }
     }
-    entries.sort((left, right) => left.name.localeCompare(right.name));
-    return entries;
+    const exportsField = (manifest as { exports?: unknown }).exports;
+    if (exportsField && typeof exportsField === 'object' && !Array.isArray(exportsField)) {
+        for (const [subpath, target] of Object.entries(exportsField as Record<string, unknown>)) {
+            if (!subpath.startsWith('./')) continue;
+            const targetPath = resolveTarget(target);
+            if (!targetPath || !targetPath.endsWith('.vmz')) continue;
+            const name = subpath.slice(2);
+            if (!entries.has(name)) entries.set(name, { name, path: path.resolve(packageDir, targetPath) });
+        }
+    }
+    return [...entries.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function resolveTarget(target: unknown): string | null {

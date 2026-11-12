@@ -55,6 +55,12 @@ export default class LibCard {
     assert!(code.contains("@doki-land/davinci/scene"), "code={code}");
     assert!(!code.contains("./vmz-runtime.js"), "code={code}");
     assert!(!code.contains("./dom-core.js"), "code={code}");
+    assert!(!code.contains("sourceMappingURL"), "code={code}");
+    assert!(
+        !report.emitted.iter().any(|path| path.to_string_lossy().ends_with(".map")),
+        "library artifacts must not ship source maps: {:?}",
+        report.emitted
+    );
     assert!(report.emitted.contains(&js));
 }
 

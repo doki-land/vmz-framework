@@ -114,11 +114,6 @@ pub fn compile_library(
             let js_path = options.out_dir.join(format!("{}.js", entry.name));
             fs::write(&js_path, &code)?;
             report.emitted.push(js_path);
-            if let Some(map) = client.map {
-                let map_path = options.out_dir.join(format!("{}.js.map", entry.name));
-                fs::write(&map_path, map)?;
-                report.emitted.push(map_path);
-            }
         }
 
         if let Some(scss) = &options.scss {
@@ -151,7 +146,6 @@ pub fn compile_library(
 
 struct EntryClient {
     code: String,
-    map: Option<String>,
 }
 
 /// 复用单文件编译前端产出入口模块文本：写进临时目录，只取回 `*.client.js`
@@ -207,23 +201,11 @@ fn emit_entry_client(
         }
     };
 
-    let stem = client_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default()
-        .trim_end_matches(".client.js")
-        .to_string();
     let original = fs::read_to_string(&client_path)?;
-    let map = fs::read_to_string(client_path.with_extension("js.map")).ok();
     report.diagnostics.extend(staged.diagnostics);
     fs::remove_dir_all(&staging)?;
 
-    Ok(Some(EntryClient {
-        code: rewrite_source_map_reference(&original, &stem, &entry.name),
-        map: map.map(|text| {
-            text.replace(&format!("\"{stem}.client.js\""), &format!("\"{}.js\"", entry.name))
-        }),
-    }))
+    Ok(Some(EntryClient { code: strip_source_map_comment(&original) }))
 }
 
 /// 产物名必须是裸文件名：路径分隔符或 `..` 会把库产物写到其它目录。
@@ -247,15 +229,19 @@ fn package_root(path: &Path) -> PathBuf {
     path.parent().map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// source map 注释指向改名后的产物：`<stem>.client.js.map` → `<Name>.js.map`。
-fn rewrite_source_map_reference(code: &str, stem: &str, name: &str) -> String {
-    if stem.is_empty() {
-        return code.to_string();
+/// 库产物不携带 source map：map 内嵌构建机绝对路径，且与「不做内容指纹」
+/// 的库产物契约无关。同时去掉产物尾部的 `sourceMappingURL` 注释，避免指向
+/// 不存在的文件。
+fn strip_source_map_comment(code: &str) -> String {
+    let mut out = String::with_capacity(code.len());
+    for line in code.lines() {
+        if line.trim_start().starts_with("//# sourceMappingURL=") {
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
     }
-    code.replace(
-        &format!("//# sourceMappingURL={stem}.client.js.map"),
-        &format!("//# sourceMappingURL={name}.js.map"),
-    )
+    out
 }
 
 /// 把交付运行时同伴的相对引用改为 `@vmz/core` 公开 face，并返回仍未被映射的
@@ -283,7 +269,7 @@ fn ensure_trailing_newline(css: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{rewrite_runtime_faces, rewrite_source_map_reference};
+    use super::{rewrite_runtime_faces, strip_source_map_comment};
 
     #[test]
     fn maps_runtime_faces_to_public_core_entries() {
@@ -301,12 +287,10 @@ mod tests {
     }
 
     #[test]
-    fn retargets_source_map_comment_to_renamed_module() {
-        let code = rewrite_source_map_reference(
+    fn drops_source_map_reference_without_keeping_a_dangling_comment() {
+        let code = strip_source_map_comment(
             "export default class X{}\n//# sourceMappingURL=Chart.client.js.map\n",
-            "Chart",
-            "Chart",
         );
-        assert!(code.contains("//# sourceMappingURL=Chart.js.map"));
+        assert_eq!(code, "export default class X{}\n");
     }
 }
