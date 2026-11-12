@@ -33,6 +33,7 @@ export default class Nested {}
         sources: vec![vmz.clone()],
         designs_style_entry: None,
         designs_style_files: Vec::new(),
+        provenance_comments: true,
     });
     let _ = std::fs::remove_file(&vmz);
 
@@ -48,6 +49,42 @@ export default class Nested {}
         result.css
     );
     assert_eq!(result.css_relative, "vmz-style.css");
+}
+
+#[test]
+fn library_mode_omits_provenance_comments() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    std::fs::create_dir_all(&dir).unwrap();
+    let vmz = dir.join("LibPlain.vmz");
+    std::fs::write(
+        &vmz,
+        r#"<template><div class="lib-plain">x</div></template>
+<style>
+.lib-plain { color: #123456; }
+</style>
+<script client>
+export default class LibPlain {}
+</script>
+"#,
+    )
+    .unwrap();
+
+    let result = ProductionScssCompiler.emit_project(&ScssEmitRequest {
+        project_root: dir.clone(),
+        out_dir: dir.join("dist-unused"),
+        sources: vec![vmz.clone()],
+        designs_style_entry: None,
+        designs_style_files: Vec::new(),
+        provenance_comments: false,
+    });
+    let _ = std::fs::remove_file(&vmz);
+
+    assert!(result.css.contains(".lib-plain"), "css={}", result.css);
+    assert!(
+        !result.css.contains(env!("CARGO_MANIFEST_DIR")),
+        "library css must not carry build-machine paths: {}",
+        result.css
+    );
 }
 
 #[test]
@@ -78,6 +115,7 @@ export default class TwMix {}
         sources: vec![vmz.clone()],
         designs_style_entry: None,
         designs_style_files: Vec::new(),
+        provenance_comments: true,
     });
     let _ = std::fs::remove_file(&vmz);
 

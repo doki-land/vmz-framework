@@ -44,7 +44,7 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
     for path in style_paths {
         match compile_file(&path, &req.project_root, &designs_styles) {
             Ok(css) if !css.trim().is_empty() => {
-                parts.push(format!("/* {} */\n{}", path.display(), css.trim_end()));
+                parts.push(with_provenance(&path, css.trim_end(), req.provenance_comments));
             }
             Ok(_) => {}
             Err(msg) => diagnostics.push(
@@ -81,7 +81,7 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
         }
         match compile_source(stripped, style.lang, source, &req.project_root) {
             Ok(css) if !css.trim().is_empty() => {
-                parts.push(format!("/* {} */\n{}", source.display(), css.trim_end()));
+                parts.push(with_provenance(source, css.trim_end(), req.provenance_comments));
             }
             Ok(_) => {}
             Err(msg) => diagnostics.push(
@@ -92,6 +92,11 @@ fn emit_project_impl(req: &ScssEmitRequest) -> ScssEmitResult {
     }
 
     ScssEmitResult { css: parts.join("\n\n"), css_relative: "vmz-style.css".into(), diagnostics }
+}
+
+/// 每个样式块的出处注释。库产物关掉：发布字节里不应出现构建机绝对路径。
+fn with_provenance(path: &Path, css: &str, enabled: bool) -> String {
+    if enabled { format!("/* {} */\n{css}", path.display()) } else { css.to_string() }
 }
 
 fn compile_file(path: &Path, project_root: &Path, designs_styles: &Path) -> Result<String, String> {

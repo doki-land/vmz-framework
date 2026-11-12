@@ -512,6 +512,7 @@ fn emit_stylesheets(
                 sources: sources.clone(),
                 designs_style_entry: designs.style_entry.clone(),
                 designs_style_files: designs.style_files.clone(),
+                provenance_comments: true,
             });
             report.diagnostics.extend(result.diagnostics);
             if !result.css.trim().is_empty() {

@@ -18,6 +18,9 @@ pub struct ScssEmitRequest {
     pub designs_style_entry: Option<PathBuf>,
     /// All discovered files under `designs/styles` (for inventory / diagnostics).
     pub designs_style_files: Vec<PathBuf>,
+    /// 是否为每个来源块写 `/* <源文件> */` 出处注释。交付装配需要（开发者
+    /// 定位样式来源）；库产物不需要，且会把构建机绝对路径带进发布字节。
+    pub provenance_comments: bool,
 }
 
 /// CSS body and diagnostics returned by a [`ScssCompiler`].

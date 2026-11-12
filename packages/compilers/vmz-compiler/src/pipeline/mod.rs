@@ -8,6 +8,7 @@ pub mod emit_direct;
 pub mod emit_ir;
 pub mod expr_plan;
 pub mod field_rw;
+pub mod library;
 pub mod link;
 pub mod method_compose;
 pub mod plan_build;
