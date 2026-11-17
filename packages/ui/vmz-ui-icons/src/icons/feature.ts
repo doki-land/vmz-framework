@@ -14,4 +14,8 @@ export const FEATURE_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M4 18H20', 'M12 15V6', 'M8 10L12 6L16 10'],
     },
+    'feature.assistant': {
+        kind: 'stroke',
+        paths: ['M12 3.5L13.9 9.1L19.5 11L13.9 12.9L12 18.5L10.1 12.9L4.5 11L10.1 9.1Z'],
+    },
 };

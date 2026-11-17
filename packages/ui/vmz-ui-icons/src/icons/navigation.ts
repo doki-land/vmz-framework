@@ -24,4 +24,13 @@ export const NAVIGATION_ICONS: Record<string, IconDef> = {
         circles: [{ cx: 12, cy: 12, r: 9 }],
         paths: ['M15.17 9.34L13.5 13.5L8.83 14.67Q8.5 15.5 9.34 15.17L10.5 10.5L14.67 8.83Q15.5 8.5 15.17 9.34Z'],
     },
+    'nav.chat': {
+        kind: 'stroke',
+        paths: ['M4 6.5A2.5 2.5 0 0 1 6.5 4H17.5A2.5 2.5 0 0 1 20 6.5V13.5A2.5 2.5 0 0 1 17.5 16H9L4 20V6.5Z'],
+    },
+    'nav.contacts': {
+        kind: 'stroke',
+        circles: [{ cx: 12, cy: 8.6, r: 3.4 }],
+        paths: ['M5.2 20C5.2 16.5 8.3 14.1 12 14.1C15.7 14.1 18.8 16.5 18.8 20'],
+    },
 };

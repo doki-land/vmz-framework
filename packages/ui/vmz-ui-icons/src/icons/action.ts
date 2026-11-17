@@ -88,6 +88,23 @@ export const ACTION_ICONS: Record<string, IconDef> = {
         kind: 'stroke',
         paths: ['M8 6V18', 'M5 15L8 18L11 15', 'M14 8V18', 'M17 11V18', 'M20 14V18'],
     },
+    'action.send': {
+        kind: 'stroke',
+        paths: ['M4.8 12H17', 'M12.6 6.4L18.2 12L12.6 17.6'],
+    },
+    'action.sidebar': {
+        kind: 'stroke',
+        paths: ['M3.5 4.5H20.5V19.5H3.5Z', 'M14.6 4.5V19.5'],
+    },
+    'action.settings': {
+        kind: 'stroke',
+        paths: ['M5 7.5H19', 'M5 12H19', 'M5 16.5H19'],
+        dots: [
+            { cx: 9, cy: 7.5, r: 1.8 },
+            { cx: 15, cy: 12, r: 1.8 },
+            { cx: 9.5, cy: 16.5, r: 1.8 },
+        ],
+    },
     'action.external': {
         kind: 'stroke',
         paths: ['M14 4H20V10', 'M20 4L11 13', 'M18 14V20H4V6H10'],
