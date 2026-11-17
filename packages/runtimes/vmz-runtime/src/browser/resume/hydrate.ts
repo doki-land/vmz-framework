@@ -81,6 +81,11 @@ export async function hydrateRoute(Page, container, props = {}, layoutCtors = []
         const slot = findOwnedDefaultSlot(inst.__vmzDomRoot);
         const outlet = document.createElement('div');
         outlet.setAttribute('data-vmz-outlet', '');
+        // The outlet is an ownership marker for the page instance, not a visual box.
+        // A real block box here breaks the layout chain the page author wrote against
+        // the layout slot (`height: 100%`, flex items) and makes the client tree differ
+        // from the SSR tree, which has no wrapper.
+        outlet.style.display = 'contents';
         if (slot && slot.parentNode) slot.replaceWith(outlet);
         else if (inst.__vmzDomRoot && typeof inst.__vmzDomRoot.appendChild === 'function') {
             inst.__vmzDomRoot.appendChild(outlet);
