@@ -283,6 +283,11 @@ jobs:
       - name: Verify @doki-land/davinci facade pack
         run: node scripts/ci/verify-davinci-facade.mjs
 
+      - name: Build @vmz/ui-charts library artifacts
+        # The gate verifies the packed tarball, so it must build the library the same way
+        # `publish-npm.yml` does instead of relying on a `dist` that CI never produced.
+        run: pnpm build:ui-charts
+
       - name: Verify @vmz/ui-charts pack surface
         run: node scripts/ci/verify-ui-charts-pack.mjs
 
