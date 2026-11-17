@@ -66,7 +66,9 @@ struct Frame {
 /// Erase TypeScript-only syntax from `source` and return JavaScript.
 ///
 /// Returns an error for syntax that cannot be erased without changing runtime
-/// behavior, such as `enum`, `namespace`, `declare module` and `declare global`.
+/// behavior, such as `enum` and `namespace`. Ambient `declare` forms — including
+/// `declare global`, `declare module` and `declare namespace` — are type-only and
+/// are erased with the rest of the declaration.
 pub fn erase_types(source: &str) -> Result<String, String> {
     Ok(erase_types_with_deletions(source)?.0)
 }
@@ -265,14 +267,9 @@ impl<'a> Eraser<'a> {
                         )
                     );
                     if statement_start && declares {
-                        let namespace = matches!(self.kind(i + 1), Some(T::Namespace | T::Global))
-                            || self.text(i + 1) == Some("module");
-                        if namespace {
-                            return Err(
-                                "type erasure does not support `declare` module or namespace declarations"
-                                    .into(),
-                            );
-                        }
+                        // Ambient `declare global` / `declare module` / `declare namespace`
+                        // blocks are type-only: erase the whole statement like any other
+                        // `declare` form instead of rejecting it.
                         let end = self.statement_end(i);
                         self.delete_to(i, end);
                         i = end;
@@ -1439,6 +1436,29 @@ mod tests {
             erase_types("import { type B, type C as D } from \"./x\";\nconst a = 1;\n").unwrap();
         assert!(!js.contains("import"), "{js}");
         assert!(js.contains("const a = 1;"), "{js}");
+    }
+
+    #[test]
+    fn erases_ambient_global_and_module_declarations() {
+        let js = erase_types(
+            "declare global {\n  interface Window { bridge?: string }\n}\nconst ok = 1;\n",
+        )
+        .unwrap();
+        assert!(!js.contains("declare"), "{js}");
+        assert!(!js.contains("interface Window"), "{js}");
+        assert!(js.contains("const ok = 1;"), "{js}");
+
+        let module = erase_types(
+            "declare module \"./x\" {\n  const value: number;\n}\nexport const keep = 2;\n",
+        )
+        .unwrap();
+        assert!(!module.contains("declare"), "{module}");
+        assert!(module.contains("export const keep = 2;"), "{module}");
+
+        let namespace = erase_types("declare namespace A {\n  const b: number;\n}\nconst c = 3;\n")
+            .unwrap();
+        assert!(!namespace.contains("declare"), "{namespace}");
+        assert!(namespace.contains("const c = 3;"), "{namespace}");
     }
 
     #[test]
