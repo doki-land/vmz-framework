@@ -1066,7 +1066,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28#27753079755689cdb1b56407df5e7cc67450db28"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4#4e3bd170950f851b6fed01fadd34fe8344cbbca4"
 dependencies = [
  "serde",
  "smallvec",
@@ -1087,17 +1087,17 @@ dependencies = [
 [[package]]
 name = "oak-formatter"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28#27753079755689cdb1b56407df5e7cc67450db28"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4#4e3bd170950f851b6fed01fadd34fe8344cbbca4"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
 ]
 
 [[package]]
 name = "oak-typescript"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28#27753079755689cdb1b56407df5e7cc67450db28"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4#4e3bd170950f851b6fed01fadd34fe8344cbbca4"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
  "oak-formatter",
  "serde",
 ]
@@ -1113,9 +1113,9 @@ dependencies = [
 [[package]]
 name = "oak-vue"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28#27753079755689cdb1b56407df5e7cc67450db28"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4#4e3bd170950f851b6fed01fadd34fe8344cbbca4"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
  "serde",
 ]
 
@@ -2029,7 +2029,7 @@ version = "0.3.16"
 dependencies = [
  "boost-fs",
  "json5",
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
  "oak-typescript",
  "oak-vue",
  "resvg",
@@ -2074,7 +2074,7 @@ name = "vmz-generator"
 version = "0.3.16"
 dependencies = [
  "json5",
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
  "oak-typescript",
  "serde",
  "serde_json",
@@ -2138,7 +2138,7 @@ dependencies = [
 name = "vmz-oak-frontend-adapter"
 version = "0.3.16"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
  "oak-typescript",
  "oak-vue",
  "thiserror 2.0.21",
@@ -2149,7 +2149,7 @@ dependencies = [
 name = "vmz-pack"
 version = "0.3.16"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=27753079755689cdb1b56407df5e7cc67450db28)",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=4e3bd170950f851b6fed01fadd34fe8344cbbca4)",
  "oak-typescript",
  "serde",
  "serde_json",

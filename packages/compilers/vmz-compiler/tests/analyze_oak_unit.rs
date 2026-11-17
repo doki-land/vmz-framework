@@ -41,6 +41,26 @@ export default class Page {
 }
 
 #[test]
+fn oak_keeps_field_name_for_typed_identifier_initializer() {
+    let src = r#"
+const SEED: Row[] = [];
+type Row = { id: string };
+export default class Page {
+  rows: Row[] = SEED;
+  name = "x";
+  bump() {
+    this.rows = [];
+  }
+}
+"#;
+    let oak = try_component_decl_via_oak(ScriptKind::Client, src).expect("oak surface");
+    let names: Vec<&str> = oak.fields.iter().map(|f| f.name.as_str()).collect();
+    assert!(names.contains(&"rows"), "fields={names:?}");
+    assert!(names.contains(&"name"), "fields={names:?}");
+    assert!(!names.contains(&"SEED"), "fields={names:?}");
+}
+
+#[test]
 fn oak_lowers_server_http_decorator() {
     let src = r#"
 export default class PageServer {
