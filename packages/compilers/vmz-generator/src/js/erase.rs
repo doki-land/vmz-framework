@@ -1455,8 +1455,8 @@ mod tests {
         assert!(!module.contains("declare"), "{module}");
         assert!(module.contains("export const keep = 2;"), "{module}");
 
-        let namespace = erase_types("declare namespace A {\n  const b: number;\n}\nconst c = 3;\n")
-            .unwrap();
+        let namespace =
+            erase_types("declare namespace A {\n  const b: number;\n}\nconst c = 3;\n").unwrap();
         assert!(!namespace.contains("declare"), "{namespace}");
         assert!(namespace.contains("const c = 3;"), "{namespace}");
     }
