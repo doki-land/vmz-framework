@@ -131,7 +131,10 @@ test('workspace collection matches the publishable package set', () => {
     assert.ok(names.includes('@vmz/vmz'), 'CLI must be addressed as @vmz/vmz');
     assert.equal(names.includes('vmz'), false, 'bare vmz is not a registry package');
     for (const pkg of packages) {
-        assert.ok(pkg.name.startsWith('@vmz/') || pkg.name === 'vmz', `unexpected package ${pkg.name}`);
+        // The publishable set is the `@vmz/*` family plus the DaVinci facade, which
+        // owns its own scope because it is a product-level entry, not a VMZ package.
+        const scoped = pkg.name.startsWith('@vmz/') || pkg.name.startsWith('@doki-land/davinci');
+        assert.ok(scoped || pkg.name === 'vmz', `unexpected package ${pkg.name}`);
         assert.ok(pkg.version, `${pkg.name} has no version`);
     }
 });
