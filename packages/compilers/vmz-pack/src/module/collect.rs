@@ -29,7 +29,7 @@ use oak_typescript::ast::{
 };
 use oak_typescript::scope::module_scope_facts;
 
-use super::record::{
+use compiler_bundle::module::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
     ModuleRecord, RequireFact, ScopeBindingFact, ScopeIncompleteReason, StatementEffect,
     StatementFact,

@@ -62,8 +62,9 @@ yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "7ba022a049cafef979dfe7a8adf81d9a0d3dd373" }
-boost-http = { git = "https://github.com/oovm/rust-boost", rev = "7ba022a049cafef979dfe7a8adf81d9a0d3dd373" }
+boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "54e7196e7f176dbb3a7a38778a12982beada8b56" }
+boost-net = { git = "https://github.com/oovm/rust-boost", rev = "54e7196e7f176dbb3a7a38778a12982beada8b56" }
+compiler-bundle = { git = "https://github.com/oovm/rust-boost", rev = "54e7196e7f176dbb3a7a38778a12982beada8b56" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }

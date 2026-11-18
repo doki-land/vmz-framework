@@ -4,7 +4,8 @@
 
 use std::time::{Duration, Instant};
 
-use boost_http::{HttpTransport, Method, Request, Transport, Url};
+use boost_net::http::{HttpTransport, Method, Request, Transport};
+use boost_net::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -92,7 +93,7 @@ pub enum MonitorError {
     Message(String),
     /// Transport-level request failure.
     #[error(transparent)]
-    Request(#[from] boost_http::RequestError),
+    Request(#[from] boost_net::NetError),
     /// Response body that did not match the expected REST shape.
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
