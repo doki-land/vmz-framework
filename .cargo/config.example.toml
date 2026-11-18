@@ -11,5 +11,6 @@ oak-vue = { path = "<your-path>/oaks/examples/oak-vue" }
 oak-typescript = { path = "<your-path>/oaks/examples/oak-typescript" }
 
 [patch."https://github.com/oovm/rust-boost"]
-boost-fs = { path = "<your-path>/rust-boost/projects/boost-fs" }
-boost-http = { path = "<your-path>/rust-boost/projects/boost-http" }
+boost-fs = { path = "<your-path>/rust-boost/projects/boost/boost-fs" }
+boost-net = { path = "<your-path>/rust-boost/projects/boost/boost.net" }
+compiler-bundle = { path = "<your-path>/rust-boost/projects/compiler/compiler.bundle" }
