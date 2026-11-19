@@ -544,7 +544,7 @@ fn binding_reads(module: &vmz_types::ReactiveModule, attr: &str) -> Vec<String> 
 
 #[test]
 fn html_binding_expands_method_reads_end_to_end() {
-    // Whole chain: Oak analysis (getter / call edges + template-string holes) →
+    // Whole chain: `data.text` analysis (getter / call edges + template-string holes) →
     // reactive binding reads.
     let src = r#"
 export default class Chart {

@@ -9,8 +9,8 @@ publish = false
 
 [dependencies]
 compiler-bundle.workspace = true
-oak-typescript.workspace = true
-vmz-oak-frontend-adapter.workspace = true
+data-text-typescript.workspace = true
+vmz-text-frontend-adapter.workspace = true
 serde_json.workspace = true
 
 [lib]

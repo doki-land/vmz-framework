@@ -1,7 +1,7 @@
 //! Thin `ExprPlan` ingress for template expressions (`0.1.19`).
 //!
 //! Expressions remain authored as text on Semantic AST; this plan captures the
-//! snippet root span (Oak TypeScript primary) + field reads + each-alias prop
+//! snippet root span (`data.text` TypeScript primary) + field reads + each-alias prop
 //! paths so scope fixtures do not re-scan raw strings ad hoc.
 
 use vmz_generator::{SnippetSpan, template_expr_root_span, template_expr_snippet_error};

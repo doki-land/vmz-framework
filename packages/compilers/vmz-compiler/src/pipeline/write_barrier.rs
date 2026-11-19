@@ -1,4 +1,4 @@
-//! Owned mutation lowering through the Oak TypeScript frontend.
+//! Owned mutation lowering through the `data.text` TypeScript frontend.
 
 use std::collections::HashSet;
 
@@ -11,7 +11,7 @@ pub struct WriteBarrierRewrite {
     pub rewritten: usize,
 }
 
-/// Lower strides, transposes, then individual owned writes through Oak.
+/// Lower strides, transposes, then individual owned writes through `data.text`.
 pub fn rewrite_static_path_writes(
     source: &str,
     owned_fields: &HashSet<String>,
@@ -19,25 +19,25 @@ pub fn rewrite_static_path_writes(
     let stride = rewrite_array_item_strides(source, owned_fields);
     let transpose = rewrite_list_transpose(&stride.source, owned_fields);
     let writes =
-        super::write_barrier_oak::rewrite_static_path_writes(&transpose.source, owned_fields)
-            .expect("Oak failed to parse owned mutation source");
+        super::write_barrier_text::rewrite_static_path_writes(&transpose.source, owned_fields)
+            .expect("`data.text` failed to parse owned mutation source");
     WriteBarrierRewrite {
         source: writes.source,
         rewritten: stride.rewritten + transpose.rewritten + writes.rewritten,
     }
 }
 
-/// Lower owned array stride loops through Oak.
+/// Lower owned array stride loops through `data.text`.
 pub fn rewrite_array_item_strides(
     source: &str,
     owned_fields: &HashSet<String>,
 ) -> WriteBarrierRewrite {
-    super::write_barrier_oak::rewrite_array_item_strides(source, owned_fields)
-        .expect("Oak failed to parse array stride source")
+    super::write_barrier_text::rewrite_array_item_strides(source, owned_fields)
+        .expect("`data.text` failed to parse array stride source")
 }
 
-/// Lower owned list transposes through Oak.
+/// Lower owned list transposes through `data.text`.
 pub fn rewrite_list_transpose(source: &str, owned_fields: &HashSet<String>) -> WriteBarrierRewrite {
-    super::write_barrier_oak::rewrite_list_transpose(source, owned_fields)
-        .expect("Oak failed to parse list transpose source")
+    super::write_barrier_text::rewrite_list_transpose(source, owned_fields)
+        .expect("`data.text` failed to parse list transpose source")
 }

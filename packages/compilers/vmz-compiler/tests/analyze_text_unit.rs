@@ -1,0 +1,79 @@
+//! `data.text`-primary script surface analysis tests.
+
+use vmz_compiler::analyze::analyze_script;
+use vmz_compiler::parse::analyze_text::try_component_decl_via_text;
+use vmz_compiler::sfc::ScriptKind;
+use vmz_types::FieldKind;
+
+#[test]
+fn text_lowers_default_export_props_and_state() {
+    let src = r#"
+export default class Page {
+  public title = 'hi';
+  count = 0;
+  onClick() {}
+}
+"#;
+    let text = try_component_decl_via_text(ScriptKind::Client, src).expect("text surface");
+    assert_eq!(text.name, "Page");
+    assert!(text.properties.iter().any(|f| f.name == "title" && f.kind == FieldKind::Prop));
+    assert!(text.fields.iter().any(|f| f.name == "count" && f.kind == FieldKind::State));
+    assert!(text.methods.iter().any(|m| m.name == "onClick"));
+}
+
+#[test]
+fn analyze_script_prefers_text_surface_with_method_rw() {
+    let src = r#"
+export default class Page {
+  public title = 'hi';
+  count = 0;
+  bump() {
+    this.count++;
+  }
+}
+"#;
+    let analyzed = analyze_script(ScriptKind::Client, src);
+    assert_eq!(analyzed.decl.name, "Page");
+    assert!(analyzed.decl.properties.iter().any(|f| f.name == "title"));
+    assert!(analyzed.decl.fields.iter().any(|f| f.name == "count"));
+    let bump = analyzed.decl.methods.iter().find(|m| m.name == "bump").expect("bump");
+    assert!(bump.writes.iter().any(|w| w == "count"), "writes={:?}", bump.writes);
+}
+
+#[test]
+fn text_keeps_field_name_for_typed_identifier_initializer() {
+    let src = r#"
+const SEED: Row[] = [];
+type Row = { id: string };
+export default class Page {
+  rows: Row[] = SEED;
+  name = "x";
+  bump() {
+    this.rows = [];
+  }
+}
+"#;
+    let text = try_component_decl_via_text(ScriptKind::Client, src).expect("text surface");
+    let names: Vec<&str> = text.fields.iter().map(|f| f.name.as_str()).collect();
+    assert!(names.contains(&"rows"), "fields={names:?}");
+    assert!(names.contains(&"name"), "fields={names:?}");
+    assert!(!names.contains(&"SEED"), "fields={names:?}");
+}
+
+#[test]
+fn text_lowers_server_http_decorator() {
+    let src = r#"
+export default class PageServer {
+  @Get('/api/ping')
+  async ping() {
+    return { ok: true };
+  }
+}
+"#;
+    let text = try_component_decl_via_text(ScriptKind::Server, src).expect("text server");
+    let ping = text.methods.iter().find(|m| m.name == "ping").expect("ping");
+    assert!(ping.is_async);
+    let http = ping.http.as_ref().expect("http");
+    assert_eq!(http.verb, "GET");
+    assert_eq!(http.path, "/api/ping");
+}

@@ -12,12 +12,12 @@ fn body_block(body: &str) -> TemplateBlock {
     TemplateBlock { content: body.to_string(), content_start: 0 }
 }
 
-/// Oak-direct Semantic parse (the production ingress).
-fn oak_semantic(body: &str) -> Result<vmz_compiler::SemanticIr, String> {
+/// `data.text`-direct Semantic parse (the production ingress).
+fn text_semantic(body: &str) -> Result<vmz_compiler::SemanticIr, String> {
     parse_template_semantic_primary(&body_block(body)).map_err(|e| e.render_plain())
 }
 
-/// Concrete → Semantic adapter parse (must agree with the Oak-direct path).
+/// Concrete → Semantic adapter parse (must agree with the `data.text`-direct path).
 fn adapter_semantic(body: &str) -> Result<vmz_compiler::SemanticIr, String> {
     let concrete = parse_template_concrete_body_primary(body).map_err(|e| e.render_plain())?;
     lower_concrete_to_semantic(&concrete).map_err(|e| e.render_plain())
@@ -25,15 +25,15 @@ fn adapter_semantic(body: &str) -> Result<vmz_compiler::SemanticIr, String> {
 
 /// Vue rejects the template, so both VMZ layers must fail with the same diagnostic.
 ///
-/// VMZ's Oak parser rejects malformed template syntax at the CST level with stable
-/// `oak::syntax` / `oak::expected_token` codes (see `vmz-oak-frontend-adapter::describe`).
+/// VMZ's `data.text` parser rejects malformed template syntax at the CST level with stable
+/// `text::syntax` / `text::expected_token` codes (see `vmz-text-frontend-adapter::describe`).
 /// We pin two invariants here:
-///   1. Both the Oak-direct and Concrete→Semantic paths reject the same body.
-///   2. The two paths surface the same **set** of Oak diagnostic kinds — parity is
+///   1. Both the `data.text`-direct and Concrete→Semantic paths reject the same body.
+///   2. The two paths surface the same **set** of `data.text` diagnostic kinds — parity is
 ///      tracked at the diagnostic-code level, not by Vue's human-readable message
 ///      (which VMZ intentionally leaves to catalog localization).
 fn assert_rejected(body: &str) {
-    let oak = oak_semantic(body).expect_err(&format!("oak accepted: {body}"));
+    let text = text_semantic(body).expect_err(&format!("text accepted: {body}"));
     let adapter = adapter_semantic(body).expect_err(&format!("adapter accepted: {body}"));
 
     let extract_codes = |rendered: &str| -> Vec<String> {
@@ -55,18 +55,18 @@ fn assert_rejected(body: &str) {
         v
     };
 
-    let oak_codes = extract_codes(&oak);
+    let text_codes = extract_codes(&text);
     let adapter_codes = extract_codes(&adapter);
 
     assert_eq!(
-        oak_codes, adapter_codes,
-        "oak vs adapter code mismatch for {body}\n  oak:     {oak}\n  adapter: {adapter}"
+        text_codes, adapter_codes,
+        "text vs adapter code mismatch for {body}\n  text:     {text}\n  adapter: {adapter}"
     );
 }
 
 /// Vue accepts the template, so both VMZ layers must parse it.
 fn assert_accepted(body: &str) {
-    oak_semantic(body).unwrap_or_else(|e| panic!("oak rejected: {body}: {e}"));
+    text_semantic(body).unwrap_or_else(|e| panic!("text rejected: {body}: {e}"));
     adapter_semantic(body).unwrap_or_else(|e| panic!("adapter rejected: {body}: {e}"));
 }
 
@@ -240,10 +240,10 @@ fn verbatim_v_pre_skips_interpolation() {
     use vmz_compiler::SemanticIr;
 
     let body = r#"<div v-pre>{{ x }}<span>{{ y }}</span></div>"#;
-    let oak = oak_semantic(body).expect("oak parse");
+    let text = text_semantic(body).expect("text parse");
     let adapter = adapter_semantic(body).expect("adapter parse");
 
-    for (label, semantic) in [("oak", oak), ("adapter", adapter)] {
+    for (label, semantic) in [("text", text), ("adapter", adapter)] {
         let SemanticIr { roots } = &semantic;
         let SemanticNode::Element { tag, props, children, .. } = &roots[0] else {
             panic!("{label}: expected root element");
@@ -273,7 +273,7 @@ fn verbatim_v_pre_skips_interpolation() {
 #[test]
 fn verbatim_v_pre_skips_directives() {
     let body = r#"<div v-pre :class="cls" @click="fn" v-if="ok"><span v-for="i in xs">{{ i }}</span></div>"#;
-    let semantic = oak_semantic(body).expect("oak parse");
+    let semantic = text_semantic(body).expect("text parse");
 
     let SemanticNode::Element { tag, props, children, .. } = &semantic.roots[0] else {
         panic!("expected root element");
@@ -296,7 +296,7 @@ fn verbatim_v_pre_skips_directives() {
 #[test]
 fn v_pre_does_not_affect_siblings_or_parent() {
     let body = r#"<p>{{ a }}</p><div v-pre>{{ b }}</div><span :title="t">{{ c }}</span>"#;
-    let semantic = oak_semantic(body).expect("oak parse");
+    let semantic = text_semantic(body).expect("text parse");
 
     // Three roots:
     // 1. <p>{{ a }}</p> — NORMAL, should have one Interpolation child
@@ -336,7 +336,7 @@ fn accepts_v_once() {
 #[test]
 fn rejects_v_once_with_argument_or_expression() {
     // Not a custom directive: `v-once:x` / `v-once="x"` are structured errors on both
-    // the Oak-direct and Concrete→Semantic paths.
+    // the `data.text`-direct and Concrete→Semantic paths.
     assert_rejected(r#"<div v-once:x>y</div>"#);
     assert_rejected(r#"<div v-once="x">y</div>"#);
 }
@@ -346,10 +346,10 @@ fn v_once_keeps_subtree_expressions_structured() {
     // Unlike `v-pre`, `v-once` freezes evaluation frequency, not parsing: the subtree keeps
     // its interpolations / bindings (validated and emitted once at create).
     let body = r#"<div v-once :title="t">{{ x }}<span>{{ y }}</span></div>"#;
-    let oak = oak_semantic(body).expect("oak parse");
+    let text = text_semantic(body).expect("text parse");
     let adapter = adapter_semantic(body).expect("adapter parse");
 
-    for (label, semantic) in [("oak", oak), ("adapter", adapter)] {
+    for (label, semantic) in [("text", text), ("adapter", adapter)] {
         let SemanticNode::Element { props, children, .. } = &semantic.roots[0] else {
             panic!("{label}: expected root element");
         };
@@ -381,7 +381,7 @@ fn accepts_v_memo() {
 #[test]
 fn rejects_v_memo_without_expression_or_with_argument() {
     // Not a custom directive: a bare `v-memo`, an empty value, an argument and a
-    // modifier are structured errors on both the Oak-direct and Concrete→Semantic paths.
+    // modifier are structured errors on both the `data.text`-direct and Concrete→Semantic paths.
     assert_rejected(r#"<div v-memo>y</div>"#);
     assert_rejected(r#"<div v-memo="">y</div>"#);
     assert_rejected(r#"<div v-memo:x="[a]">y</div>"#);
@@ -393,10 +393,10 @@ fn v_memo_keeps_dependency_array_and_subtree_bindings() {
     // The marker keeps the author expression as its value (emit builds the snapshot gate
     // from it) and does not consume the subtree: interpolations / bindings survive.
     let body = r#"<div v-memo="[a, b]" :title="t">{{ x }}<span>{{ y }}</span></div>"#;
-    let oak = oak_semantic(body).expect("oak parse");
+    let text = text_semantic(body).expect("text parse");
     let adapter = adapter_semantic(body).expect("adapter parse");
 
-    for (label, semantic) in [("oak", oak), ("adapter", adapter)] {
+    for (label, semantic) in [("text", text), ("adapter", adapter)] {
         let SemanticNode::Element { props, children, .. } = &semantic.roots[0] else {
             panic!("{label}: expected root element");
         };
@@ -572,7 +572,7 @@ fn expands_bind_same_name_shorthand() {
 }
 
 fn first_bind_expr(body: &str) -> String {
-    let semantic = oak_semantic(body).expect("semantic");
+    let semantic = text_semantic(body).expect("semantic");
     let SemanticNode::Element { props, .. } = &semantic.roots[0] else {
         panic!("expected element, got {:?}", semantic.roots[0]);
     };

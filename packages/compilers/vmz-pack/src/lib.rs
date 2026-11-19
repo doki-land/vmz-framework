@@ -4,7 +4,7 @@
 //! 发射）归 `compiler-bundle`；本 crate 只提供宿主侧的三件能力，并把它们
 //! 注入算法入口：
 //!
-//! - [`module`]：Oak TypeScript AST → 模块事实（`ModuleFactSource` 实现）。
+//! - [`module`]：`data.text` TypeScript AST → 模块事实（`ModuleFactSource` 实现）。
 //! - [`graph`] / [`emit`]：把只读源码端口与产物写出端口接到本地文件系统。
 //!
 //! 合同：模块图 → 符号/副作用活跃 → 多入口分包 → chunk/资源 manifest。

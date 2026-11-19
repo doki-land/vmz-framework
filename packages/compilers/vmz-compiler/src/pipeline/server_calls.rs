@@ -2,8 +2,8 @@
 //!
 //! Server view call edges (provenance).
 
-use oak_typescript::ast::{ClassMember, Expression, ExpressionKind, ObjectProperty, Statement};
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+use data_text_typescript::ast::{ClassMember, Expression, ExpressionKind, ObjectProperty, Statement};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 use vmz_types::ClientServerCall;
 
 /// Walk client script; return `(server_method, from_client_method)` for `ClassName.method(...)`.

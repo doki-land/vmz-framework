@@ -29,7 +29,7 @@ emit     chunk plan → JS text, file names, fingerprints, manifest, writes
 
 ## Non-goals
 
-- Regex-based module semantics: this crate consumes Oak syntax facts only
+- Regex-based module semantics: this crate consumes `data.text` syntax facts only
 - Claiming code splitting is complete while semantics remain conservative
 - Being a general-purpose bundler for other ecosystems
 

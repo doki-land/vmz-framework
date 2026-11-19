@@ -1,4 +1,4 @@
-//! Shared Oak `format` contract through the VMZ workspace adapter.
+//! Shared `data.text` `format` contract through the VMZ workspace adapter.
 
 use std::path::Path;
 

@@ -1,5 +1,5 @@
 mod engine;
-mod oak;
+mod text;
 mod rustfmt;
 mod style;
 mod walk;
@@ -19,7 +19,7 @@ pub struct FormatFileResult {
     pub output: String,
 }
 
-/// JS/TS extensions routed to the Oak formatter.
+/// JS/TS extensions routed to the `data.text` formatter.
 const JS_TS_EXTENSIONS: &[&str] = &["ts", "mts", "cts", "js", "mjs", "cjs", "jsx", "tsx"];
 
 /// Options for [`run_target_format`].
@@ -39,7 +39,7 @@ pub struct TargetFormatOptions {
     /// `Some(false)` rejects `.rs` targets. A `.rs` file passed directly is
     /// always an explicit opt-in.
     pub rust: Option<bool>,
-    /// Run the Oak formatter on JS/TS targets (default on).
+    /// Run the `data.text` formatter on JS/TS targets (default on).
     pub javascript: Option<bool>,
     /// Run the `.vmz` authoring formatter (default on).
     pub vmz: Option<bool>,
@@ -182,7 +182,7 @@ fn format_js_file(
     path: &Path,
     check: bool,
     report: &mut TargetFormatReport,
-    options: &oak_typescript::formatter::FormatOptions,
+    options: &data_text_typescript::formatter::FormatOptions,
 ) -> Result<()> {
     let source = fs::read_to_string(path).map_err(|err| format!("{}: {err}", path.display()))?;
     let result = match engine::format_source_with_options(path, &source, options.clone()) {

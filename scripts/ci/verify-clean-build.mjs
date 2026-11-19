@@ -47,7 +47,7 @@ if (!skipBuild) {
 }
 
 run('cargo', ['test', '-p', 'vmz-formatter', '--lib', 'aria_invalid_ternary', '--', '--nocapture']);
-run('cargo', ['test', '-p', 'vmz-generator', 'oak_parses_ternary', '--', '--nocapture']);
+run('cargo', ['test', '-p', 'vmz-generator', 'text_parses_ternary', '--', '--nocapture']);
 run('cargo', ['test', '-p', 'vmz-compiler', '--test', 'event_shell_check_unit', '--', '--nocapture']);
 run('pnpm', ['fmt:check']);
 

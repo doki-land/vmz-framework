@@ -6,11 +6,11 @@
 use std::collections::BTreeSet;
 use std::ops::Range;
 
-use oak_typescript::TypeScriptRoot;
-use oak_typescript::ast::{
+use data_text_typescript::TypeScriptRoot;
+use data_text_typescript::ast::{
     ClassMember, Expression, ExpressionKind, ImportSpecifier, ObjectProperty, Statement,
 };
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 use vmz_types::SecretRequirement;
 
 /// One hard client-domain secret / mock-provider finding.
@@ -71,11 +71,11 @@ fn is_secrets_module(source: &str) -> bool {
     source == "#server/secrets" || source.starts_with("#server/secrets/")
 }
 
-fn span(range: &oak_core::Range<usize>) -> Range<u32> {
+fn span(range: &data_text_core::Range<usize>) -> Range<u32> {
     range.start as u32..range.end as u32
 }
 
-fn source_span(range: &oak_core::Range<usize>, source: &str) -> Range<u32> {
+fn source_span(range: &data_text_core::Range<usize>, source: &str) -> Range<u32> {
     let mut end = range.end;
     while end > range.start && source.as_bytes().get(end - 1).is_some_and(u8::is_ascii_whitespace) {
         end -= 1;
@@ -214,7 +214,7 @@ impl SecretVisitor {
         }
     }
 
-    fn visit_import(&mut self, declaration: &oak_typescript::ast::ImportDeclaration) {
+    fn visit_import(&mut self, declaration: &data_text_typescript::ast::ImportDeclaration) {
         if !is_secrets_module(&declaration.module_specifier.value) {
             return;
         }
@@ -407,7 +407,7 @@ impl ClientBoundaryVisitor {
         }
     }
 
-    fn visit_import(&mut self, declaration: &oak_typescript::ast::ImportDeclaration) {
+    fn visit_import(&mut self, declaration: &data_text_typescript::ast::ImportDeclaration) {
         let source = declaration.module_specifier.value.as_str();
         if is_secrets_module(source) {
             self.push(
@@ -559,7 +559,7 @@ fn walk_expression(expression: &Expression, visit: &mut impl FnMut(&Expression))
         | ExpressionKind::JsxElement(_)
         | ExpressionKind::JsxFragment(_)
         | ExpressionKind::JsxSelfClosingElement(_) => {}
-        // Variants beyond the pinned Oak rev contribute no sub-expressions;
+        // Variants beyond the pinned `data.text` rev contribute no sub-expressions;
         // walk them explicitly when the pinned rev exposes them.
         _ => {}
     }
@@ -631,7 +631,7 @@ fn bare_callee_name(expression: &Expression, source: &str) -> Option<String> {
 fn first_string_arg(
     args: &[Expression],
     source: &str,
-    call_span: &oak_core::Range<usize>,
+    call_span: &data_text_core::Range<usize>,
 ) -> Option<String> {
     let raw = if let Some(expression) = args.first() {
         source.get(expression.span.start..expression.span.end)?.trim().to_string()

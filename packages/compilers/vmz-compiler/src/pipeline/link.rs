@@ -3,13 +3,13 @@
 //! `to` is a stable RouteId. Renaming a page file or changing `path` must not require
 //! editing Links; only RouteId rename (or class default-id change) does.
 //!
-//! Params object literals are parsed with Oak AST — no string-scan/splice for values.
+//! Params object literals are parsed with `data.text` AST — no string-scan/splice for values.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use oak_typescript::ast::{ExpressionKind, ObjectProperty, Statement};
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+use data_text_typescript::ast::{ExpressionKind, ObjectProperty, Statement};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
 use crate::sfc::{DataBlock, ParsedVmz};
 use crate::template::{AttrValue, TemplateIr, TemplateNode};
@@ -482,7 +482,7 @@ pub fn realize_path_pattern(
     if out.is_empty() { Ok("/".into()) } else { Ok(format!("/{}", out.join("/"))) }
 }
 
-/// Parse static string entries from a params object expression via Oak AST.
+/// Parse static string entries from a params object expression via `data.text` AST.
 /// Returns `None` when the expression is not a fully static object of string literals.
 pub fn parse_static_link_params(expr: &str) -> Option<BTreeMap<String, String>> {
     let trimmed = strip_outer_parens(expr.trim());

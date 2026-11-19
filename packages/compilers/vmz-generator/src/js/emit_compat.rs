@@ -1,4 +1,4 @@
-//! Client / server JS module assembly: Oak transpile + Direct emit + component meta.
+//! Client / server JS module assembly: `data.text` transpile + Direct emit + component meta.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
@@ -393,9 +393,9 @@ pub fn rewrite_virtual_import(
 
 /// Author may write `from './foo.ts'`; Node ESM under `dist/` needs `.js`.
 ///
-/// Uses Oak CST-level [`rewrite_module_specifiers`] so only the specifier string
+/// Uses `data.text` CST-level [`rewrite_module_specifiers`] so only the specifier string
 /// itself is replaced — other text on the same line (comments, literals) and
-/// dynamic `import("…")` calls included. When Oak cannot parse the module the
+/// dynamic `import("…")` calls included. When `data.text` cannot parse the module the
 /// source is returned unchanged rather than risk a text-level false positive.
 pub fn rewrite_ts_spec_imports(js: &str) -> String {
     let remap = |spec: &str| -> Option<String> {

@@ -326,7 +326,7 @@ export default class Demo {
 }
 
 #[test]
-fn oak_transpose_rewrites_numeric_indices_without_fallback() {
+fn text_transpose_rewrites_numeric_indices_without_fallback() {
     let source = r#"export default class Demo {
   swapRows() {
     const rows = this.rows.slice();
@@ -338,11 +338,11 @@ fn oak_transpose_rewrites_numeric_indices_without_fallback() {
     }
   }
 }"#;
-    let result = vmz_compiler::pipeline::write_barrier_oak::rewrite_list_transpose(
+    let result = vmz_compiler::pipeline::write_barrier_text::rewrite_list_transpose(
         source,
         &owned(&["rows"]),
     )
-    .expect("Oak parse");
+    .expect("`data.text` parse");
     assert_eq!(result.rewritten, 1, "{}", result.source);
     assert!(result.source.contains("__vmzListTranspose(this, \"rows\", 1, 998)"));
     assert!(!result.source.contains(".slice()"));

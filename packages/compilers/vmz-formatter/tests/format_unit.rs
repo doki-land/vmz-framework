@@ -1,4 +1,4 @@
-//! Unit tests for vmz-formatter (Oak CST formatting + EditorConfig + SFC assemble).
+//! Unit tests for vmz-formatter (`data.text` CST formatting + EditorConfig + SFC assemble).
 
 use std::fs;
 use std::path::PathBuf;
@@ -20,7 +20,7 @@ fn write(path: &std::path::Path, text: &str) {
 }
 
 #[test]
-fn formats_script_with_oak_keeps_comment() {
+fn formats_script_with_text_keeps_comment() {
     let dir = temp_dir("script");
     write(
         &dir.join(".editorconfig"),

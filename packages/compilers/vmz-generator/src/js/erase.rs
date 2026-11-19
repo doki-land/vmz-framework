@@ -1,13 +1,13 @@
-//! TypeScript type erasure over the Oak TypeScript lexer token stream.
+//! TypeScript type erasure over the `data.text` TypeScript lexer token stream.
 //!
-//! Oak's TypeScript parser does not materialize class member annotations,
+//! `data.text`'s TypeScript parser does not materialize class member annotations,
 //! parameter annotations or return types as CST/AST nodes, so those ranges
 //! cannot be removed through syntax-node spans. Erasure therefore runs on
 //! lexer tokens: it deletes type-only ranges and keeps every other source byte,
 //! which preserves formatting, comments and line numbering.
 
-use oak_core::{Lexer, NoLexerCache, SourceText};
-use oak_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
+use data_text_core::{Lexer, NoLexerCache, SourceText};
+use data_text_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
 
 /// A significant (non-trivia) lexer token.
 #[derive(Clone, Copy)]
@@ -84,7 +84,7 @@ pub fn erase_types_with_deletions(source: &str) -> Result<(String, Vec<(usize, u
     let lexer = TypeScriptLexer::new(&language);
     let mut cache = NoLexerCache;
     let lexed = lexer.lex(&text, &[], &mut cache);
-    let tokens = lexed.result.map_err(|error| format!("Oak TypeScript lexer failed: {error:?}"))?;
+    let tokens = lexed.result.map_err(|error| format!("`data.text` TypeScript lexer failed: {error:?}"))?;
     let mut significant = Vec::with_capacity(tokens.len());
     for token in tokens.iter() {
         if is_trivia(token.kind) {
@@ -94,7 +94,7 @@ pub fn erase_types_with_deletions(source: &str) -> Result<(String, Vec<(usize, u
             break;
         }
         if token.kind == T::Error {
-            return Err(format!("Oak TypeScript lexer rejected byte offset {}", token.span.start));
+            return Err(format!("`data.text` TypeScript lexer rejected byte offset {}", token.span.start));
         }
         significant.push(Token { kind: token.kind, start: token.span.start, end: token.span.end });
     }

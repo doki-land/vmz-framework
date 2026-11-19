@@ -1,10 +1,10 @@
-//! Analyze script bodies through Oak TypeScript AST.
+//! Analyze script bodies through `data.text` TypeScript AST.
 
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 use vmz_types::{ComponentDecl, SourceRange};
 
 use crate::field_rw::ForbiddenFactory;
-use crate::parse::analyze_oak::{component_decl_from_root, forbidden_factories_from_root};
+use crate::parse::analyze_text::{component_decl_from_root, forbidden_factories_from_root};
 use crate::sfc::ScriptKind;
 
 /// Script analysis result for one client or server body.
@@ -14,7 +14,7 @@ pub struct AnalyzedScript {
     pub kind: ScriptKind,
     /// Default-exported component declaration (Anonymous when missing).
     pub decl: ComponentDecl,
-    /// Oak parse diagnostics.
+    /// `data.text` parse diagnostics.
     pub parse_errors: Vec<String>,
     /// Forbidden factory calls found in this script.
     pub forbidden_factories: Vec<ForbiddenFactory>,
@@ -53,7 +53,7 @@ pub fn analyze_script(kind: ScriptKind, source: &str) -> AnalyzedScript {
             }
         }
     } else if parse_errors.is_empty() {
-        parse_errors.push("Oak TypeScript analysis failed".to_string());
+        parse_errors.push("`data.text` TypeScript analysis failed".to_string());
     }
     AnalyzedScript { kind, decl, parse_errors, forbidden_factories }
 }

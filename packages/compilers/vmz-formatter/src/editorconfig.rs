@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use oak_typescript::formatter::FormatOptions;
+use data_text_typescript::formatter::FormatOptions;
 
 /// Resolved EditorConfig (+ defaults) for one file.
 #[derive(Debug, Clone)]
@@ -61,13 +61,13 @@ impl EditorSettings {
         }
     }
 
-    /// Map into Oak `FormatOptions` for the JS/TS workspace path.
+    /// Map into `data.text` `FormatOptions` for the JS/TS workspace path.
     pub fn format_options(&self) -> FormatOptions {
         FormatOptions {
             indent_width: self.indent_width,
             line_width: self.line_width.map(usize::from).unwrap_or(144),
             type_erasure: false,
-            quote_style: oak_typescript::formatter::QuoteStyle::Preserve,
+            quote_style: data_text_typescript::formatter::QuoteStyle::Preserve,
         }
     }
 }

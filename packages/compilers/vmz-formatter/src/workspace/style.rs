@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use oak_typescript::formatter::{FormatOptions, QuoteStyle};
+use data_text_typescript::formatter::{FormatOptions, QuoteStyle};
 
 /// Default style aligned with the VMZ workspace contract.
 pub fn default_format_options() -> FormatOptions {
@@ -28,13 +28,13 @@ pub fn load_format_options(
 
     if value.pointer("/formatter/indentStyle").and_then(|v| v.as_str()) == Some("tab") {
         return Err(format!(
-            "{}: Oak format does not support tab indentation",
+            "{}: `data.text` format does not support tab indentation",
             biome_path.display()
         ));
     }
     if value.pointer("/javascript/formatter/quoteStyle").and_then(|v| v.as_str()) == Some("double")
     {
-        return Err(format!("{}: Oak format does not support double quotes", biome_path.display()));
+        return Err(format!("{}: `data.text` format does not support double quotes", biome_path.display()));
     }
 
     let indent_width = value

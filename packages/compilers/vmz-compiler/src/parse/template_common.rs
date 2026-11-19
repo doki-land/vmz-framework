@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use oak_typescript::ast::ExpressionKind;
-use vmz_oak_frontend_adapter::parse_expression_snippet;
+use data_text_typescript::ast::ExpressionKind;
+use vmz_text_frontend_adapter::parse_expression_snippet;
 
 /// Parse failure for Vue template syntax.
 ///
@@ -13,7 +13,7 @@ use vmz_oak_frontend_adapter::parse_expression_snippet;
 /// diagnostic catalog, never by the template parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateParseError {
-    /// Stable diagnostic code (`vmz::template::*`, or a forwarded `oak::*` code).
+    /// Stable diagnostic code (`vmz::template::*`, or a forwarded `text::*` code).
     pub code: &'static str,
     /// Catalog template arguments.
     pub args: BTreeMap<String, String>,

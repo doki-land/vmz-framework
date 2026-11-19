@@ -8,7 +8,7 @@ members = [
     "packages/compilers/vmz-debugger",
     "packages/compilers/vmz-inspector",
     "packages/compilers/vmz-formatter",
-    "packages/compilers/vmz-oak-frontend-adapter",
+    "packages/compilers/vmz-text-frontend-adapter",
     "packages/compilers/vmz-pack",
     "packages/compilers/vmz-artifacts",
     "packages/compilers/vmz-github",
@@ -26,7 +26,7 @@ license = "MIT"
 authors = ["VMZ Contributors"]
 repository = "https://github.com/vmz-framework/vmz-framework"
 rust-version = "1.95"
-# Oak frontend integration requires nightly (see `rust-toolchain.toml`).
+# The `data.text` frontend integration requires nightly (see `rust-toolchain.toml`).
 
 [workspace.dependencies]
 vmz-protocol = { path = "packages/compilers/vmz-protocol" }
@@ -40,15 +40,15 @@ vmz-inspector = { path = "packages/compilers/vmz-inspector" }
 vmz-formatter = { path = "packages/compilers/vmz-formatter" }
 vmz-plugin-tailwind = { path = "packages/compilers/vmz-plugin-tailwind" }
 vmz-plugin-sasso = { path = "packages/compilers/vmz-plugin-sasso" }
-vmz-oak-frontend-adapter = { path = "packages/compilers/vmz-oak-frontend-adapter" }
+vmz-text-frontend-adapter = { path = "packages/compilers/vmz-text-frontend-adapter" }
 vmz-pack = { path = "packages/compilers/vmz-pack" }
 
-# Oaks frontend (Vue SFC / CST). Git deps are pinned to a fixed `rev` so CI and
+# `data.text` frontend (Vue SFC / CST). Git deps are pinned to a fixed `rev` so CI and
 # local resolve the exact same commit.
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-oak-core = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "7c4c631967228daadde86a85da38c8617f149216" }
-oak-vue = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "7c4c631967228daadde86a85da38c8617f149216" }
-oak-typescript = { git = "https://github.com/yggdrasil-language/oaks.git", rev = "7c4c631967228daadde86a85da38c8617f149216" }
+data-text-core = { git = "https://github.com/oovm/rust-boost", rev = "37fee59efe65e8767f99dc0039a92fd797cedcb8" }
+data-text-vue = { git = "https://github.com/oovm/rust-boost", rev = "37fee59efe65e8767f99dc0039a92fd797cedcb8" }
+data-text-typescript = { git = "https://github.com/oovm/rust-boost", rev = "37fee59efe65e8767f99dc0039a92fd797cedcb8" }
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
@@ -62,9 +62,9 @@ yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "54e7196e7f176dbb3a7a38778a12982beada8b56" }
-boost-net = { git = "https://github.com/oovm/rust-boost", rev = "54e7196e7f176dbb3a7a38778a12982beada8b56" }
-compiler-bundle = { git = "https://github.com/oovm/rust-boost", rev = "54e7196e7f176dbb3a7a38778a12982beada8b56" }
+boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "37fee59efe65e8767f99dc0039a92fd797cedcb8" }
+boost-net = { git = "https://github.com/oovm/rust-boost", rev = "37fee59efe65e8767f99dc0039a92fd797cedcb8" }
+compiler-bundle = { git = "https://github.com/oovm/rust-boost", rev = "37fee59efe65e8767f99dc0039a92fd797cedcb8" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }

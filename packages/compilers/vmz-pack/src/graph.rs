@@ -1,7 +1,7 @@
-//! 模块图组装：把 Oak 事实与本地文件系统接到 `compiler-bundle` 的图算法上。
+//! 模块图组装：把 `data.text` 事实与本地文件系统接到 `compiler-bundle` 的图算法上。
 //!
 //! VMZ 侧保留 `build_graph(entries, target, root)` 形态的入口：事实来源固定
-//! 为本 crate 的 Oak 收集器，源码读取固定为本地文件系统。需要注入其它事实
+//! 为本 crate 的 `data.text` 收集器，源码读取固定为本地文件系统。需要注入其它事实
 //! 来源或远程快照的调用方直接消费 `compiler-bundle` 的端口化入口，不经过
 //! 本适配层。
 //!
@@ -17,10 +17,10 @@ use compiler_bundle::{ModuleFactSource, PackDiagnostic, StdSourceReader};
 
 pub use compiler_bundle::graph::*;
 
-/// Oak TypeScript 事实来源：本 crate 唯一的 `ModuleFactSource` 实现。
-struct OakFacts;
+/// `data.text` TypeScript 事实来源：本 crate 唯一的 `ModuleFactSource` 实现。
+struct ModuleFacts;
 
-impl ModuleFactSource for OakFacts {
+impl ModuleFactSource for ModuleFacts {
     fn parse_module(
         &self,
         label: Option<&str>,
@@ -58,7 +58,7 @@ pub fn build_graph_with_roots(
     origins: &HashMap<PathBuf, PathBuf>,
 ) -> ModuleGraph {
     compiler_bundle::graph::build_graph_with_roots(
-        &OakFacts,
+        &ModuleFacts,
         &StdSourceReader,
         entries,
         target,

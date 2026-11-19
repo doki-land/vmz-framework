@@ -1,8 +1,8 @@
 //! VMZ formatter: `.vmz` SFC authoring + explicit-target surfaces (JS/TS + per-file `rustfmt`).
 //!
 //! Final `.vmz` text exits through [`VmzDocument`]. `<template>` prints from the
-//! Semantic AST with Oak-formatted expressions. Script/style bodies go through
-//! Oak TypeScript and the VMZ CSS formatter. Format scope is always the explicit
+//! Semantic AST with `data.text`-formatted expressions. Script/style bodies go through
+//! `data.text` TypeScript and the VMZ CSS formatter. Format scope is always the explicit
 //! CLI path — never an implicit workspace walk.
 
 #![deny(missing_docs)]

@@ -1,5 +1,5 @@
-use vmz_compiler::oak::project_nyar_from_vmz;
-use vmz_oak_frontend_adapter::{NyarBindingKind, NyarImportKind, NyarMemberKind, NyarProgramRole};
+use vmz_compiler::text::project_nyar_from_vmz;
+use vmz_text_frontend_adapter::{NyarBindingKind, NyarImportKind, NyarMemberKind, NyarProgramRole};
 
 #[test]
 fn nyar_projection_maps_client_props_and_server_boundary() {
@@ -146,8 +146,8 @@ export default class Page {}
 }
 
 #[test]
-fn oak_static_import_collect_fills_module_specifier() {
-    use vmz_compiler::parse::analyze_oak::collect_static_imports_via_oak;
+fn text_static_import_collect_fills_module_specifier() {
+    use vmz_compiler::parse::analyze_text::collect_static_imports_via_text;
     use vmz_compiler::sfc::ScriptKind;
 
     let source = r#"
@@ -156,43 +156,43 @@ import type { T } from '@pkg/types';
 export { a } from './re';
 export default class Page {}
 "#;
-    let imports = collect_static_imports_via_oak(ScriptKind::Client, source);
+    let imports = collect_static_imports_via_text(ScriptKind::Client, source);
     assert!(
         imports.iter().any(|i| i.module_specifier == "./lib"),
-        "expected Oak path to fill module_specifier, got {imports:?}"
+        "expected `data.text` path to fill module_specifier, got {imports:?}"
     );
     assert!(
         imports.iter().any(|i| i.module_specifier == "@pkg/types" && i.is_type_only),
-        "expected type-only import via Oak, got {imports:?}"
+        "expected type-only import via `data.text`, got {imports:?}"
     );
     assert!(
         imports
             .iter()
             .any(|i| { i.kind == NyarImportKind::ExportFrom && i.module_specifier == "./re" }),
-        "expected Oak export-from, got {imports:?}"
+        "expected `data.text` export-from, got {imports:?}"
     );
 }
 
 #[test]
-fn oak_static_import_collect_ignores_at_in_comments_and_strings() {
-    use vmz_compiler::parse::analyze_oak::collect_static_imports_via_oak;
+fn text_static_import_collect_ignores_at_in_comments_and_strings() {
+    use vmz_compiler::parse::analyze_text::collect_static_imports_via_text;
     use vmz_compiler::sfc::ScriptKind;
 
     let source = "// @decorator is only a comment\nimport value from '@pkg/value';\nexport default class Page { label = '@label'; }";
-    let imports = collect_static_imports_via_oak(ScriptKind::Client, source);
+    let imports = collect_static_imports_via_text(ScriptKind::Client, source);
     assert_eq!(imports.len(), 1, "imports={imports:?}");
     assert_eq!(imports[0].module_specifier, "@pkg/value");
 }
 
 #[test]
-fn oak_button_surface_preserves_runtime_prop_defaults() {
-    use vmz_compiler::parse::analyze_oak::try_component_decl_via_oak;
+fn text_button_surface_preserves_runtime_prop_defaults() {
+    use vmz_compiler::parse::analyze_text::try_component_decl_via_text;
     use vmz_compiler::sfc::ScriptKind;
 
     let component = include_str!("../../../ui/vmz-ui/src/components/Button.vmz");
     let source =
         component.split("<script client>").nth(1).unwrap().split("</script>").next().unwrap();
-    let decl = try_component_decl_via_oak(ScriptKind::Client, source).expect("Button Oak surface");
+    let decl = try_component_decl_via_text(ScriptKind::Client, source).expect("Button `data.text` surface");
     for (name, expected) in
         [("type", "\"button\""), ("disabled", "false"), ("loading", "false"), ("onClick", "null")]
     {

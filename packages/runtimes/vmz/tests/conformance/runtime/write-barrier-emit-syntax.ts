@@ -2,7 +2,7 @@
  * Write barrier emission: rewritten expressions must stay parsable JavaScript.
  *
  * A concise arrow body such as `xhr.onabort = () => resolve({ aborted: true })`
- * is a statement whose Oak span includes the trailing `;`. Copying that slice
+ * is a statement whose `data.text` span includes the trailing `;`. Copying that slice
  * into the barrier call emitted `__vmzWritePath(this, "_xhr", ["onabort"], () =>
  * resolve({...});)` — a `;` inside the argument list and a missing `)`.
  *

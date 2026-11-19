@@ -1629,7 +1629,7 @@ pub struct FormatTargetsRunOptions {
     pub check: Option<bool>,
     /// Rust opt-in for directory targets / veto for `.rs` targets.
     pub rust: Option<bool>,
-    /// Run the Oak CST formatter on JS/TS targets.
+    /// Run the `data.text` CST formatter on JS/TS targets.
     pub javascript: Option<bool>,
     /// Run the `.vmz` authoring formatter.
     pub vmz: Option<bool>,

@@ -1,7 +1,7 @@
 //! Faithful `.vmz` reassembly: preserve router/meta/lang/attrs/block order.
 
 use vmz_compiler::{DataBlock, ParsedVmz, ScriptBlock, ScriptLanguage, StyleLanguage};
-use vmz_oak_frontend_adapter::{TemplateShellInput, format_cst_diagnostics, require_template_cst};
+use vmz_text_frontend_adapter::{TemplateShellInput, format_cst_diagnostics, require_template_cst};
 
 use crate::editorconfig::EditorSettings;
 use crate::template_print::format_template_body;
@@ -25,7 +25,7 @@ pub fn assemble_vmz(
     }
 
     let template_source = detent_envelope(&parsed.template.content);
-    // CST preflight — print goes through Oak Semantic.
+    // CST preflight — print goes through `data.text` Semantic.
     require_template_cst(&TemplateShellInput {
         content: parsed.template.content.clone(),
         content_start: parsed.template.content_start,

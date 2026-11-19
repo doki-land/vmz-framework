@@ -7,7 +7,7 @@ use crate::editorconfig::EditorSettings;
 use crate::script::format_script_block;
 use crate::style::format_style_block;
 
-/// Owned format document: envelope + template AST print + Oak script/style bodies.
+/// Owned format document: envelope + template AST print + `data.text` script/style bodies.
 ///
 /// Final `.vmz` text must exit only through [`VmzDocument::print`].
 pub struct VmzDocument<'a> {
@@ -21,7 +21,7 @@ impl<'a> VmzDocument<'a> {
         Self { parsed, settings }
     }
 
-    /// Format script/style with Oak and VMZ CSS, template via Semantic AST, then assemble envelope.
+    /// Format script/style with `data.text` and VMZ CSS, template via Semantic AST, then assemble envelope.
     pub fn print(self) -> Result<String, String> {
         let parsed = self.parsed;
         let settings = self.settings;
@@ -36,7 +36,7 @@ impl<'a> VmzDocument<'a> {
         } else {
             None
         };
-        // `assemble_vmz` formats `<template>` from Semantic AST with Oak expressions.
+        // `assemble_vmz` formats `<template>` from Semantic AST with `data.text` expressions.
         assemble_vmz(parsed, &client, server.as_deref(), style.as_deref(), settings)
     }
 }

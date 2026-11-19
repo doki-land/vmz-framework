@@ -96,7 +96,7 @@ fn class_default_route_id_survives_path_rename() {
 }
 
 #[test]
-fn oak_params_static_strings() {
+fn text_params_static_strings() {
     let p = parse_static_link_params("id: 'sku-1'").unwrap();
     assert_eq!(p.get("id").map(String::as_str), Some("sku-1"));
     assert_eq!(realize_path_pattern("/users/:id", &p).unwrap(), "/users/sku-1");

@@ -1,35 +1,35 @@
-//! Rewrite ESM module specifiers with Oak CST span patches.
+//! Rewrite ESM module specifiers with `data.text` CST span patches.
 
-use oak_core::{Lexer, NoLexerCache, SourceText};
-use oak_typescript::ast::{Expression, ExpressionKind, ModuleSpecifier, Statement};
-use oak_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+use data_text_core::{Lexer, NoLexerCache, SourceText};
+use data_text_typescript::ast::{Expression, ExpressionKind, ModuleSpecifier, Statement};
+use data_text_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
-/// Rewrite import, export-from, and dynamic-import module strings with Oak CST spans.
+/// Rewrite import, export-from, and dynamic-import module strings with `data.text` CST spans.
 ///
-/// Returns None when Oak cannot safely parse the module.
+/// Returns None when `data.text` cannot safely parse the module.
 pub fn rewrite_module_specifiers(
     source: &str,
     mut map: impl FnMut(&str) -> Option<String>,
 ) -> Option<String> {
-    rewrite_module_specifiers_via_oak(source, &mut map)
+    rewrite_module_specifiers_via_text(source, &mut map)
 }
 
 /// Collect import, export-from, and dynamic-import module specifiers without rewriting.
 ///
-/// Same Oak walk as [`rewrite_module_specifiers`], so the collected set always
-/// matches what a rewrite could reach. Returns None when Oak cannot safely
+/// Same `data.text` walk as [`rewrite_module_specifiers`], so the collected set always
+/// matches what a rewrite could reach. Returns None when `data.text` cannot safely
 /// parse the module.
 pub fn collect_module_specifiers(source: &str) -> Option<Vec<String>> {
     let mut out = Vec::new();
-    rewrite_module_specifiers_via_oak(source, &mut |spec| {
+    rewrite_module_specifiers_via_text(source, &mut |spec| {
         out.push(spec.to_string());
         None
     })?;
     Some(out)
 }
 
-/// Like [`rewrite_module_specifiers`], panicking when Oak cannot parse the module.
+/// Like [`rewrite_module_specifiers`], panicking when `data.text` cannot parse the module.
 pub fn rewrite_module_specifiers_required(
     source: &str,
     map: impl FnMut(&str) -> Option<String>,
@@ -43,7 +43,7 @@ pub fn rewrite_module_specifiers_required(
     })
 }
 
-fn rewrite_module_specifiers_via_oak(
+fn rewrite_module_specifiers_via_text(
     source: &str,
     map: &mut dyn FnMut(&str) -> Option<String>,
 ) -> Option<String> {
@@ -118,7 +118,7 @@ fn collect_stmt_spec_patches(
         }
         Statement::ClassDeclaration(c) => {
             for m in &c.body {
-                if let oak_typescript::ast::ClassMember::Method { body, .. } = m {
+                if let data_text_typescript::ast::ClassMember::Method { body, .. } = m {
                     for s in body {
                         collect_stmt_spec_patches(source, s, map, out);
                     }
@@ -140,7 +140,7 @@ fn collect_expr_spec_patches(
             push_expr_string_spec_patch(source, module_specifier, map, out);
         }
         ExpressionKind::CallExpression { func, args } => {
-            // Oaks lowers `import("…")` either as CallExpression(Identifier("import"), [lit])
+            // `data.text` lowers `import("…")` either as CallExpression(Identifier("import"), [lit])
             // or with the module string as the callee and zero args.
             if matches!(func.kind.as_ref(), ExpressionKind::Identifier(n) if n == "import") {
                 if let Some(first) = args.first() {
@@ -186,17 +186,17 @@ fn collect_expr_spec_patches(
         ExpressionKind::ObjectLiteral { properties } => {
             for p in properties {
                 match p {
-                    oak_typescript::ast::ObjectProperty::Property { value, .. } => {
+                    data_text_typescript::ast::ObjectProperty::Property { value, .. } => {
                         collect_expr_spec_patches(source, value, map, out);
                     }
                     // Method bodies are function statements; specifiers inside them
                     // still need rewriting, like `FunctionExpression`.
-                    oak_typescript::ast::ObjectProperty::Method { body, .. } => {
+                    data_text_typescript::ast::ObjectProperty::Method { body, .. } => {
                         for s in body {
                             collect_stmt_spec_patches(source, s, map, out);
                         }
                     }
-                    oak_typescript::ast::ObjectProperty::Spread(e) => {
+                    data_text_typescript::ast::ObjectProperty::Spread(e) => {
                         collect_expr_spec_patches(source, e, map, out);
                     }
                 }
@@ -274,7 +274,7 @@ fn push_specifier_patch(
 
 /// Locate the string-literal token that carries `spec` inside a declaration span.
 ///
-/// Works on Oak lexer tokens, so quotes inside comments or other literals in the
+/// Works on `data.text` lexer tokens, so quotes inside comments or other literals in the
 /// same span are never mistaken for the module specifier.
 fn find_specifier_string(
     source: &str,

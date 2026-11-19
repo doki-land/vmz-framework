@@ -1,7 +1,7 @@
-//! JavaScript artifact printing through Oak TypeScript parsing.
+//! JavaScript artifact printing through `data.text` TypeScript parsing.
 use super::erase::erase_types_with_deletions;
-use oak_core::{Lexer, NoLexerCache, SourceText};
-use oak_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
+use data_text_core::{Lexer, NoLexerCache, SourceText};
+use data_text_typescript::{TypeScriptLanguage, TypeScriptLexer, TypeScriptTokenType as T};
 use std::path::PathBuf;
 /// JS output.
 #[derive(Debug, Clone)]
@@ -45,22 +45,22 @@ pub struct SourceMapSegment {
     pub src_col: u32,
 }
 
-/// Parse and print a TypeScript source module with Oak type erasure.
+/// Parse and print a TypeScript source module with `data.text` type erasure.
 pub fn print_js_source(
     source: &str,
     filename: &str,
     options: &JsPrintOptions,
 ) -> Result<EmittedJs, String> {
-    let shell = vmz_oak_frontend_adapter::ScriptShellInput {
+    let shell = vmz_text_frontend_adapter::ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
-        role: vmz_oak_frontend_adapter::ScriptRole::Client,
+        role: vmz_text_frontend_adapter::ScriptRole::Client,
     };
-    let parsed = vmz_oak_frontend_adapter::parse_script_ast(&shell);
+    let parsed = vmz_text_frontend_adapter::parse_script_ast(&shell);
     if !parsed.ok {
         return Err(format!(
-            "Oak TypeScript parse failed: {}",
-            vmz_oak_frontend_adapter::format_cst_diagnostics(&parsed.diagnostics)
+            "`data.text` TypeScript parse failed: {}",
+            vmz_text_frontend_adapter::format_cst_diagnostics(&parsed.diagnostics)
         ));
     }
     let (formatted, deletions) = erase_types_with_deletions(source)?;
@@ -88,7 +88,7 @@ pub fn minify_source(source: &str) -> Result<(String, Vec<SourceMapSegment>), St
     minify_tokens(source, &[])
 }
 
-/// Minify from Oak lexer tokens, keeping string, template, regex and comment
+/// Minify from `data.text` lexer tokens, keeping string, template, regex and comment
 /// semantics intact.
 ///
 /// Boundaries: tokens are emitted as their original source slices (strings,
@@ -113,7 +113,7 @@ fn minify_tokens(
     let tokens = lexer
         .lex(&text, &[], &mut cache)
         .result
-        .map_err(|error| format!("Oak TypeScript lexer failed: {error:?}"))?;
+        .map_err(|error| format!("`data.text` TypeScript lexer failed: {error:?}"))?;
 
     let mut out = String::with_capacity(source.len());
     let mut line = 0u32;
@@ -130,7 +130,7 @@ fn minify_tokens(
             break;
         }
         if token.kind == T::Error {
-            return Err(format!("Oak TypeScript lexer rejected byte offset {}", token.span.start));
+            return Err(format!("`data.text` TypeScript lexer rejected byte offset {}", token.span.start));
         }
         for (start, end) in kept_fragments(token.span.start, token.span.end, deletions) {
             let fragment = &source[start..end];

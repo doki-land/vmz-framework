@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
-description = "VMZ authoring formatter: .vmz SFC + Oak TypeScript and CSS formatter + EditorConfig"
+description = "VMZ authoring formatter: .vmz SFC + `data.text` TypeScript and CSS formatter + EditorConfig"
 publish = false
 
 [dependencies]
@@ -15,6 +15,6 @@ serde.workspace = true
 serde_json.workspace = true
 json5.workspace = true
 vmz-compiler.workspace = true
-vmz-oak-frontend-adapter.workspace = true
-oak-typescript.workspace = true
+vmz-text-frontend-adapter.workspace = true
+data-text-typescript.workspace = true
 boost-fs.workspace = true

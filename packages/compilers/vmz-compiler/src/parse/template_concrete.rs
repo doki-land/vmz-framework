@@ -1,17 +1,17 @@
 //! Layer-1 Concrete Template AST — **deprecated adapter** (stage C).
 //!
-//! **Only path**: Oak Vue AST via [`super::template_oak::parse_template_layers_primary`].
+//! **Only path**: `data.text` Vue AST via [`super::template_text::parse_template_layers_primary`].
 //! This module remains only as:
-//! - IR shape shared by Oak lowering / Semantic / legacy TemplateIr
+//! - IR shape shared by `data.text` lowering / Semantic / legacy TemplateIr
 //! - shared attribute classification algebra ([`classify_concrete_attr`])
 //!
 //! # Feature freeze (hard)
 //!
-//! Do **not** extend this module with new Vue syntax. Gaps go to Oaks (`oak-vue`)
+//! Do **not** extend this module with new Vue syntax. Gaps go to `data.text` (`data-text-vue`)
 //! first; VMZ only adapts. Allowed changes: bugfixes that restore prior behavior,
-//! diagnostic clarity, and Oak classify helpers ([`classify_concrete_attr`]).
+//! diagnostic clarity, and `data.text` classify helpers ([`classify_concrete_attr`]).
 //!
-//! Expressions remain `String` here (`ExprPlan` is Oak-primary snippet ingress).
+//! Expressions remain `String` here (`ExprPlan` is `data.text`-primary snippet ingress).
 //! Downstream emit still consumes [`super::template::TemplateIr`] via
 //! [`super::template_lower`].
 
@@ -207,7 +207,7 @@ pub enum Directive {
 
 /// Classify one template attribute/directive name + value into [`ConcreteAttr`].
 ///
-/// Used by the Oak frontend adapter when lowering Oak Vue AST nodes.
+/// Used by the `data.text` frontend adapter when lowering `data.text` Vue AST nodes.
 pub fn classify_concrete_attr(
     name: &str,
     value: Option<&str>,

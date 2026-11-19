@@ -1,4 +1,4 @@
-//! `module` 模块事实层验收：源码 → `ModuleRecord` 只经 Oak TypeScript AST 建立，
+//! `module` 模块事实层验收：源码 → `ModuleRecord` 只经 `data.text` TypeScript AST 建立，
 //! 所有事实用 `&source[span.0..span.1]` 切片回到原文核对，不接受正则识别。
 
 use vmz_pack::PackDiagnostic;
@@ -25,7 +25,7 @@ fn ok(source: &str) -> vmz_pack::module::ModuleRecord {
 
 /// ① 普通值导入：default / named / namespace / 混合（含内联 `type` 绑定）。
 #[test]
-fn value_imports_are_collected_from_oak_ast() {
+fn value_imports_are_collected_from_template_ast() {
     let source = "import Def from './a.js';\nimport { REGISTRY, type IconDef } from './b.js';\nimport * as ns from './c.js';\nimport Def2, { x } from './d.js';";
     let record = ok(source);
     assert!(record.diagnostics.is_empty(), "{:?}", record.diagnostics);
@@ -39,7 +39,7 @@ fn value_imports_are_collected_from_oak_ast() {
     assert_eq!(def.bindings.len(), 1);
     assert_eq!(def.bindings[0].local, "Def");
     assert_eq!(def.bindings[0].imported, ImportedName::Default);
-    assert_eq!(def.bindings[0].span, None, "Oak AST 不携带 binding span");
+    assert_eq!(def.bindings[0].span, None, "`data.text` AST 不携带 binding span");
 
     let named = &record.imports[1];
     assert_eq!(named.specifier, "./b.js");
@@ -298,12 +298,12 @@ fn syntax_errors_return_diagnostics() {
     for diagnostic in &error {
         assert_eq!(diagnostic.code, "vmz::pack::module::parse_failed");
         assert_eq!(diagnostic.path.as_deref(), Some("broken.ts"));
-        assert!(diagnostic.span.is_some(), "Oak 诊断应带 span：{diagnostic:?}");
+        assert!(diagnostic.span.is_some(), "`data.text` 诊断应带 span：{diagnostic:?}");
         assert!(!diagnostic.message.is_empty());
     }
 }
 
-/// ⑨ 顶层 await（TLA）：由 Oak root 级 `top_level_await_spans` 正式事实驱动。
+/// ⑨ 顶层 await（TLA）：由 `data.text` root 级 `top_level_await_spans` 正式事实驱动。
 #[test]
 fn top_level_await_is_recorded() {
     let source = "await fetch('/x');\nconst later = await(1);";
@@ -497,7 +497,7 @@ fn type_reference_sets_flag_without_span() {
 /// `eval` 触发上游 incomplete：引用可能缺失，消费者必须拒绝任何绑定改名；
 /// 本层原样透传精确原因，不做名字匹配补洞。
 #[test]
-fn scope_incomplete_reasons_are_passed_through_from_oak() {
+fn scope_incomplete_reasons_are_passed_through_from_text() {
     let record = ok("const a = 1;\neval('a');\n");
     assert_eq!(
         record.scope_incomplete_reasons,

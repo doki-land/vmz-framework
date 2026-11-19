@@ -1,4 +1,4 @@
-//! Template expression dependencies through Oak, with a conservative lexical fallback.
+//! Template expression dependencies through `data.text`, with a conservative lexical fallback.
 
 use vmz_types::DepKey;
 
@@ -18,7 +18,7 @@ pub fn collect_template_dep_keys(expr: &str, fields: &[String], scope: &[String]
 /// Collect structured deps plus sibling class method / getter references.
 ///
 /// Expanding a referenced method's body reads stays with the caller: this layer
-/// only reports names. When Oak cannot lower the snippet the lexical fallback
+/// only reports names. When `data.text` cannot lower the snippet the lexical fallback
 /// still reports field keys but deliberately reports no method names, because
 /// the scanner cannot tell a method from a global.
 pub fn collect_template_dep_ctx(
@@ -31,7 +31,7 @@ pub fn collect_template_dep_ctx(
     if trimmed.is_empty() || (fields.is_empty() && methods.is_empty()) {
         return (Vec::new(), Vec::new());
     }
-    match super::oak_expr_ops::collect_template_deps_via_oak(trimmed, fields, scope, methods) {
+    match super::expr_ops::collect_template_deps_via_text(trimmed, fields, scope, methods) {
         Some(deps) => (deps.keys, deps.methods),
         None => {
             if fields.is_empty() {

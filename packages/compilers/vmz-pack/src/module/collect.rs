@@ -1,7 +1,7 @@
-//! 源码 → [`ModuleRecord`] 的收集器：只消费 Oak TypeScript AST，
+//! 源码 → [`ModuleRecord`] 的收集器：只消费 `data.text` TypeScript AST，
 //! 不做模块身份解析、链接与分包，也不引入任何正则模块语义识别。
 //!
-//! Oak 已实测的结构事实（决定下面的判定方式）：
+//! `data.text` 已实测的结构事实（决定下面的判定方式）：
 //! - 动态 `import(…)` 是正式 `ImportExpression` 节点，说明符是唯一子表达式，
 //!   不再靠空 `ImportDeclaration` 指纹或 span 间隙猜测。
 //! - `import.meta` 是正式 `MetaProperty` 节点，语句头同样按表达式语句给出。
@@ -19,15 +19,15 @@
 //!   `extends` 以 `TypeAnnotation::Reference { name: 原文 }` 承载运行时父类
 //!   引用。匿名 `export default class` 仍落为空名 `ClassDeclaration`。
 
-use vmz_oak_frontend_adapter::{
-    OakFrontendDiagnostic, ScriptRole, ScriptShellInput, parse_script_ast,
+use vmz_text_frontend_adapter::{
+    FrontendDiagnostic, ScriptRole, ScriptShellInput, parse_script_ast,
 };
 
-use oak_typescript::ast::{
+use data_text_typescript::ast::{
     ClassMember, ExportDeclaration, ExportSpecifier, Expression, ExpressionKind,
     ExpressionStatement, ImportSpecifier, ObjectProperty, Statement, TypeAnnotation, VariableKind,
 };
-use oak_typescript::scope::module_scope_facts;
+use data_text_typescript::scope::module_scope_facts;
 
 use crate::diag::PackDiagnostic;
 use compiler_bundle::module::{
@@ -44,13 +44,13 @@ const DYNAMIC_IMPORT_UNRESOLVED: &str = "vmz::pack::module::dynamic_import_unres
 const REQUIRE_NONLITERAL: &str = "vmz::pack::module::require_nonliteral";
 /// import 形态无法提取模块说明符（如 `import.meta`、残缺语句）。
 const IMPORT_WITHOUT_SPECIFIER: &str = "vmz::pack::module::import_without_specifier";
-/// Oak 无法给出完整语句事实（绑定名缺失、误解析形态等），
+/// `data.text` 无法给出完整语句事实（绑定名缺失、误解析形态等），
 /// 链接层必须按副作用保守保留。
 const STATEMENT_FACT_INCOMPLETE: &str = "vmz::pack::module::statement_fact_incomplete";
 
 /// 解析源码并收集模块事实。
 ///
-/// Oak 报告任何解析错误时返回 `Err`（每条 Oak 诊断映射为
+/// `data.text` 报告任何解析错误时返回 `Err`（每条 `data.text` 诊断映射为
 /// `vmz::pack::module::parse_failed`），不静默降级为部分事实；
 /// 成功时返回 [`ModuleRecord`]，非致命诊断在
 /// [`ModuleRecord::diagnostics`] 内。
@@ -62,48 +62,48 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
         content_start: 0,
         role: ScriptRole::Client,
     });
-    // 解析失败时 Oak 仍可能给出残缺 root，一律按失败处理。
+    // 解析失败时 `data.text` 仍可能给出残缺 root，一律按失败处理。
     let Some(root) = parsed.root.filter(|_| parsed.ok) else {
         return Err(parse_failure(path, &parsed.diagnostics));
     };
     let mut collector = Collector::new(path, source);
     collector.walk_stmts(&root.statements);
     collector.record_top(&root.statements);
-    // TLA 资格直接取 Oak root 级正式事实，不扫语句树、不猜测。
+    // TLA 资格直接取 `data.text` root 级正式事实，不扫语句树、不猜测。
     collector.record.flags.has_tla = root.has_top_level_await();
-    // scope 事实直接取 Oak 正式投影：builder 未开启类型擦除（默认关闭），
+    // scope 事实直接取 `data.text` 正式投影：builder 未开启类型擦除（默认关闭），
     // 值引用与遮蔽排除由上游保证；不完整原因逐字镜像透传，本层不做名字匹配补洞。
     let scope = module_scope_facts(&root);
     collector.record.scope_incomplete_reasons = scope
         .incomplete_reasons
         .into_iter()
         .map(|reason| match reason {
-            oak_typescript::scope::ScopeIncompleteReason::DirectEval => {
+            data_text_typescript::scope::ScopeIncompleteReason::DirectEval => {
                 ScopeIncompleteReason::DirectEval
             }
-            oak_typescript::scope::ScopeIncompleteReason::TemplateInterpolation => {
+            data_text_typescript::scope::ScopeIncompleteReason::TemplateInterpolation => {
                 ScopeIncompleteReason::TemplateInterpolation
             }
-            oak_typescript::scope::ScopeIncompleteReason::Jsx => ScopeIncompleteReason::Jsx,
-            oak_typescript::scope::ScopeIncompleteReason::AmbiguousMemberKey => {
+            data_text_typescript::scope::ScopeIncompleteReason::Jsx => ScopeIncompleteReason::Jsx,
+            data_text_typescript::scope::ScopeIncompleteReason::AmbiguousMemberKey => {
                 ScopeIncompleteReason::AmbiguousMemberKey
             }
-            oak_typescript::scope::ScopeIncompleteReason::Namespace => {
+            data_text_typescript::scope::ScopeIncompleteReason::Namespace => {
                 ScopeIncompleteReason::Namespace
             }
-            oak_typescript::scope::ScopeIncompleteReason::EmptyBindingName => {
+            data_text_typescript::scope::ScopeIncompleteReason::EmptyBindingName => {
                 ScopeIncompleteReason::EmptyBindingName
             }
-            oak_typescript::scope::ScopeIncompleteReason::ZeroWidthDeclarationSpan => {
+            data_text_typescript::scope::ScopeIncompleteReason::ZeroWidthDeclarationSpan => {
                 ScopeIncompleteReason::ZeroWidthDeclarationSpan
             }
-            oak_typescript::scope::ScopeIncompleteReason::DuplicateBinding => {
+            data_text_typescript::scope::ScopeIncompleteReason::DuplicateBinding => {
                 ScopeIncompleteReason::DuplicateBinding
             }
-            oak_typescript::scope::ScopeIncompleteReason::BindingSpanMismatch => {
+            data_text_typescript::scope::ScopeIncompleteReason::BindingSpanMismatch => {
                 ScopeIncompleteReason::BindingSpanMismatch
             }
-            oak_typescript::scope::ScopeIncompleteReason::TopLevelReturn => {
+            data_text_typescript::scope::ScopeIncompleteReason::TopLevelReturn => {
                 ScopeIncompleteReason::TopLevelReturn
             }
         })
@@ -127,8 +127,8 @@ pub fn parse_module(path: Option<&str>, source: &str) -> Result<ModuleRecord, Ve
     Ok(collector.record)
 }
 
-/// Oak 诊断 → 致命解析失败诊断。
-fn parse_failure(path: Option<&str>, diagnostics: &[OakFrontendDiagnostic]) -> Vec<PackDiagnostic> {
+/// `data.text` 诊断 → 致命解析失败诊断。
+fn parse_failure(path: Option<&str>, diagnostics: &[FrontendDiagnostic]) -> Vec<PackDiagnostic> {
     let mut failures: Vec<PackDiagnostic> = diagnostics
         .iter()
         .map(|d| {
@@ -144,7 +144,7 @@ fn parse_failure(path: Option<&str>, diagnostics: &[OakFrontendDiagnostic]) -> V
         .collect();
     if failures.is_empty() {
         let mut diagnostic =
-            PackDiagnostic::new(PARSE_FAILED, "Oak 未能构建脚本 AST 且没有诊断详情");
+            PackDiagnostic::new(PARSE_FAILED, "`data.text` 未能构建脚本 AST 且没有诊断详情");
         if let Some(path) = path {
             diagnostic = diagnostic.with_path(path);
         }
@@ -153,12 +153,12 @@ fn parse_failure(path: Option<&str>, diagnostics: &[OakFrontendDiagnostic]) -> V
     failures
 }
 
-/// Oak span → 字节区间。
+/// `data.text` span → 字节区间。
 fn range(span: core::range::Range<usize>) -> (usize, usize) {
     (span.start, span.end)
 }
 
-/// 声明语句引入的全部绑定名：多 declarator 与解构都按 Oak 的
+/// 声明语句引入的全部绑定名：多 declarator 与解构都按 `data.text` 的
 /// `binding_names` 展开，去重保序。
 fn declared_names(statement: &Statement) -> Vec<String> {
     if let Statement::VariableDeclaration(d) = statement {
@@ -184,7 +184,7 @@ fn declared_names(statement: &Statement) -> Vec<String> {
     if name.is_empty() { Vec::new() } else { vec![name.to_string()] }
 }
 
-/// 类型空间的导出声明（`export type Foo = string` 的声明级修饰符在 Oak 中
+/// 类型空间的导出声明（`export type Foo = string` 的声明级修饰符在 `data.text` 中
 /// 丢失，只能按声明种类补判）。
 fn is_type_declaration(statement: &Statement) -> bool {
     matches!(statement, Statement::TypeAlias(_) | Statement::Interface(_))
@@ -353,7 +353,7 @@ impl<'a> Collector<'a> {
         if incomplete {
             self.diagnostic(
                 STATEMENT_FACT_INCOMPLETE,
-                "Oak 无法给出该语句的完整事实，链接层按副作用保守保留",
+                "`data.text` 无法给出该语句的完整事实，链接层按副作用保守保留",
                 span,
             );
         }
@@ -387,7 +387,7 @@ impl<'a> Collector<'a> {
                 for declarator in &d.declarators {
                     match &declarator.value {
                         Some(value) => pure &= expr_pure(value),
-                        // `const x` 缺初值是语法错误（Oak 已带诊断），不再谎报事实缺口。
+                        // `const x` 缺初值是语法错误（`data.text` 已带诊断），不再谎报事实缺口。
                         None => {
                             return if matches!(d.kind, VariableKind::Const) {
                                 (StatementEffect::SideEffect, false)
@@ -520,7 +520,7 @@ impl<'a> Collector<'a> {
         (effect, incomplete)
     }
 
-    /// Oak 误解析指纹：表达式语句的表达式 span 与语句 span（去尾分号/空白）
+    /// `data.text` 误解析指纹：表达式语句的表达式 span 与语句 span（去尾分号/空白）
     /// 不重合，即语句里还有表达式未覆盖的原文（`for (…)`、`namespace` 等
     /// 被误建成残缺标识符/成员表达式的形态）。
     fn expression_statement_misparsed(&self, statement: &ExpressionStatement) -> bool {
@@ -763,7 +763,7 @@ impl<'a> Collector<'a> {
                 }
             }
             (Some(declaration), Some(source)) => {
-                // 兼容形态：若 Oak 仍以 declaration 承载命名空间重导出，按标识符取名。
+                // 兼容形态：若 `data.text` 仍以 declaration 承载命名空间重导出，按标识符取名。
                 let source_span =
                     if source.value.is_empty() { None } else { Some(range(source.span.clone())) };
                 if let Statement::ExpressionStatement(expression) = declaration.as_ref() {
@@ -970,7 +970,7 @@ fn expr_pure(expression: &Expression) -> bool {
             expr_pure(test) && expr_pure(consequent) && expr_pure(alternate)
         }
         ExpressionKind::UnaryExpression { operator, argument } => {
-            // Oak 实测：关键字后带空白的一元算子（含 `await x`、`delete o.k`）
+            // `data.text` 实测：关键字后带空白的一元算子（含 `await x`、`delete o.k`）
             // operator 被 trivia 覆盖为空格，与 `typeof`/`void` 同形不可区分，
             // 只有无空格形态留下真实算子文本；判不了即非纯。
             matches!(operator.as_str(), "typeof" | "void" | "!" | "-" | "+" | "~")

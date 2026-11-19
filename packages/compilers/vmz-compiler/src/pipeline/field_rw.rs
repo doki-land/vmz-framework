@@ -1,4 +1,4 @@
-//! Component factory restrictions and Oak template dependency collection.
+//! Component factory restrictions and `data.text` template dependency collection.
 
 use vmz_types::{DepKey, SourceRange};
 
@@ -51,7 +51,7 @@ pub fn is_forbidden_factory(name: &str) -> bool {
     FORBIDDEN_CREATE.contains(&name)
 }
 
-/// Template expression deps (Oak primary via generator).
+/// Template expression deps (`data.text` primary via generator).
 /// Emits stable DepKey strings: `user.name` (path) or `user` (field root).
 pub fn collect_template_deps(expr: &str, fields: &[String], scope: &[String]) -> Vec<String> {
     vmz_generator::js::collect_template_deps(expr, fields, scope)
@@ -64,7 +64,7 @@ pub fn collect_each_alias_prop_paths(expr: &str, as_name: &str) -> Vec<Vec<Strin
     if trimmed.is_empty() || as_name.is_empty() {
         return Vec::new();
     }
-    vmz_generator::js::collect_each_alias_prop_paths_via_oak(trimmed, as_name).unwrap_or_default()
+    vmz_generator::js::collect_each_alias_prop_paths_via_text(trimmed, as_name).unwrap_or_default()
 }
 
 /// Same as [`collect_template_deps`] but returns structured [`DepKey`]s.

@@ -1,6 +1,6 @@
-//! Format `<script>` bodies via Oak TypeScript.
+//! Format `<script>` bodies via `data.text` TypeScript.
 
-use oak_typescript::formatter::format_source as oak_format_source;
+use data_text_typescript::formatter::format_source as text_format_source;
 use vmz_compiler::{ScriptBlock, ScriptLanguage};
 
 use crate::editorconfig::EditorSettings;
@@ -12,7 +12,7 @@ pub fn format_script_block(
 ) -> Result<String, String> {
     match block.lang {
         ScriptLanguage::Ts => {
-            let formatted = oak_format_source(&block.content, &settings.format_options())
+            let formatted = text_format_source(&block.content, &settings.format_options())
                 .map_err(|error| error.to_string())?;
             Ok(normalize_body(&formatted, settings))
         }

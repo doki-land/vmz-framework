@@ -1,8 +1,8 @@
 //! SFC surface: split `.vmz`, template IR, script analysis.
 
 pub mod analyze;
-pub mod analyze_oak;
-pub mod field_rw_oak;
+pub mod analyze_text;
+pub mod field_rw_text;
 pub mod offset_index;
 pub mod rust_dsl;
 pub mod sfc;
@@ -12,7 +12,7 @@ pub mod template_concrete;
 pub(crate) mod template_const;
 pub mod template_ir;
 pub mod template_lower;
-pub mod template_oak;
+pub mod template_text;
 pub mod template_semantic;
 pub mod template_span;
 pub mod transpile;

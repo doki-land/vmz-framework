@@ -1,6 +1,6 @@
 // Diagram importer stubs — Mermaid / other DSLs → DiagramSpec.
 //
-// Full Mermaid parsing lives upstream (oak-mermaid / host). This module
+// Full Mermaid parsing lives upstream (data-text-mermaid / host). This module
 // is intentionally thin — host produces structured input, we accept it.
 
 import { EMPTY_DIAGNOSTICS, type DiagnosticSet } from "@doki-land/davinci-types";
@@ -21,7 +21,7 @@ export interface MermaidBlock {
  *  Currently accepts only manually-constructed specs. Full Mermaid
  *  parsing is host-scope. */
 export function parseMermaid(_block: MermaidBlock): { spec?: DiagramSpec; diagnostics: DiagnosticSet } {
-    // TODO: integrate oak-mermaid parser output.
+    // TODO: integrate data-text-mermaid parser output.
     return { diagnostics: EMPTY_DIAGNOSTICS };
 }
 

@@ -1,4 +1,4 @@
-//! JavaScript generation through Oak validation and source emitters.
+//! JavaScript generation through `data.text` validation and source emitters.
 mod deps;
 mod emit_compat;
 mod emit_direct;
@@ -8,8 +8,8 @@ pub mod expr_parse;
 pub mod helpers;
 mod locale;
 mod module_rewrite;
-mod oak_expr_ops;
-mod oak_expr_print;
+mod expr_ops;
+mod expr_print;
 mod print;
 mod row_kernel;
 mod transpile;
@@ -37,7 +37,7 @@ pub use locale::{
 pub use module_rewrite::{
     collect_module_specifiers, rewrite_module_specifiers, rewrite_module_specifiers_required,
 };
-pub use oak_expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_oak};
+pub use expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_text};
 pub use print::{
     EmittedJs, JsPrintOptions, SourceLines, SourceMapSegment, map_erased_offset, minify_source,
     print_js_source, source_map_json,

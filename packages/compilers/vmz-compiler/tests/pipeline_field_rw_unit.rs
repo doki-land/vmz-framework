@@ -1,11 +1,11 @@
-//! Oak-backed field read/write and template dependency contracts.
+//! `data.text`-backed field read/write and template dependency contracts.
 
-use oak_typescript::ast::{ClassMember, Statement};
+use data_text_typescript::ast::{ClassMember, Statement};
 use vmz_compiler::ScriptKind;
 use vmz_compiler::parse::analyze::analyze_script;
-use vmz_compiler::parse::field_rw_oak::OakFieldRw;
+use vmz_compiler::parse::field_rw_text::FieldRw;
 use vmz_compiler::pipeline::field_rw::*;
-use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, require_script_ast};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, require_script_ast};
 
 #[test]
 fn flags_use_and_create_factories() {
@@ -18,7 +18,7 @@ fn flags_use_and_create_factories() {
 #[test]
 fn tracks_this_field_write_and_read() {
     let src = "class C { async onMount() { this.user = await f(); this.tags.push(1); let x = this.user.name; this.user.bio = x; } }";
-    let mut rw = OakFieldRw::new(["user".into(), "tags".into()]);
+    let mut rw = FieldRw::new(["user".into(), "tags".into()]);
     walk_script(&mut rw, src);
     assert!(rw.writes.iter().any(|w| w == "user"), "writes={:?}", rw.writes);
     assert!(rw.writes.iter().any(|w| w == "tags"), "writes={:?}", rw.writes);
@@ -27,7 +27,7 @@ fn tracks_this_field_write_and_read() {
 }
 
 #[test]
-fn template_deps_oak_paths_and_scope() {
+fn template_deps_text_paths_and_scope() {
     let fields = vec!["user".into(), "count".into(), "tags".into()];
     let deps = collect_template_deps("!user || count", &fields, &[]);
     assert!(deps.contains(&"user".into()));
@@ -53,7 +53,7 @@ fn tracks_alias_member_read_and_write() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["user".into()]);
+    let mut rw = FieldRw::new(["user".into()]);
     walk_script(&mut rw, src);
     assert!(rw.reads.iter().any(|r| r == "user" || r == "user.name"), "reads={:?}", rw.reads);
     assert!(rw.reads.iter().any(|r| r == "user.name"), "reads={:?}", rw.reads);
@@ -71,7 +71,7 @@ fn tracks_nested_alias_and_object_destructure() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["user".into()]);
+    let mut rw = FieldRw::new(["user".into()]);
     walk_script(&mut rw, src);
     assert!(rw.reads.iter().any(|r| r == "user.profile"), "reads={:?}", rw.reads);
     assert!(rw.reads.iter().any(|r| r == "user.profile.name"), "reads={:?}", rw.reads);
@@ -87,7 +87,7 @@ fn tracks_direct_destructure_from_this() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["user".into()]);
+    let mut rw = FieldRw::new(["user".into()]);
     walk_script(&mut rw, src);
     assert!(rw.reads.iter().any(|r| r == "user.name"), "reads={:?}", rw.reads);
     assert!(rw.reads.iter().any(|r| r == "user.bio"), "reads={:?}", rw.reads);
@@ -103,7 +103,7 @@ fn local_rebind_does_not_write_field() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["user".into()]);
+    let mut rw = FieldRw::new(["user".into()]);
     walk_script(&mut rw, src);
     assert!(!rw.writes.iter().any(|w| w == "user.name"), "writes={:?}", rw.writes);
 }
@@ -119,7 +119,7 @@ fn tracks_this_method_calls() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["tags".into()]);
+    let mut rw = FieldRw::new(["tags".into()]);
     walk_script(&mut rw, src);
     assert!(rw.calls.iter().any(|c| c == "refresh"), "calls={:?}", rw.calls);
     assert!(rw.calls.iter().any(|c| c == "#load"), "calls={:?}", rw.calls);
@@ -140,7 +140,7 @@ fn marks_dynamic_this_callee_opaque() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["user".into()]);
+    let mut rw = FieldRw::new(["user".into()]);
     walk_script(&mut rw, src);
     assert!(rw.opaque_callee, "this[name]() must set opaque_callee");
     assert!(rw.calls.is_empty());
@@ -161,7 +161,7 @@ fn array_destructure_widens_with_reason() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["tags".into()]);
+    let mut rw = FieldRw::new(["tags".into()]);
     walk_script(&mut rw, src);
     assert!(
         rw.star_reasons.iter().any(|(f, r)| f == "tags" && r == "array_destructure"),
@@ -188,7 +188,7 @@ fn nested_arrow_captures_alias_into_owner() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::new(["user".into()]);
+    let mut rw = FieldRw::new(["user".into()]);
     walk_script(&mut rw, src);
     assert!(
         rw.writes.iter().any(|w| w == "user.name"),
@@ -215,7 +215,7 @@ fn records_getter_member_read_by_name() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::with_methods(["spec".into()], ["markup".into()]);
+    let mut rw = FieldRw::with_methods(["spec".into()], ["markup".into()]);
     walk_named_method(&mut rw, src, "render");
     assert_eq!(rw.member_reads, vec!["markup".to_string()]);
     assert!(rw.calls.is_empty(), "value read is not a call: {:?}", rw.calls);
@@ -224,7 +224,7 @@ fn records_getter_member_read_by_name() {
 
 #[test]
 fn reads_fields_inside_template_string_holes() {
-    // Oak's builder drops template-literal expressions (`argument: None`), so the
+    // `data.text`'s builder drops template-literal expressions (`argument: None`), so the
     // walker recovers the `${...}` holes from the statement source slice.
     let src = r#"
         export default class C {
@@ -251,7 +251,7 @@ fn dynamic_member_access_stays_conservative() {
           }
         }
     "#;
-    let mut rw = OakFieldRw::with_methods(["spec".into()], ["markup".into()]);
+    let mut rw = FieldRw::with_methods(["spec".into()], ["markup".into()]);
     walk_named_method(&mut rw, src, "pick");
     assert!(rw.member_reads.is_empty(), "this[key] must not resolve a member");
     assert!(rw.reads.is_empty(), "this[key] must not read a field: {:?}", rw.reads);
@@ -263,7 +263,7 @@ fn dynamic_member_access_stays_conservative() {
           }
         }
     "#;
-    let mut rw2 = OakFieldRw::with_methods(["spec".into()], ["markup".into()]);
+    let mut rw2 = FieldRw::with_methods(["spec".into()], ["markup".into()]);
     walk_named_method(&mut rw2, src2, "pick");
     assert!(rw2.member_reads.is_empty(), "reads={:?}", rw2.member_reads);
     assert!(rw2.reads.iter().any(|r| r == "spec.*"), "reads={:?}", rw2.reads);
@@ -286,13 +286,13 @@ fn getter_chain_composes_reads_and_terminates() {
     assert!(markup.reads.iter().any(|r| r == "data"), "reads={:?}", markup.reads);
 }
 
-fn walk_named_method(visitor: &mut OakFieldRw, source: &str, name: &str) {
+fn walk_named_method(visitor: &mut FieldRw, source: &str, name: &str) {
     let root = require_script_ast(&ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
         role: ScriptRole::Client,
     })
-    .expect("Oak must parse the method fixture");
+    .expect("`data.text` must parse the method fixture");
     for statement in &root.statements {
         if let Statement::ClassDeclaration(class) = statement {
             for member in &class.body {
@@ -306,13 +306,13 @@ fn walk_named_method(visitor: &mut OakFieldRw, source: &str, name: &str) {
     }
 }
 
-fn walk_script(visitor: &mut OakFieldRw, source: &str) {
+fn walk_script(visitor: &mut FieldRw, source: &str) {
     let root = require_script_ast(&ScriptShellInput {
         content: source.to_string(),
         content_start: 0,
         role: ScriptRole::Client,
     })
-    .expect("Oak must parse the original read/write fixture");
+    .expect("`data.text` must parse the original read/write fixture");
     for statement in &root.statements {
         if let Statement::ClassDeclaration(class) = statement {
             for member in &class.body {

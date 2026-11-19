@@ -1,6 +1,6 @@
-//! Shared template expression snippet ingress through Oak TypeScript.
+//! Shared template expression snippet ingress through `data.text` TypeScript.
 
-use vmz_oak_frontend_adapter::parse_expression_snippet;
+use vmz_text_frontend_adapter::parse_expression_snippet;
 
 /// Inclusive-start / exclusive-end UTF-8 byte range inside the trimmed snippet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +28,7 @@ pub fn template_expr_snippet_error(expr: &str) -> Option<String> {
     template_expr_snippet_error_with_span(expr).map(|(message, _)| message)
 }
 
-/// First Oak parse error plus its snippet-local span.
+/// First `data.text` parse error plus its snippet-local span.
 pub fn template_expr_snippet_error_with_span(expr: &str) -> Option<(String, SnippetSpan)> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
@@ -41,7 +41,7 @@ pub fn template_expr_snippet_error_with_span(expr: &str) -> Option<(String, Snip
     let diagnostic = parsed.diagnostics.first();
     let message = diagnostic
         .map(|diagnostic| diagnostic.render_plain())
-        .unwrap_or_else(|| "Oak TypeScript expression parse failed".to_string());
+        .unwrap_or_else(|| "`data.text` TypeScript expression parse failed".to_string());
     let span = diagnostic
         .and_then(|diagnostic| diagnostic.span)
         .map(|span| SnippetSpan { start: span.start as u32, end: span.end as u32 })
@@ -49,12 +49,12 @@ pub fn template_expr_snippet_error_with_span(expr: &str) -> Option<(String, Snip
     Some((message, span))
 }
 
-/// Whether the template expression snippet is accepted by Oak.
+/// Whether the template expression snippet is accepted by `data.text`.
 pub fn template_expr_snippet_ok(expr: &str) -> bool {
     template_expr_snippet_error(expr).is_none()
 }
 
-/// Root expression span inside the trimmed snippet when Oak accepts it.
+/// Root expression span inside the trimmed snippet when `data.text` accepts it.
 pub fn template_expr_root_span(expr: &str) -> Option<SnippetSpan> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
@@ -64,17 +64,17 @@ pub fn template_expr_root_span(expr: &str) -> Option<SnippetSpan> {
     parsed.root_span.map(|span| SnippetSpan { start: span.start as u32, end: span.end as u32 })
 }
 
-/// Canonical-print a template expression through the Oak expression printer.
+/// Canonical-print a template expression through the `data.text` expression printer.
 pub fn print_template_expr(expr: &str) -> Result<String, String> {
     let trimmed = expr.trim();
     if trimmed.is_empty() {
         return Ok(String::new());
     }
-    if let Some(output) = super::oak_expr_print::print_template_expr_via_oak(trimmed) {
+    if let Some(output) = super::expr_print::print_template_expr_via_text(trimmed) {
         return Ok(output);
     }
     Err(template_expr_snippet_error(trimmed)
-        .unwrap_or_else(|| "Oak TypeScript expression shape is unsupported".to_string()))
+        .unwrap_or_else(|| "`data.text` TypeScript expression shape is unsupported".to_string()))
 }
 
 #[cfg(test)]
@@ -94,9 +94,9 @@ mod tests {
     }
 
     #[test]
-    fn oak_accepts_member_with_local_span() {
-        let oak = parse_expression_snippet("tag.label");
-        assert!(oak.ok, "oak diags={:?}", oak.diagnostics);
+    fn text_accepts_member_with_local_span() {
+        let text = parse_expression_snippet("tag.label");
+        assert!(text.ok, "text diags={:?}", text.diagnostics);
         assert_eq!(template_expr_root_span("tag.label"), Some(SnippetSpan { start: 0, end: 9 }));
     }
 

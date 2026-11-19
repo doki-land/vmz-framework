@@ -167,9 +167,9 @@ class Client {
 }
 
 #[test]
-fn oak_ast_must_preserve_security_calls_in_object_initializers() {
-    use oak_typescript::ast::{ClassMember, ExpressionKind, ObjectProperty, Statement};
-    use vmz_oak_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+fn template_ast_must_preserve_security_calls_in_object_initializers() {
+    use data_text_typescript::ast::{ClassMember, ExpressionKind, ObjectProperty, Statement};
+    use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 
     let source = r#"
 import { secret as binding } from '#server/secrets';
@@ -187,7 +187,7 @@ class Client {
         role: ScriptRole::Client,
     });
     assert!(parsed.ok, "{:?}", parsed.diagnostics);
-    let root = parsed.root.expect("Oak must produce the complete security fixture root");
+    let root = parsed.root.expect("`data.text` must produce the complete security fixture root");
     let class = root
         .statements
         .iter()
@@ -212,7 +212,7 @@ class Client {
             }
             _ => None,
         })
-        .expect("Oak must not discard the object initializer containing secret/mock calls");
+        .expect("`data.text` must not discard the object initializer containing secret/mock calls");
     let ExpressionKind::ObjectLiteral { properties } = initializer.kind.as_ref() else {
         panic!("security initializer must remain an object literal: {initializer:?}");
     };

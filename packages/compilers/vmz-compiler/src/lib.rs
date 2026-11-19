@@ -1,4 +1,4 @@
-//! VMZ compiler: `.vmz` SFC + Oak analysis + Program Graph / Execution Plan + Workspace.
+//! VMZ compiler: `.vmz` SFC + `data.text` analysis + Program Graph / Execution Plan + Workspace.
 //!
 //! Text artifact printers live in **`vmz-generator`** (CodeGenerators). This crate
 //! orchestrates analyze → IR → `vmz_generator::*` → disk layout.
@@ -25,7 +25,7 @@ pub mod document;
 pub mod locale;
 pub mod miniprogram;
 pub mod native;
-pub mod oak;
+pub mod text;
 pub mod parse;
 pub mod pipeline;
 pub mod platform;
@@ -156,8 +156,8 @@ pub use template::{
     is_preformatted_tag, lower_concrete_to_ir, lower_concrete_to_semantic,
     lower_vue_root_to_semantic, parse_template, parse_template_asts,
     parse_template_concrete_body_primary, parse_template_concrete_primary,
-    parse_template_concrete_via_oak, parse_template_layers_primary,
-    parse_template_semantic_primary, parse_template_semantic_via_oak, semantic_ast_stats,
+    parse_template_concrete_via_text, parse_template_layers_primary,
+    parse_template_semantic_primary, parse_template_semantic_via_text, semantic_ast_stats,
     template_parse_to_diagnostic,
 };
 pub use tw::{

@@ -471,7 +471,7 @@ fn dynamic_edges_are_judged_per_call_site() {
     assert!(retained);
 }
 
-/// TLA 形态：`has_tla` 由 Oak root 级事实置位，链接层按非纯语句
+/// TLA 形态：`has_tla` 由 `data.text` root 级事实置位，链接层按非纯语句
 /// 保守保留该模块（TLA 资格事实供后续产物层决定异步边界）。
 #[test]
 fn tla_shaped_module_retained_without_new_diagnostics() {
@@ -488,7 +488,7 @@ fn tla_shaped_module_retained_without_new_diagnostics() {
     assert!(graph.diagnostics.is_empty(), "{:?}", graph.diagnostics);
 
     let tla = graph.index_of(&root.join("src/tla.js")).unwrap();
-    // 模块层按 Oak 正式事实置位 TLA、不报语句诊断。
+    // 模块层按 `data.text` 正式事实置位 TLA、不报语句诊断。
     assert!(graph.nodes[tla].record.flags.has_tla);
     assert!(graph.nodes[tla].record.diagnostics.is_empty());
 

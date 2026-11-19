@@ -9,8 +9,8 @@
 //! selection) and the Reactive module (no binding for a constant), so both
 //! artifacts agree on one rule set.
 
-use oak_typescript::ast::{Expression, ExpressionKind};
-use vmz_oak_frontend_adapter::parse_expression_snippet;
+use data_text_typescript::ast::{Expression, ExpressionKind};
+use vmz_text_frontend_adapter::parse_expression_snippet;
 
 /// Literal value the template compiler can decide at build time.
 #[derive(Debug, Clone, PartialEq)]
@@ -90,7 +90,7 @@ pub fn fold_const_expr(expr: &str) -> Option<ConstValue> {
     if trimmed.is_empty() {
         return None;
     }
-    // A hole-free template literal is a single token, and Oak only lowers the
+    // A hole-free template literal is a single token, and `data.text` only lowers the
     // interpolated form to an expression node. Reading the raw literal text is
     // not a second parser: it accepts one self-contained token or nothing.
     if let Some(text) = hole_free_template(trimmed) {
@@ -129,7 +129,7 @@ fn eval(src: &str, expr: &Expression) -> Option<ConstValue> {
 
 /// Unary operator token (`!`, `-`, `+`, `typeof`).
 ///
-/// Oak's unary builder takes the text of the *last* leaf, so `typeof 'a'` reports
+/// `data.text`'s unary builder takes the text of the *last* leaf, so `typeof 'a'` reports
 /// a bare space instead of the keyword. Fall back to the source slice between
 /// the expression start and the argument start, which is exactly the operator.
 fn unary_operator(src: &str, expr: &Expression, operator: &str, argument: &Expression) -> String {

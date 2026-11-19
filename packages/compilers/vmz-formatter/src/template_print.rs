@@ -1,6 +1,6 @@
-//! Print Semantic template AST as Vue author syntax with Oak expressions.
+//! Print Semantic template AST as Vue author syntax with `data.text` expressions.
 
-use oak_typescript::formatter::{FormatOptions, format_source};
+use data_text_typescript::formatter::{FormatOptions, format_source};
 use vmz_compiler::{
     Directive, DirectiveArg, SemanticIr, SemanticNode, SemanticProp, TemplateBlock, TemplateSpan,
     is_preformatted_tag, parse_template_semantic_primary,
@@ -8,9 +8,9 @@ use vmz_compiler::{
 
 use crate::editorconfig::EditorSettings;
 
-/// Format a `<template>` body via Oak layers Semantic → Vue print.
+/// Format a `<template>` body via `data.text` layers Semantic → Vue print.
 ///
-/// Expressions are normalized through Oak CST formatting.
+/// Expressions are normalized through `data.text` CST formatting.
 pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<String, String> {
     let block = TemplateBlock { content: body.to_string(), content_start: 0 };
     let semantic = parse_template_semantic_primary(&block).map_err(|e| e.render_plain())?;
@@ -18,7 +18,7 @@ pub fn format_template_body(body: &str, settings: &EditorSettings) -> Result<Str
 }
 
 /// Canonical expression text for Vue attr / interpolation slots.
-fn oak_expr(expr: &str) -> Result<String, String> {
+fn text_expr(expr: &str) -> Result<String, String> {
     format_source(expr.trim(), &FormatOptions::default())
         .map(|formatted| formatted.trim().to_owned())
         .map_err(|error| error.to_string())
@@ -26,7 +26,7 @@ fn oak_expr(expr: &str) -> Result<String, String> {
 
 /// Delimit a printed JS expression for a Vue/HTML attribute value.
 ///
-/// Oak formatting may prefer double-quoted string literals. Inside `attr="…"` that breaks
+/// `data.text` formatting may prefer double-quoted string literals. Inside `attr="…"` that breaks
 /// when the expression itself contains `"`. Prefer single-quoted attribute delimiters
 /// in that case (Vue author surface).
 fn delimit_vue_attr_value(printed: &str) -> String {
@@ -61,7 +61,7 @@ fn escape_js_double_quotes(s: &str) -> String {
 }
 
 fn vue_attr_assignment(expr: &str) -> Result<String, String> {
-    Ok(format!("={}", delimit_vue_attr_value(&oak_expr(expr)?)))
+    Ok(format!("={}", delimit_vue_attr_value(&text_expr(expr)?)))
 }
 
 fn print_semantic(
@@ -97,7 +97,7 @@ fn print_node(
         }
         SemanticNode::Interpolation { expr, .. } => {
             let pad = settings.indent_unit().repeat(depth);
-            let e = oak_expr(expr)?;
+            let e = text_expr(expr)?;
             lines.push(format!("{pad}{{{{ {e} }}}}"));
         }
         SemanticNode::Element { tag, props, children, span } => {
@@ -130,7 +130,7 @@ fn print_node(
             };
             let mut cf = vec![format!(
                 "v-for={}",
-                delimit_vue_attr_value(&format!("{alias} in {}", oak_expr(iterable)?))
+                delimit_vue_attr_value(&format!("{alias} in {}", text_expr(iterable)?))
             )];
             if let Some(k) = key {
                 cf.push(format!(":key{}", vue_attr_assignment(k)?));
@@ -160,7 +160,7 @@ fn print_node(
             let pad = settings.indent_unit().repeat(depth);
             let name_s = match name {
                 DirectiveArg::Static(s) => s.clone(),
-                DirectiveArg::Dynamic(e) => format!("[{}]", oak_expr(e)?),
+                DirectiveArg::Dynamic(e) => format!("[{}]", text_expr(e)?),
             };
             let mut open = format!("{pad}<template #{name_s}");
             if let Some(p) = slot_props {
@@ -327,7 +327,7 @@ fn format_props(props: &[SemanticProp]) -> Result<String, String> {
 fn format_arg(arg: &DirectiveArg) -> Result<String, String> {
     match arg {
         DirectiveArg::Static(n) => Ok(n.clone()),
-        DirectiveArg::Dynamic(e) => Ok(format!("[{}]", oak_expr(e)?)),
+        DirectiveArg::Dynamic(e) => Ok(format!("[{}]", text_expr(e)?)),
     }
 }
 
@@ -421,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn oak_expr_format_is_idempotent_inside_template() {
+    fn text_expr_format_is_idempotent_inside_template() {
         let src = r#"<p>{{ a+b }}</p>"#;
         let once = format_template_body(src, &settings()).unwrap();
         let twice = format_template_body(&once, &settings()).unwrap();

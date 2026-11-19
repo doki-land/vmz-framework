@@ -1,4 +1,4 @@
-//! TypeScript source transformation through Oak.
+//! TypeScript source transformation through `data.text`.
 use super::print::{EmittedJs, JsPrintOptions, print_js_source};
 use std::path::Path;
 /// Transpile output.

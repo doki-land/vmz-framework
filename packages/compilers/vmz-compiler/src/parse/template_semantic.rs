@@ -1,10 +1,10 @@
 //! Layer-2 Vue Semantic AST (Structured Template Semantics).
 //!
-//! **Primary ingress**: [`super::template_oak::parse_template_semantic_primary`]
-//! (Oak Vue AST → Semantic; attr classify may use [`ConcreteAttr`] algebra).
+//! **Primary ingress**: [`super::template_text::parse_template_semantic_primary`]
+//! (`data.text` Vue AST → Semantic; attr classify may use [`ConcreteAttr`] algebra).
 //!
 //! [`lower_concrete_to_semantic`] is the Concrete adapter used by
-//! [`super::template_oak::parse_template_layers_primary`] and layer tests. Oak direct
+//! [`super::template_text::parse_template_layers_primary`] and layer tests. `data.text` direct
 //! Semantic must not route through [`super::template_concrete::ConcreteIr`].
 //!
 //! Pipeline emit still goes through the legacy [`super::template_ir::TemplateIr`]
@@ -225,15 +225,15 @@ pub enum SemanticProp {
 
 /// Lower Concrete → Semantic (IfChain / ForNode / Bind·On plans; comments dropped).
 ///
-/// Concrete comes from Oak via [`super::template_oak::parse_template_concrete_primary`].
-/// [`super::template_oak::parse_template_semantic_primary`] walks Oak directly and must agree.
+/// Concrete comes from `data.text` via [`super::template_text::parse_template_concrete_primary`].
+/// [`super::template_text::parse_template_semantic_primary`] walks `data.text` directly and must agree.
 pub fn lower_concrete_to_semantic(concrete: &ConcreteIr) -> Result<SemanticIr, TemplateParseError> {
     let roots = lower_siblings(&concrete.roots)?;
     validate_root_slot_templates(&roots)?;
     Ok(SemanticIr { roots })
 }
 
-/// Control-flow kind on classified attrs (shared by Oak direct lower + Concrete adapter).
+/// Control-flow kind on classified attrs (shared by `data.text` direct lower + Concrete adapter).
 #[derive(Debug, Clone)]
 pub(crate) enum ControlFlowKind {
     /// `v-if`.
@@ -259,7 +259,7 @@ pub(crate) fn control_flow_kind(attrs: &[ConcreteAttr]) -> Option<ControlFlowKin
     None
 }
 
-/// Structure one element after children are already Semantic (Oak direct path).
+/// Structure one element after children are already Semantic (`data.text` direct path).
 ///
 /// `has_author_children` mirrors Vue's `children.length`: whitespace-only text is not a child,
 /// while comments and interpolations are. The lowered `children` list cannot answer that itself
@@ -997,7 +997,7 @@ fn lower_siblings_verbatim(
                 }
             }
             // Verbatim: `{{ x }}` must be kept as literal text including the mustache
-            // delimiters. Oak AST had the full source span here; Concrete only has
+            // delimiters. `data.text` AST had the full source span here; Concrete only has
             // the expression body, so we reconstruct `{{ expr }}`.
             ConcreteNode::Interpolation { expr, span } => {
                 let value = format!("{{{{ {} }}}}", expr);

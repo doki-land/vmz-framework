@@ -1,0 +1,996 @@
+//! `data.text`-backed stride write-barrier lowering.
+
+use std::collections::{HashMap, HashSet};
+
+use data_text_typescript::ast::{ClassMember, Expression, ExpressionKind, ObjectProperty, Statement};
+use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
+
+use super::write_barrier::WriteBarrierRewrite;
+
+const ARRAY_MUTATOR_NAMES: &[&str] =
+    &["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin"];
+
+#[derive(Debug, Clone)]
+enum BarrierKind {
+    Path { operator: String, rhs: std::ops::Range<usize> },
+    Update { operator: String },
+    Mutator { method: String, args: std::ops::Range<usize> },
+}
+
+/// Path segment within an owned field. Static segments come from dot access and
+/// render as string literals. Dynamic segments come from computed access and
+/// must render as live expressions — quoting them would freeze the source text
+/// (`this.cells[i]` must index by the runtime value of `i`, not the key `"i"`).
+#[derive(Debug, Clone)]
+enum Seg {
+    Static(String),
+    Dynamic(String),
+}
+
+impl Seg {
+    fn render(&self) -> String {
+        match self {
+            Seg::Static(name) => format!("{name:?}"),
+            Seg::Dynamic(expr) => expr.clone(),
+        }
+    }
+}
+
+fn render_path(segments: &[Seg]) -> String {
+    segments.iter().map(Seg::render).collect::<Vec<_>>().join(", ")
+}
+
+#[derive(Debug, Clone)]
+struct BarrierHit {
+    span: std::ops::Range<usize>,
+    root: String,
+    segments: Vec<Seg>,
+    kind: BarrierKind,
+}
+
+/// Rewrite ordinary owned writes through `data.text` AST spans.
+pub fn rewrite_static_path_writes(
+    source: &str,
+    owned_fields: &HashSet<String>,
+) -> Option<WriteBarrierRewrite> {
+    if owned_fields.is_empty() {
+        return Some(WriteBarrierRewrite { source: source.to_string(), rewritten: 0 });
+    }
+    let parsed = parse_script_ast(&ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    });
+    let root = parsed.root.as_ref().filter(|_| parsed.ok)?;
+    let mut aliases = HashMap::new();
+    let mut hits = Vec::new();
+    collect_statements(&root.statements, source, owned_fields, &mut aliases, &mut hits);
+    hits.sort_by_key(|hit| std::cmp::Reverse(hit.span.start));
+    let mut output = source.to_string();
+    for hit in &hits {
+        let replacement = render_barrier(source, hit);
+        output.replace_range(hit.span.clone(), &replacement);
+    }
+    Some(WriteBarrierRewrite { source: output, rewritten: hits.len() })
+}
+
+fn collect_statements(
+    statements: &[Statement],
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &mut HashMap<String, (String, Vec<Seg>)>,
+    hits: &mut Vec<BarrierHit>,
+) {
+    for statement in statements {
+        match statement {
+            Statement::VariableDeclaration(decl) => {
+                if let Some(value) = decl.value() {
+                    if let Some(path) = owned_path(value, owned, aliases, source)
+                        && decl.declarators.first().is_some_and(|d| d.pattern_text.is_none())
+                    {
+                        aliases.insert(decl.name().to_string(), path);
+                    }
+                    collect_expression(value, source, owned, aliases, hits);
+                }
+            }
+            Statement::ExpressionStatement(expr) => {
+                collect_expression(&expr.expression, source, owned, aliases, hits)
+            }
+            Statement::BlockStatement(block) => {
+                collect_statements(&block.statements, source, owned, aliases, hits)
+            }
+            Statement::ClassDeclaration(class) => {
+                for member in &class.body {
+                    if let ClassMember::Method { body, params, .. } = member {
+                        collect_function_body(params, body, source, owned, aliases, hits);
+                    }
+                }
+            }
+            Statement::FunctionDeclaration(function) => collect_function_body(
+                &function.params,
+                &function.body,
+                source,
+                owned,
+                aliases,
+                hits,
+            ),
+            Statement::ExportDeclaration(export) => {
+                if let Some(inner) = export.declaration.as_deref() {
+                    collect_statements(std::slice::from_ref(inner), source, owned, aliases, hits);
+                }
+            }
+            Statement::IfStatement(if_stmt) => {
+                collect_statement(&if_stmt.consequent, source, owned, aliases, hits);
+                if let Some(alternate) = if_stmt.alternate.as_deref() {
+                    collect_statement(alternate, source, owned, aliases, hits);
+                }
+            }
+            Statement::ForStatement(for_stmt) => {
+                if let Some(initializer) = &for_stmt.initializer {
+                    collect_statement(initializer, source, owned, aliases, hits);
+                }
+                if let Some(test) = &for_stmt.test {
+                    collect_expression(test, source, owned, aliases, hits);
+                }
+                if let Some(incrementor) = &for_stmt.incrementor {
+                    collect_expression(incrementor, source, owned, aliases, hits);
+                }
+                collect_statement(&for_stmt.body, source, owned, aliases, hits);
+            }
+            Statement::WhileStatement(while_stmt) => {
+                collect_expression(&while_stmt.test, source, owned, aliases, hits);
+                collect_statement(&while_stmt.body, source, owned, aliases, hits);
+            }
+            Statement::DoWhileStatement(do_stmt) => {
+                collect_statement(&do_stmt.body, source, owned, aliases, hits);
+                collect_expression(&do_stmt.test, source, owned, aliases, hits);
+            }
+            Statement::ForInStatement(for_in) => {
+                collect_statement(&for_in.left, source, owned, aliases, hits);
+                collect_expression(&for_in.right, source, owned, aliases, hits);
+                collect_statement(&for_in.body, source, owned, aliases, hits);
+            }
+            Statement::ForOfStatement(for_of) => {
+                collect_statement(&for_of.left, source, owned, aliases, hits);
+                collect_expression(&for_of.right, source, owned, aliases, hits);
+                collect_statement(&for_of.body, source, owned, aliases, hits);
+            }
+            Statement::SwitchStatement(switch_stmt) => {
+                collect_expression(&switch_stmt.discriminant, source, owned, aliases, hits);
+                for case in &switch_stmt.cases {
+                    if let Some(test) = &case.test {
+                        collect_expression(test, source, owned, aliases, hits);
+                    }
+                    collect_statements(&case.consequent, source, owned, aliases, hits);
+                }
+            }
+            Statement::TryStatement(try_stmt) => {
+                collect_statements(&try_stmt.block, source, owned, aliases, hits);
+                if let Some(handler) = &try_stmt.handler {
+                    collect_statements(&handler.body, source, owned, aliases, hits);
+                }
+                if let Some(finalizer) = &try_stmt.finalizer {
+                    collect_statements(finalizer, source, owned, aliases, hits);
+                }
+            }
+            Statement::ReturnStatement(ret) => {
+                if let Some(argument) = &ret.argument {
+                    collect_expression(argument, source, owned, aliases, hits);
+                }
+            }
+            Statement::ThrowStatement(throw_stmt) => {
+                collect_expression(&throw_stmt.argument, source, owned, aliases, hits)
+            }
+            _ => {}
+        }
+    }
+}
+
+fn collect_statement(
+    statement: &Statement,
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &mut HashMap<String, (String, Vec<Seg>)>,
+    hits: &mut Vec<BarrierHit>,
+) {
+    collect_statements(std::slice::from_ref(statement), source, owned, aliases, hits);
+}
+
+/// Collect a function body in its own alias scope.
+///
+/// Aliases are discovered per script, so a `const xhr = this._xhr` in one class
+/// method would otherwise leak into unrelated module-level functions. A
+/// parameter named `xhr` in `function xhrSend(xhr)` shadows that alias and the
+/// function is not a component method — rewriting its writes to
+/// `this.constructor.__vmzWritePath` emits code that throws at runtime.
+fn collect_function_body(
+    params: &[data_text_typescript::ast::FunctionParam],
+    body: &[Statement],
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &HashMap<String, (String, Vec<Seg>)>,
+    hits: &mut Vec<BarrierHit>,
+) {
+    let mut scoped = aliases.clone();
+    for param in params {
+        for name in &param.binding_names {
+            scoped.remove(name);
+        }
+    }
+    // Default values are evaluated in the function scope, so `(xhr = this._xhr)`
+    // re-binds the parameter name to the owned path instead of shadowing it.
+    for param in params {
+        let Some(default) = &param.default else { continue };
+        collect_expression(default, source, owned, &mut scoped, hits);
+        if param.pattern_text.is_none()
+            && !param.name.is_empty()
+            && let Some(path) = owned_path(default, owned, &scoped, source)
+        {
+            scoped.insert(param.name.clone(), path);
+        }
+    }
+    collect_statements(body, source, owned, &mut scoped, hits);
+}
+
+fn collect_expression(
+    expression: &Expression,
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &mut HashMap<String, (String, Vec<Seg>)>,
+    hits: &mut Vec<BarrierHit>,
+) {
+    match expression.kind.as_ref() {
+        ExpressionKind::AssignmentExpression { left, operator, right } => {
+            if let Some((root, segments)) = owned_path(left, owned, aliases, source)
+                && !segments.is_empty()
+            {
+                // A concise arrow body (`() => resolve({ ... })`) is parsed as a
+                // statement, so `data.text`'s span for the right-hand expression (and
+                // for the enclosing assignment) includes the statement `;`.
+                // Copying that slice verbatim puts the `;` inside the emitted
+                // call and leaves the call with no closing `)`.
+                let rhs = trim_statement_end(source, right.span.clone().into());
+                hits.push(BarrierHit {
+                    span: expression.span.start..rhs.end,
+                    root,
+                    segments,
+                    kind: BarrierKind::Path { operator: operator.clone(), rhs },
+                });
+            }
+            collect_expression(right, source, owned, aliases, hits);
+        }
+        ExpressionKind::UpdateExpression { operator, argument, .. } => {
+            // Root field updates (`++this.count`) stay plain JS: the field setter
+            // reports the write, same as `this.count = this.count + 1`. Lowering
+            // them here would emit an empty path, which the runtime rejects.
+            if let Some((root, segments)) = owned_path(argument, owned, aliases, source)
+                && !segments.is_empty()
+            {
+                hits.push(BarrierHit {
+                    span: expression.span.clone().into(),
+                    root,
+                    segments,
+                    kind: BarrierKind::Update { operator: operator.clone() },
+                });
+            }
+        }
+        ExpressionKind::CallExpression { func, args } => {
+            if let Some((object, method)) = static_member(func)
+                && ARRAY_MUTATOR_NAMES.contains(&method.as_str())
+                && let Some((root, segments)) = owned_path(object, owned, aliases, source)
+            {
+                let args = if let (Some(first), Some(last)) = (args.first(), args.last()) {
+                    trim_statement_end(source, first.span.start..last.span.end)
+                } else {
+                    0..0
+                };
+                let span = trim_statement_end(source, expression.span.clone().into());
+                hits.push(BarrierHit {
+                    span,
+                    root,
+                    segments,
+                    kind: BarrierKind::Mutator { method, args },
+                });
+            }
+            collect_expression(func, source, owned, aliases, hits);
+            for arg in args {
+                collect_expression(arg, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::MemberExpression { object, property, computed, .. } => {
+            collect_expression(object, source, owned, aliases, hits);
+            if *computed {
+                collect_expression(property, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::BinaryExpression { left, right, .. } => {
+            collect_expression(left, source, owned, aliases, hits);
+            collect_expression(right, source, owned, aliases, hits);
+        }
+        ExpressionKind::ConditionalExpression { test, consequent, alternate } => {
+            collect_expression(test, source, owned, aliases, hits);
+            collect_expression(consequent, source, owned, aliases, hits);
+            collect_expression(alternate, source, owned, aliases, hits);
+        }
+        // Writes inside callbacks/timers still need the barrier: the promise
+        // `.then` / `setTimeout` body runs after the event, but the component is
+        // still a WriteBarrier one, so a bare nested write never reports.
+        ExpressionKind::ArrowFunction { body, params, .. } => collect_function_body(
+            params,
+            std::slice::from_ref(body.as_ref()),
+            source,
+            owned,
+            aliases,
+            hits,
+        ),
+        ExpressionKind::FunctionExpression { body, params, .. } => {
+            collect_function_body(params, body, source, owned, aliases, hits)
+        }
+        ExpressionKind::AsExpression { expression, .. }
+        | ExpressionKind::SatisfiesExpression { expression, .. }
+        | ExpressionKind::TypeAssertionExpression { expression, .. }
+        | ExpressionKind::NonNullExpression(expression) => {
+            collect_expression(expression, source, owned, aliases, hits)
+        }
+        ExpressionKind::SequenceExpression(items) => {
+            for item in items {
+                collect_expression(item, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::NewExpression { func, args } => {
+            collect_expression(func, source, owned, aliases, hits);
+            for arg in args {
+                collect_expression(arg, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::ObjectLiteral { properties } => {
+            for property in properties {
+                match property {
+                    ObjectProperty::Property { value, .. } | ObjectProperty::Spread(value) => {
+                        collect_expression(value, source, owned, aliases, hits);
+                    }
+                    ObjectProperty::Method { body, params, .. } => {
+                        collect_function_body(params, body, source, owned, aliases, hits);
+                    }
+                }
+            }
+        }
+        ExpressionKind::ArrayLiteral { elements } => {
+            for element in elements {
+                collect_expression(element, source, owned, aliases, hits);
+            }
+        }
+        ExpressionKind::UnaryExpression { argument, .. }
+        | ExpressionKind::AwaitExpression(argument)
+        | ExpressionKind::SpreadElement(argument) => {
+            collect_expression(argument, source, owned, aliases, hits)
+        }
+        _ => {}
+    }
+}
+
+fn static_member(expression: &Expression) -> Option<(&Expression, String)> {
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
+        expression.kind.as_ref()
+    else {
+        return None;
+    };
+    Some((object, ident(property)?.to_string()))
+}
+
+fn owned_path(
+    expression: &Expression,
+    owned: &HashSet<String>,
+    aliases: &HashMap<String, (String, Vec<Seg>)>,
+    source: &str,
+) -> Option<(String, Vec<Seg>)> {
+    match expression.kind.as_ref() {
+        ExpressionKind::Identifier(name) => aliases.get(name).cloned(),
+        ExpressionKind::MemberExpression { object, property, computed, .. } => {
+            let (root, mut segments) =
+                if let Some(path) = owned_path(object, owned, aliases, source) {
+                    path
+                } else if ident(object) == Some("this")
+                    && !*computed
+                    && let Some(field) = ident(property)
+                    && owned.contains(field)
+                {
+                    return Some((field.to_string(), Vec::new()));
+                } else {
+                    return None;
+                };
+            let segment = if *computed {
+                Seg::Dynamic(source.get(property.span.clone())?.trim().to_string())
+            } else {
+                Seg::Static(ident(property)?.to_string())
+            };
+            segments.push(segment);
+            Some((root, segments))
+        }
+        _ => None,
+    }
+}
+
+/// Trim trailing statement terminators and whitespace from an expression span.
+///
+/// `data.text` parses a concise arrow body (`x => expr`) as a statement, so its span —
+/// and the span of the assignment that owns it — can extend past the `;`.
+fn trim_statement_end(source: &str, span: std::ops::Range<usize>) -> std::ops::Range<usize> {
+    let mut end = span.end.min(source.len());
+    while end > span.start {
+        let byte = source.as_bytes()[end - 1];
+        if byte.is_ascii_whitespace() || byte == b';' {
+            end -= 1;
+        } else {
+            break;
+        }
+    }
+    span.start..end
+}
+
+fn render_barrier(source: &str, hit: &BarrierHit) -> String {
+    let path = render_path(&hit.segments);
+    match &hit.kind {
+        BarrierKind::Path { operator, rhs } => {
+            let rhs = source.get(rhs.clone()).unwrap_or_default().trim();
+            // Array item leaf write (`rows[i].label`) — only a computed index
+            // followed by a dot leaf is an array item; `user.address.city`
+            // (two static segments) is an object path and stays on the
+            // generic write path.
+            if let [Seg::Dynamic(index), Seg::Static(leaf)] = &hit.segments[..] {
+                let item = match operator.as_str() {
+                    "=" => Some(format!(
+                        "this.constructor.__vmzWritePathItem(this, {:?}, {}, {:?}, {})",
+                        hit.root, index, leaf, rhs
+                    )),
+                    "+=" | "-=" | "*=" | "/=" | "%=" => Some(format!(
+                        "this.constructor.__vmzWritePathCompoundItem(this, {:?}, {}, {:?}, {:?}, {})",
+                        hit.root,
+                        index,
+                        leaf,
+                        &operator[..operator.len() - 1],
+                        rhs
+                    )),
+                    _ => None,
+                };
+                if let Some(item) = item {
+                    return item;
+                }
+            }
+            match operator.as_str() {
+                "=" => format!(
+                    "this.constructor.__vmzWritePath(this, {:?}, [{}], {})",
+                    hit.root, path, rhs
+                ),
+                "+=" | "-=" | "*=" | "/=" | "%=" => format!(
+                    "this.constructor.__vmzWritePathCompound(this, {:?}, [{}], {:?}, {})",
+                    hit.root,
+                    path,
+                    &operator[..operator.len() - 1],
+                    rhs
+                ),
+                "||=" | "&&=" | "??=" => format!(
+                    "this.constructor.__vmzWritePathLogical(this, {:?}, [{}], {:?}, {})",
+                    hit.root,
+                    path,
+                    &operator[..operator.len() - 1],
+                    rhs
+                ),
+                _ => source.get(hit.span.clone()).unwrap_or_default().to_string(),
+            }
+        }
+        BarrierKind::Update { operator } => format!(
+            "this.constructor.__vmzWritePathCompound(this, {:?}, [{}], {:?}, 1)",
+            hit.root,
+            path,
+            if operator == "++" { "+" } else { "-" }
+        ),
+        BarrierKind::Mutator { method, args } => {
+            // The runtime takes `args` as one array parameter — trailing bare
+            // arguments would collapse into a single non-array value and the
+            // mutator would run with an empty argument list.
+            let args = if args.is_empty() {
+                "[]".to_string()
+            } else {
+                format!("[{}]", source.get(args.clone()).unwrap_or_default().trim())
+            };
+            format!(
+                "this.constructor.__vmzArrayMutate(this, {:?}, [{}], {:?}, {})",
+                hit.root, path, method, args
+            )
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StrideHit {
+    full: std::ops::Range<usize>,
+    root: String,
+    leaf: String,
+    operator: String,
+    rhs: String,
+    start: String,
+    step: String,
+}
+
+/// Rewrite stride loops through `data.text` AST spans.
+pub fn rewrite_array_item_strides(
+    source: &str,
+    owned_fields: &HashSet<String>,
+) -> Option<WriteBarrierRewrite> {
+    if owned_fields.is_empty() {
+        return Some(WriteBarrierRewrite { source: source.to_string(), rewritten: 0 });
+    }
+    let parsed = parse_script_ast(&ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    });
+    let root = parsed.root.as_ref().filter(|_| parsed.ok)?;
+    let mut aliases = HashMap::new();
+    let mut hits = Vec::new();
+    walk_statements(&root.statements, source, owned_fields, &mut aliases, &mut hits);
+    hits.sort_by_key(|hit| std::cmp::Reverse(hit.full.start));
+    let mut output = source.to_string();
+    for hit in &hits {
+        let replacement = format!(
+            "this.constructor.__vmzArrayItemCompoundStride(this, {root:?}, {leaf:?}, {operator:?}, {rhs}, {start}, {step})",
+            root = hit.root,
+            leaf = hit.leaf,
+            operator = hit.operator,
+            rhs = hit.rhs,
+            start = hit.start,
+            step = hit.step,
+        );
+        output.replace_range(hit.full.clone(), &replacement);
+    }
+    Some(WriteBarrierRewrite { source: output, rewritten: hits.len() })
+}
+
+/// Rewrite the idiomatic copy-and-swap list pattern through `data.text` AST spans.
+pub fn rewrite_list_transpose(
+    source: &str,
+    owned_fields: &HashSet<String>,
+) -> Option<WriteBarrierRewrite> {
+    if owned_fields.is_empty() {
+        return Some(WriteBarrierRewrite { source: source.to_string(), rewritten: 0 });
+    }
+    let parsed = parse_script_ast(&ScriptShellInput {
+        content: source.to_string(),
+        content_start: 0,
+        role: ScriptRole::Client,
+    });
+    let root = parsed.root.as_ref().filter(|_| parsed.ok)?;
+    let mut hits = Vec::new();
+    collect_transpose_statements(&root.statements, source, owned_fields, &mut hits);
+    hits.sort_by_key(|hit: &TransposeHit| std::cmp::Reverse(hit.span.start));
+    let mut output = source.to_string();
+    for hit in &hits {
+        output.replace_range(hit.span.clone(), &hit.replacement);
+    }
+    Some(WriteBarrierRewrite { source: output, rewritten: hits.len() })
+}
+
+struct TransposeHit {
+    span: std::ops::Range<usize>,
+    replacement: String,
+}
+
+fn collect_transpose_statements(
+    statements: &[Statement],
+    source: &str,
+    owned: &HashSet<String>,
+    hits: &mut Vec<TransposeHit>,
+) {
+    let mut index = 0;
+    while index < statements.len() {
+        if index + 1 < statements.len()
+            && let Some(hit) =
+                match_transpose_pair(&statements[index], &statements[index + 1], source, owned)
+        {
+            hits.push(hit);
+            index += 2;
+            continue;
+        }
+        match &statements[index] {
+            Statement::BlockStatement(block) => {
+                collect_transpose_statements(&block.statements, source, owned, hits)
+            }
+            Statement::ClassDeclaration(class) => {
+                for member in &class.body {
+                    if let ClassMember::Method { body, .. } = member {
+                        collect_transpose_statements(body, source, owned, hits);
+                    }
+                }
+            }
+            Statement::FunctionDeclaration(function) => {
+                collect_transpose_statements(&function.body, source, owned, hits)
+            }
+            Statement::IfStatement(if_stmt) => {
+                collect_transpose_statement(&if_stmt.consequent, source, owned, hits);
+                if let Some(alternate) = if_stmt.alternate.as_deref() {
+                    collect_transpose_statement(alternate, source, owned, hits);
+                }
+            }
+            Statement::ExportDeclaration(export) => {
+                if let Some(inner) = export.declaration.as_deref() {
+                    collect_transpose_statement(inner, source, owned, hits);
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+}
+
+fn collect_transpose_statement(
+    statement: &Statement,
+    source: &str,
+    owned: &HashSet<String>,
+    hits: &mut Vec<TransposeHit>,
+) {
+    collect_transpose_statements(std::slice::from_ref(statement), source, owned, hits);
+}
+
+fn match_transpose_pair(
+    first: &Statement,
+    second: &Statement,
+    source: &str,
+    owned: &HashSet<String>,
+) -> Option<TransposeHit> {
+    let Statement::VariableDeclaration(decl) = first else { return None };
+    if decl.declarators.first().is_some_and(|d| d.pattern_text.is_some()) {
+        return None;
+    }
+    let local = decl.name();
+    let Some((field, _)) = slice_source(decl.value()?, owned) else { return None };
+    let Statement::IfStatement(if_stmt) = second else { return None };
+    let (op, rhs) = transpose_length_test(&if_stmt.test, source, local)?;
+    let Statement::BlockStatement(body) = if_stmt.consequent.as_ref() else { return None };
+    if body.statements.len() != 4 || if_stmt.alternate.is_some() {
+        return None;
+    }
+    let (tmp, index_a) = transpose_tmp_read(&body.statements[0], source, local)?;
+    let index_b = transpose_swap_write(&body.statements[1], source, local, &index_a)?;
+    if !transpose_tmp_write(&body.statements[2], source, local, &index_b, &tmp) {
+        return None;
+    }
+    if !transpose_assign_back(&body.statements[3], source, &field, local) || index_a == index_b {
+        return None;
+    }
+    let start = first.span().start;
+    let end = if_stmt.span.end;
+    Some(TransposeHit {
+        span: start..end,
+        replacement: format!(
+            "if (this.{field}.length {op} {rhs}) {{\n      this.constructor.__vmzListTranspose(this, {field:?}, {index_a}, {index_b});\n    }}",
+        ),
+    })
+}
+
+fn slice_source(expression: &Expression, owned: &HashSet<String>) -> Option<(String, String)> {
+    let ExpressionKind::CallExpression { func, args } = expression.kind.as_ref() else {
+        return None;
+    };
+    if !args.is_empty() {
+        return None;
+    }
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
+        func.kind.as_ref()
+    else {
+        return None;
+    };
+    if ident(property) != Some("slice") {
+        return None;
+    }
+    let (root, field) = member(object)?;
+    if ident(root) != Some("this") || !owned.contains(&field) {
+        return None;
+    }
+    Some((field, String::new()))
+}
+
+fn transpose_length_test(
+    expression: &Expression,
+    source: &str,
+    local: &str,
+) -> Option<(String, String)> {
+    let ExpressionKind::BinaryExpression { left, operator, right } = expression.kind.as_ref()
+    else {
+        return None;
+    };
+    if !matches!(operator.as_str(), ">" | ">=") {
+        return None;
+    }
+    let (object, property) = member(left)?;
+    (ident(object) == Some(local) && property == "length")
+        .then(|| (operator.clone(), text(source, right)))
+}
+
+fn transpose_tmp_read(
+    statement: &Statement,
+    source: &str,
+    local: &str,
+) -> Option<(String, String)> {
+    let Statement::VariableDeclaration(decl) = statement else { return None };
+    let value = decl.value()?;
+    let (object, index) = transpose_indexed_member(value)?;
+    (ident(object) == Some(local)).then(|| (decl.name().to_string(), text(source, index)))
+}
+
+fn transpose_swap_write(
+    statement: &Statement,
+    source: &str,
+    local: &str,
+    index_a: &str,
+) -> Option<String> {
+    let (left, right) = assignment_statement(statement)?;
+    let (object, index) = transpose_indexed_member(left)?;
+    let (value_object, value_index) = transpose_indexed_member(right)?;
+    (ident(object) == Some(local)
+        && text(source, index) == index_a
+        && ident(value_object) == Some(local))
+    .then(|| text(source, value_index))
+}
+
+fn transpose_tmp_write(
+    statement: &Statement,
+    source: &str,
+    local: &str,
+    index_b: &str,
+    tmp: &str,
+) -> bool {
+    let Some((left, right)) = assignment_statement(statement) else { return false };
+    let Some((object, index)) = transpose_indexed_member(left) else { return false };
+    ident(object) == Some(local) && text(source, index) == index_b && ident(right) == Some(tmp)
+}
+
+fn transpose_indexed_member(expression: &Expression) -> Option<(&Expression, &Expression)> {
+    let ExpressionKind::MemberExpression { object, property, computed: true, optional: false } =
+        expression.kind.as_ref()
+    else {
+        return None;
+    };
+    Some((object, property))
+}
+
+fn transpose_assign_back(statement: &Statement, _source: &str, field: &str, local: &str) -> bool {
+    let Some((left, right)) = assignment_statement(statement) else { return false };
+    let Some((object, property)) = member(left) else { return false };
+    ident(object) == Some("this") && property == field && ident(right) == Some(local)
+}
+
+fn assignment_statement(statement: &Statement) -> Option<(&Expression, &Expression)> {
+    let Statement::ExpressionStatement(expr) = statement else { return None };
+    let ExpressionKind::AssignmentExpression { left, operator, right } =
+        expr.expression.kind.as_ref()
+    else {
+        return None;
+    };
+    (operator == "=").then(|| (left.as_ref(), right.as_ref()))
+}
+
+fn walk_statements(
+    statements: &[Statement],
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &mut HashMap<String, String>,
+    hits: &mut Vec<StrideHit>,
+) {
+    let mut index = 0;
+    while index < statements.len() {
+        if index + 1 < statements.len()
+            && let Statement::VariableDeclaration(decl) = &statements[index]
+            && let Some(root) = decl.value().and_then(this_root)
+            && owned.contains(&root)
+            && let Statement::ForStatement(for_stmt) = &statements[index + 1]
+            && let Some(mut hit) = match_for(for_stmt, source, owned, aliases)
+            && hit.root == root
+        {
+            hit.full.start = decl.span.start;
+            hits.push(hit);
+            index += 2;
+            continue;
+        }
+        match &statements[index] {
+            Statement::VariableDeclaration(decl) => {
+                if let Some(root) = decl.value().and_then(this_root)
+                    && owned.contains(&root)
+                    && decl.declarators.first().is_some_and(|d| d.pattern_text.is_none())
+                {
+                    aliases.insert(decl.name().to_string(), root);
+                }
+            }
+            Statement::ForStatement(for_stmt) => {
+                if let Some(hit) = match_for(for_stmt, source, owned, aliases) {
+                    hits.push(hit);
+                }
+                walk_statement(&for_stmt.body, source, owned, aliases, hits);
+            }
+            _ => walk_statement(&statements[index], source, owned, aliases, hits),
+        }
+        index += 1;
+    }
+}
+
+fn walk_statement(
+    statement: &Statement,
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &mut HashMap<String, String>,
+    hits: &mut Vec<StrideHit>,
+) {
+    match statement {
+        Statement::BlockStatement(block) => {
+            walk_statements(&block.statements, source, owned, aliases, hits)
+        }
+        Statement::ClassDeclaration(class) => {
+            for member in &class.body {
+                if let ClassMember::Method { body, .. } = member {
+                    walk_statements(body, source, owned, aliases, hits);
+                }
+            }
+        }
+        Statement::ExportDeclaration(export) => {
+            if let Some(inner) = export.declaration.as_deref() {
+                walk_statement(inner, source, owned, aliases, hits);
+            }
+        }
+        Statement::FunctionDeclaration(function) => {
+            walk_statements(&function.body, source, owned, aliases, hits)
+        }
+        Statement::IfStatement(if_stmt) => {
+            walk_statement(&if_stmt.consequent, source, owned, aliases, hits);
+            if let Some(alternate) = if_stmt.alternate.as_deref() {
+                walk_statement(alternate, source, owned, aliases, hits);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn match_for(
+    statement: &data_text_typescript::ast::ForStatement,
+    source: &str,
+    owned: &HashSet<String>,
+    aliases: &HashMap<String, String>,
+) -> Option<StrideHit> {
+    let Statement::VariableDeclaration(init) = statement.initializer.as_deref()? else {
+        return None;
+    };
+    let index_name = init.name().to_string();
+    let start = init.value().map(|expr| text(source, expr)).unwrap_or_default();
+    let ExpressionKind::BinaryExpression { left, operator, right } =
+        statement.test.as_ref()?.kind.as_ref()
+    else {
+        return None;
+    };
+    if operator != "<" || ident(left)? != index_name {
+        return None;
+    }
+    let (length_object, length_property) = member(right)?;
+    if length_property != "length" {
+        return None;
+    }
+    let root = resolve_root(length_object, aliases, owned)?;
+    let step = match statement.incrementor.as_ref()?.kind.as_ref() {
+        ExpressionKind::UpdateExpression { operator, argument, .. }
+            if operator == "++" && ident(argument) == Some(index_name.as_str()) =>
+        {
+            "1".to_string()
+        }
+        ExpressionKind::AssignmentExpression { left, operator, right }
+            if operator == "+=" && ident(left) == Some(index_name.as_str()) =>
+        {
+            text(source, right)
+        }
+        _ => return None,
+    };
+    let Statement::BlockStatement(body) = statement.body.as_ref() else { return None };
+    if body.statements.len() != 1 {
+        return None;
+    }
+    let Statement::ExpressionStatement(expr_stmt) = &body.statements[0] else { return None };
+    let ExpressionKind::AssignmentExpression { left, operator, right } =
+        expr_stmt.expression.kind.as_ref()
+    else {
+        return None;
+    };
+    let operation = operator.strip_suffix('=')?;
+    if !matches!(operation, "+" | "-" | "*" | "/" | "%") {
+        return None;
+    }
+    let (indexed, leaf) = member(left)?;
+    let (array, index_name_from_path) = indexed_member(indexed)?;
+    if index_name_from_path != index_name {
+        return None;
+    }
+    if resolve_root(array, aliases, owned)? != root {
+        return None;
+    }
+    Some(StrideHit {
+        full: statement.span.clone().into(),
+        root,
+        leaf,
+        operator: operation.to_string(),
+        rhs: text(source, right),
+        start,
+        step,
+    })
+}
+
+fn ident(expr: &Expression) -> Option<&str> {
+    match expr.kind.as_ref() {
+        ExpressionKind::Identifier(name) => Some(name),
+        _ => None,
+    }
+}
+
+fn member(expr: &Expression) -> Option<(&Expression, String)> {
+    let ExpressionKind::MemberExpression { object, property, computed: false, .. } =
+        expr.kind.as_ref()
+    else {
+        return None;
+    };
+    Some((object, ident(property)?.to_string()))
+}
+
+fn indexed_member(expr: &Expression) -> Option<(&Expression, String)> {
+    let ExpressionKind::MemberExpression { object, property, computed: true, .. } =
+        expr.kind.as_ref()
+    else {
+        return None;
+    };
+    Some((object, ident(property)?.to_string()))
+}
+
+fn this_root(expr: &Expression) -> Option<String> {
+    let (object, property) = member(expr)?;
+    (ident(object) == Some("this")).then_some(property)
+}
+
+fn resolve_root(
+    expr: &Expression,
+    aliases: &HashMap<String, String>,
+    owned: &HashSet<String>,
+) -> Option<String> {
+    if let Some(name) = ident(expr) {
+        return aliases
+            .get(name)
+            .cloned()
+            .or_else(|| owned.contains(name).then(|| name.to_string()));
+    }
+    this_root(expr)
+}
+
+fn text(source: &str, expr: &Expression) -> String {
+    source.get(expr.span.clone()).unwrap_or_default().trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rewrite_array_item_strides;
+    use std::collections::HashSet;
+
+    #[test]
+    fn lowers_alias_stride_loop_without_oxc() {
+        let source = r#"
+export default class Demo {
+  rows = [];
+  update() {
+    const rows = this.rows;
+    for (let i = 0; i < rows.length; i += 10) {
+      rows[i].label += " !!!";
+    }
+  }
+}
+"#;
+        let owned = HashSet::from([String::from("rows")]);
+        let result = rewrite_array_item_strides(source, &owned).expect("`data.text` parse");
+        assert_eq!(result.rewritten, 1);
+        assert!(result.source.contains(
+            "__vmzArrayItemCompoundStride(this, \"rows\", \"label\", \"+\", \" !!!\", 0, 10)"
+        ));
+        assert!(!result.source.contains("for ("));
+    }
+}

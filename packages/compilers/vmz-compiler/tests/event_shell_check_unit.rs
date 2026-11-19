@@ -1,4 +1,4 @@
-//! Regression: event-shell / production-catalog check must finish (Oak parser progress).
+//! Regression: event-shell / production-catalog check must finish (`data.text` parser progress).
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};

@@ -86,12 +86,12 @@ fn minify_keeps_statements_without_semicolons_apart() {
         !code.contains("import{create}from\"./core.mjs\"import"),
         "two import declarations must not merge into one line: {code}"
     );
-    let shell = vmz_oak_frontend_adapter::ScriptShellInput {
+    let shell = vmz_text_frontend_adapter::ScriptShellInput {
         content: code.clone(),
         content_start: 0,
-        role: vmz_oak_frontend_adapter::ScriptRole::Client,
+        role: vmz_text_frontend_adapter::ScriptRole::Client,
     };
-    let parsed = vmz_oak_frontend_adapter::parse_script_ast(&shell);
+    let parsed = vmz_text_frontend_adapter::parse_script_ast(&shell);
     assert!(
         parsed.ok,
         "semicolon-free statements must stay parseable: {code}\n{:?}",
@@ -115,7 +115,7 @@ fn minify_keeps_newline_between_semicolon_free_assignments() {
 }
 
 #[test]
-fn minified_output_reparses_with_oak() {
+fn minified_output_reparses_with_text() {
     let source = concat!(
         "const state = { count: 0, label: \"a   b\" };\n",
         "export function bump(step) {\n",
@@ -129,12 +129,12 @@ fn minified_output_reparses_with_oak() {
         "const pattern = /a b/g;\n",
     );
     let code = minified(source);
-    let shell = vmz_oak_frontend_adapter::ScriptShellInput {
+    let shell = vmz_text_frontend_adapter::ScriptShellInput {
         content: code.clone(),
         content_start: 0,
-        role: vmz_oak_frontend_adapter::ScriptRole::Client,
+        role: vmz_text_frontend_adapter::ScriptRole::Client,
     };
-    let parsed = vmz_oak_frontend_adapter::parse_script_ast(&shell);
+    let parsed = vmz_text_frontend_adapter::parse_script_ast(&shell);
     assert!(parsed.ok, "minified output must stay parseable: {code}\n{:?}", parsed.diagnostics);
 }
 

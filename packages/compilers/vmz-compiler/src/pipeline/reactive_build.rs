@@ -33,7 +33,7 @@ pub struct TemplateExprError {
     pub body_span: TemplateSpan,
 }
 
-/// Collect Oak parse failures for every template expression binding (interp / attr).
+/// Collect `data.text` parse failures for every template expression binding (interp / attr).
 ///
 /// Expressions remain `String` in IR; this is the early validation ingress before
 /// emit re-parses for codegen. Prefer [`collect_concrete_expr_errors`] when spans matter.

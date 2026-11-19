@@ -347,6 +347,6 @@ upsertCheck(proof, {
 });
 addLimitation(proof, 'pack-gates: arrow-const dynamic import edges stay conservative at link (dead variant still ships)');
 addLimitation(proof, 'pack-gates: `interface` bodies keep module scope facts incomplete (module-level prune fallback)');
-addLimitation(proof, 'pack-gates: `${...}` interpolations are invisible in the Oak AST, so modules with template interpolation keep incomplete scope facts and ship via the conservative isolated path');
+addLimitation(proof, 'pack-gates: `${...}` interpolations are invisible in the `data.text` AST, so modules with template interpolation keep incomplete scope facts and ship via the conservative isolated path');
 writeProof(proof, root);
 console.log('pack-artifact-gates PASS');

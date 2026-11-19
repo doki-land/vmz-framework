@@ -1,0 +1,20 @@
+[package]
+name = "vmz-text-frontend-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "VMZ ↔ `data.text` frontend adapter (CST template parse + SFC region projection)"
+publish = false
+
+[dependencies]
+data-text-core.workspace = true
+data-text-typescript.workspace = true
+data-text-vue.workspace = true
+thiserror.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+vmz-compiler.workspace = true

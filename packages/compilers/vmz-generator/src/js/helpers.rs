@@ -296,25 +296,25 @@ pub fn looks_like_ternary(expr: &str) -> bool {
 
 /// Top-level `a ? b : c` -> (test, consequent, alternate).
 pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
-    let parsed = vmz_oak_frontend_adapter::parse_expression_snippet(expr.trim());
+    let parsed = vmz_text_frontend_adapter::parse_expression_snippet(expr.trim());
     if !parsed.ok {
         return None;
     }
     let root = parsed.expression?;
-    let oak_typescript::ast::ExpressionKind::ConditionalExpression { test, consequent, alternate } =
+    let data_text_typescript::ast::ExpressionKind::ConditionalExpression { test, consequent, alternate } =
         root.kind.as_ref()
     else {
         return None;
     };
-    let print = |part: &oak_typescript::ast::Expression| {
-        super::oak_expr_print::print_oak_expression(part).filter(|s| !s.is_empty())
+    let print = |part: &data_text_typescript::ast::Expression| {
+        super::expr_print::print_text_expression(part).filter(|s| !s.is_empty())
     };
     Some((print(test)?, print(consequent)?, print(alternate)?))
 }
 
-/// Rewrite bare field idents to `this.field` (Oak span rewrite primary).
+/// Rewrite bare field idents to `this.field` (`data.text` span rewrite primary).
 ///
-/// Falls back to the legacy scanner when Oak cannot lower the snippet.
+/// Falls back to the legacy scanner when `data.text` cannot lower the snippet.
 pub fn bind_field_idents(
     expr: &str,
     fields: &[String],
@@ -336,14 +336,14 @@ pub fn bind_field_idents_ctx(
         return expr.trim().to_string();
     }
     if let Some(s) =
-        super::oak_expr_ops::bind_field_idents_via_oak(expr, fields, methods, scope, aliases)
+        super::expr_ops::bind_field_idents_via_text(expr, fields, methods, scope, aliases)
     {
         return s;
     }
     bind_field_idents_legacy(expr, fields, methods, scope, aliases)
 }
 
-/// Conservative char scanner for snippets Oak cannot lower.
+/// Conservative char scanner for snippets `data.text` cannot lower.
 fn bind_field_idents_legacy(
     expr: &str,
     fields: &[String],

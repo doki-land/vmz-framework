@@ -16,11 +16,11 @@ pub use super::template_concrete::{
 };
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, VerbatimChild};
 pub use super::template_lower::{is_preformatted_tag, lower_concrete_to_ir};
-pub use super::template_oak::{
+pub use super::template_text::{
     lower_vue_root_to_semantic, parse_template_concrete_body_primary,
-    parse_template_concrete_primary, parse_template_concrete_via_oak,
+    parse_template_concrete_primary, parse_template_concrete_via_text,
     parse_template_layers_primary, parse_template_semantic_primary,
-    parse_template_semantic_via_oak,
+    parse_template_semantic_via_text,
 };
 pub use super::template_semantic::{
     EventTarget, IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp,
@@ -30,7 +30,7 @@ pub use super::template_span::TemplateSpan;
 
 /// Parse a `<template>` body as Vue template syntax into legacy VMZ IR.
 ///
-/// Uses Oak layers primary (Concrete + Semantic), then lowers Concrete → TemplateIr.
+/// Uses `data.text` layers primary (Concrete + Semantic), then lowers Concrete → TemplateIr.
 pub fn parse_template(input: &str) -> Result<TemplateIr, TemplateParseError> {
     let (concrete, _) = parse_template_layers_primary(&crate::sfc::TemplateBlock {
         content: input.to_string(),
@@ -39,7 +39,7 @@ pub fn parse_template(input: &str) -> Result<TemplateIr, TemplateParseError> {
     lower_concrete_to_ir(&concrete)
 }
 
-/// Parse once into Semantic AST + legacy TemplateIr (Oak layers primary).
+/// Parse once into Semantic AST + legacy TemplateIr (`data.text` layers primary).
 pub fn parse_template_asts(input: &str) -> Result<(SemanticIr, TemplateIr), TemplateParseError> {
     let (concrete, semantic) = parse_template_layers_primary(&crate::sfc::TemplateBlock {
         content: input.to_string(),

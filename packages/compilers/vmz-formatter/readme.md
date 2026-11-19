@@ -1,6 +1,6 @@
 # vmz-formatter
 
-Authoring formatter for `.vmz` SFCs: **Oak CST formatting** plus **EditorConfig**.
+Authoring formatter for `.vmz` SFCs: **`data.text` CST formatting** plus **EditorConfig**.
 
 |                |                                                          |
 |----------------|----------------------------------------------------------|
@@ -15,7 +15,7 @@ Authoring formatter for `.vmz` SFCs: **Oak CST formatting** plus **EditorConfig*
 - Discover / format a file or project tree (`format_path`)
 - Explicit-target JS/TS + per-file `rustfmt` (`run_target_format`; scope is the CLI path, never `cargo fmt --all`)
 - Default **write**; `--check` only reports drift (cargo-fmt style — no `--write`)
-- `<script lang=ts>` → Oak `format` (text-in IR)
+- `<script lang=ts>` → `data.text` `format` (text-in IR)
 - `<style>` → VMZ CSS formatter (`css` / `scss` / `sass`)
 - Non-TS server DSL bodies are left alone (envelope trim / EOL only)
 - Faithful SFC reassembly: `<router>` / `<meta>` / `lang` / attrs / block order
@@ -38,7 +38,7 @@ Authoring formatter for `.vmz` SFCs: **Oak CST formatting** plus **EditorConfig*
 `@vmz/vmz`  `vmz format <path>`  →  vmz-napi `formatTargetsRun`  →  vmz_formatter::run_target_format
 ```
 
-JavaScript and TypeScript source formatting is delegated to Oak.
+JavaScript and TypeScript source formatting is delegated to `data.text`.
 
 ## Development
 
