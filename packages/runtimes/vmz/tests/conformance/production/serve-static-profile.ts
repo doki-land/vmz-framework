@@ -110,6 +110,13 @@ try {
     if (about.status !== 200) fail(`GET /about/ -> ${about.status}`);
     if (!about.body.includes('data-vmz-page')) fail('GET /about/ did not return the emitted page HTML');
 
+    // `<Link>` renders the extensionless form (`/about`), so static preview
+    // must resolve it to the emitted `about/index.html` exactly like the dev
+    // host's route matching does. A 404 here breaks every nav click on preview.
+    const aboutNoSlash = await get(`http://127.0.0.1:${PORT}/about`);
+    if (aboutNoSlash.status !== 200) fail(`GET /about -> ${aboutNoSlash.status}, expected 200 via directory index`);
+    if (!aboutNoSlash.body.includes('data-vmz-page')) fail('GET /about did not return the emitted page HTML');
+
     const missing = await get(`http://127.0.0.1:${PORT}/no-such-route`);
     if (missing.status !== 404) fail(`GET /no-such-route -> ${missing.status}, expected 404`);
     if (!missing.body.includes('route-static-404')) fail('404 response is not the emitted 404 document');

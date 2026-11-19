@@ -333,7 +333,15 @@ export function createLocalStaticHandler(distDir, policy) {
             let rel = pathname;
             if (rel.endsWith('/')) rel += 'index.html';
             if (rel === '/') rel = '/index.html';
-            const file = safeJoin(root, rel.replace(/^\//, ''));
+            let file = safeJoin(root, rel.replace(/^\//, ''));
+            if (!(file && fs.existsSync(file) && fs.statSync(file).isFile()) && !path.extname(rel)) {
+                // Directory-index resolution: the build emits `features/index.html`
+                // while `<Link>` renders the extensionless `/features`. Serve both
+                // forms so static preview matches the dev host's route matching
+                // instead of 404ing the very hrefs the site links to.
+                const dirIndex = safeJoin(root, path.posix.join(rel.replace(/^\//, ''), 'index.html'));
+                if (dirIndex && fs.existsSync(dirIndex) && fs.statSync(dirIndex).isFile()) file = dirIndex;
+            }
             if (file && fs.existsSync(file) && fs.statSync(file).isFile()) {
                 const body = fs.readFileSync(file);
                 const type = contentType(file);
