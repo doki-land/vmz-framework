@@ -3,71 +3,6 @@
 version = 4
 
 [[package]]
-name = "acorn-codec"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-
-[[package]]
-name = "acorn-core"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-dependencies = [
- "boost-diagnostic",
-]
-
-[[package]]
-name = "acorn-jvm"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-dependencies = [
- "acorn-core",
- "acorn-source",
- "acorn-zip",
- "serde",
-]
-
-[[package]]
-name = "acorn-odin"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=2033ca05fcdc74d8484b1426beb4c204ef2fc613#2033ca05fcdc74d8484b1426beb4c204ef2fc613"
-dependencies = [
- "serde",
- "sha2 0.10.9",
-]
-
-[[package]]
-name = "acorn-pe"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "acorn-source"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-
-[[package]]
-name = "acorn-wasm"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-dependencies = [
- "acorn-codec",
- "serde",
-]
-
-[[package]]
-name = "acorn-zip"
-version = "0.0.1"
-source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
-dependencies = [
- "acorn-codec",
- "acorn-core",
- "acorn-source",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -124,12 +59,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
-name = "base64"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
-
-[[package]]
 name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -166,12 +95,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "boost-collection"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-collection-macro",
+]
+
+[[package]]
+name = "boost-collection-macro"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
+]
+
+[[package]]
+name = "boost-console"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+
+[[package]]
 name = "boost-crypto"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
- "base64 0.23.1",
  "boost-random",
+ "data-encoding",
  "rsa",
  "sha1",
  "sha2 0.10.9",
@@ -179,35 +131,51 @@ dependencies = [
 ]
 
 [[package]]
-name = "boost-diagnostic"
+name = "boost-fs"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86#9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
+ "boost-random",
+]
+
+[[package]]
+name = "boost-harness"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-console",
+ "boost-harness-macro",
+ "boost-math",
  "boost-source",
  "serde",
 ]
 
 [[package]]
-name = "boost-fs"
+name = "boost-harness-macro"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
- "boost-random",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
 ]
 
 [[package]]
 name = "boost-math"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-collection",
+]
 
 [[package]]
 name = "boost-net"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
- "base64 0.23.1",
  "boost-crypto",
  "boost-random",
+ "data-encoding",
  "rustls",
  "url",
  "webpki-roots",
@@ -216,7 +184,7 @@ dependencies = [
 [[package]]
 name = "boost-random"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
  "boost-math",
 ]
@@ -224,7 +192,7 @@ dependencies = [
 [[package]]
 name = "boost-source"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86#9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
  "serde",
 ]
@@ -283,7 +251,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 [[package]]
 name = "compiler-analysis"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
  "compiler-types",
 ]
@@ -291,8 +259,10 @@ dependencies = [
 [[package]]
 name = "compiler-bundle"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
+ "boost-collection",
+ "boost-math",
  "compiler-emitter",
  "serde",
  "serde_json",
@@ -302,17 +272,19 @@ dependencies = [
 [[package]]
 name = "compiler-emitter"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
- "acorn-jvm",
- "acorn-odin",
- "acorn-pe",
- "acorn-wasm",
+ "boost-collection",
+ "boost-math",
  "compiler-optimize",
  "compiler-target",
  "compiler-types",
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
- "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
+ "data-binary-jvm",
+ "data-binary-odin",
+ "data-binary-pe",
+ "data-binary-wasm",
+ "data-text-core",
+ "data-text-typescript",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -321,7 +293,7 @@ dependencies = [
 [[package]]
 name = "compiler-optimize"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
  "compiler-types",
  "serde",
@@ -330,20 +302,19 @@ dependencies = [
 [[package]]
 name = "compiler-target"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
  "compiler-analysis",
  "compiler-optimize",
  "compiler-types",
  "serde",
  "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
 name = "compiler-types"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
 dependencies = [
  "serde",
  "sha2 0.11.1",
@@ -455,6 +426,118 @@ name = "ctor"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
+
+[[package]]
+name = "data-binary-core"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-harness",
+]
+
+[[package]]
+name = "data-binary-jvm"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-source",
+ "data-binary-core",
+ "data-binary-zip",
+ "serde",
+]
+
+[[package]]
+name = "data-binary-odin"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "serde",
+ "sha2 0.11.1",
+]
+
+[[package]]
+name = "data-binary-pe"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "data-binary-wasm"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "data-encoding",
+ "serde",
+]
+
+[[package]]
+name = "data-binary-zip"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-source",
+ "data-binary-core",
+ "data-checksum",
+ "data-compression",
+]
+
+[[package]]
+name = "data-checksum"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+
+[[package]]
+name = "data-compression"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "data-binary-core",
+ "data-checksum",
+]
+
+[[package]]
+name = "data-encoding"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+
+[[package]]
+name = "data-text-core"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "boost-source",
+ "data-checksum",
+ "serde",
+]
+
+[[package]]
+name = "data-text-formatter"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "data-text-core",
+]
+
+[[package]]
+name = "data-text-typescript"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "data-text-core",
+ "data-text-formatter",
+ "serde",
+]
+
+[[package]]
+name = "data-text-vue"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+dependencies = [
+ "data-text-core",
+ "serde",
+]
 
 [[package]]
 name = "data-url"
@@ -578,7 +661,7 @@ checksum = "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -783,7 +866,7 @@ checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1231,7 +1314,7 @@ dependencies = [
  "napi-derive-backend",
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1244,7 +1327,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "semver",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1310,69 +1393,11 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216#7c4c631967228daadde86a85da38c8617f149216"
-dependencies = [
- "serde",
- "smallvec",
- "triomphe",
- "twox-hash",
-]
-
-[[package]]
-name = "oak-core"
-version = "0.0.12"
 source = "git+https://github.com/yggdrasil-language/oaks.git?rev=96319cc48450614338a921b39d0ac131b9db1cda#96319cc48450614338a921b39d0ac131b9db1cda"
 dependencies = [
  "smallvec",
  "triomphe",
  "twox-hash",
-]
-
-[[package]]
-name = "oak-core"
-version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484#a0416cb1cba9a348df175d3ca230f794ec562484"
-dependencies = [
- "serde",
- "smallvec",
- "triomphe",
- "twox-hash",
-]
-
-[[package]]
-name = "oak-formatter"
-version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216#7c4c631967228daadde86a85da38c8617f149216"
-dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
-]
-
-[[package]]
-name = "oak-formatter"
-version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484#a0416cb1cba9a348df175d3ca230f794ec562484"
-dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
-]
-
-[[package]]
-name = "oak-typescript"
-version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216#7c4c631967228daadde86a85da38c8617f149216"
-dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-formatter 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "serde",
-]
-
-[[package]]
-name = "oak-typescript"
-version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484#a0416cb1cba9a348df175d3ca230f794ec562484"
-dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
- "oak-formatter 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
- "serde",
 ]
 
 [[package]]
@@ -1380,16 +1405,7 @@ name = "oak-vos"
 version = "0.0.12"
 source = "git+https://github.com/yggdrasil-language/oaks.git?rev=96319cc48450614338a921b39d0ac131b9db1cda#96319cc48450614338a921b39d0ac131b9db1cda"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=96319cc48450614338a921b39d0ac131b9db1cda)",
-]
-
-[[package]]
-name = "oak-vue"
-version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216#7c4c631967228daadde86a85da38c8617f149216"
-dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "serde",
+ "oak-core",
 ]
 
 [[package]]
@@ -1596,7 +1612,7 @@ checksum = "92ecd8964f8453721699a1ed72037b0db49ce2f5a5138486ee89bed6f67cdf3a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1792,7 +1808,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_derive_internals",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1843,7 +1859,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1854,7 +1870,7 @@ checksum = "f852137cce035d6a4df67ccce505ff6b3e9fd3a10e3e52b24dc71e650bb1a9bd"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -1868,19 +1884,6 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
-]
-
-[[package]]
-name = "serde_yaml"
-version = "0.9.34+deprecated"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
-dependencies = [
- "indexmap",
- "itoa",
- "ryu",
- "serde",
- "unsafe-libyaml",
 ]
 
 [[package]]
@@ -2034,9 +2037,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.9"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2051,7 +2054,7 @@ checksum = "901704edd0dfe137f1987838ee4f259e4e063c31371bdb423f7ae38ec6f77f02"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -2149,7 +2152,7 @@ checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -2340,12 +2343,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
-name = "unsafe-libyaml"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
-
-[[package]]
 name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2369,7 +2366,7 @@ version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80be9b06fbae3b8b303400ab20778c80bbaf338f563afe567cf3c9eea17b47ef"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "data-url",
  "flate2",
  "fontdb",
@@ -2446,10 +2443,10 @@ name = "vmz-compiler"
 version = "0.3.16"
 dependencies = [
  "boost-fs",
+ "data-text-core",
+ "data-text-typescript",
+ "data-text-vue",
  "json5",
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-vue",
  "resvg",
  "schemars",
  "serde",
@@ -2458,8 +2455,8 @@ dependencies = [
  "thiserror 2.0.21",
  "vmz-debugger",
  "vmz-generator",
- "vmz-oak-frontend-adapter",
  "vmz-protocol",
+ "vmz-text-frontend-adapter",
  "vmz-types",
 ]
 
@@ -2477,29 +2474,29 @@ name = "vmz-formatter"
 version = "0.3.16"
 dependencies = [
  "boost-fs",
+ "data-text-typescript",
  "editorconfig",
  "json5",
- "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "schemars",
  "serde",
  "serde_json",
  "vmz-compiler",
- "vmz-oak-frontend-adapter",
+ "vmz-text-frontend-adapter",
 ]
 
 [[package]]
 name = "vmz-generator"
 version = "0.3.16"
 dependencies = [
+ "data-text-core",
+ "data-text-typescript",
  "json5",
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "serde",
  "serde_json",
  "sha2 0.11.1",
  "thiserror 2.0.21",
- "vmz-oak-frontend-adapter",
  "vmz-protocol",
+ "vmz-text-frontend-adapter",
  "vmz-types",
  "yaml_serde",
 ]
@@ -2553,24 +2550,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "vmz-oak-frontend-adapter"
-version = "0.3.16"
-dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-vue",
- "thiserror 2.0.21",
- "vmz-compiler",
-]
-
-[[package]]
 name = "vmz-pack"
 version = "0.3.16"
 dependencies = [
  "compiler-bundle",
- "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
+ "data-text-typescript",
  "serde_json",
- "vmz-oak-frontend-adapter",
+ "vmz-text-frontend-adapter",
 ]
 
 [[package]]
@@ -2600,6 +2586,17 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "vmz-text-frontend-adapter"
+version = "0.3.16"
+dependencies = [
+ "data-text-core",
+ "data-text-typescript",
+ "data-text-vue",
+ "thiserror 2.0.21",
+ "vmz-compiler",
 ]
 
 [[package]]
@@ -2692,7 +2689,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
  "wasm-bindgen-shared",
 ]
 
@@ -2843,7 +2840,7 @@ checksum = "ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
  "synstructure",
 ]
 
@@ -2884,7 +2881,7 @@ checksum = "f75b4683f6c7f45248d4d64056a24298c6281e0993356d7d1b4a1a962ef10d4a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
  "synstructure",
 ]
 
@@ -2939,7 +2936,7 @@ checksum = "c3743ddbf47738d929cd1ae2e199d40d0162979dfe31aef8ae646d2bf00bf97a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.9",
+ "syn 3.0.10",
 ]
 
 [[package]]
