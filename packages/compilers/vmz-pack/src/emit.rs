@@ -34,7 +34,14 @@ pub fn plan_emit_with_cache(
     options: &EmitOptions,
     cache: &mut EmitCache,
 ) -> Result<EmitPlan, Vec<PackDiagnostic>> {
-    compiler_bundle::emit::plan_emit_with_cache(graph, link, chunks, options, &StdSourceReader, cache)
+    compiler_bundle::emit::plan_emit_with_cache(
+        graph,
+        link,
+        chunks,
+        options,
+        &StdSourceReader,
+        cache,
+    )
 }
 
 /// 全量写出：每个产物都落盘。

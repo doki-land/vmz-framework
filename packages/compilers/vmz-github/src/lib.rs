@@ -4,8 +4,8 @@
 
 use std::time::{Duration, Instant};
 
-use boost_net::http::{HttpTransport, Method, Request, Transport};
 use boost_net::Url;
+use boost_net::http::{HttpTransport, Method, Request, Transport};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

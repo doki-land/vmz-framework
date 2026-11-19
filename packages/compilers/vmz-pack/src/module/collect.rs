@@ -29,12 +29,12 @@ use oak_typescript::ast::{
 };
 use oak_typescript::scope::module_scope_facts;
 
+use crate::diag::PackDiagnostic;
 use compiler_bundle::module::{
     AssetFact, ExportFact, ImportBinding, ImportFact, ImportKind, ImportedName, ModuleFlags,
     ModuleRecord, RequireFact, ScopeBindingFact, ScopeIncompleteReason, StatementEffect,
     StatementFact,
 };
-use crate::diag::PackDiagnostic;
 
 /// 源码解析失败诊断码（致命，走 `Err`）。
 const PARSE_FAILED: &str = "vmz::pack::module::parse_failed";
