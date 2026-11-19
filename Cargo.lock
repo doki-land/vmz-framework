@@ -3,6 +3,71 @@
 version = 4
 
 [[package]]
+name = "acorn-codec"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+
+[[package]]
+name = "acorn-core"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+dependencies = [
+ "boost-diagnostic",
+]
+
+[[package]]
+name = "acorn-jvm"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+dependencies = [
+ "acorn-core",
+ "acorn-source",
+ "acorn-zip",
+ "serde",
+]
+
+[[package]]
+name = "acorn-odin"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=2033ca05fcdc74d8484b1426beb4c204ef2fc613#2033ca05fcdc74d8484b1426beb4c204ef2fc613"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "acorn-pe"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "acorn-source"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+
+[[package]]
+name = "acorn-wasm"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+dependencies = [
+ "acorn-codec",
+ "serde",
+]
+
+[[package]]
+name = "acorn-zip"
+version = "0.0.1"
+source = "git+https://github.com/yggdrasil-language/acorn.rs?rev=beccbdf77374dbb2ca67395be19af3e2048c57ca#beccbdf77374dbb2ca67395be19af3e2048c57ca"
+dependencies = [
+ "acorn-codec",
+ "acorn-core",
+ "acorn-source",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -59,6 +124,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+
+[[package]]
+name = "base64ct"
+version = "1.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -89,18 +166,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "boost-crypto"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "base64 0.23.1",
+ "boost-random",
+ "rsa",
+ "sha1",
+ "sha2 0.10.9",
+ "zeroize",
+]
+
+[[package]]
+name = "boost-diagnostic"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86#9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86"
+dependencies = [
+ "boost-source",
+ "serde",
+]
+
+[[package]]
 name = "boost-fs"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=7ba022a049cafef979dfe7a8adf81d9a0d3dd373#7ba022a049cafef979dfe7a8adf81d9a0d3dd373"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
 dependencies = [
  "boost-random",
 ]
 
 [[package]]
-name = "boost-http"
+name = "boost-math"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=7ba022a049cafef979dfe7a8adf81d9a0d3dd373#7ba022a049cafef979dfe7a8adf81d9a0d3dd373"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+
+[[package]]
+name = "boost-net"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
 dependencies = [
+ "base64 0.23.1",
+ "boost-crypto",
+ "boost-random",
  "rustls",
  "url",
  "webpki-roots",
@@ -109,7 +216,18 @@ dependencies = [
 [[package]]
 name = "boost-random"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=7ba022a049cafef979dfe7a8adf81d9a0d3dd373#7ba022a049cafef979dfe7a8adf81d9a0d3dd373"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "boost-math",
+]
+
+[[package]]
+name = "boost-source"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86#9aa52745d6eae2d7748c76e4e3e6555e1f6e4b86"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bumpalo"
@@ -153,7 +271,7 @@ checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.1",
- "rand_core",
+ "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -161,6 +279,81 @@ name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
+
+[[package]]
+name = "compiler-analysis"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "compiler-types",
+]
+
+[[package]]
+name = "compiler-bundle"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "compiler-emitter",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+]
+
+[[package]]
+name = "compiler-emitter"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "acorn-jvm",
+ "acorn-odin",
+ "acorn-pe",
+ "acorn-wasm",
+ "compiler-optimize",
+ "compiler-target",
+ "compiler-types",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
+ "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+]
+
+[[package]]
+name = "compiler-optimize"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "compiler-types",
+ "serde",
+]
+
+[[package]]
+name = "compiler-target"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "compiler-analysis",
+ "compiler-optimize",
+ "compiler-types",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "compiler-types"
+version = "0.1.0"
+source = "git+https://github.com/oovm/rust-boost?rev=54e7196e7f176dbb3a7a38778a12982beada8b56#54e7196e7f176dbb3a7a38778a12982beada8b56"
+dependencies = [
+ "serde",
+ "sha2 0.11.1",
+]
+
+[[package]]
+name = "const-oid"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "const-oid"
@@ -345,12 +538,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "der"
+version = "0.7.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
+dependencies = [
+ "const-oid 0.9.6",
+ "pem-rfc7468",
+ "zeroize",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
+ "const-oid 0.9.6",
  "crypto-common 0.1.7",
 ]
 
@@ -361,7 +566,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
  "block-buffer 0.12.1",
- "const-oid",
+ "const-oid 0.10.2",
  "crypto-common 0.2.2",
 ]
 
@@ -640,7 +845,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi",
- "rand_core",
+ "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -883,6 +1088,9 @@ name = "lazy_static"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
+dependencies = [
+ "spin",
+]
 
 [[package]]
 name = "libc"
@@ -1055,12 +1263,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
+name = "num-bigint-dig"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e661dda6640fad38e827a6d4a310ff4763082116fe217f279885c97f511bb0b7"
+dependencies = [
+ "lazy_static",
+ "libm",
+ "num-integer",
+ "num-iter",
+ "num-traits",
+ "rand 0.8.8",
+ "smallvec",
+ "zeroize",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-iter"
+version = "0.1.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -1085,6 +1329,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "oak-core"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484#a0416cb1cba9a348df175d3ca230f794ec562484"
+dependencies = [
+ "serde",
+ "smallvec",
+ "triomphe",
+ "twox-hash",
+]
+
+[[package]]
 name = "oak-formatter"
 version = "0.0.12"
 source = "git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216#7c4c631967228daadde86a85da38c8617f149216"
@@ -1093,12 +1348,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "oak-formatter"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484#a0416cb1cba9a348df175d3ca230f794ec562484"
+dependencies = [
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
+]
+
+[[package]]
 name = "oak-typescript"
 version = "0.0.12"
 source = "git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216#7c4c631967228daadde86a85da38c8617f149216"
 dependencies = [
  "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-formatter",
+ "oak-formatter 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
+ "serde",
+]
+
+[[package]]
+name = "oak-typescript"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484#a0416cb1cba9a348df175d3ca230f794ec562484"
+dependencies = [
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
+ "oak-formatter 0.0.12 (git+https://github.com/yggdrasil-language/oak.rs?rev=a0416cb1cba9a348df175d3ca230f794ec562484)",
  "serde",
 ]
 
@@ -1132,6 +1405,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b81cf3b8cb96aa0e73bbedfcdc9708d09fec2854ba8d474be4e6f666d7379e8b"
 
 [[package]]
+name = "pem-rfc7468"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88b39c9bfcfc231068454382784bb460aae594343fb030d46e9f50a645418412"
+dependencies = [
+ "base64ct",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1148,6 +1430,27 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
+
+[[package]]
+name = "pkcs1"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
+dependencies = [
+ "der",
+ "pkcs8",
+ "spki",
+]
+
+[[package]]
+name = "pkcs8"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
+dependencies = [
+ "der",
+ "spki",
+]
 
 [[package]]
 name = "png"
@@ -1169,6 +1472,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d83eb9bc6d8e5cf568e7a1101d60ee05e81ed50ea106026f3d18deeb046d7661"
 dependencies = [
  "zerovec",
+]
+
+[[package]]
+name = "ppv-lite86"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
+dependencies = [
+ "zerocopy",
 ]
 
 [[package]]
@@ -1203,13 +1515,42 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rand"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
+dependencies = [
+ "rand_chacha",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
 dependencies = [
  "chacha20",
  "getrandom 0.4.3",
- "rand_core",
+ "rand_core 0.10.1",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+dependencies = [
+ "getrandom 0.2.17",
 ]
 
 [[package]]
@@ -1325,6 +1666,27 @@ name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
+
+[[package]]
+name = "rsa"
+version = "0.9.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8573f03f5883dcaebdfcf4725caa1ecb9c15b2ef50c43a07b816e06799bb12d"
+dependencies = [
+ "const-oid 0.9.6",
+ "digest 0.10.7",
+ "num-bigint-dig",
+ "num-integer",
+ "num-traits",
+ "pkcs1",
+ "pkcs8",
+ "rand_core 0.6.4",
+ "sha2 0.10.9",
+ "signature",
+ "spki",
+ "subtle",
+ "zeroize",
+]
 
 [[package]]
 name = "rustc-hash"
@@ -1509,6 +1871,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_yaml"
+version = "0.9.34+deprecated"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a978451301f4db1d02937a4ab3ccce137717b81826e79b7d49ffe3244a13c3b8"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest 0.10.7",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1535,6 +1921,16 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "signature"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
+dependencies = [
+ "digest 0.10.7",
+ "rand_core 0.6.4",
+]
 
 [[package]]
 name = "simd-adler32"
@@ -1577,6 +1973,22 @@ name = "smallvec"
 version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
+
+[[package]]
+name = "spin"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
+
+[[package]]
+name = "spki"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
+dependencies = [
+ "base64ct",
+ "der",
+]
 
 [[package]]
 name = "stable_deref_trait"
@@ -1816,7 +2228,7 @@ version = "2.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2"
 dependencies = [
- "rand",
+ "rand 0.10.3",
 ]
 
 [[package]]
@@ -1928,6 +2340,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
+name = "unsafe-libyaml"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+
+[[package]]
 name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1951,7 +2369,7 @@ version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80be9b06fbae3b8b303400ab20778c80bbaf338f563afe567cf3c9eea17b47ef"
 dependencies = [
- "base64",
+ "base64 0.22.1",
  "data-url",
  "flate2",
  "fontdb",
@@ -2030,7 +2448,7 @@ dependencies = [
  "boost-fs",
  "json5",
  "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript",
+ "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "oak-vue",
  "resvg",
  "schemars",
@@ -2061,7 +2479,7 @@ dependencies = [
  "boost-fs",
  "editorconfig",
  "json5",
- "oak-typescript",
+ "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "schemars",
  "serde",
  "serde_json",
@@ -2075,7 +2493,7 @@ version = "0.3.16"
 dependencies = [
  "json5",
  "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript",
+ "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -2090,7 +2508,7 @@ dependencies = [
 name = "vmz-github"
 version = "0.3.16"
 dependencies = [
- "boost-http",
+ "boost-net",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -2139,7 +2557,7 @@ name = "vmz-oak-frontend-adapter"
 version = "0.3.16"
 dependencies = [
  "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript",
+ "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "oak-vue",
  "thiserror 2.0.21",
  "vmz-compiler",
@@ -2149,12 +2567,9 @@ dependencies = [
 name = "vmz-pack"
 version = "0.3.16"
 dependencies = [
- "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
- "oak-typescript",
- "serde",
+ "compiler-bundle",
+ "oak-typescript 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=7c4c631967228daadde86a85da38c8617f149216)",
  "serde_json",
- "sha2 0.11.1",
- "vmz-generator",
  "vmz-oak-frontend-adapter",
 ]
 
@@ -2433,6 +2848,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "zerocopy"
+version = "0.8.63"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5fe1f8f1b06191a00962174c61aa5005e0bb391a6d80d07e24d115c01a92ed8"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.63"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "863ad3ac83293fb4d740aedbfdc9240dd8d1a50c1099acd76ce80ce7c7230c7f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "zerofrom"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2458,6 +2893,20 @@ name = "zeroize"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "zerotrie"
