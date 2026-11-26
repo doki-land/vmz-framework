@@ -46,9 +46,9 @@ vmz-pack = { path = "packages/compilers/vmz-pack" }
 # `data.text` frontend (Vue SFC / CST). Git deps are pinned to a fixed `rev` so CI and
 # local resolve the exact same commit.
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-data-text-core = { git = "https://github.com/oovm/rust-boost", rev = "b6343d76c96e4520a5d1e970260b815bf8b5deaa" }
-data-text-vue = { git = "https://github.com/oovm/rust-boost", rev = "b6343d76c96e4520a5d1e970260b815bf8b5deaa" }
-data-text-typescript = { git = "https://github.com/oovm/rust-boost", rev = "b6343d76c96e4520a5d1e970260b815bf8b5deaa" }
+data-text-core = { git = "https://github.com/oovm/rust-boost", rev = "dbe77e10c92ba79bb9ca1dc13ee3783c543023dd" }
+data-text-vue = { git = "https://github.com/oovm/rust-boost", rev = "dbe77e10c92ba79bb9ca1dc13ee3783c543023dd" }
+data-text-typescript = { git = "https://github.com/oovm/rust-boost", rev = "dbe77e10c92ba79bb9ca1dc13ee3783c543023dd" }
 editorconfig = "1.0.0"
 
 clap = { version = "4.6.6", features = ["derive"] }
@@ -62,9 +62,9 @@ yaml_serde = "0.10.6"
 sha2 = "0.11.0"
 thiserror = "2.0.20"
 # Overlaid by local path `.cargo/config.toml` (git ignored).
-boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "b6343d76c96e4520a5d1e970260b815bf8b5deaa" }
-boost-net = { git = "https://github.com/oovm/rust-boost", rev = "b6343d76c96e4520a5d1e970260b815bf8b5deaa" }
-compiler-bundle = { git = "https://github.com/oovm/rust-boost", rev = "b6343d76c96e4520a5d1e970260b815bf8b5deaa" }
+boost-fs = { git = "https://github.com/oovm/rust-boost", rev = "dbe77e10c92ba79bb9ca1dc13ee3783c543023dd" }
+boost-net = { git = "https://github.com/oovm/rust-boost", rev = "dbe77e10c92ba79bb9ca1dc13ee3783c543023dd" }
+compiler-bundle = { git = "https://github.com/oovm/rust-boost", rev = "dbe77e10c92ba79bb9ca1dc13ee3783c543023dd" }
 tokio = { version = "1", features = ["rt", "time", "macros"] }
 
 napi = { version = "3.12.1", default-features = true, features = ["napi4"] }

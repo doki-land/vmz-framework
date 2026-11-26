@@ -97,7 +97,7 @@ dependencies = [
 [[package]]
 name = "boost-collection"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-collection-macro",
 ]
@@ -105,7 +105,7 @@ dependencies = [
 [[package]]
 name = "boost-collection-macro"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -115,12 +115,12 @@ dependencies = [
 [[package]]
 name = "boost-console"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 
 [[package]]
 name = "boost-crypto"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-random",
  "data-encoding",
@@ -133,7 +133,7 @@ dependencies = [
 [[package]]
 name = "boost-fs"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-random",
 ]
@@ -141,7 +141,7 @@ dependencies = [
 [[package]]
 name = "boost-harness"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-console",
  "boost-harness-macro",
@@ -153,7 +153,7 @@ dependencies = [
 [[package]]
 name = "boost-harness-macro"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -163,7 +163,7 @@ dependencies = [
 [[package]]
 name = "boost-math"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-collection",
 ]
@@ -171,7 +171,7 @@ dependencies = [
 [[package]]
 name = "boost-net"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-crypto",
  "boost-random",
@@ -184,7 +184,7 @@ dependencies = [
 [[package]]
 name = "boost-random"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-math",
 ]
@@ -192,7 +192,7 @@ dependencies = [
 [[package]]
 name = "boost-source"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "serde",
 ]
@@ -251,7 +251,7 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 [[package]]
 name = "compiler-analysis"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "compiler-types",
 ]
@@ -259,7 +259,7 @@ dependencies = [
 [[package]]
 name = "compiler-bundle"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-collection",
  "boost-math",
@@ -272,7 +272,7 @@ dependencies = [
 [[package]]
 name = "compiler-emitter"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-collection",
  "boost-math",
@@ -293,7 +293,7 @@ dependencies = [
 [[package]]
 name = "compiler-optimize"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "compiler-types",
  "serde",
@@ -302,7 +302,7 @@ dependencies = [
 [[package]]
 name = "compiler-target"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "compiler-analysis",
  "compiler-optimize",
@@ -314,7 +314,7 @@ dependencies = [
 [[package]]
 name = "compiler-types"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "serde",
  "sha2 0.11.1",
@@ -430,7 +430,7 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 [[package]]
 name = "data-binary-core"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-harness",
 ]
@@ -438,7 +438,7 @@ dependencies = [
 [[package]]
 name = "data-binary-jvm"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-source",
  "data-binary-core",
@@ -449,7 +449,7 @@ dependencies = [
 [[package]]
 name = "data-binary-odin"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "serde",
  "sha2 0.11.1",
@@ -458,7 +458,7 @@ dependencies = [
 [[package]]
 name = "data-binary-pe"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "serde",
 ]
@@ -466,7 +466,7 @@ dependencies = [
 [[package]]
 name = "data-binary-wasm"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "data-encoding",
  "serde",
@@ -475,7 +475,7 @@ dependencies = [
 [[package]]
 name = "data-binary-zip"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-source",
  "data-binary-core",
@@ -486,12 +486,12 @@ dependencies = [
 [[package]]
 name = "data-checksum"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 
 [[package]]
 name = "data-compression"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "data-binary-core",
  "data-checksum",
@@ -500,12 +500,12 @@ dependencies = [
 [[package]]
 name = "data-encoding"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 
 [[package]]
 name = "data-text-core"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "boost-source",
  "data-checksum",
@@ -515,7 +515,7 @@ dependencies = [
 [[package]]
 name = "data-text-formatter"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "data-text-core",
 ]
@@ -523,7 +523,7 @@ dependencies = [
 [[package]]
 name = "data-text-typescript"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "data-text-core",
  "data-text-formatter",
@@ -533,7 +533,7 @@ dependencies = [
 [[package]]
 name = "data-text-vue"
 version = "0.1.0"
-source = "git+https://github.com/oovm/rust-boost?rev=b6343d76c96e4520a5d1e970260b815bf8b5deaa#b6343d76c96e4520a5d1e970260b815bf8b5deaa"
+source = "git+https://github.com/oovm/rust-boost?rev=dbe77e10c92ba79bb9ca1dc13ee3783c543023dd#dbe77e10c92ba79bb9ca1dc13ee3783c543023dd"
 dependencies = [
  "data-text-core",
  "serde",
