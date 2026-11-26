@@ -10,10 +10,10 @@
 
 mod contract;
 mod nyar_contract;
+mod script_ast;
 mod template_ast;
 mod template_cst;
 mod text_expr;
-mod script_ast;
 
 pub use contract::{
     BlockKind, ByteSpan, FrontendDiagnostic, ScriptRole, ScriptShellInput, SfcBlockRegion,
@@ -23,7 +23,7 @@ pub use nyar_contract::{
     NyarAnalysisInput, NyarBindingKind, NyarHttpRoute, NyarImportBinding, NyarImportDecl,
     NyarImportKind, NyarInternalType, NyarMember, NyarMemberKind, NyarProgramRole, NyarProgramUnit,
 };
+pub use script_ast::{ScriptAstParse, parse_script_ast, require_script_ast};
 pub use template_ast::{TemplateAstParse, parse_template_ast, require_template_ast};
 pub use template_cst::{format_cst_diagnostics, parse_template_cst, require_template_cst};
 pub use text_expr::{ExpressionSnippetParse, parse_expression_snippet, require_expression_snippet};
-pub use script_ast::{ScriptAstParse, parse_script_ast, require_script_ast};

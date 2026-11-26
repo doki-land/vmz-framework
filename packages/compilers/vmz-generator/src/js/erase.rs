@@ -84,7 +84,8 @@ pub fn erase_types_with_deletions(source: &str) -> Result<(String, Vec<(usize, u
     let lexer = TypeScriptLexer::new(&language);
     let mut cache = NoLexerCache;
     let lexed = lexer.lex(&text, &[], &mut cache);
-    let tokens = lexed.result.map_err(|error| format!("`data.text` TypeScript lexer failed: {error:?}"))?;
+    let tokens =
+        lexed.result.map_err(|error| format!("`data.text` TypeScript lexer failed: {error:?}"))?;
     let mut significant = Vec::with_capacity(tokens.len());
     for token in tokens.iter() {
         if is_trivia(token.kind) {
@@ -94,7 +95,10 @@ pub fn erase_types_with_deletions(source: &str) -> Result<(String, Vec<(usize, u
             break;
         }
         if token.kind == T::Error {
-            return Err(format!("`data.text` TypeScript lexer rejected byte offset {}", token.span.start));
+            return Err(format!(
+                "`data.text` TypeScript lexer rejected byte offset {}",
+                token.span.start
+            ));
         }
         significant.push(Token { kind: token.kind, start: token.span.start, end: token.span.end });
     }

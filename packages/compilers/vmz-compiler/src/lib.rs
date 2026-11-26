@@ -25,12 +25,12 @@ pub mod document;
 pub mod locale;
 pub mod miniprogram;
 pub mod native;
-pub mod text;
 pub mod parse;
 pub mod pipeline;
 pub mod platform;
 pub mod session;
 pub mod style;
+pub mod text;
 pub mod tooling;
 
 // --- Flat module path aliases (internal `crate::…` + napi) ---

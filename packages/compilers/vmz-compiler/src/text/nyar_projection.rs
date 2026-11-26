@@ -11,9 +11,9 @@ use vmz_text_frontend_adapter::{
 use vmz_types::{ComponentDecl, FieldDecl, FieldKind, MethodDecl};
 
 use crate::analyze::AnalyzedScript;
-use crate::text::vmz_regions::project_parsed_vmz;
 use crate::parse::analyze_text::collect_static_imports;
 use crate::sfc::{ParsedVmz, ScriptBlock, ScriptKind, parse_vmz};
+use crate::text::vmz_regions::project_parsed_vmz;
 
 /// Build Nyar analysis input from a parsed SFC and script analysis results.
 pub fn project_nyar_analysis_input(

@@ -2,7 +2,9 @@
 //!
 //! Returns `None` when the AST shape is not yet printable.
 
-use data_text_typescript::ast::{Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement};
+use data_text_typescript::ast::{
+    Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement,
+};
 use vmz_text_frontend_adapter::parse_expression_snippet;
 
 /// Print a trimmed template expression snippet when `data.text` lowers and we can emit text.
@@ -408,7 +410,10 @@ mod tests {
     fn stripped_as_keeps_grouping_parens() {
         // 断言剥离后内层表达式的结合关系不能变：`(a + b) as T` 仍需括号。
         assert_eq!(print_template_expr_via_text("(a + b) as T").as_deref(), Some("(a + b)"));
-        assert_eq!(print_template_expr_via_text("x * (a + b as T)").as_deref(), Some("x * (a + b)"));
+        assert_eq!(
+            print_template_expr_via_text("x * (a + b as T)").as_deref(),
+            Some("x * (a + b)")
+        );
         assert_eq!(
             print_template_expr_via_text("flag ? a as T : b").as_deref(),
             Some("flag ? a : b")
@@ -417,7 +422,10 @@ mod tests {
 
     #[test]
     fn strips_satisfies_and_angle_assertions_from_output() {
-        assert_eq!(print_template_expr_via_text("value satisfies Config").as_deref(), Some("value"));
+        assert_eq!(
+            print_template_expr_via_text("value satisfies Config").as_deref(),
+            Some("value")
+        );
         assert_eq!(
             print_template_expr_via_text("mod.default satisfies FractalWasm").as_deref(),
             Some("mod.default")

@@ -130,7 +130,10 @@ fn minify_tokens(
             break;
         }
         if token.kind == T::Error {
-            return Err(format!("`data.text` TypeScript lexer rejected byte offset {}", token.span.start));
+            return Err(format!(
+                "`data.text` TypeScript lexer rejected byte offset {}",
+                token.span.start
+            ));
         }
         for (start, end) in kept_fragments(token.span.start, token.span.end, deletions) {
             let fragment = &source[start..end];

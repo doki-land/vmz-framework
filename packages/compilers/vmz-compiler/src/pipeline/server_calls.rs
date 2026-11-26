@@ -2,7 +2,9 @@
 //!
 //! Server view call edges (provenance).
 
-use data_text_typescript::ast::{ClassMember, Expression, ExpressionKind, ObjectProperty, Statement};
+use data_text_typescript::ast::{
+    ClassMember, Expression, ExpressionKind, ObjectProperty, Statement,
+};
 use vmz_text_frontend_adapter::{ScriptRole, ScriptShellInput, parse_script_ast};
 use vmz_types::ClientServerCall;
 

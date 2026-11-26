@@ -1,6 +1,6 @@
 //! `data.text` TypeScript parse for VMZ template expression snippets.
 
-use data_text_core::{Builder, Lexer, TextError, ParseSession, Range, SourceText};
+use data_text_core::{Builder, Lexer, ParseSession, Range, SourceText, TextError};
 use data_text_typescript::ast::{
     ClassMember, Expression, ExpressionKind, FunctionParam, ObjectProperty, Statement,
     TypeParameter,

@@ -4,12 +4,12 @@ mod emit_compat;
 mod emit_direct;
 mod emit_ir;
 mod erase;
+mod expr_ops;
 pub mod expr_parse;
+mod expr_print;
 pub mod helpers;
 mod locale;
 mod module_rewrite;
-mod expr_ops;
-mod expr_print;
 mod print;
 mod row_kernel;
 mod transpile;
@@ -21,6 +21,7 @@ pub use emit_compat::{
 pub use emit_ir::{IrDepCursor, TakenBinding, TakenCfBranch, TakenControlFlow};
 pub use entry::{EntryComponent, emit_serve_entry_client, emit_serve_entry_event};
 pub use erase::{erase_types, erase_types_with_deletions};
+pub use expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_text};
 pub use expr_parse::{
     SnippetSpan, print_template_expr, template_expr_root_span, template_expr_snippet_error,
     template_expr_snippet_error_with_span, template_expr_snippet_ok, wrap_template_expr_source,
@@ -37,7 +38,6 @@ pub use locale::{
 pub use module_rewrite::{
     collect_module_specifiers, rewrite_module_specifiers, rewrite_module_specifiers_required,
 };
-pub use expr_ops::{TemplateDeps, collect_each_alias_prop_paths_via_text};
 pub use print::{
     EmittedJs, JsPrintOptions, SourceLines, SourceMapSegment, map_erased_offset, minify_source,
     print_js_source, source_map_json,

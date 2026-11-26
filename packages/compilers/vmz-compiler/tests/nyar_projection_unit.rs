@@ -192,7 +192,8 @@ fn text_button_surface_preserves_runtime_prop_defaults() {
     let component = include_str!("../../../ui/vmz-ui/src/components/Button.vmz");
     let source =
         component.split("<script client>").nth(1).unwrap().split("</script>").next().unwrap();
-    let decl = try_component_decl_via_text(ScriptKind::Client, source).expect("Button `data.text` surface");
+    let decl = try_component_decl_via_text(ScriptKind::Client, source)
+        .expect("Button `data.text` surface");
     for (name, expected) in
         [("type", "\"button\""), ("disabled", "false"), ("loading", "false"), ("onClick", "null")]
     {

@@ -1,7 +1,7 @@
 mod engine;
-mod text;
 mod rustfmt;
 mod style;
+mod text;
 mod walk;
 
 pub use engine::format_source_with_options;

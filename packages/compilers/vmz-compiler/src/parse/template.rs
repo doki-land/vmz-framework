@@ -16,17 +16,17 @@ pub use super::template_concrete::{
 };
 pub use super::template_ir::{AttrValue, TemplateAttr, TemplateIr, TemplateNode, VerbatimChild};
 pub use super::template_lower::{is_preformatted_tag, lower_concrete_to_ir};
+pub use super::template_semantic::{
+    EventTarget, IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp,
+    lower_concrete_to_semantic, semantic_ast_stats,
+};
+pub use super::template_span::TemplateSpan;
 pub use super::template_text::{
     lower_vue_root_to_semantic, parse_template_concrete_body_primary,
     parse_template_concrete_primary, parse_template_concrete_via_text,
     parse_template_layers_primary, parse_template_semantic_primary,
     parse_template_semantic_via_text,
 };
-pub use super::template_semantic::{
-    EventTarget, IfBranch, SemanticAstStats, SemanticIr, SemanticNode, SemanticProp,
-    lower_concrete_to_semantic, semantic_ast_stats,
-};
-pub use super::template_span::TemplateSpan;
 
 /// Parse a `<template>` body as Vue template syntax into legacy VMZ IR.
 ///

@@ -1,7 +1,7 @@
 //! `data.text` CST parse entry for VMZ `<template>` regions.
 
 use crate::contract::{ByteSpan, FrontendDiagnostic, TemplateCstParse, TemplateShellInput};
-use data_text_core::{TextError, TextErrorKind, ParseSession, Parser, SourceText};
+use data_text_core::{ParseSession, Parser, SourceText, TextError, TextErrorKind};
 use data_text_vue::{VueLanguage, VueParser};
 
 pub(crate) const TEMPLATE_OPEN: &str = "<template>";
@@ -25,9 +25,7 @@ pub fn parse_template_cst(template: &TemplateShellInput) -> TemplateCstParse {
 }
 
 /// Fail fast when `data.text` CST rejects a template body (for `vmz format` preflight).
-pub fn require_template_cst(
-    template: &TemplateShellInput,
-) -> Result<(), Vec<FrontendDiagnostic>> {
+pub fn require_template_cst(template: &TemplateShellInput) -> Result<(), Vec<FrontendDiagnostic>> {
     let parse = parse_template_cst(template);
     if parse.ok {
         return Ok(());

@@ -301,8 +301,11 @@ pub fn split_ternary_parts(expr: &str) -> Option<(String, String, String)> {
         return None;
     }
     let root = parsed.expression?;
-    let data_text_typescript::ast::ExpressionKind::ConditionalExpression { test, consequent, alternate } =
-        root.kind.as_ref()
+    let data_text_typescript::ast::ExpressionKind::ConditionalExpression {
+        test,
+        consequent,
+        alternate,
+    } = root.kind.as_ref()
     else {
         return None;
     };

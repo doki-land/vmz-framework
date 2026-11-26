@@ -1,4 +1,4 @@
-use vmz_compiler::{text::project_parsed_vmz, parse_template_concrete_via_text, parse_vmz};
+use vmz_compiler::{parse_template_concrete_via_text, parse_vmz, text::project_parsed_vmz};
 use vmz_text_frontend_adapter::BlockKind;
 
 #[test]
@@ -235,7 +235,7 @@ export default class Branch {}
     let via_semantic =
         vmz_compiler::parse_template_semantic_primary(&parsed.template).expect("semantic");
     assert_eq!(via_semantic, semantic);
-    let via_oak =
-        vmz_compiler::parse_template_semantic_via_text(&parsed.template).expect("semantic via text");
+    let via_oak = vmz_compiler::parse_template_semantic_via_text(&parsed.template)
+        .expect("semantic via text");
     assert_eq!(via_oak, semantic);
 }

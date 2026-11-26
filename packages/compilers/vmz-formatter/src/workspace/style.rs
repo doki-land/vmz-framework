@@ -34,7 +34,10 @@ pub fn load_format_options(
     }
     if value.pointer("/javascript/formatter/quoteStyle").and_then(|v| v.as_str()) == Some("double")
     {
-        return Err(format!("{}: `data.text` format does not support double quotes", biome_path.display()));
+        return Err(format!(
+            "{}: `data.text` format does not support double quotes",
+            biome_path.display()
+        ));
     }
 
     let indent_width = value

@@ -122,9 +122,10 @@ fn ast_root_or_fail(
 ) -> Result<&VueRoot, TemplateParseError> {
     match &parsed.root {
         Some(root) if parsed.ok => Ok(root),
-        _ => {
-            Err(TemplateParseError::parse_failed(format_text_fail(parsed), text_fail_offset(parsed)))
-        }
+        _ => Err(TemplateParseError::parse_failed(
+            format_text_fail(parsed),
+            text_fail_offset(parsed),
+        )),
     }
 }
 
