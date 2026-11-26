@@ -1768,31 +1768,71 @@ fn is_component_host_attr(name: &str) -> bool {
     name == "id" || name.starts_with("data-") || name.starts_with("aria-")
 }
 
+/// Event modifiers that change listener behavior instead of naming a key.
+/// Every other modifier is treated as a `KeyboardEvent.key` name, which is how
+/// Vue's `withKeys` behaves (`@keydown.page-down`, `@keydown.f1`, …).
+const EVENT_BEHAVIOR_MODIFIERS: &[&str] = &[
+    "self", "stop", "prevent", "capture", "passive", "once", "exact", "ctrl", "alt", "shift",
+    "meta", "lazy", "number", "trim",
+];
+
 /// Vue key-modifier aliases mapped to the hyphenated `KeyboardEvent.key` names
 /// they accept (`delete` also covers backspace, `esc` covers escape).
-fn key_modifier_candidates(modifier: &str) -> Option<&'static [&'static str]> {
+fn key_modifier_candidates(modifier: &str) -> &'static [&'static str] {
     match modifier {
-        "enter" => Some(&["enter"]),
-        "tab" => Some(&["tab"]),
-        "esc" => Some(&["escape", "esc"]),
-        "space" => Some(&[" ", "space"]),
-        "delete" => Some(&["delete", "backspace"]),
-        _ => None,
+        "enter" => &["enter"],
+        "tab" => &["tab"],
+        "esc" => &["escape", "esc"],
+        "space" => &[" ", "space"],
+        "delete" => &["delete", "backspace"],
+        "up" => &["arrow-up"],
+        "down" => &["arrow-down"],
+        "left" => &["arrow-left"],
+        "right" => &["arrow-right"],
+        _ => &[],
     }
 }
 
-fn collect_key_candidates(mods: &[String]) -> Option<Vec<&'static str>> {
-    let mut out: Vec<&'static str> = Vec::new();
-    for m in mods {
-        if let Some(candidates) = key_modifier_candidates(m) {
-            for k in candidates {
-                if !out.contains(k) {
-                    out.push(*k);
+/// `pageDown` → `page-down`, matching Vue's `hyphenate(event.key)`.
+fn hyphenate_key_name(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 4);
+    for (index, ch) in name.chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if index > 0 {
+                out.push('-');
+            }
+            out.extend(ch.to_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// Collect the `KeyboardEvent.key` candidates for a modifier list. Unknown
+/// modifiers become key names themselves (Vue parity) so nothing is dropped
+/// silently; multiple key modifiers keep Vue's "any of" semantics.
+fn collect_key_candidates(mods: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for modifier in mods {
+        if EVENT_BEHAVIOR_MODIFIERS.contains(&modifier.as_str()) {
+            continue;
+        }
+        let aliases = key_modifier_candidates(modifier);
+        if aliases.is_empty() {
+            let key = hyphenate_key_name(modifier);
+            if !out.contains(&key) {
+                out.push(key);
+            }
+        } else {
+            for key in aliases {
+                if !out.iter().any(|existing| existing == key) {
+                    out.push((*key).to_string());
                 }
             }
         }
     }
-    if out.is_empty() { None } else { Some(out) }
+    out
 }
 
 /// `v-model.number` cast shared with native model lowering: empty and
@@ -1829,11 +1869,14 @@ fn event_guards(mods: &[String], el: &str) -> String {
         }
     }
     // Key modifiers filter after the modifier guards (Vue `withKeys`
-    // hyphenates `event.key` and skips events without a key).
-    if let Some(keys) = collect_key_candidates(mods) {
+    // hyphenates `event.key` and skips events without a key). The extra
+    // `isComposing` guard keeps an IME confirmation Enter from submitting:
+    // browsers report it as `key: "Enter"` with `keyCode 229`.
+    let keys = collect_key_candidates(mods);
+    if !keys.is_empty() {
         let list = keys.iter().map(|k| q(k)).collect::<Vec<_>>().join(",");
         guards.push_str(&format!(
-            r"if ('key' in ev) {{ var __vmzKey = String(ev.key).replace(/\B([A-Z])/g, '-$1').toLowerCase(); if ([{list}].indexOf(__vmzKey) < 0) return; }} "
+            r"if ('key' in ev) {{ if (ev.isComposing || ev.keyCode === 229) return; var __vmzKey = String(ev.key).replace(/\B([A-Z])/g, '-$1').toLowerCase(); if ([{list}].indexOf(__vmzKey) < 0) return; }} "
         ));
     }
     guards

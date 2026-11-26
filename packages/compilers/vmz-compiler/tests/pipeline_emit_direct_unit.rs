@@ -187,6 +187,47 @@ export default class KeyDemo {
 }
 
 #[test]
+fn key_modifiers_cover_arrow_aliases_and_explicit_key_names() {
+    let src = r#"
+export default class KeyAliasDemo {
+  hits = 0;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    // `up` is a Vue alias for ArrowUp; `page-down` is an explicit key name and
+    // must not be dropped just because it has no alias.
+    let tpl = parse_template(
+        r#"<input @keydown.up="(() => hits++)" @keydown.page-down="(() => hits++)" />"#,
+    )
+    .unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    assert!(js.contains(r#"["arrow-up"].indexOf(__vmzKey) < 0"#), "`.up` alias missing: {js}");
+    assert!(js.contains(r#"["page-down"].indexOf(__vmzKey) < 0"#), "explicit key dropped: {js}");
+}
+
+#[test]
+fn key_modifiers_skip_ime_composition_enter() {
+    let src = r#"
+export default class KeyImeDemo {
+  hits = 0;
+}
+"#;
+    let client = analyze_script(ScriptKind::Client, src);
+    let tpl = parse_template(r#"<input @keydown.enter="(() => hits++)" />"#).unwrap();
+    let program = build_program_module("t.vmz", &client.decl, &tpl);
+    assert!(is_direct_eligible(&program.units[0].view));
+    let js = emit_client_js(src, &client, &tpl, None).unwrap();
+    // IME confirmation Enter reports key "Enter" with keyCode 229; it must not
+    // be treated as an explicit submit.
+    assert!(
+        js.contains("ev.isComposing || ev.keyCode === 229"),
+        "`.enter` must skip IME composition: {js}"
+    );
+}
+
+#[test]
 fn v_model_number_keeps_empty_and_non_numeric_strings() {
     let src = r#"
 export default class NumberModel {
